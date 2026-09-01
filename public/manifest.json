@@ -1,0 +1,79 @@
+{
+  "name": "ZENET HUB - Verified Social Accounts Marketplace",
+  "short_name": "ZENET Hub",
+  "description": "Verified social accounts marketplace, social media growth boosting, virtual phone numbers, and instant escrow wallet payment hub.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#0b0616",
+  "theme_color": "#7c3aed",
+  "lang": "en-US",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "categories": ["shopping", "business", "social", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Marketplace",
+      "short_name": "Market",
+      "description": "Browse verified social accounts for sale",
+      "url": "/?view=marketplace",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Buy Virtual Number",
+      "short_name": "SMS Numbers",
+      "description": "Purchase instant SMS verification virtual numbers",
+      "url": "/?view=virtual_numbers",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Social Boost",
+      "short_name": "Boost",
+      "description": "Instant follower and engagement boosting service",
+      "url": "/?view=social_boost",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Orders & Wallet",
+      "short_name": "Orders",
+      "description": "View active purchases and wallet balance",
+      "url": "/?view=orders",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

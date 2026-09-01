@@ -1,0 +1,302 @@
+{
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "Registered users on ZENET Marketplace",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "telegram": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "role": { "type": "string" },
+        "walletBalance": { "type": "number" },
+        "virtualAccount": { "type": "object" },
+        "referralCode": { "type": "string" },
+        "referredBy": { "type": "string" },
+        "totalPurchasesAmount": { "type": "number" },
+        "referralRewardClaimed": { "type": "boolean" },
+        "referralCount": { "type": "number" },
+        "totalReferralEarnings": { "type": "number" }
+      },
+      "required": ["uid", "email"]
+    },
+    "wallet_transactions": {
+      "title": "Wallet Transactions",
+      "description": "User wallet deposits, purchase deductions, escrow holds, and payout withdrawals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" },
+        "reference": { "type": "string" },
+        "channel": { "type": "string" }
+      },
+      "required": ["userId", "type", "amount", "description"]
+    },
+    "listings": {
+      "title": "Account Listings",
+      "description": "Social media accounts listed for sale",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "followers": { "type": "string" },
+        "accountAge": { "type": "string" },
+        "pva": { "type": "boolean" },
+        "monetized": { "type": "boolean" },
+        "twoFactor": { "type": "boolean" },
+        "warrantyDays": { "type": "number" },
+        "creatorId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "owner_id": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "sellerEmail": { "type": "string" },
+        "sellerWhatsapp": { "type": "string" },
+        "sellerTelegram": { "type": "string" },
+        "status": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "badges": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "category", "price", "sellerId"]
+    },
+    "inquiries": {
+      "title": "Buyer Inquiries",
+      "description": "Direct contact inquiries from buyers to sellers",
+      "type": "object",
+      "properties": {
+        "listingId": { "type": "string" },
+        "listingTitle": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "buyerEmail": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["listingId", "buyerId", "sellerId", "message"]
+    },
+    "purchases": {
+      "title": "Purchase Orders",
+      "description": "Completed account purchases via International Escrow Payment Gateways",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "listingId": { "type": "string" },
+        "listingTitle": { "type": "string" },
+        "category": { "type": "string" },
+        "price": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "currency": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "sellerEmail": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "buyerEmail": { "type": "string" },
+        "paymentGateway": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "purchasedAt": { "type": "string" },
+        "status": { "type": "string" },
+        "transferCode": { "type": "string" }
+      },
+      "required": ["listingId", "buyerId", "sellerId", "price", "paymentGateway"]
+    },
+    "reports": {
+      "title": "Marketplace Reports",
+      "description": "User & listing abuse or fraud reports submitted by buyers or sellers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetTitle": { "type": "string" },
+        "targetType": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "reporterEmail": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "reason": { "type": "string" },
+        "details": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "adminNotes": { "type": "string" }
+      },
+      "required": ["targetId", "reporterId", "reason"]
+    },
+    "reviews": {
+      "title": "Seller Reviews",
+      "description": "Ratings and feedback for sellers by verified buyers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "reviewerId": { "type": "string" },
+        "reviewerName": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "listingTitle": { "type": "string" }
+      },
+      "required": ["sellerId", "reviewerId", "rating"]
+    },
+    "referrals": {
+      "title": "Referrals",
+      "description": "User referral tracking and reward status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "referrerId": { "type": "string" },
+        "referredUserId": { "type": "string" },
+        "referredUserEmail": { "type": "string" },
+        "referredUserName": { "type": "string" },
+        "referredAt": { "type": "string" },
+        "totalSpent": { "type": "number" },
+        "rewardClaimed": { "type": "boolean" },
+        "rewardAmount": { "type": "number" },
+        "rewardClaimedAt": { "type": "string" }
+      },
+      "required": ["referrerId", "referredUserId"]
+    },
+    "virtual_number_orders": {
+      "title": "Virtual Number Orders",
+      "description": "Virtual SMS number verification orders",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "providerActivationId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "server": { "type": "string" },
+        "country": { "type": "string" },
+        "service": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "price": { "type": "number" },
+        "customerPrice": { "type": "number" },
+        "providerCost": { "type": "number" },
+        "markup": { "type": "number" },
+        "isRealOrder": { "type": "boolean" },
+        "code": { "type": "string" },
+        "smsText": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "expiresAt": { "type": "string" }
+      },
+      "required": ["orderId", "userId", "service", "status"]
+    },
+    "tickets": {
+      "title": "Support Tickets",
+      "description": "User support tickets and inquiries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "subject", "message"]
+    },
+    "zenedUpdateProducts": {
+      "title": "ZENED U Update Products",
+      "description": "Products listed in the ZENED U Update marketplace with large visual cards and private delivery details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "stock": { "type": "number" },
+        "status": { "type": "string" },
+        "secretDeliveryInfo": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "price", "description"]
+    },
+    "zenedUpdateOrders": {
+      "title": "ZENED U Update Orders",
+      "description": "Buyer purchase orders for ZENED U Update products with private secret delivery information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "productImage": { "type": "string" },
+        "price": { "type": "number" },
+        "buyerId": { "type": "string" },
+        "buyerEmail": { "type": "string" },
+        "buyerName": { "type": "string" },
+        "secretDeliveryInfo": { "type": "string" },
+        "purchasedAt": { "type": "string" },
+        "status": { "type": "string" },
+        "transactionId": { "type": "string" }
+      },
+      "required": ["productId", "buyerId", "price"]
+    },
+    "social_boost_orders": {
+      "title": "Social Media Boosting Orders",
+      "description": "Customer growth and boosting orders processed via OneGridHub SMM engine and wallet debit",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "platform": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "target": { "type": "string" },
+        "quantity": { "type": "number" },
+        "charge": { "type": "number" },
+        "providerCost": { "type": "number" },
+        "markup": { "type": "number" },
+        "profit": { "type": "number" },
+        "providerOrderId": { "type": "string" },
+        "status": { "type": "string" },
+        "startCount": { "type": "number" },
+        "remains": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["orderId", "userId", "platform", "serviceId", "target", "quantity", "charge"]
+    },
+    "social_boost_settings": {
+      "title": "Social Media Boosting Settings",
+      "description": "Owner pricing markup percentages, minimum floors, and platform visibility controls",
+      "type": "object",
+      "properties": {
+        "defaultMarkupPercent": { "type": "number" },
+        "minMarkupPer1k": { "type": "number" },
+        "pricingStyle": { "type": "string" },
+        "platformStatus": { "type": "object" },
+        "disabledServices": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

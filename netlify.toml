@@ -1,0 +1,127 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--include=dev"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Admin Management endpoints
+[[redirects]]
+  from = "/api/admin/manage-role"
+  to = "/.netlify/functions/admin-manage-role"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/admin/wallets/override"
+  to = "/.netlify/functions/admin-wallets-override"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/admin/wallets/adjust"
+  to = "/.netlify/functions/admin-wallets-override"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/admin/override-wallet"
+  to = "/.netlify/functions/admin-wallets-override"
+  status = 200
+  force = true
+
+# Route Paystack & Wallet endpoints to Netlify Functions
+[[redirects]]
+  from = "/api/paystack/initialize"
+  to = "/.netlify/functions/paystack-initialize"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/paystack/verify/*"
+  to = "/.netlify/functions/paystack-verify"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/paystack/verify"
+  to = "/.netlify/functions/paystack-verify"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/paystack/webhook"
+  to = "/.netlify/functions/paystack-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/wallet/purchase"
+  to = "/.netlify/functions/wallet-purchase"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/payment/create-checkout"
+  to = "/.netlify/functions/payment-create-checkout"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/social-boost/*"
+  to = "/.netlify/functions/social-boost/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/social-boost"
+  to = "/.netlify/functions/social-boost"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/onegridhub/*"
+  to = "/.netlify/functions/onegridhub/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/onegridhub"
+  to = "/.netlify/functions/onegridhub"
+  status = 200
+  force = true
+
+# Catch-all rule for SPA routing fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Security & PWA cache headers
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+

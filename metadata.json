@@ -1,0 +1,6 @@
+{
+  "name": "ZENET Hub",
+  "description": "ZENET HUB - Verified social accounts marketplace, social media growth boosting marketplace, virtual phone numbers, and instant escrow wallet payment hub.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
