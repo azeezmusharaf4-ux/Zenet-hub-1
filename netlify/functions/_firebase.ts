@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, Firestore } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: "gen-lang-client-0874836857",
@@ -25,4 +25,4 @@ export function getDb(): Firestore | null {
   }
 }
 
-export { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs };
+export { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction };

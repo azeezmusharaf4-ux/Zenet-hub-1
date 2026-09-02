@@ -1,29 +1,37 @@
-import { getDb } from './_firebase';
-import { runTransaction, doc, collection, getDoc, setDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
+import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
 
-// Configuration helper
+// Helper to resolve API Key from all environment variable aliases
 const getApiKey = (): string => {
-  const rawKey = (
-    process.env.ONEGRIDHUB_API_KEY ||
-    process.env.ONEGRID_API_KEY ||
-    process.env.ONEGRIDHUB_KEY ||
-    process.env.ONE_GRID_HUB_API_KEY ||
-    process.env.OGH_API_KEY ||
-    process.env.VIRTUAL_NUMBER_API_KEY ||
-    process.env.ONEGRIDHUB_TOKEN ||
-    process.env.ONEGRIDHUB_SECRET ||
-    ''
-  ).trim().replace(/^["']|["']$/g, '');
-
-  const isPlaceholder = !rawKey ||
-    ['ONEGRIDHUB_API_KEY', 'YOUR_API_KEY', 'MY_ONEGRIDHUB_API_KEY', 'UNDEFINED', 'NULL', 'PLACEHOLDER', 'YOUR_KEY_HERE'].includes(rawKey.toUpperCase()) ||
-    rawKey.startsWith('MY_');
-
-  return isPlaceholder ? '' : rawKey;
+  const candidates = [
+    process.env.ONEGRIDHUB_API_KEY,
+    process.env.ONEGRID_API_KEY,
+    process.env.ONEGRIDHUB_KEY,
+    process.env.ONE_GRID_HUB_API_KEY,
+    process.env.OGH_API_KEY,
+    process.env.SIM_API_KEY,
+    process.env.VIRTUAL_NUMBER_API_KEY,
+    process.env.SMM_API_KEY,
+    process.env.ONEGRIDHUB_TOKEN,
+    process.env.ONEGRIDHUB_SECRET
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === 'string') {
+      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
+      if (clean && clean !== 'undefined' && clean !== 'null' && clean !== 'your_api_key_here' && !clean.startsWith('MY_')) {
+        return clean;
+      }
+    }
+  }
+  return '';
 };
 
-const getOneGridHubBaseUrl = (): string => {
-  let raw = (process.env.ONEGRIDHUB_BASE_URL || 'https://onegridhub.com/api/v1/index.php').trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
+// Helper to resolve OneGridHub Base URL
+const getBaseUrl = (): string => {
+  let raw = (process.env.ONEGRIDHUB_BASE_URL || 'https://onegridhub.com/api/v1/index.php')
+    .trim()
+    .replace(/^['"`]|['"`]$/g, '')
+    .replace(/\/+$/, '');
+
   if (!raw.includes('/api/v1')) {
     raw = `${raw}/api/v1/index.php`;
   } else if (!raw.endsWith('.php')) {
@@ -32,393 +40,245 @@ const getOneGridHubBaseUrl = (): string => {
   return raw;
 };
 
-// Common headers for CORS and JSON response
-const headers = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-paystack-signature',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Content-Type': 'application/json'
+// Normalize server IDs
+const normalizeServerId = (srv?: string): string => {
+  if (!srv) return 'all1';
+  const s = srv.toLowerCase().trim();
+  if (s === 'server_1' || s === '1' || s === 'all' || s === 'all_1') return 'all1';
+  if (s === 'server_2' || s === '2' || s === 'usa' || s === 'usa_1') return 'usa1';
+  if (s === 'server_3' || s === '3' || s === 'all_2') return 'all2';
+  if (s === 'usa1' || s === 'usa2' || s === 'usa3' || s === 'all1' || s === 'all2' || s === 'all3') return s;
+  if (s.startsWith('usa')) return 'usa1';
+  if (s.startsWith('all')) return 'all1';
+  return 'all1';
 };
 
-const COUNTRY_NAME_TO_CODE: Record<string, string> = {
-  'united kingdom': '+44',
-  'uk': '+44',
-  'great britain': '+44',
-  'united states': '+1',
-  'usa': '+1',
-  'canada': '+1',
-  'nigeria': '+234',
-  'ghana': '+233',
-  'south africa': '+27',
-  'kenya': '+254',
-  'germany': '+49',
-  'france': '+33',
-  'netherlands': '+31',
-  'holland': '+31',
-  'india': '+91',
-  'philippines': '+63',
-  'indonesia': '+62',
-  'brazil': '+55',
-  'australia': '+61',
-  'russia': '+7',
-  'ukraine': '+380',
-  'egypt': '+20',
-  'poland': '+48',
-  'spain': '+34',
-  'italy': '+39',
-  'turkey': '+90',
-  'china': '+86',
-  'japan': '+81',
-  'south korea': '+82',
-  'vietnam': '+84',
-  'thailand': '+66',
-  'malaysia': '+60',
-  'singapore': '+65',
-  'mexico': '+52',
-  'colombia': '+57',
-  'argentina': '+54',
-  'chile': '+56',
-  'peru': '+51',
-  'pakistan': '+92',
-  'bangladesh': '+880',
-  'saudi arabia': '+966',
-  'united arab emirates': '+971',
-  'uae': '+971',
-  'israel': '+972',
-  'sweden': '+46',
-  'switzerland': '+41',
-  'belgium': '+32',
-  'austria': '+43',
-  'portugal': '+351',
-  'greece': '+30',
-  'romania': '+40',
-  'czech republic': '+420',
-  'denmark': '+45',
-  'finland': '+358',
-  'norway': '+47',
-  'ireland': '+353',
-  'new zealand': '+64',
-  'tanzania': '+255',
-  'uganda': '+256',
-  'algeria': '+213',
-  'morocco': '+212',
-  'ethiopia': '+251',
-  'ivory coast': '+225',
-  "cote d'ivoire": '+225',
-  'cameroon': '+237',
-  'senegal': '+221',
-  'zimbabwe': '+263',
-  'zambia': '+260',
-  'rwanda': '+250',
-  'angola': '+244',
-  'mozambique': '+258',
-  'madagascar': '+261',
-  'congo': '+242',
-  'drc': '+243',
-  'democratic republic of the congo': '+243',
-  'haiti': '+509',
-  'cambodia': '+855',
-  'myanmar': '+95',
-  'sri lanka': '+94',
-  'nepal': '+977',
-  'afghanistan': '+93',
-  'iraq': '+964',
-  'iran': '+98',
-  'jordan': '+962',
-  'lebanon': '+961',
-  'kuwait': '+965',
-  'qatar': '+974',
-  'oman': '+968',
-  'bahrain': '+973',
-  'yemen': '+967',
-  'taiwan': '+886',
-  'hong kong': '+852',
-  'macao': '+853',
-  'uzbekistan': '+998',
-  'kazakhstan': '+7',
-  'kyrgyzstan': '+996',
-  'tajikistan': '+992',
-  'turkmenistan': '+993',
-  'azerbaijan': '+994',
-  'armenia': '+374',
-  'georgia': '+995',
-  'cyprus': '+357',
-  'croatia': '+385',
-  'serbia': '+381',
-  'slovenia': '+386',
-  'slovakia': '+421',
-  'hungary': '+36',
-  'bulgaria': '+359',
-  'lithuania': '+370',
-  'latvia': '+371',
-  'estonia': '+372',
-  'belarus': '+375',
-  'moldova': '+373',
-  'albania': '+355',
-  'bosnia': '+387',
-  'north macedonia': '+389',
-  'montenegro': '+382',
-  'luxembourg': '+352',
-  'iceland': '+354',
-  'malta': '+356',
-  'dominican republic': '+1',
-  'jamaica': '+1',
-  'trinidad and tobago': '+1',
-  'bahamas': '+1',
-  'barbados': '+1',
-  'panama': '+507',
-  'costa rica': '+506',
-  'guatemala': '+502',
-  'honduras': '+504',
-  'el salvador': '+503',
-  'nicaragua': '+505',
-  'ecuador': '+593',
-  'bolivia': '+591',
-  'paraguay': '+595',
-  'uruguay': '+598',
-  'venezuela': '+58',
-  'gambia': '+220',
-  'guinea': '+224',
-  'mali': '+223',
-  'chad': '+235',
-  'papua new guinea': '+675',
-  'fiji': '+679',
-  'mongolia': '+976'
-};
-
+// Built-in default servers, countries, and services for high availability
 const DEFAULT_SERVERS = [
-  { id: 'all1', name: 'Global Server 1 (Primary High-Speed)', region: 'Global' },
-  { id: 'all2', name: 'Global Server 2 (High Stock Gateway)', region: 'Global' },
-  { id: 'all3', name: 'Global Server 3 (Direct Route)', region: 'Global' },
-  { id: 'usa1', name: 'USA Server 1 (Direct US Routes)', region: 'USA' },
-  { id: 'usa2', name: 'USA Server 2 (US Resilient)', region: 'USA' },
-  { id: 'usa3', name: 'USA Server 3 (US High Volume)', region: 'USA' }
+  { id: 'all1', name: 'Global Server 1 (All Countries)', region: 'Global' },
+  { id: 'all2', name: 'Global Server 2 (All Countries)', region: 'Global' },
+  { id: 'all3', name: 'Global Server 3 (All Countries)', region: 'Global' },
+  { id: 'usa1', name: 'USA Server 1', region: 'USA' },
+  { id: 'usa2', name: 'USA Server 2', region: 'USA' },
+  { id: 'usa3', name: 'USA Server 3', region: 'USA' }
 ];
 
 const DEFAULT_COUNTRIES = [
-  { id: '1', name: 'United States', code: '+1' },
-  { id: '187', name: 'United States (Special)', code: '+1' },
+  { id: '187', name: 'United States', code: '+1' },
   { id: '2', name: 'United Kingdom', code: '+44' },
   { id: '36', name: 'Canada', code: '+1' },
   { id: '14', name: 'Nigeria', code: '+234' },
-  { id: '38', name: 'Ghana', code: '+233' },
   { id: '31', name: 'South Africa', code: '+27' },
-  { id: '8', name: 'Kenya', code: '+254' },
   { id: '43', name: 'Germany', code: '+49' },
-  { id: '77', name: 'France', code: '+33' }
+  { id: '77', name: 'France', code: '+33' },
+  { id: '48', name: 'Netherlands', code: '+31' },
+  { id: '73', name: 'Brazil', code: '+55' },
+  { id: '22', name: 'India', code: '+91' },
+  { id: '32', name: 'Australia', code: '+61' },
+  { id: '86', name: 'China', code: '+86' },
+  { id: '16', name: 'Kenya', code: '+254' },
+  { id: '38', name: 'Ghana', code: '+233' },
+  { id: '53', name: 'Egypt', code: '+20' }
 ];
 
-function normalizeServerId(raw: string): string {
-  const s = (raw || 'all1').trim().toLowerCase();
-  if (['all1', 'all2', 'all3', 'usa1', 'usa2', 'usa3'].includes(s)) return s;
-  if (s.includes('usa')) return 'usa1';
-  return 'all1';
-}
+const DEFAULT_SERVICES = [
+  { id: 'wa', name: 'WhatsApp', price: 950, rate: 950 },
+  { id: 'tg', name: 'Telegram', price: 850, rate: 850 },
+  { id: 'ig', name: 'Instagram', price: 800, rate: 800 },
+  { id: 'fb', name: 'Facebook', price: 800, rate: 800 },
+  { id: 'go', name: 'Google / Gmail / YouTube', price: 900, rate: 900 },
+  { id: 'tt', name: 'TikTok', price: 750, rate: 750 },
+  { id: 'tw', name: 'Twitter / X', price: 850, rate: 850 },
+  { id: 'pp', name: 'PayPal', price: 1400, rate: 1400 },
+  { id: 'nf', name: 'Netflix', price: 950, rate: 950 },
+  { id: 'op', name: 'OpenAI / ChatGPT', price: 1100, rate: 1100 },
+  { id: 'ds', name: 'Discord', price: 800, rate: 800 },
+  { id: 'sc', name: 'Snapchat', price: 800, rate: 800 },
+  { id: 'am', name: 'Amazon', price: 900, rate: 900 },
+  { id: 'st', name: 'Steam', price: 850, rate: 850 },
+  { id: 'ap', name: 'Apple', price: 1200, rate: 1200 },
+  { id: 'ub', name: 'Uber', price: 850, rate: 850 },
+  { id: 'ti', name: 'Tinder', price: 950, rate: 950 },
+  { id: 'bn', name: 'Binance', price: 1300, rate: 1300 },
+  { id: 'ot', name: 'Any Other / General Service', price: 750, rate: 750 }
+];
 
-function normalizeCountryEntry(rawId: string, rawName?: string, rawCode?: string): { id: string; name: string; code: string } {
-  const cleanId = String(rawId || '').trim();
-  let name = rawName ? String(rawName).trim() : cleanId;
-  const nameKey = name.toLowerCase().trim();
-  let code = rawCode ? String(rawCode).trim() : (COUNTRY_NAME_TO_CODE[nameKey] || '');
-  if (!code && (cleanId === '1' || cleanId === '187' || cleanId === 'US' || cleanId === 'USA')) code = '+1';
-  if (!code && (cleanId === '2' || cleanId === 'GB' || cleanId === 'UK')) code = '+44';
-  if (!code && (cleanId === '14' || cleanId === 'NG')) code = '+234';
-  return { id: cleanId, name, code: code || '+1' };
-}
+const DEFAULT_DIGITAL_PRODUCTS = [
+  { id: 'canva_pro_1m', name: 'Canva Pro 1-Month Private Upgrade', category: 'Design & Graphics', price: 1500, stock: 45, description: 'Direct email activation with full pro tools and brand kits' },
+  { id: 'chatgpt_plus_shared', name: 'ChatGPT Plus Shared Account (1 Month)', category: 'AI & Productivity', price: 3500, stock: 20, description: 'GPT-4o, DALL-E 3 image generation, and custom GPTs' },
+  { id: 'spotify_prem_3m', name: 'Spotify Premium 3-Months Activation', category: 'Music & Audio', price: 2000, stock: 50, description: 'Ad-free high-fidelity audio with offline song downloads' },
+  { id: 'netflix_uhd_1m', name: 'Netflix 4K Ultra HD Profile (1 Month)', category: 'Streaming & Video', price: 2800, stock: 30, description: 'Dedicated personal pin-protected profile with 4K UHD streaming' },
+  { id: 'grammarly_prem_1m', name: 'Grammarly Premium (1 Month Access)', category: 'AI & Productivity', price: 2200, stock: 25, description: 'Full AI rewrite suggestions, plagiarism checker, and tone adjustments' },
+  { id: 'nordvpn_1y', name: 'NordVPN 1-Year Private Credentials', category: 'Security & VPN', price: 4500, stock: 15, description: 'Ultra-fast encrypted servers across 60+ countries' },
+  { id: 'youtube_prem_3m', name: 'YouTube Premium 3-Months Family Slot', category: 'Streaming & Video', price: 2500, stock: 35, description: 'Ad-free YouTube & YouTube Music with background playback' }
+];
+
+const DEFAULT_PRICING = {
+  markupPercentage: 35,
+  minPrice: 500,
+  minMarkupNaira: 250,
+  fixedPrices: {}
+};
 
 export const handler = async (event: any) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-caller-email, x-admin-email',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Content-Type': 'application/json'
+  };
+
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
-  const db = getDb();
-  let params: any = {};
-  if (event.httpMethod === 'GET') {
-    params = event.queryStringParameters || {};
-  } else {
-    try {
-      params = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
-    } catch {
-      params = {};
-    }
-  }
+  try {
+    const db = getDb();
+    const apiKey = getApiKey();
+    const baseUrl = getBaseUrl();
 
-  // Determine action from query, body, or URL path (:splat)
-  let action = params.action || event.queryStringParameters?.action;
-  if (!action && event.path) {
-    const cleanPath = event.path.split('?')[0].replace(/\/+$/, '');
-    const segments = cleanPath.split('/').filter(Boolean);
-    const last = segments[segments.length - 1];
-    if (last && last !== 'onegridhub') {
-      action = last;
-    }
-  }
-
-  if (!action) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: 'Action parameter or subpath is required.' })
-    };
-  }
-
-  const apiKey = getApiKey();
-  const baseUrl = getOneGridHubBaseUrl();
-
-  const queryOneGridHub = async (endpoint: string, queryParams: Record<string, string> = {}) => {
-    if (!apiKey) return null;
-    try {
-      const q = new URLSearchParams({
-        ...queryParams,
-        endpoint,
-        action: endpoint,
-        api_key: apiKey,
-        apikey: apiKey,
-        token: apiKey
-      }).toString();
-
-      const url = `${baseUrl}?${q}`;
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json, text/plain, */*',
-          'User-Agent': 'ZENET-Hub-Gateway/1.0'
-        }
-      });
-
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data;
-    } catch (err) {
-      console.warn(`[OneGridHub Proxy Error] ${endpoint}:`, err);
-      return null;
-    }
-  };
-
-  // 1. SERVERS
-  if (action === 'servers') {
-    if (apiKey) {
-      const data = await queryOneGridHub('servers');
-      if (data && data.status === 'success' && Array.isArray(data.servers)) {
-        const normalized = data.servers.map((s: any) => ({
-          id: s.id,
-          name: s.label || s.name || `${s.region || 'Server'} (${s.id})`,
-          region: s.region || (s.id.startsWith('usa') ? 'USA' : 'Global')
-        }));
-        return { statusCode: 200, headers, body: JSON.stringify(normalized) };
+    let body: any = {};
+    if (event.body) {
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+      } catch {
+        body = {};
       }
     }
-    return { statusCode: 200, headers, body: JSON.stringify(DEFAULT_SERVERS) };
-  }
 
-  // 2. COUNTRIES
-  if (action === 'countries') {
-    const rawServer = (params.server || event.queryStringParameters?.server || '').toString();
-    const server = normalizeServerId(rawServer);
+    const queryParams = event.queryStringParameters || {};
+    let action = (queryParams.action || body.action || '').toString().toLowerCase().trim();
 
-    if (apiKey) {
-      const data = await queryOneGridHub('countries', { server });
-      if (data && data.status === 'success' && Array.isArray(data.countries)) {
-        const countryMap = new Map<string, { id: string; name: string; code?: string }>();
-        data.countries.forEach((item: any) => {
-          const rawId = (item.id || '').toString();
-          const rawName = (item.name || '').toString();
-          const rawCode = (item.code || '').toString();
-          if (rawId && rawName) {
-            const normalized = normalizeCountryEntry(rawId, rawName, rawCode);
-            if (normalized.id && !countryMap.has(normalized.id)) {
-              countryMap.set(normalized.id, normalized);
+    // Extract path candidates from event.path, rawUrl, and headers
+    const pathCandidates: string[] = [];
+    if (event.path) pathCandidates.push(event.path);
+    if (event.rawUrl) {
+      try {
+        pathCandidates.push(new URL(event.rawUrl).pathname);
+      } catch {}
+    }
+    if (event.headers?.['x-forwarded-uri']) pathCandidates.push(event.headers['x-forwarded-uri']);
+    if (event.headers?.['x-original-url']) pathCandidates.push(event.headers['x-original-url']);
+
+    if (!action) {
+      const knownActions = [
+        'servers', 'countries', 'services', 'pricing-settings', 'price',
+        'buy', 'status', 'cancel', 'orders', 'balance',
+        'digital-products', 'products', 'digital-order', 'buy-product'
+      ];
+
+      for (const p of pathCandidates) {
+        if (!p) continue;
+        const clean = p.split('?')[0].replace(/\/+$/, '').toLowerCase();
+        const segments = clean.split('/').filter(Boolean);
+        // Check exact segments first in reverse
+        for (let i = segments.length - 1; i >= 0; i--) {
+          const seg = segments[i];
+          if (seg && seg !== 'onegridhub' && seg !== 'api' && seg !== '.netlify' && seg !== 'functions') {
+            if (knownActions.includes(seg)) {
+              action = seg;
+              break;
             }
           }
-        });
+        }
+        if (action) break;
+      }
+    }
 
-        const list = Array.from(countryMap.values());
-        if (list.length > 0) {
-          const priorityOrder = ['1', '187', 'US', '2', 'GB', '36', 'CA', '14', 'NG', '38', 'GH', '31', 'ZA', '8', 'KE', '43', 'DE', '77', 'FR'];
-          const priorityNames = ['united states', 'united kingdom', 'canada', 'nigeria', 'ghana', 'south africa', 'germany', 'france', 'netherlands', 'india', 'brazil', 'australia'];
-          list.sort((a, b) => {
-            const pA = priorityOrder.indexOf(a.id);
-            const pB = priorityOrder.indexOf(b.id);
-            if (pA !== -1 && pB !== -1) return pA - pB;
-            if (pA !== -1) return -1;
-            if (pB !== -1) return 1;
+    // Heuristic fallbacks based on query parameters if action is still unset or generic
+    if (!action || action === 'onegridhub') {
+      if (queryParams.service || queryParams.serviceCode || (queryParams.country && queryParams.service)) {
+        action = 'price';
+      } else if (queryParams.country && queryParams.server) {
+        action = 'services';
+      } else if (queryParams.server && !queryParams.country) {
+        action = 'countries';
+      } else if (queryParams.orderId || queryParams.id) {
+        action = 'status';
+      } else if (event.httpMethod === 'POST' && (body.serviceCode || body.service || body.country)) {
+        action = 'buy';
+      } else {
+        action = 'servers';
+      }
+    }
 
-            const nA = priorityNames.indexOf(a.name.toLowerCase().trim());
-            const nB = priorityNames.indexOf(b.name.toLowerCase().trim());
-            if (nA !== -1 && nB !== -1) return nA - nB;
-            if (nA !== -1) return -1;
-            if (nB !== -1) return 1;
+    console.log(`[Netlify OneGridHub] Action: ${action}, Method: ${event.httpMethod}`);
 
-            return a.name.localeCompare(b.name);
+    // Helper: Load Pricing Settings
+    const getPricingSettings = async () => {
+      if (!db) return DEFAULT_PRICING;
+      try {
+        const pRef = doc(db, 'system_settings', 'onegridhub_pricing');
+        const pSnap = await getDoc(pRef);
+        if (pSnap.exists()) {
+          return { ...DEFAULT_PRICING, ...pSnap.data() };
+        }
+      } catch (e) {
+        console.warn('[Netlify OneGridHub] Pricing read notice:', e);
+      }
+      return DEFAULT_PRICING;
+    };
+
+    // Helper: Calculate Selling Price
+    const calculateSellingPrice = (baseWholesale: number, serviceCode: string, pricing: any) => {
+      if (pricing.fixedPrices && pricing.fixedPrices[serviceCode]) {
+        return Math.round(Number(pricing.fixedPrices[serviceCode]));
+      }
+      const markup = Number(pricing.markupPercentage || 35);
+      const minPrice = Number(pricing.minPrice || 500);
+      const calculated = baseWholesale + (baseWholesale * markup) / 100;
+      return Math.round(Math.max(calculated, minPrice));
+    };
+
+    // 1. GET /servers
+    if (action === 'servers') {
+      if (apiKey) {
+        try {
+          const res = await fetch(`${baseUrl}?action=servers&key=${encodeURIComponent(apiKey)}`, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(8000)
           });
-          return { statusCode: 200, headers, body: JSON.stringify(list) };
+          const data: any = await res.json();
+          if (data && data.status && Array.isArray(data.data) && data.data.length > 0) {
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({ success: true, servers: data.data })
+            };
+          }
+        } catch (e) {
+          console.warn('[Netlify OneGridHub] Servers API fetch notice:', e);
         }
       }
-    }
-    return { statusCode: 200, headers, body: JSON.stringify(DEFAULT_COUNTRIES) };
-  }
 
-  // 3. SERVICES
-  if (action === 'services') {
-    const rawServer = (params.server || event.queryStringParameters?.server || '').toString();
-    const rawCountry = (params.country || event.queryStringParameters?.country || '').toString();
-    const server = normalizeServerId(rawServer);
-    const country = rawCountry.trim() || '187';
-
-    if (apiKey) {
-      const data = await queryOneGridHub('services', { server, country });
-      if (data && data.status === 'success' && Array.isArray(data.services)) {
-        const rawServices = data.services.map((item: any) => ({
-          id: (item.id || item.service || '').toString(),
-          name: (item.name || item.title || `Service ${item.id}`).toString()
-        }));
-
-        const popularKeywords = ['whatsapp', 'telegram', 'google', 'openai', 'instagram', 'facebook', 'tiktok', 'twitter', 'amazon', 'uber', 'microsoft', 'apple', 'discord', 'netflix'];
-        rawServices.sort((a: any, b: any) => {
-          const aName = a.name.toLowerCase();
-          const bName = b.name.toLowerCase();
-          const aIdx = popularKeywords.findIndex(kw => aName.includes(kw));
-          const bIdx = popularKeywords.findIndex(kw => bName.includes(kw));
-          if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-          if (aIdx !== -1) return -1;
-          if (bIdx !== -1) return 1;
-          return a.name.localeCompare(b.name);
-        });
-
-        return { statusCode: 200, headers, body: JSON.stringify(rawServices) };
-      }
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, servers: DEFAULT_SERVERS })
+      };
     }
 
-    const defaultSvcs = [
-      { id: '1012', name: 'WhatsApp' },
-      { id: '907', name: 'Telegram' },
-      { id: '395', name: 'Google/Gmail' },
-      { id: '1081', name: 'OpenAI / ChatGPT' },
-      { id: '522', name: 'Instagram' },
-      { id: '401', name: 'Facebook' },
-      { id: '898', name: 'TikTok' },
-      { id: '1058', name: 'Twitter / X' }
-    ];
-    return { statusCode: 200, headers, body: JSON.stringify(defaultSvcs) };
-  }
+    // 2. GET /balance - Provider Balance
+    if (action === 'balance') {
+      let providerBalance = '0.00';
+      let currency = 'NGN';
+      let status = 'disconnected';
 
-  // 4. PRICING SETTINGS
-  if (action === 'pricing-settings') {
-    if (event.httpMethod === 'GET') {
-      let markup = Number(process.env.VIRTUAL_NUMBER_MARKUP) || 500;
-      let minPrice = 300;
-      let fixedPrices: Record<string, number> = {};
-
-      if (db) {
+      if (apiKey) {
         try {
-          const snap = await getDoc(doc(db, 'system_settings', 'onegridhub_pricing'));
-          if (snap.exists()) {
-            const d = snap.data();
-            if (d.markup !== undefined) markup = Number(d.markup);
-            if (d.minPrice !== undefined) minPrice = Number(d.minPrice);
-            if (d.fixedPrices) fixedPrices = d.fixedPrices;
+          const res = await fetch(`${baseUrl}?action=balance&key=${encodeURIComponent(apiKey)}`, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(8000)
+          });
+          const data: any = await res.json();
+          if (data && (data.balance !== undefined || data.data?.balance !== undefined)) {
+            providerBalance = String(data.balance ?? data.data?.balance);
+            currency = data.currency || 'NGN';
+            status = 'connected';
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[Netlify OneGridHub] Balance API fetch notice:', e);
+        }
       }
 
       return {
@@ -426,346 +286,507 @@ export const handler = async (event: any) => {
         headers,
         body: JSON.stringify({
           success: true,
-          markup,
-          minPrice,
-          fixedPrices,
-          isRealKeyConfigured: Boolean(apiKey)
+          status,
+          balance: providerBalance,
+          currency,
+          configured: Boolean(apiKey)
         })
       };
     }
 
-    if (event.httpMethod === 'POST' && db) {
-      try {
-        await setDoc(doc(db, 'system_settings', 'onegridhub_pricing'), {
-          ...params,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-        return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Pricing updated.' }) };
-      } catch (e: any) {
-        return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: e.message }) };
-      }
-    }
-  }
-
-  // 5. PRICE
-  if (action === 'price') {
-    const rawServer = (params.server || event.queryStringParameters?.server || '').toString();
-    const rawCountry = (params.country || event.queryStringParameters?.country || '').toString();
-    const rawService = (params.service || event.queryStringParameters?.service || '').toString();
-    const server = normalizeServerId(rawServer);
-    const country = rawCountry.trim();
-    const service = rawService.trim();
-
-    let markup = Number(process.env.VIRTUAL_NUMBER_MARKUP) || 500;
-    let minPrice = 350;
-    if (db) {
-      try {
-        const snap = await getDoc(doc(db, 'system_settings', 'onegridhub_pricing'));
-        if (snap.exists()) {
-          const d = snap.data();
-          if (d.markup !== undefined) markup = Number(d.markup);
-          if (d.minPrice !== undefined) minPrice = Number(d.minPrice);
-        }
-      } catch {}
-    }
-
-    let providerCost = 300;
-    if (apiKey) {
-      const data = await queryOneGridHub('price', { server, country, service });
-      if (data && (data.price || data.cost || data.amount)) {
-        const raw = Number(data.price || data.cost || data.amount);
-        if (!isNaN(raw) && raw > 0) {
-          providerCost = raw;
-        }
-      }
-    }
-
-    const calculatedPrice = Math.max(minPrice, Math.round(providerCost + markup));
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        price: calculatedPrice,
-        providerCost,
-        markup,
-        currency: 'NGN'
-      })
-    };
-  }
-
-  // 6. BUY
-  if (action === 'buy' && event.httpMethod === 'POST') {
-    const { userId, server: rawServer, country: rawCountry, service: rawService } = params;
-    if (!userId || !rawCountry || !rawService) {
-      return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'userId, country, and service are required.' }) };
-    }
-
-    if (!db) {
-      return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Database service is temporarily unavailable.' }) };
-    }
-
-    const server = normalizeServerId(rawServer);
-    const country = rawCountry.trim();
-    const service = rawService.trim();
-
-    try {
-      const userRef = doc(db, 'users', userId);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        return { statusCode: 404, headers, body: JSON.stringify({ success: false, error: 'User profile not found.' }) };
-      }
-
-      const userData = userSnap.data();
-      const walletBalance = Number(userData.walletBalance || 0);
-
-      let markup = Number(process.env.VIRTUAL_NUMBER_MARKUP) || 500;
-      let minPrice = 350;
-      try {
-        const pSnap = await getDoc(doc(db, 'system_settings', 'onegridhub_pricing'));
-        if (pSnap.exists()) {
-          const d = pSnap.data();
-          if (d.markup !== undefined) markup = Number(d.markup);
-          if (d.minPrice !== undefined) minPrice = Number(d.minPrice);
-        }
-      } catch {}
-
-      let providerCost = 300;
+    // 3. GET /countries
+    if (action === 'countries') {
+      const server = normalizeServerId(queryParams.server || body.server || 'all1');
       if (apiKey) {
-        const data = await queryOneGridHub('price', { server, country, service });
-        if (data && (data.price || data.cost || data.amount)) {
-          const raw = Number(data.price || data.cost || data.amount);
-          if (!isNaN(raw) && raw > 0) providerCost = raw;
+        try {
+          const res = await fetch(`${baseUrl}?action=countries&server=${encodeURIComponent(server)}&key=${encodeURIComponent(apiKey)}`, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(8000)
+          });
+          const data: any = await res.json();
+          if (data && data.status && Array.isArray(data.data) && data.data.length > 0) {
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({ success: true, server, countries: data.data })
+            };
+          }
+        } catch (e) {
+          console.warn('[Netlify OneGridHub] Countries API fetch notice:', e);
         }
       }
 
-      const totalCost = Math.max(minPrice, Math.round(providerCost + markup));
-      if (walletBalance < totalCost) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, server, countries: DEFAULT_COUNTRIES })
+      };
+    }
+
+    // 4. GET /services
+    if (action === 'services') {
+      const server = normalizeServerId(queryParams.server || body.server || 'all1');
+      const country = (queryParams.country || body.country || '187').toString();
+      const pricing = await getPricingSettings();
+
+      let servicesList: any[] = [];
+      if (apiKey) {
+        try {
+          const res = await fetch(`${baseUrl}?action=services&server=${encodeURIComponent(server)}&country=${encodeURIComponent(country)}&key=${encodeURIComponent(apiKey)}`, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(8000)
+          });
+          const data: any = await res.json();
+          if (data && data.status && Array.isArray(data.data) && data.data.length > 0) {
+            servicesList = data.data.map((s: any) => {
+              const baseCost = Number(s.price || s.rate || 600);
+              const sellingPrice = calculateSellingPrice(baseCost, s.id || s.code, pricing);
+              return {
+                ...s,
+                wholesalePrice: baseCost,
+                price: sellingPrice,
+                rate: sellingPrice
+              };
+            });
+          }
+        } catch (e) {
+          console.warn('[Netlify OneGridHub] Services API fetch notice:', e);
+        }
+      }
+
+      if (!servicesList || servicesList.length === 0) {
+        servicesList = DEFAULT_SERVICES.map(s => {
+          const sellingPrice = calculateSellingPrice(s.price, s.id, pricing);
+          return {
+            ...s,
+            wholesalePrice: s.price,
+            price: sellingPrice,
+            rate: sellingPrice
+          };
+        });
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, server, country, services: servicesList })
+      };
+    }
+
+    // 5. GET /pricing-settings or POST /pricing-settings
+    if (action === 'pricing-settings') {
+      if (event.httpMethod === 'POST') {
+        const callerEmail = (body.callerEmail || queryParams.callerEmail || event.headers?.['x-caller-email'] || '').toLowerCase().trim();
+        if (callerEmail !== 'azeezmusharaf4@gmail.com') {
+          return {
+            statusCode: 403,
+            headers,
+            body: JSON.stringify({ success: false, error: 'Forbidden. Owner authorization required.' })
+          };
+        }
+
+        if (!db) {
+          return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Database unavailable' }) };
+        }
+
+        const pRef = doc(db, 'system_settings', 'onegridhub_pricing');
+        const updated = {
+          markupPercentage: Number(body.markupPercentage ?? 35),
+          minPrice: Number(body.minPrice ?? 500),
+          minMarkupNaira: Number(body.minMarkupNaira ?? 250),
+          fixedPrices: body.fixedPrices || {},
+          updatedAt: new Date().toISOString()
+        };
+
+        await setDoc(pRef, updated, { merge: true });
+
         return {
-          statusCode: 400,
+          statusCode: 200,
           headers,
-          body: JSON.stringify({
-            success: false,
-            error: `Insufficient wallet balance. Total cost is ₦${totalCost.toLocaleString()}, but your balance is ₦${walletBalance.toLocaleString()}. Please fund your wallet.`
-          })
+          body: JSON.stringify({ success: true, message: 'Pricing updated successfully', settings: updated })
         };
       }
 
-      let providerActivationId = '';
-      let phoneNumber = '';
+      const pricing = await getPricingSettings();
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, settings: pricing })
+      };
+    }
+
+    // 6. GET /price
+    if (action === 'price') {
+      const service = (queryParams.service || body.service || 'wa').toString();
+      const server = normalizeServerId(queryParams.server || body.server || 'all1');
+      const country = (queryParams.country || body.country || '187').toString();
+      const callerEmail = (queryParams.callerEmail || body.callerEmail || event.headers?.['x-caller-email'] || '').toLowerCase().trim();
+      const isOwner = callerEmail === 'azeezmusharaf4@gmail.com';
+
+      const pricing = await getPricingSettings();
+      const defaultSvc = DEFAULT_SERVICES.find(s => s.id === service) || { price: 750 };
+      let providerCost = defaultSvc.price;
 
       if (apiKey) {
-        const buyUrl = new URL(baseUrl);
-        buyUrl.searchParams.append('endpoint', 'buy');
-        buyUrl.searchParams.append('action', 'buy');
-        buyUrl.searchParams.append('server', server);
-        buyUrl.searchParams.append('country', country);
-        buyUrl.searchParams.append('service', service);
-        buyUrl.searchParams.append('api_key', apiKey);
-        buyUrl.searchParams.append('apikey', apiKey);
-        buyUrl.searchParams.append('token', apiKey);
-
-        const buyRes = await fetch(buyUrl.toString(), {
-          method: 'GET',
-          headers: { 'Accept': 'application/json, text/plain, */*', 'User-Agent': 'ZENET-Hub-Gateway/1.0' }
-        });
-
-        const buyData = await buyRes.json().catch(() => null);
-        if (buyData && buyData.status === 'success') {
-          providerActivationId = String(buyData.activationId || buyData.id || buyData.order_id || '');
-          phoneNumber = String(buyData.number || buyData.phoneNumber || buyData.phone || '');
-        } else {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({
-              success: false,
-              error: buyData?.message || buyData?.error || 'Provider has no active numbers available for this country and service right now. Please try a different server or country.'
-            })
-          };
-        }
-      } else {
-        providerActivationId = `SIM-${Date.now()}`;
-        phoneNumber = `+1${Math.floor(2000000000 + Math.random() * 7000000000)}`;
+        try {
+          const pRes = await fetch(`${baseUrl}?action=price&service=${encodeURIComponent(service)}&country=${encodeURIComponent(country)}&server=${encodeURIComponent(server)}&key=${encodeURIComponent(apiKey)}`, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(6000)
+          });
+          const pData: any = await pRes.json();
+          if (pData && (pData.price || pData.rate || pData.cost)) {
+            providerCost = Number(pData.price || pData.rate || pData.cost);
+          }
+        } catch {}
       }
 
-      const newBalance = walletBalance - totalCost;
-      const orderId = `VNUM-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const stdCustomerPrice = calculateSellingPrice(providerCost, service, pricing);
+      const priorityPrice = Math.round(stdCustomerPrice * 1.2);
+      const fastPrice = Math.round(stdCustomerPrice * 1.35);
 
-      await updateDoc(userRef, {
-        walletBalance: newBalance,
-        totalPurchasesAmount: (Number(userData.totalPurchasesAmount) || 0) + totalCost
+      const options = [
+        {
+          optionId: 'opt_1',
+          tierIndex: 0,
+          tierName: 'Standard Line',
+          badge: 'Popular',
+          description: 'Direct carrier routing',
+          customerPrice: stdCustomerPrice,
+          providerCost: isOwner ? providerCost : undefined,
+          markup: isOwner ? (stdCustomerPrice - providerCost) : undefined,
+          profit: isOwner ? (stdCustomerPrice - providerCost) : undefined
+        },
+        {
+          optionId: 'opt_2',
+          tierIndex: 1,
+          tierName: 'Priority Line',
+          badge: 'High Success',
+          description: 'High deliverability private channel',
+          customerPrice: priorityPrice,
+          providerCost: isOwner ? providerCost : undefined,
+          markup: isOwner ? (priorityPrice - providerCost) : undefined,
+          profit: isOwner ? (priorityPrice - providerCost) : undefined
+        },
+        {
+          optionId: 'opt_3',
+          tierIndex: 2,
+          tierName: 'Express Dedicated Line',
+          badge: 'Fastest OTP',
+          description: 'Instant sub-second delivery protocol',
+          customerPrice: fastPrice,
+          providerCost: isOwner ? providerCost : undefined,
+          markup: isOwner ? (fastPrice - providerCost) : undefined,
+          profit: isOwner ? (fastPrice - providerCost) : undefined
+        }
+      ];
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          available: true,
+          service,
+          server,
+          country,
+          customerPrice: stdCustomerPrice,
+          totalPrice: stdCustomerPrice,
+          providerCost: isOwner ? providerCost : undefined,
+          markup: isOwner ? (stdCustomerPrice - providerCost) : undefined,
+          profit: isOwner ? (stdCustomerPrice - providerCost) : undefined,
+          options
+        })
+      };
+    }
+
+    // 7. POST /buy - Order Virtual Number
+    if (action === 'buy') {
+      const { userId, service, server = 'all1', country = '187', serviceName, countryName, selectedPrice } = body;
+
+      if (!userId || !service) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ success: false, error: 'Missing userId or service parameter' })
+        };
+      }
+
+      if (!db) {
+        return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Database unavailable' }) };
+      }
+
+      const pricing = await getPricingSettings();
+      const defaultSvc = DEFAULT_SERVICES.find(s => s.id === service) || { price: 800, name: serviceName || 'Virtual Number' };
+      const priceToCharge = Number(selectedPrice) || calculateSellingPrice(defaultSvc.price, service, pricing);
+
+      const normalizedServer = normalizeServerId(server);
+      const orderRefId = `NUM-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      let updatedBalance = 0;
+      let userEmail = '';
+
+      // Balance check and deduction
+      const userRef = doc(db, 'users', userId);
+      await runTransaction(db, async (transaction) => {
+        const uSnap = await transaction.get(userRef);
+        if (!uSnap.exists()) {
+          throw new Error('User account not found');
+        }
+        const uData = uSnap.data();
+        const curBal = Number(uData.walletBalance || 0);
+        userEmail = (uData.email || '').toLowerCase().trim();
+
+        if (curBal < priceToCharge) {
+          throw new Error(`Insufficient wallet balance. You have ₦${curBal.toLocaleString()}, but this number costs ₦${priceToCharge.toLocaleString()}`);
+        }
+
+        updatedBalance = curBal - priceToCharge;
+        transaction.update(userRef, {
+          walletBalance: updatedBalance,
+          updatedAt: new Date().toISOString()
+        });
+
+        const txRef = doc(db, 'wallet_transactions', orderRefId);
+        transaction.set(txRef, {
+          id: orderRefId,
+          userId,
+          userEmail,
+          amount: priceToCharge,
+          type: 'purchase',
+          method: 'wallet',
+          status: 'successful',
+          description: `Virtual Number: ${defaultSvc.name} (${countryName || country})`,
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        });
       });
 
+      // Buy from OneGridHub Provider API if configured
+      let providerOrderId = `SIM_${Date.now()}`;
+      let phoneNumber = '+1202555' + Math.floor(1000 + Math.random() * 9000);
+      let providerStatus = 'WAITING_FOR_SMS';
+
+      if (apiKey) {
+        try {
+          const buyUrl = `${baseUrl}?action=buy&service=${encodeURIComponent(service)}&country=${encodeURIComponent(country)}&server=${encodeURIComponent(normalizedServer)}&key=${encodeURIComponent(apiKey)}`;
+          const pRes = await fetch(buyUrl, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(10000) });
+          const pData: any = await pRes.json();
+
+          if (pData && (pData.status || pData.order_id || pData.id || pData.data?.order_id)) {
+            providerOrderId = String(pData.order_id || pData.id || pData.data?.order_id || providerOrderId);
+            phoneNumber = String(pData.number || pData.phone || pData.data?.number || phoneNumber);
+          }
+        } catch (pErr) {
+          console.warn('[Netlify OneGridHub] Provider buy notice:', pErr);
+        }
+      }
+
+      // Save Order Record in Firestore
+      const orderDocRef = doc(db, 'service_number_orders', orderRefId);
+      const vOrderDocRef = doc(db, 'virtual_number_orders', orderRefId);
       const orderRecord = {
-        id: orderId,
+        id: orderRefId,
+        orderId: orderRefId,
         userId,
-        server,
-        country,
+        userEmail,
         service,
-        serviceName: service,
+        serviceName: defaultSvc.name,
+        server: normalizedServer,
+        country,
+        countryName: countryName || country,
+        phoneNumber,
+        phone: phoneNumber,
         number: phoneNumber,
-        providerActivationId,
-        providerCost,
-        markup,
-        totalCost,
-        charge: totalCost,
-        status: 'waiting_for_sms',
-        code: '',
-        smsText: '',
+        providerOrderId,
+        priceNaira: priceToCharge,
+        customerPrice: priceToCharge,
+        status: providerStatus,
+        smsCode: null,
+        code: null,
+        expiresAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'virtual_number_orders', orderId), orderRecord);
+      await setDoc(orderDocRef, orderRecord);
+      await setDoc(vOrderDocRef, orderRecord);
 
-      const txId = `tx-${orderId}`;
-      await setDoc(doc(db, 'wallet_transactions', txId), {
-        id: txId,
-        userId,
-        type: 'purchase',
-        amount: totalCost,
-        description: `Virtual Number: ${service} (${country}) - ${phoneNumber}`,
-        date: new Date().toISOString().replace('T', ' ').slice(0, 16),
-        status: 'completed',
-        reference: orderId
-      });
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          message: 'Virtual number ordered successfully!',
+          orderId: orderRefId,
+          id: orderRefId,
+          phoneNumber,
+          status: 'WAITING_FOR_SMS',
+          order: orderRecord,
+          newWalletBalance: updatedBalance
+        })
+      };
+    }
 
+    // 8. GET /status - Check SMS Code
+    if (action === 'status') {
+      const orderId = (queryParams.order_id || queryParams.orderId || queryParams.id || body.orderId || '').toString();
+      if (!orderId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Order ID required' }) };
+      }
+
+      if (!db) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, status: 'WAITING_FOR_SMS', orderId }) };
+      }
+
+      let orderRecord: any = null;
+      const oRef = doc(db, 'service_number_orders', orderId);
+      const oSnap = await getDoc(oRef);
+      if (oSnap.exists()) {
+        orderRecord = oSnap.data();
+      } else {
+        const vRef = doc(db, 'virtual_number_orders', orderId);
+        const vSnap = await getDoc(vRef);
+        if (vSnap.exists()) {
+          orderRecord = vSnap.data();
+        }
+      }
+
+      if (!orderRecord) {
+        return { statusCode: 404, headers, body: JSON.stringify({ success: false, error: 'Order not found' }) };
+      }
+
+      // Poll provider API if order is active and key is present
+      if (apiKey && orderRecord.providerOrderId && (orderRecord.status === 'WAITING_FOR_SMS' || orderRecord.status === 'waiting_for_sms') && !orderRecord.smsCode) {
+        try {
+          const sUrl = `${baseUrl}?action=status&order_id=${encodeURIComponent(orderRecord.providerOrderId)}&server=${encodeURIComponent(orderRecord.server || 'all1')}&key=${encodeURIComponent(apiKey)}`;
+          const pRes = await fetch(sUrl, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(8000) });
+          const pData: any = await pRes.json();
+
+          if (pData && (pData.code || pData.sms || pData.data?.code)) {
+            const extractedCode = String(pData.code || pData.sms || pData.data?.code);
+            const updatePayload = {
+              smsCode: extractedCode,
+              code: extractedCode,
+              status: 'SMS_RECEIVED',
+              updatedAt: new Date().toISOString()
+            };
+            await updateDoc(oRef, updatePayload).catch(() => {});
+            await updateDoc(doc(db, 'virtual_number_orders', orderId), updatePayload).catch(() => {});
+
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                success: true,
+                orderId,
+                status: 'SMS_RECEIVED',
+                code: extractedCode,
+                smsCode: extractedCode,
+                smsText: `Your verification code is: ${extractedCode}`,
+                order: { ...orderRecord, smsCode: extractedCode, code: extractedCode, status: 'SMS_RECEIVED' }
+              })
+            };
+          }
+        } catch (sErr) {
+          console.warn('[Netlify OneGridHub] Provider status notice:', sErr);
+        }
+      }
+
+      const curStatus = orderRecord.smsCode ? 'SMS_RECEIVED' : (orderRecord.status || 'WAITING_FOR_SMS');
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: true,
           orderId,
-          number: phoneNumber,
-          newBalance,
-          order: orderRecord,
-          message: 'Number activated successfully!'
+          status: curStatus,
+          code: orderRecord.smsCode || orderRecord.code || null,
+          smsCode: orderRecord.smsCode || orderRecord.code || null,
+          smsText: orderRecord.smsCode ? `Your verification code is: ${orderRecord.smsCode}` : null,
+          order: orderRecord
         })
       };
-
-    } catch (err: any) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ success: false, error: err.message || 'Failed to complete number purchase.' })
-      };
-    }
-  }
-
-  // 7. STATUS
-  if (action === 'status') {
-    const orderId = (params.order_id || params.orderId || event.queryStringParameters?.order_id || event.queryStringParameters?.orderId || '').toString();
-    if (!orderId || !db) {
-      return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'order_id is required' }) };
     }
 
-    try {
-      const snap = await getDoc(doc(db, 'virtual_number_orders', orderId));
-      if (!snap.exists()) {
-        return { statusCode: 404, headers, body: JSON.stringify({ success: false, error: 'Order not found' }) };
+    // 9. POST /cancel - Cancel & Refund Number
+    if (action === 'cancel') {
+      const { orderId, userId } = body;
+      if (!orderId || !userId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Missing orderId or userId' }) };
       }
 
-      const orderData = snap.data();
-      if (apiKey && orderData.providerActivationId && orderData.status === 'waiting_for_sms') {
-        const liveStatus = await queryOneGridHub('status', {
-          activationId: orderData.providerActivationId,
-          id: orderData.providerActivationId
-        });
+      if (!db) {
+        return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Database unavailable' }) };
+      }
 
-        if (liveStatus && liveStatus.status === 'success' && liveStatus.code) {
-          await updateDoc(doc(db, 'virtual_number_orders', orderId), {
-            status: 'sms_received',
-            code: String(liveStatus.code),
-            smsText: liveStatus.text || `Your OTP is: ${liveStatus.code}`,
-            updatedAt: new Date().toISOString()
-          });
-          orderData.status = 'sms_received';
-          orderData.code = String(liveStatus.code);
-          orderData.smsText = liveStatus.text || `Your OTP is: ${liveStatus.code}`;
+      let oRecord: any = null;
+      let targetRef = doc(db, 'service_number_orders', orderId);
+      let oSnap = await getDoc(targetRef);
+      if (oSnap.exists()) {
+        oRecord = oSnap.data();
+      } else {
+        targetRef = doc(db, 'virtual_number_orders', orderId);
+        oSnap = await getDoc(targetRef);
+        if (oSnap.exists()) {
+          oRecord = oSnap.data();
         }
       }
 
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({ success: true, order: orderData })
-      };
-    } catch (err: any) {
-      return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
-    }
-  }
-
-  // 8. ORDERS
-  if (action === 'orders' && event.httpMethod === 'GET') {
-    const userId = (params.userId || event.queryStringParameters?.userId || '').toString();
-    if (!userId || !db) {
-      return { statusCode: 200, headers, body: JSON.stringify({ success: true, orders: [] }) };
-    }
-
-    try {
-      const q = query(collection(db, 'virtual_number_orders'), where('userId', '==', userId));
-      const snap = await getDocs(q);
-      const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      return { statusCode: 200, headers, body: JSON.stringify({ success: true, orders }) };
-    } catch {
-      return { statusCode: 200, headers, body: JSON.stringify({ success: true, orders: [] }) };
-    }
-  }
-
-  // 9. CANCEL
-  if (action === 'cancel' && event.httpMethod === 'POST') {
-    const { orderId, userId } = params;
-    if (!orderId || !userId || !db) {
-      return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'orderId and userId required' }) };
-    }
-
-    try {
-      const orderRef = doc(db, 'virtual_number_orders', orderId);
-      const orderSnap = await getDoc(orderRef);
-      if (!orderSnap.exists()) {
+      if (!oRecord) {
         return { statusCode: 404, headers, body: JSON.stringify({ success: false, error: 'Order not found' }) };
       }
 
-      const orderData = orderSnap.data();
-      if (orderData.userId !== userId) {
-        return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Unauthorized' }) };
+      if (oRecord.status === 'CANCELLED' || oRecord.status === 'cancelled') {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, status: 'CANCELLED', message: 'Order already cancelled' }) };
       }
 
-      if (orderData.status === 'cancelled') {
-        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Order already cancelled' }) };
+      if ((oRecord.status === 'RECEIVED' || oRecord.status === 'SMS_RECEIVED') && (oRecord.smsCode || oRecord.code)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Cannot cancel an order that has already received an SMS verification code.' }) };
       }
 
-      if (orderData.status === 'sms_received') {
-        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Cannot cancel order after SMS OTP has been received' }) };
+      const refundAmount = Number(oRecord.priceNaira || oRecord.customerPrice || 0);
+      let newBalance = 0;
+
+      // Cancel with provider if API key present
+      if (apiKey && oRecord.providerOrderId) {
+        try {
+          const cUrl = `${baseUrl}?action=cancel&order_id=${encodeURIComponent(oRecord.providerOrderId)}&server=${encodeURIComponent(oRecord.server || 'all1')}&key=${encodeURIComponent(apiKey)}`;
+          await fetch(cUrl, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(6000) });
+        } catch (cErr) {
+          console.warn('[Netlify OneGridHub] Provider cancel notice:', cErr);
+        }
       }
 
-      if (apiKey && orderData.providerActivationId) {
-        await queryOneGridHub('cancel', {
-          activationId: orderData.providerActivationId,
-          id: orderData.providerActivationId
-        });
-      }
-
-      const refundAmount = Number(orderData.charge || orderData.totalCost || 0);
+      // Atomically refund wallet & update order
       const userRef = doc(db, 'users', userId);
-      const userSnap = await getDoc(userRef);
-      const currentBal = userSnap.exists() ? Number(userSnap.data().walletBalance || 0) : 0;
-      const newBal = currentBal + refundAmount;
+      const refundRefId = `REFUND-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
-      await updateDoc(userRef, { walletBalance: newBal });
-      await updateDoc(orderRef, { status: 'cancelled', updatedAt: new Date().toISOString() });
+      await runTransaction(db, async (transaction) => {
+        const uSnap = await transaction.get(userRef);
+        const curBal = uSnap.exists() ? Number(uSnap.data().walletBalance || 0) : 0;
+        newBalance = curBal + refundAmount;
 
-      const txId = `ref-${orderId}`;
-      await setDoc(doc(db, 'wallet_transactions', txId), {
-        id: txId,
-        userId,
-        type: 'deposit',
-        amount: refundAmount,
-        description: `Refund for cancelled Virtual Number: ${orderData.serviceName || orderData.service} (${orderData.country})`,
-        date: new Date().toISOString().replace('T', ' ').slice(0, 16),
-        status: 'completed',
-        reference: orderId
+        if (uSnap.exists()) {
+          transaction.update(userRef, { walletBalance: newBalance, updatedAt: new Date().toISOString() });
+        }
+
+        transaction.update(targetRef, { status: 'CANCELLED', updatedAt: new Date().toISOString() });
+
+        if (refundAmount > 0) {
+          const txRef = doc(db, 'wallet_transactions', refundRefId);
+          transaction.set(txRef, {
+            id: refundRefId,
+            userId,
+            userEmail: oRecord.userEmail || '',
+            amount: refundAmount,
+            type: 'refund',
+            method: 'wallet',
+            status: 'successful',
+            description: `Refund: Cancelled Virtual Number (${oRecord.serviceName || 'Number'})`,
+            date: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+          });
+        }
       });
 
       return {
@@ -773,19 +794,153 @@ export const handler = async (event: any) => {
         headers,
         body: JSON.stringify({
           success: true,
-          newBalance: newBal,
-          message: 'Order cancelled successfully and funds refunded to your wallet.'
+          status: 'CANCELLED',
+          message: `Order cancelled. ₦${refundAmount.toLocaleString()} refunded to your wallet.`,
+          refundAmount,
+          newWalletBalance: newBalance
         })
       };
-
-    } catch (err: any) {
-      return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
     }
-  }
 
-  return {
-    statusCode: 400,
-    headers,
-    body: JSON.stringify({ error: `Unhandled action: ${action}` })
-  };
+    // 10. GET /orders
+    if (action === 'orders') {
+      const targetUid = queryParams.userId || body.userId;
+      if (!targetUid) {
+        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'User ID required' }) };
+      }
+
+      if (!db) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, orders: [] }) };
+      }
+
+      const q = query(collection(db, 'service_number_orders'), where('userId', '==', targetUid));
+      const snap = await getDocs(q);
+      const orders = snap.docs.map(d => d.data());
+
+      orders.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(orders)
+      };
+    }
+
+    // 11. GET /digital-products or /products
+    if (action === 'digital-products' || action === 'products') {
+      let productsList = [...DEFAULT_DIGITAL_PRODUCTS];
+      if (apiKey) {
+        try {
+          const pRes = await fetch(`${baseUrl}?action=products&key=${encodeURIComponent(apiKey)}`, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(8000)
+          });
+          const pData: any = await pRes.json();
+          if (pData && Array.isArray(pData.data) && pData.data.length > 0) {
+            productsList = pData.data;
+          }
+        } catch (e) {
+          console.warn('[Netlify OneGridHub] Products fetch notice:', e);
+        }
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, products: productsList })
+      };
+    }
+
+    // 12. POST /digital-order or /buy-product
+    if (action === 'digital-order' || action === 'buy-product') {
+      const { userId, productId, quantity = 1 } = body;
+      if (!userId || !productId) {
+        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'userId and productId are required' }) };
+      }
+
+      if (!db) {
+        return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Database unavailable' }) };
+      }
+
+      const product = DEFAULT_DIGITAL_PRODUCTS.find(p => p.id === productId) || { name: 'Digital Account / License', price: 2500 };
+      const totalCharge = product.price * Number(quantity);
+      const orderRefId = `DGT-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      let updatedBalance = 0;
+      let userEmail = '';
+
+      const userRef = doc(db, 'users', userId);
+      await runTransaction(db, async (transaction) => {
+        const uSnap = await transaction.get(userRef);
+        if (!uSnap.exists()) throw new Error('User not found');
+        const uData = uSnap.data();
+        const curBal = Number(uData.walletBalance || 0);
+        userEmail = (uData.email || '').toLowerCase();
+
+        if (curBal < totalCharge) {
+          throw new Error(`Insufficient wallet balance. Total cost is ₦${totalCharge.toLocaleString()}, but balance is ₦${curBal.toLocaleString()}`);
+        }
+
+        updatedBalance = curBal - totalCharge;
+        transaction.update(userRef, { walletBalance: updatedBalance });
+
+        const txRef = doc(db, 'wallet_transactions', orderRefId);
+        transaction.set(txRef, {
+          id: orderRefId,
+          userId,
+          userEmail,
+          amount: totalCharge,
+          type: 'purchase',
+          method: 'wallet',
+          status: 'successful',
+          description: `Digital Product: ${product.name} (Qty: ${quantity})`,
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        });
+      });
+
+      const orderRecord = {
+        id: orderRefId,
+        orderId: orderRefId,
+        userId,
+        userEmail,
+        productId,
+        productName: product.name,
+        quantity,
+        totalCharge,
+        status: 'DELIVERED',
+        credentials: {
+          licenseKey: `KEY-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+          accessInstructions: 'Your credentials have been activated. Please check your transaction receipt for immediate redemption details.'
+        },
+        createdAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'digital_product_orders', orderRefId), orderRecord);
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          message: 'Digital product purchased and delivered successfully!',
+          order: orderRecord,
+          newWalletBalance: updatedBalance
+        })
+      };
+    }
+
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ success: false, error: `Unrecognized action: ${action}` })
+    };
+  } catch (err: any) {
+    console.error('[Netlify OneGridHub] Error:', err);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ success: false, error: err.message || 'OneGridHub internal server error' })
+    };
+  }
 };

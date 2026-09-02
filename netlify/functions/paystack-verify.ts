@@ -1,10 +1,10 @@
-import { getDb, doc, getDoc, setDoc, updateDoc } from './_firebase';
+import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
 
 export const handler = async (event: any) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-paystack-signature',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Content-Type': 'application/json'
   };
 
@@ -16,8 +16,16 @@ export const handler = async (event: any) => {
     const rawSecretKey = process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET || process.env.PAYSTACK_KEY || '';
     const paystackSecretKey = rawSecretKey ? rawSecretKey.trim().replace(/^['"`]|['"`]$/g, '').trim() : '';
 
-    const reference = event.queryStringParameters?.reference || event.path?.split('/').pop();
-    const queryUserId = event.queryStringParameters?.userId;
+    // Extract reference from query or path
+    let reference = event.queryStringParameters?.reference || '';
+    if (!reference && event.path) {
+      const parts = event.path.split('/').filter(Boolean);
+      const last = parts[parts.length - 1];
+      if (last && last !== 'paystack-verify' && last !== 'verify') {
+        reference = decodeURIComponent(last);
+      }
+    }
+    const queryUserId = event.queryStringParameters?.userId || '';
 
     if (!reference) {
       return {
@@ -53,9 +61,18 @@ export const handler = async (event: any) => {
       const paidAmountKobo = pstData.amount;
       const amountNaira = paidAmountKobo / 100;
       const metadata = pstData.metadata || {};
-      const targetUid = metadata.userId || queryUserId;
-      const expectedAmountNaira = metadata.expectedAmountNaira || metadata.priceNaira;
+      const customerEmail = (pstData.customer?.email || '').trim().toLowerCase();
+      const customerCode = pstData.customer?.customer_code;
 
+      let targetUid: string | null = metadata.userId || queryUserId || null;
+      if (!targetUid && Array.isArray(metadata.custom_fields)) {
+        const uField = metadata.custom_fields.find((f: any) => f.variable_name === 'user_id' || f.variable_name === 'userId');
+        if (uField && uField.value) {
+          targetUid = String(uField.value);
+        }
+      }
+
+      const expectedAmountNaira = metadata.expectedAmountNaira || metadata.priceNaira;
       if (expectedAmountNaira && Number(expectedAmountNaira) > 0) {
         const expectedKobo = Math.round(Number(expectedAmountNaira) * 100);
         if (paidAmountKobo < expectedKobo) {
@@ -74,7 +91,7 @@ export const handler = async (event: any) => {
 
       // Update Firestore user wallet & transaction ledger with idempotency
       const db = getDb();
-      if (db && targetUid) {
+      if (db) {
         try {
           const txDocRef = doc(db, 'wallet_transactions', reference);
           const txSnap = await getDoc(txDocRef);
@@ -89,43 +106,81 @@ export const handler = async (event: any) => {
                 alreadyProcessed: true,
                 status: 'success',
                 reference: pstData.reference,
-                amount: txSnap.data().amount || amountNaira,
+                amount: txSnap.data()?.amount || amountNaira,
                 currency: pstData.currency || 'NGN',
                 paidAt: pstData.paid_at || pstData.paidAt,
                 channel: pstData.channel,
-                buyerEmail: pstData.customer?.email,
-                userId: targetUid,
+                buyerEmail: customerEmail,
+                userId: targetUid || txSnap.data()?.userId,
                 gateway: 'paystack'
               })
             };
           }
 
-          const uDocRef = doc(db, 'users', String(targetUid));
-          const uDocSnap = await getDoc(uDocRef);
-          const currentBal = uDocSnap.exists() ? (uDocSnap.data().walletBalance || 0) : 0;
-          const newBal = currentBal + amountNaira;
-
-          if (uDocSnap.exists()) {
-            await updateDoc(uDocRef, { walletBalance: newBal });
-          } else {
-            await setDoc(uDocRef, { walletBalance: newBal }, { merge: true });
+          // If targetUid is not resolved, search by customer code or email
+          if (!targetUid && customerCode) {
+            const custCodeQ = query(collection(db, 'users'), where('paystackCustomerCode', '==', customerCode));
+            const custCodeSnap = await getDocs(custCodeQ);
+            if (!custCodeSnap.empty) {
+              targetUid = custCodeSnap.docs[0].id;
+            }
           }
 
-          await setDoc(txDocRef, {
-            id: reference,
-            userId: String(targetUid),
-            userEmail: pstData.customer?.email || '',
-            amount: amountNaira,
-            type: 'deposit',
-            method: 'paystack',
-            status: 'successful',
-            paystackReference: reference,
-            description: metadata.listingTitle || 'Paystack Wallet Deposit',
-            date: new Date().toISOString(),
-            createdAt: new Date().toISOString()
-          });
+          if (!targetUid && customerEmail) {
+            const usersQ = query(collection(db, 'users'), where('email', '==', customerEmail));
+            const usersSnap = await getDocs(usersQ);
+            if (!usersSnap.empty) {
+              targetUid = usersSnap.docs[0].id;
+            } else {
+              const allUsersSnap = await getDocs(collection(db, 'users'));
+              for (const uDoc of allUsersSnap.docs) {
+                const uEmail = (uDoc.data().email || '').toLowerCase().trim();
+                if (uEmail === customerEmail) {
+                  targetUid = uDoc.id;
+                  break;
+                }
+              }
+            }
+          }
 
-          console.log(`[Netlify Paystack Verify] Credited ₦${amountNaira} to User ${targetUid}. New Bal: ₦${newBal}`);
+          if (targetUid) {
+            const uDocRef = doc(db, 'users', String(targetUid));
+            let newBalance = amountNaira;
+
+            await runTransaction(db, async (transaction) => {
+              const uDocSnap = await transaction.get(uDocRef);
+              const currentBal = uDocSnap.exists() ? (uDocSnap.data().walletBalance || 0) : 0;
+              newBalance = currentBal + amountNaira;
+
+              if (uDocSnap.exists()) {
+                transaction.update(uDocRef, { walletBalance: newBalance, updatedAt: new Date().toISOString() });
+              } else {
+                transaction.set(uDocRef, {
+                  id: String(targetUid),
+                  email: customerEmail || '',
+                  walletBalance: newBalance,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                }, { merge: true });
+              }
+
+              transaction.set(txDocRef, {
+                id: reference,
+                userId: String(targetUid),
+                userEmail: customerEmail || '',
+                amount: amountNaira,
+                type: 'deposit',
+                method: 'paystack',
+                status: 'successful',
+                paystackReference: reference,
+                description: metadata.listingTitle || 'Paystack Wallet Deposit',
+                date: new Date().toISOString(),
+                createdAt: new Date().toISOString()
+              });
+            });
+
+            console.log(`[Netlify Paystack Verify] Credited ₦${amountNaira} to User ${targetUid}. New Bal: ₦${newBalance}`);
+          }
         } catch (creditErr) {
           console.warn('[Netlify Paystack Verify] Wallet credit notice:', creditErr);
         }
@@ -142,7 +197,7 @@ export const handler = async (event: any) => {
           currency: pstData.currency || 'NGN',
           paidAt: pstData.paid_at || pstData.paidAt,
           channel: pstData.channel,
-          buyerEmail: pstData.customer?.email,
+          buyerEmail: customerEmail,
           userId: targetUid,
           gateway: 'paystack',
           raw: pstData
@@ -160,14 +215,11 @@ export const handler = async (event: any) => {
       };
     }
   } catch (err: any) {
-    console.error('Error in Netlify paystack-verify:', err);
+    console.error('[Netlify Paystack Verify] Error:', err);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({
-        verified: false,
-        error: err.message || 'Payment verification failed'
-      })
+      body: JSON.stringify({ verified: false, error: err.message || 'Payment verification error' })
     };
   }
 };

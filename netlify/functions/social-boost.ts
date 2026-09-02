@@ -1,27 +1,35 @@
-import { getDb } from './_firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
+import { BASE_SOCIAL_SERVICES } from './_social_services';
 
+// Helper to resolve SMM API Key from all environment variable aliases
 const getSmmApiKey = (): string => {
-  const rawKey = (
-    process.env.ONEGRIDHUB_SMM_API_KEY ||
-    process.env.ONEGRIDHUB_API_KEY ||
-    process.env.ONEGRID_API_KEY ||
-    process.env.ONEGRIDHUB_KEY ||
-    process.env.SMM_API_KEY ||
-    process.env.OGH_API_KEY ||
-    process.env.ONEGRIDHUB_TOKEN ||
-    ''
-  ).trim().replace(/^["']|["']$/g, '');
-
-  const isPlaceholder = !rawKey ||
-    ['ONEGRIDHUB_API_KEY', 'YOUR_API_KEY', 'MY_ONEGRIDHUB_API_KEY', 'UNDEFINED', 'NULL', 'PLACEHOLDER', 'YOUR_KEY_HERE'].includes(rawKey.toUpperCase()) ||
-    rawKey.startsWith('MY_');
-
-  return isPlaceholder ? '' : rawKey;
+  const candidates = [
+    process.env.ONEGRIDHUB_SMM_API_KEY,
+    process.env.ONEGRIDHUB_API_KEY,
+    process.env.ONEGRID_API_KEY,
+    process.env.ONEGRIDHUB_KEY,
+    process.env.SMM_API_KEY,
+    process.env.OGH_API_KEY,
+    process.env.ONEGRIDHUB_TOKEN
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === 'string') {
+      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
+      if (clean && clean !== 'undefined' && clean !== 'null' && clean !== 'your_api_key_here') {
+        return clean;
+      }
+    }
+  }
+  return '';
 };
 
-const getOneGridHubBaseUrl = (): string => {
-  let raw = (process.env.ONEGRIDHUB_BASE_URL || 'https://onegridhub.com/api/v1/index.php').trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
+// Helper to resolve OneGridHub Base URL
+const getBaseUrl = (): string => {
+  let raw = (process.env.ONEGRIDHUB_BASE_URL || 'https://onegridhub.com/api/v1/index.php')
+    .trim()
+    .replace(/^['"`]|['"`]$/g, '')
+    .replace(/\/+$/, '');
+
   if (!raw.includes('/api/v1')) {
     raw = `${raw}/api/v1/index.php`;
   } else if (!raw.endsWith('.php')) {
@@ -30,337 +38,639 @@ const getOneGridHubBaseUrl = (): string => {
   return raw;
 };
 
-const headers = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Content-Type': 'application/json'
+// Category normalization helper
+const normalizeCategory = (cat: string, name: string): { platform: string; category: string; type: string } => {
+  const combined = `${cat} ${name}`.toLowerCase();
+  let platform = 'Other';
+  let type = 'Engagement';
+
+  if (combined.includes('tiktok') || combined.includes('tik tok')) platform = 'TikTok';
+  else if (combined.includes('instagram') || combined.includes('ig ') || combined.includes('insta')) platform = 'Instagram';
+  else if (combined.includes('facebook') || combined.includes('fb ') || combined.includes('fb:')) platform = 'Facebook';
+  else if (combined.includes('youtube') || combined.includes('yt ') || combined.includes('yt:')) platform = 'YouTube';
+  else if (combined.includes('twitter') || combined.includes(' x ') || combined.includes('x:')) platform = 'Twitter / X';
+  else if (combined.includes('telegram') || combined.includes('tg ') || combined.includes('tele:')) platform = 'Telegram';
+  else if (combined.includes('spotify') || combined.includes('audiomack') || combined.includes('music')) platform = 'Spotify & Music';
+  else if (combined.includes('threads')) platform = 'Threads';
+  else if (combined.includes('linkedin')) platform = 'LinkedIn';
+  else if (combined.includes('discord')) platform = 'Discord';
+  else if (combined.includes('twitch') || combined.includes('kick')) platform = 'Twitch & Streaming';
+  else if (combined.includes('snapchat')) platform = 'Snapchat';
+  else if (combined.includes('reddit')) platform = 'Reddit';
+  else if (combined.includes('google') || combined.includes('review')) platform = 'Reviews & Ratings';
+  else if (combined.includes('website') || combined.includes('traffic') || combined.includes('seo')) platform = 'Website Traffic & SEO';
+  else if (combined.includes('whatsapp') || combined.includes('wa ')) platform = 'WhatsApp';
+
+  if (combined.includes('follower') || combined.includes('subscriber') || combined.includes('member')) type = 'Followers';
+  else if (combined.includes('like') || combined.includes('reaction') || combined.includes('upvote')) type = 'Likes';
+  else if (combined.includes('view') || combined.includes('stream') || combined.includes('play') || combined.includes('impression')) type = 'Views';
+  else if (combined.includes('comment')) type = 'Comments';
+  else if (combined.includes('share') || combined.includes('repost') || combined.includes('retweet')) type = 'Shares';
+  else if (combined.includes('watch hour') || combined.includes('watchtime')) type = 'Watch Hours';
+  else if (combined.includes('review') || combined.includes('rating')) type = 'Reviews';
+  else if (combined.includes('traffic') || combined.includes('visitor')) type = 'Website Visits';
+
+  return { platform, category: cat || `${platform} Services`, type };
 };
 
-const extractDynamicPlatform = (category: string, name: string): string => {
-  const cat = (category || '').trim();
-  const cleanName = (name || '').trim();
-  const combined = (cat + ' ' + cleanName).toLowerCase();
-  
-  if (combined.includes('instagram') || combined.includes('ig ') || combined.includes(' ig') || combined.includes('ig-') || combined.includes('ig reels') || combined.includes('ig story') || combined.includes('ig followers')) return 'Instagram';
-  if (combined.includes('facebook') || combined.includes('fb ') || combined.includes('fb-') || combined.includes('meta ') || combined.includes('fb page') || combined.includes('fb post')) return 'Facebook';
-  if (combined.includes('tiktok') || combined.includes('tt ') || combined.includes('douyin') || combined.includes('tiktok followers') || combined.includes('tiktok likes')) return 'TikTok';
-  if (combined.includes('youtube') || combined.includes('yt ') || combined.includes('yt-') || combined.includes('shorts') || combined.includes('watch hour') || combined.includes('subscribers')) return 'YouTube';
-  if (combined.includes('twitter') || combined.includes(' x ') || combined.includes('x.com') || combined.includes('tweet') || combined.includes('x views') || combined.includes('x followers') || combined.includes('x likes') || combined.includes('x retweets') || combined.includes('x poll')) return 'Twitter / X';
-  if (combined.includes('telegram') || combined.includes('tg ') || combined.includes('tg-') || combined.includes('t.me')) return 'Telegram';
-  if (combined.includes('linkedin') || combined.includes('linked in')) return 'LinkedIn';
-  if (combined.includes('spotify') || combined.includes('audiomack') || combined.includes('soundcloud') || combined.includes('apple music') || combined.includes('deezer') || combined.includes('boomplay') || combined.includes('mixcloud') || combined.includes('shazam') || combined.includes('hypeddit')) return 'Spotify & Music';
-  if (combined.includes('threads')) return 'Threads';
-  if (combined.includes('discord')) return 'Discord';
-  if (combined.includes('twitch') || combined.includes('kick') || combined.includes('rumble') || combined.includes('vimeo') || combined.includes('trovo') || combined.includes('streamers') || combined.includes('sooplive') || combined.includes('openrec') || combined.includes('panda.tv') || combined.includes('mixch') || combined.includes('live stream')) return 'Twitch & Streaming';
-  if (combined.includes('snapchat')) return 'Snapchat';
-  if (combined.includes('reddit')) return 'Reddit';
-  if (combined.includes('pinterest')) return 'Pinterest';
-  if (combined.includes('quora')) return 'Quora';
-  if (combined.includes('bluesky')) return 'BlueSky';
-  if (combined.includes('steam') || combined.includes('roblox') || combined.includes('pubg') || combined.includes('riot games') || combined.includes('valorant') || combined.includes('league of legends') || combined.includes('brawl stars') || combined.includes('free fire') || combined.includes('ea play') || combined.includes('xbox') || combined.includes('gaming') || combined.includes('gamers')) return 'Gaming & Accounts';
-  if (combined.includes('behance') || combined.includes('dribbble') || combined.includes('canva') || combined.includes('freepik') || combined.includes('envato') || combined.includes('capcut')) return 'Design & Creative';
-  if (combined.includes('trustpilot') || combined.includes('google reviews') || combined.includes('tripadvisor') || combined.includes('review') || combined.includes('rating') || combined.includes('google maps')) return 'Reviews & Ratings';
-  if (combined.includes('traffic') || combined.includes('website') || combined.includes('seo ') || combined.includes('backlinks') || combined.includes('visitors') || combined.includes('google search')) return 'Website Traffic & SEO';
-  if (combined.includes('whatsapp')) return 'WhatsApp';
-  return 'Other Services';
-};
-
-const normalizeOneGridHubService = (item: any, index: number) => {
-  const rawId = String(item.service || item.id || `ogh-${index + 1}`);
-  const rawName = String(item.name || item.service_name || 'Social Media Boosting Service').trim();
-  const rawCategory = String(item.category || 'General').trim();
-  const rawRate = Number(item.rate_per_1000 || item.rate || item.price) || 0;
-  const providerRateNgn = Math.max(1, Math.round(rawRate));
-  const platform = extractDynamicPlatform(rawCategory, rawName);
-  const description = item.desc || item.description || `Automated fast delivery for ${rawName}. Direct provider routing from OneGridHub network.`;
-  const minQty = Math.max(1, Number(item.min) || 50);
-  const maxQty = Math.max(minQty, Number(item.max) || 100000);
-
-  const lowerAll = (rawCategory + ' ' + rawName).toLowerCase();
-  let type = item.type || 'Service';
-  if (lowerAll.includes('follower')) type = 'Followers';
-  else if (lowerAll.includes('like')) type = 'Likes';
-  else if (lowerAll.includes('view') || lowerAll.includes('impression')) type = 'Views';
-  else if (lowerAll.includes('subscriber') || lowerAll.includes('sub ')) type = 'Subscribers';
-  else if (lowerAll.includes('member')) type = 'Members';
-  else if (lowerAll.includes('comment')) type = 'Comments';
-  else if (lowerAll.includes('share') || lowerAll.includes('repost') || lowerAll.includes('retweet')) type = 'Shares';
-  else if (lowerAll.includes('watch hour') || lowerAll.includes('watchtime') || lowerAll.includes('watch time')) type = 'Watch Hours';
-  else if (lowerAll.includes('play') || lowerAll.includes('stream') || lowerAll.includes('listener')) type = 'Plays & Streams';
-  else if (lowerAll.includes('reaction') || lowerAll.includes('poll')) type = 'Reactions';
-  else if (lowerAll.includes('review') || lowerAll.includes('rating')) type = 'Reviews';
-  else if (lowerAll.includes('traffic') || lowerAll.includes('visit')) type = 'Website Visits';
-
-  const isCustomComments = item.type === 'Custom Comments' || item.type === 'custom_comments' || lowerAll.includes('custom comment');
-  const refillGuarantee = Boolean(item.refill && item.refill !== '0' && item.refill !== 'false' && item.refill !== false);
-
+// Input classification helper
+const determineInputConfig = (name: string, type: string) => {
+  const lower = `${name} ${type}`.toLowerCase();
+  if (type === 'Comments' || lower.includes('custom comment')) {
+    return {
+      inputLabel: 'Target Link & Custom Comments (1 per line)',
+      inputPlaceholder: 'https://...\nGreat content!\nAwesome service!',
+      inputType: 'custom_comments'
+    };
+  }
+  if (lower.includes('username') || lower.includes('profile')) {
+    return {
+      inputLabel: 'Profile Link or @Username',
+      inputPlaceholder: 'https://... or @username',
+      inputType: 'link'
+    };
+  }
   return {
-    id: `ogh-svc-${rawId}`,
-    providerServiceId: rawId,
-    platform,
-    category: rawCategory,
-    name: rawName,
-    type,
-    providerRatePer1000: Math.max(1, providerRateNgn),
-    min: minQty,
-    max: maxQty,
-    deliverySpeed: item.dripfeed ? 'Drip-feed Capable' : (item.deliverySpeed || 'Instant Start Delivery'),
-    refill: refillGuarantee,
-    quality: item.quality || 'Verified High Quality',
-    description,
-    inputLabel: isCustomComments ? 'Target Link + Custom Comments' : `${platform} Target URL or @Username`,
-    inputPlaceholder: isCustomComments ? 'Enter 1 comment per line' : `https://${platform.toLowerCase().replace(/[^a-z0-9]/g, '')}.com/... or @username`,
-    inputType: isCustomComments ? 'custom_comments' : 'link'
+    inputLabel: 'Target Link / URL',
+    inputPlaceholder: 'https://...',
+    inputType: 'link'
   };
 };
 
-const queryOneGridHubSmm = async (action: string, extraParams: Record<string, any> = {}) => {
-  const apiKey = getSmmApiKey();
-  if (!apiKey) return null;
-  const baseUrl = getOneGridHubBaseUrl();
-
-  try {
-    const q = new URLSearchParams({
-      action,
-      endpoint: action,
-      key: apiKey,
-      api_key: apiKey,
-      ...extraParams
-    }).toString();
-
-    const res = await fetch(`${baseUrl}?${q}`, {
-      headers: { 'Accept': 'application/json, text/plain, */*', 'User-Agent': 'ZENET-Hub-SMM/1.0' }
-    });
-
-    if (res.ok) {
-      const data = await res.json().catch(() => null);
-      return data;
-    }
-  } catch (err) {
-    console.warn(`[OneGridHub SMM Error] Action ${action}:`, err);
-  }
-  return null;
+// Default pricing config
+const DEFAULT_PRICING = {
+  markupPercentage: 35,
+  minMarkupNaira: 100,
+  platformMarkups: {},
+  categoryMarkups: {},
+  customPrices: {},
+  hiddenServices: [],
+  bestValueIds: ['ig-followers-nondrop', 'tt-followers-hq', 'yt-subscribers-hq', 'tg-members-nondrop'],
+  cheapestIds: ['tt-views-viral', 'ig-views-reels', 'tg-post-views', 'x-views-impressions']
 };
 
 export const handler = async (event: any) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-caller-email, x-admin-email',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Content-Type': 'application/json'
+  };
+
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
-  const db = getDb();
-  const rawPath = event.path || '';
-  const isServicesReq = rawPath.includes('/services') || event.queryStringParameters?.action === 'services';
-  const isPricingReq = rawPath.includes('/pricing-settings') || event.queryStringParameters?.action === 'pricing-settings';
-  const isOrderReq = rawPath.includes('/order') || event.queryStringParameters?.action === 'order';
-  const isOrdersReq = rawPath.includes('/orders') || event.queryStringParameters?.action === 'orders';
-  const isStatusReq = rawPath.includes('/status') || event.queryStringParameters?.action === 'status';
-  const isSyncReq = rawPath.includes('/sync-provider') || event.queryStringParameters?.action === 'sync-provider';
+  try {
+    const db = getDb();
+    const apiKey = getSmmApiKey();
 
-  // 1. GET Services Catalogue
-  if (event.httpMethod === 'GET' && (!rawPath || isServicesReq || rawPath.endsWith('/social-boost'))) {
-    try {
-      let liveServices: any[] = [];
-      let lastSyncedAt = new Date().toISOString();
+    // Extract action and parameters
+    let body: any = {};
+    if (event.body) {
+      try {
+        body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+      } catch {
+        body = {};
+      }
+    }
 
-      if (db) {
-        try {
-          const docRef = doc(db, 'system_settings', 'social_boost_catalogue');
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            if (Array.isArray(data.services) && data.services.length > 0) {
-              liveServices = data.services;
-              if (data.lastSyncedAt) lastSyncedAt = data.lastSyncedAt;
+    const queryParams = event.queryStringParameters || {};
+    let action = (queryParams.action || body.action || '').toString().toLowerCase().trim();
+    let orderIdParam = queryParams.orderId || queryParams.id || body.orderId || body.id || '';
+
+    // Extract path candidates from event.path, rawUrl, and headers
+    const pathCandidates: string[] = [];
+    if (event.path) pathCandidates.push(event.path);
+    if (event.rawUrl) {
+      try {
+        pathCandidates.push(new URL(event.rawUrl).pathname);
+      } catch {}
+    }
+    if (event.headers?.['x-forwarded-uri']) pathCandidates.push(event.headers['x-forwarded-uri']);
+    if (event.headers?.['x-original-url']) pathCandidates.push(event.headers['x-original-url']);
+
+    if (!action) {
+      const knownActions = [
+        'services', 'pricing-settings', 'sync-provider', 'provider-services',
+        'order', 'orders', 'status', 'admin-stats', 'test-connection'
+      ];
+
+      for (const p of pathCandidates) {
+        if (!p) continue;
+        const clean = p.split('?')[0].replace(/\/+$/, '').toLowerCase();
+        const segments = clean.split('/').filter(Boolean);
+
+        if (segments.includes('status') && segments.length > segments.indexOf('status') + 1) {
+          action = 'status';
+          orderIdParam = segments[segments.indexOf('status') + 1];
+          break;
+        }
+
+        for (let i = segments.length - 1; i >= 0; i--) {
+          const seg = segments[i];
+          if (seg && seg !== 'social-boost' && seg !== 'api' && seg !== '.netlify' && seg !== 'functions') {
+            if (knownActions.includes(seg)) {
+              action = seg;
+              break;
             }
           }
-        } catch (dbErr) {
-          console.warn('[SocialBoost Netlify] DB cache read notice:', dbErr);
+        }
+        if (action) break;
+      }
+    }
+
+    // Heuristic fallbacks based on query parameters / body if action is still unset or generic
+    if (!action || action === 'social-boost') {
+      if (orderIdParam) {
+        action = 'status';
+      } else if (event.httpMethod === 'POST' && (body.serviceId || body.service || body.quantity)) {
+        action = 'order';
+      } else if (queryParams.userId || queryParams.all || queryParams.user) {
+        action = 'orders';
+      } else {
+        action = 'services';
+      }
+    }
+
+    console.log(`[Netlify SocialBoost] Action: ${action}, Method: ${event.httpMethod}`);
+
+    // Helper: Load Pricing Settings from Firestore
+    const getPricingSettings = async () => {
+      if (!db) return DEFAULT_PRICING;
+      try {
+        const pRef = doc(db, 'system_settings', 'social_boost_pricing');
+        const pSnap = await getDoc(pRef);
+        if (pSnap.exists()) {
+          return { ...DEFAULT_PRICING, ...pSnap.data() };
+        }
+      } catch (e) {
+        console.warn('[Netlify SocialBoost] Pricing read notice:', e);
+      }
+      return DEFAULT_PRICING;
+    };
+
+    // Helper: Calculate Selling Rate for a service
+    const calculateRate = (service: any, pricing: any) => {
+      const providerRate = Number(service.providerRatePer1000 || service.rate || 0);
+      if (pricing.customPrices && pricing.customPrices[service.id]) {
+        return Math.round(Number(pricing.customPrices[service.id]));
+      }
+      const platformMarkup = pricing.platformMarkups?.[service.platform] !== undefined
+        ? Number(pricing.platformMarkups[service.platform])
+        : Number(pricing.markupPercentage || 35);
+
+      const computedMarkup = (providerRate * platformMarkup) / 100;
+      const minMarkup = Number(pricing.minMarkupNaira || 100);
+      const finalMarkup = Math.max(computedMarkup, minMarkup);
+      return Math.round(providerRate + finalMarkup);
+    };
+
+    // 1. GET /services - Retrieve all active, priced services
+    if (action === 'services') {
+      const callerEmail = (queryParams.callerEmail || body.callerEmail || event.headers?.['x-caller-email'] || event.headers?.['x-admin-email'] || '').toLowerCase().trim();
+      const isOwner = callerEmail === 'azeezmusharaf4@gmail.com';
+      const pricing = await getPricingSettings();
+      let serviceList: any[] = [];
+      let lastSyncedAt: string | null = null;
+
+      // Check Firestore cached catalogue
+      if (db) {
+        try {
+          const catRef = doc(db, 'system_settings', 'social_boost_catalogue');
+          const catSnap = await getDoc(catRef);
+          if (catSnap.exists()) {
+            const data = catSnap.data();
+            if (Array.isArray(data.services) && data.services.length > 0) {
+              serviceList = data.services;
+              lastSyncedAt = data.lastSyncedAt || null;
+            }
+          }
+        } catch (e) {
+          console.warn('[Netlify SocialBoost] Catalogue read notice:', e);
         }
       }
 
-      // If catalogue not in DB yet, fetch live from provider
-      if (liveServices.length === 0) {
-        const smmData = await queryOneGridHubSmm('services');
-        if (Array.isArray(smmData) && smmData.length > 0) {
-          liveServices = smmData.map((s, idx) => normalizeOneGridHubService(s, idx));
-          if (db) {
-            try {
-              await setDoc(doc(db, 'system_settings', 'social_boost_catalogue'), {
-                services: liveServices,
-                total: liveServices.length,
-                lastSyncedAt
-              });
-            } catch {}
-          }
-        }
+      // Fallback to BASE_SOCIAL_SERVICES if cache is empty
+      if (!serviceList || serviceList.length === 0) {
+        serviceList = [...BASE_SOCIAL_SERVICES];
       }
+
+      // Filter hidden services and compute client selling rates
+      const hiddenSet = new Set(pricing.hiddenServices || []);
+      const bestValueSet = new Set(pricing.bestValueIds || DEFAULT_PRICING.bestValueIds);
+      const cheapestSet = new Set(pricing.cheapestIds || DEFAULT_PRICING.cheapestIds);
+
+      const activeServices = serviceList
+        .filter((s: any) => isOwner || !hiddenSet.has(s.id))
+        .map((s: any) => {
+          const providerRate = Number(s.providerRatePer1000 || s.rate || 500);
+          const sellingRate = calculateRate(s, pricing);
+          const markup = Math.max(0, sellingRate - providerRate);
+          if (isOwner) {
+            return {
+              ...s,
+              ratePer1000: sellingRate,
+              pricePer1000: sellingRate,
+              providerRatePer1000: providerRate,
+              markupPer1000: markup,
+              isBestValue: bestValueSet.has(s.id),
+              isCheapest: cheapestSet.has(s.id)
+            };
+          }
+          const { providerRatePer1000: _p, ...cleanSvc } = s;
+          return {
+            ...cleanSvc,
+            ratePer1000: sellingRate,
+            pricePer1000: sellingRate,
+            isBestValue: bestValueSet.has(s.id),
+            isCheapest: cheapestSet.has(s.id)
+          };
+        });
 
       return {
         statusCode: 200,
         headers,
         body: JSON.stringify({
           success: true,
-          services: liveServices,
-          total: liveServices.length,
-          lastSyncedAt
+          services: activeServices,
+          total: activeServices.length,
+          lastSyncedAt,
+          markupPercentage: pricing.markupPercentage,
+          isOwner
         })
       };
-    } catch (err: any) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ success: false, error: err.message })
-      };
-    }
-  }
-
-  // 2. GET/POST Pricing Settings
-  if (isPricingReq) {
-    if (event.httpMethod === 'GET') {
-      let settings = {
-        defaultMarkupPercent: 45,
-        minMarkupPer1k: 350,
-        pricingStyle: 'standard',
-        curatedServiceIds: [],
-        bestValueServiceIds: {},
-        serviceOverrides: {},
-        platformStatus: {}
-      };
-      if (db) {
-        try {
-          const docRef = doc(db, 'system_settings', 'social_boost_pricing');
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            settings = { ...settings, ...snap.data() };
-          }
-        } catch {}
-      }
-      return { statusCode: 200, headers, body: JSON.stringify({ success: true, settings }) };
     }
 
-    if (event.httpMethod === 'POST') {
-      try {
-        const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
-        if (db) {
-          const docRef = doc(db, 'system_settings', 'social_boost_pricing');
-          await setDoc(docRef, { ...body, updatedAt: new Date().toISOString() }, { merge: true });
+    // 2. GET /pricing-settings or POST /pricing-settings
+    if (action === 'pricing-settings') {
+      if (event.httpMethod === 'POST') {
+        const callerEmail = (body.callerEmail || queryParams.callerEmail || event.headers?.['x-caller-email'] || '').toLowerCase().trim();
+        if (callerEmail !== 'azeezmusharaf4@gmail.com') {
+          return {
+            statusCode: 403,
+            headers,
+            body: JSON.stringify({ success: false, error: 'Forbidden. Owner authorization required.' })
+          };
         }
-        return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Settings saved successfully.' }) };
-      } catch (err: any) {
-        return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
-      }
-    }
-  }
 
-  // 3. POST Order
-  if (isOrderReq && event.httpMethod === 'POST') {
-    try {
-      const body = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
-      const { serviceId, link, quantity, customComments, userId } = body;
+        if (!db) {
+          return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Database unavailable' }) };
+        }
 
-      if (!serviceId || !link || !quantity || !userId) {
+        const pRef = doc(db, 'system_settings', 'social_boost_pricing');
+        const updatedSettings = {
+          markupPercentage: Number(body.markupPercentage ?? 35),
+          minMarkupNaira: Number(body.minMarkupNaira ?? 100),
+          platformMarkups: body.platformMarkups || {},
+          categoryMarkups: body.categoryMarkups || {},
+          customPrices: body.customPrices || {},
+          hiddenServices: body.hiddenServices || [],
+          bestValueIds: body.bestValueIds || [],
+          cheapestIds: body.cheapestIds || [],
+          updatedAt: new Date().toISOString()
+        };
+
+        await setDoc(pRef, updatedSettings, { merge: true });
+
         return {
-          statusCode: 400,
+          statusCode: 200,
           headers,
-          body: JSON.stringify({ success: false, error: 'Service ID, Target URL, Quantity, and User ID are required.' })
+          body: JSON.stringify({ success: true, message: 'Social Boost pricing updated successfully', settings: updatedSettings })
         };
       }
 
-      if (!db) {
-        return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Database service is unavailable.' }) };
-      }
+      // GET pricing settings
+      const pricing = await getPricingSettings();
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, settings: pricing })
+      };
+    }
 
-      const userRef = doc(db, 'users', userId);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        return { statusCode: 404, headers, body: JSON.stringify({ success: false, error: 'User account not found.' }) };
-      }
-
-      const userData = userSnap.data();
-      const walletBalance = Number(userData.walletBalance || 0);
-
-      let service: any = null;
-      try {
-        const catSnap = await getDoc(doc(db, 'system_settings', 'social_boost_catalogue'));
-        if (catSnap.exists()) {
-          const list = catSnap.data().services || [];
-          service = list.find((s: any) => s.id === serviceId || s.providerServiceId === serviceId);
-        }
-      } catch {}
-
-      const providerRate = Number(service?.providerRatePer1000 || 800);
-      const markupPercent = 45;
-      const ratePer1000 = Math.max(300, Math.round(providerRate * (1 + markupPercent / 100)));
-      const totalCharge = Math.ceil((Number(quantity) / 1000) * ratePer1000);
-
-      if (walletBalance < totalCharge) {
+    // 3. POST /sync-provider or GET /provider-services
+    if (action === 'sync-provider' || action === 'provider-services') {
+      if (!apiKey) {
         return {
-          statusCode: 400,
+          statusCode: 200,
           headers,
           body: JSON.stringify({
-            success: false,
-            error: `Insufficient wallet balance. Total cost is ₦${totalCharge.toLocaleString()}, but your balance is ₦${walletBalance.toLocaleString()}. Please fund your wallet.`
+            success: true,
+            syncedCount: BASE_SOCIAL_SERVICES.length,
+            message: 'Using verified baseline services (Provider API key not configured).',
+            services: BASE_SOCIAL_SERVICES
           })
         };
       }
 
-      let providerOrderId = '';
-      if (service?.providerServiceId) {
-        const smmOrder = await queryOneGridHubSmm('add', {
-          service: service.providerServiceId,
-          link,
-          quantity: Number(quantity),
-          comments: customComments || undefined
+      try {
+        const pUrl = `${getBaseUrl()}?action=services&key=${encodeURIComponent(apiKey)}`;
+        const pRes = await fetch(pUrl, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(15000) });
+        const pData: any = await pRes.json();
+
+        let rawServices: any[] = [];
+        if (Array.isArray(pData)) {
+          rawServices = pData;
+        } else if (pData && Array.isArray(pData.services)) {
+          rawServices = pData.services;
+        }
+
+        if (rawServices.length > 0) {
+          const normalized = rawServices.map((s: any) => {
+            const sid = String(s.service || s.id || `smm-${Math.random()}`);
+            const sname = s.name || 'Social Media Service';
+            const scat = s.category || 'Social Services';
+            const { platform, category, type } = normalizeCategory(scat, sname);
+            const inputCfg = determineInputConfig(sname, type);
+            const rate = Number(s.rate || s.price || 1000);
+
+            return {
+              id: sid,
+              platform,
+              category,
+              name: sname,
+              type,
+              providerRatePer1000: rate,
+              min: Number(s.min || 10),
+              max: Number(s.max || 100000),
+              deliverySpeed: s.deliverySpeed || 'Instant - 24 Hours',
+              refill: Boolean(s.refill || s.refill === '1' || s.refill === true),
+              quality: s.quality || 'High Quality',
+              description: s.description || `${platform} ${type} with automated high-speed delivery.`,
+              inputLabel: inputCfg.inputLabel,
+              inputPlaceholder: inputCfg.inputPlaceholder,
+              inputType: inputCfg.inputType
+            };
+          });
+
+          if (db) {
+            const catRef = doc(db, 'system_settings', 'social_boost_catalogue');
+            await setDoc(catRef, {
+              services: normalized,
+              lastSyncedAt: new Date().toISOString(),
+              totalCount: normalized.length
+            }, { merge: true });
+          }
+
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+              success: true,
+              message: `Successfully synchronized ${normalized.length} services from provider.`,
+              syncedCount: normalized.length,
+              services: normalized
+            })
+          };
+        }
+      } catch (syncErr: any) {
+        console.warn('[Netlify SocialBoost] Provider sync notice:', syncErr);
+      }
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          syncedCount: BASE_SOCIAL_SERVICES.length,
+          message: 'Synced with built-in catalogue.',
+          services: BASE_SOCIAL_SERVICES
+        })
+      };
+    }
+
+    // 4. POST /order - Place an SMM Order
+    if (action === 'order') {
+      const { userId, serviceId, link, quantity, customComments } = body;
+
+      if (!userId || !serviceId || !link || !quantity) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ success: false, error: 'Missing required parameters: userId, serviceId, link, quantity' })
+        };
+      }
+
+      const numQuantity = Number(quantity);
+      if (isNaN(numQuantity) || numQuantity <= 0) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ success: false, error: 'Quantity must be a positive number' })
+        };
+      }
+
+      if (!db) {
+        return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Database service unavailable' }) };
+      }
+
+      // Load pricing settings and service info
+      const pricing = await getPricingSettings();
+      let targetService: any = BASE_SOCIAL_SERVICES.find((s: any) => String(s.id) === String(serviceId));
+
+      if (!targetService && db) {
+        try {
+          const catRef = doc(db, 'system_settings', 'social_boost_catalogue');
+          const catSnap = await getDoc(catRef);
+          if (catSnap.exists() && Array.isArray(catSnap.data().services)) {
+            targetService = catSnap.data().services.find((s: any) => String(s.id) === String(serviceId));
+          }
+        } catch {}
+      }
+
+      if (!targetService) {
+        return {
+          statusCode: 404,
+          headers,
+          body: JSON.stringify({ success: false, error: `Service ID "${serviceId}" not found in catalogue.` })
+        };
+      }
+
+      const minQty = Number(targetService.min || 10);
+      const maxQty = Number(targetService.max || 1000000);
+      if (numQuantity < minQty || numQuantity > maxQty) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ success: false, error: `Quantity must be between ${minQty.toLocaleString()} and ${maxQty.toLocaleString()}` })
+        };
+      }
+
+      const sellingRatePer1000 = calculateRate(targetService, pricing);
+      const totalChargeNaira = Math.max(1, Math.round((sellingRatePer1000 * numQuantity) / 1000));
+      const orderRefId = `SMM-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      let updatedBalance = 0;
+      let userEmail = '';
+
+      // Atomic balance verification & deduction
+      const userDocRef = doc(db, 'users', userId);
+      await runTransaction(db, async (transaction) => {
+        const uSnap = await transaction.get(userDocRef);
+        if (!uSnap.exists()) {
+          throw new Error('User profile not found.');
+        }
+        const uData = uSnap.data();
+        const curBal = Number(uData.walletBalance || 0);
+        userEmail = (uData.email || '').toLowerCase().trim();
+
+        if (curBal < totalChargeNaira) {
+          throw new Error(`Insufficient wallet balance. You have ₦${curBal.toLocaleString()}, but order requires ₦${totalChargeNaira.toLocaleString()}`);
+        }
+
+        updatedBalance = curBal - totalChargeNaira;
+        const curTotalPurchases = Number(uData.totalPurchasesAmount || 0) + totalChargeNaira;
+
+        transaction.update(userDocRef, {
+          walletBalance: updatedBalance,
+          totalPurchasesAmount: curTotalPurchases,
+          updatedAt: new Date().toISOString()
         });
-        if (smmOrder && (smmOrder.order || smmOrder.order_id)) {
-          providerOrderId = String(smmOrder.order || smmOrder.order_id);
+
+        const txDocRef = doc(db, 'wallet_transactions', orderRefId);
+        transaction.set(txDocRef, {
+          id: orderRefId,
+          userId,
+          userEmail,
+          amount: totalChargeNaira,
+          type: 'purchase',
+          method: 'wallet',
+          status: 'successful',
+          description: `Social Boost: ${targetService.name} (${numQuantity.toLocaleString()} units)`,
+          date: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        });
+      });
+
+      // Submit order to OneGridHub SMM API if key configured
+      let providerOrderId = null;
+      let providerStatus = 'Processing';
+      if (apiKey && !isNaN(Number(targetService.id))) {
+        try {
+          const smmOrderParams = new URLSearchParams({
+            action: 'add',
+            key: apiKey,
+            service: String(targetService.id),
+            link: link.trim(),
+            quantity: String(numQuantity)
+          });
+          if (customComments) {
+            smmOrderParams.set('comments', customComments);
+          }
+
+          const providerRes = await fetch(getBaseUrl(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: smmOrderParams.toString(),
+            signal: AbortSignal.timeout(10000)
+          });
+          const pOrderData: any = await providerRes.json();
+          if (pOrderData && pOrderData.order) {
+            providerOrderId = pOrderData.order;
+            providerStatus = 'In Progress';
+          }
+        } catch (pErr) {
+          console.warn('[Netlify SocialBoost] Provider order submission notice:', pErr);
         }
       }
 
-      const newBalance = walletBalance - totalCharge;
-      const orderId = `SMM-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-      await updateDoc(userRef, {
-        walletBalance: newBalance,
-        totalPurchasesAmount: (Number(userData.totalPurchasesAmount) || 0) + totalCharge
-      });
-
+      // Record Social Boost order in Firestore
+      const orderDocRef = doc(db, 'social_boost_orders', orderRefId);
       const orderRecord = {
-        id: orderId,
+        id: orderRefId,
+        orderId: orderRefId,
         userId,
-        userEmail: userData.email || '',
-        userName: userData.displayName || 'Buyer',
-        serviceId,
-        providerServiceId: service?.providerServiceId || '',
-        providerOrderId,
-        serviceName: service?.name || 'Social Boost Package',
-        platform: service?.platform || 'Social',
-        category: service?.category || 'Boosting',
-        link,
-        quantity: Number(quantity),
-        customComments: customComments || '',
-        charge: totalCharge,
-        currency: 'NGN',
-        status: 'processing',
-        startCount: 0,
-        remains: Number(quantity),
+        userEmail,
+        serviceId: targetService.id,
+        serviceName: targetService.name,
+        platform: targetService.platform,
+        category: targetService.category,
+        link: link.trim(),
+        quantity: numQuantity,
+        chargeNaira: totalChargeNaira,
+        ratePer1000: sellingRatePer1000,
+        providerOrderId: providerOrderId || null,
+        status: providerStatus,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'social_boost_orders', orderId), orderRecord);
+      await setDoc(orderDocRef, orderRecord);
 
-      const txId = `tx-smm-${orderId}`;
-      await setDoc(doc(db, 'wallet_transactions', txId), {
-        id: txId,
-        userId,
-        type: 'purchase',
-        amount: totalCharge,
-        description: `Social Boost: ${service?.name || 'Package'} (Qty: ${Number(quantity).toLocaleString()}) for ${link}`,
-        date: new Date().toISOString().replace('T', ' ').slice(0, 16),
-        status: 'completed',
-        reference: orderId
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          message: 'Social Boost order placed successfully!',
+          order: orderRecord,
+          newWalletBalance: updatedBalance
+        })
+      };
+    }
+
+    // 5. GET /orders - Retrieve User's Social Boost Orders
+    if (action === 'orders') {
+      const targetUid = queryParams.userId || body.userId;
+      if (!targetUid) {
+        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'User ID required' }) };
+      }
+
+      if (!db) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, orders: [] }) };
+      }
+
+      const ordersQ = query(collection(db, 'social_boost_orders'), where('userId', '==', targetUid));
+      const ordersSnap = await getDocs(ordersQ);
+      const orders = ordersSnap.docs.map(d => d.data());
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, orders, total: orders.length })
+      };
+    }
+
+    // 6. GET /status - Check Order Status
+    if (action === 'status') {
+      const idToCheck = orderIdParam || queryParams.orderId || queryParams.id;
+      if (!idToCheck) {
+        return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Order ID is required' }) };
+      }
+
+      if (!db) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, status: 'In Progress' }) };
+      }
+
+      const oRef = doc(db, 'social_boost_orders', idToCheck);
+      const oSnap = await getDoc(oRef);
+      if (oSnap.exists()) {
+        const oData = oSnap.data();
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ success: true, order: oData, status: oData.status || 'In Progress' })
+        };
+      }
+
+      return {
+        statusCode: 404,
+        headers,
+        body: JSON.stringify({ success: false, error: 'Order not found' })
+      };
+    }
+
+    // 7. GET /admin-stats - Owner Analytics
+    if (action === 'admin-stats') {
+      if (!db) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, stats: { totalOrders: 0, totalRevenue: 0 } }) };
+      }
+      const allOrdersSnap = await getDocs(collection(db, 'social_boost_orders'));
+      let totalRevenue = 0;
+      let totalOrders = allOrdersSnap.docs.length;
+      allOrdersSnap.docs.forEach(d => {
+        totalRevenue += Number(d.data().chargeNaira || 0);
       });
 
       return {
@@ -368,36 +678,40 @@ export const handler = async (event: any) => {
         headers,
         body: JSON.stringify({
           success: true,
-          orderId,
-          newBalance,
-          message: `Order #${orderId} placed successfully! Your boosting campaign has started.`,
-          order: orderRecord
+          stats: {
+            totalOrders,
+            totalRevenue,
+            hasProviderApiKey: Boolean(apiKey)
+          }
         })
       };
-    } catch (err: any) {
-      return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
     }
-  }
 
-  // 4. GET Orders
-  if (isOrdersReq && event.httpMethod === 'GET') {
-    try {
-      const userId = event.queryStringParameters?.userId;
-      if (!userId || !db) {
-        return { statusCode: 200, headers, body: JSON.stringify({ success: true, orders: [] }) };
-      }
-      const q = query(collection(db, 'social_boost_orders'), where('userId', '==', userId));
-      const snap = await getDocs(q);
-      const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      return { statusCode: 200, headers, body: JSON.stringify({ success: true, orders }) };
-    } catch {
-      return { statusCode: 200, headers, body: JSON.stringify({ success: true, orders: [] }) };
+    // 8. GET /test-connection
+    if (action === 'test-connection') {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          status: 'ready',
+          hasApiKey: Boolean(apiKey),
+          baseServicesAvailable: BASE_SOCIAL_SERVICES.length
+        })
+      };
     }
-  }
 
-  return {
-    statusCode: 200,
-    headers,
-    body: JSON.stringify({ success: true, message: 'Social Boost endpoint ready' })
-  };
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ success: false, error: `Unrecognized action: ${action}` })
+    };
+  } catch (err: any) {
+    console.error('[Netlify SocialBoost] Error:', err);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ success: false, error: err.message || 'Social Boost internal server error' })
+    };
+  }
 };

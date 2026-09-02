@@ -72,12 +72,27 @@
   status = 200
   force = true
 
+# Health & general API
 [[redirects]]
   from = "/api/health"
   to = "/.netlify/functions/health"
   status = 200
   force = true
 
+# OneGridHub endpoints
+[[redirects]]
+  from = "/api/onegridhub/*"
+  to = "/.netlify/functions/onegridhub/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/onegridhub"
+  to = "/.netlify/functions/onegridhub"
+  status = 200
+  force = true
+
+# Social Boost endpoints
 [[redirects]]
   from = "/api/social-boost/*"
   to = "/.netlify/functions/social-boost/:splat"
@@ -90,15 +105,16 @@
   status = 200
   force = true
 
+# Unified Express API Serverless Function for all other /api/* routes
 [[redirects]]
-  from = "/api/onegridhub/*"
-  to = "/.netlify/functions/onegridhub/:splat"
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
   status = 200
   force = true
 
 [[redirects]]
-  from = "/api/onegridhub"
-  to = "/.netlify/functions/onegridhub"
+  from = "/api"
+  to = "/.netlify/functions/api"
   status = 200
   force = true
 

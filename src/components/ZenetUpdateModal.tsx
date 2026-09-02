@@ -153,7 +153,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
     );
 
     return () => unsubscribe();
-  }, [isOpen, user]);
+  }, [isOpen, user?.uid]);
 
   // System feature updates for the second tab
   const systemUpdates = [

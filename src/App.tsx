@@ -359,7 +359,7 @@ export default function App() {
       window.removeEventListener('focus', handleReactivation);
       document.removeEventListener('visibilitychange', handleReactivation);
     };
-  }, [user]);
+  }, [user?.uid]);
 
   // Sync walletBalance with userProfile
   useEffect(() => {
@@ -858,7 +858,7 @@ export default function App() {
 
   // 1b. Real-time User Profile sync
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     const userRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -873,7 +873,7 @@ export default function App() {
       console.warn('User profile listener notice:', err);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]);
 
   // 2. Real-time Firestore Listings listener (Displays real listings from Firebase)
   useEffect(() => {
@@ -907,7 +907,7 @@ export default function App() {
 
   // 3. Firestore Inquiries listener for logged in user
   useEffect(() => {
-    if (!user) {
+    if (!user?.uid) {
       setInquiries([]);
       return;
     }
@@ -926,11 +926,11 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]);
 
   // 4. Firestore Purchases listener for logged in buyer
   useEffect(() => {
-    if (!user) {
+    if (!user?.uid) {
       setPurchases([]);
       return;
     }
@@ -949,11 +949,11 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]);
 
   // 5. Firestore Wallet Transactions listener for logged in user
   useEffect(() => {
-    if (!user) {
+    if (!user?.uid) {
       setWalletTransactions([]);
       return;
     }
@@ -973,7 +973,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]);
 
   // Handler: Complete Purchase in Firestore
   const handlePaymentSuccess = async (orderInfo: {

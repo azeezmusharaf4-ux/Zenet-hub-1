@@ -358,6 +358,11 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         'Accept': 'application/json, text/plain, */*'
       };
 
+      const callerEmail = (userProfile?.email || auth?.currentUser?.email || '').toLowerCase().trim();
+      if (callerEmail) {
+        headers['x-caller-email'] = callerEmail;
+      }
+
       if (auth.currentUser) {
         try {
           const token = await getSafeIdToken(auth.currentUser);
@@ -367,17 +372,18 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         } catch {}
       }
 
+      const endpoint = `/api/social-boost/services?callerEmail=${encodeURIComponent(callerEmail)}`;
       let data: any = null;
       try {
-        const res = await fetch('/api/social-boost/services', { headers });
+        const res = await fetch(endpoint, { headers });
         if (res.ok) {
           data = await res.json();
         } else {
           // Try safeApiFetch as secondary fallback
-          data = await safeApiFetch('/api/social-boost/services', { headers });
+          data = await safeApiFetch(endpoint, { headers });
         }
       } catch {
-        data = await safeApiFetch('/api/social-boost/services', { headers });
+        data = await safeApiFetch(endpoint, { headers });
       }
 
       const receivedList: SocialBoostService[] = 
@@ -1087,6 +1093,13 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                                           <span className="text-base sm:text-lg font-black text-emerald-400 block">
                                             ₦{(service.ratePer1000 || 0).toLocaleString()}
                                           </span>
+                                          {isOwner && (
+                                            <div className="mt-1 text-[10px] font-mono text-purple-300/90 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded text-left sm:text-right whitespace-nowrap">
+                                              <span className="text-purple-300">Cost: ₦{(service.providerRatePer1000 || Math.max(0, (service.ratePer1000 || 0) - (service.markupPer1000 || 0))).toLocaleString()}</span>
+                                              <span className="mx-1 text-amber-400">→</span>
+                                              <span className="text-amber-300 font-bold">+₦{(service.markupPer1000 !== undefined ? service.markupPer1000 : Math.round((service.ratePer1000 || 0) * 0.35)).toLocaleString()} markup</span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
 
@@ -1393,6 +1406,114 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   </select>
                 </div>
               </div>
+
+              {/* Service Pricing Breakdown Table & Search */}
+              <div className="bg-[#100624] border border-[#26124c] rounded-2xl p-4 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#241049]">
+                  <div>
+                    <h3 className="text-sm font-black text-white flex items-center gap-2">
+                      <span>Services Pricing Controller & Provider Cost Breakdown</span>
+                      <span className="text-[10px] bg-purple-900/60 text-purple-200 px-2 py-0.5 rounded font-mono">
+                        {services.length} Services
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-purple-300/60 mt-0.5">
+                      Inspect wholesale prices from OneGridHub, calculated markups, and final customer prices.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Filter Controls */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search service name or ID..."
+                      value={managerSearchQuery}
+                      onChange={e => setManagerSearchQuery(e.target.value)}
+                      className="w-full bg-[#180b33] border border-[#2e1758] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-purple-400/40 focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+
+                  <select
+                    value={managerPlatformFilter}
+                    onChange={e => setManagerPlatformFilter(e.target.value)}
+                    className="bg-[#180b33] border border-[#2e1758] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                  >
+                    <option value="All">All Platforms ({services.length})</option>
+                    {Array.from(new Set(services.map(s => s.platform).filter(Boolean))).sort().map(p => (
+                      <option key={p} value={p}>
+                        {p} ({services.filter(s => s.platform === p).length})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Services List Breakdown */}
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                  {services
+                    .filter(s => {
+                      if (managerPlatformFilter !== 'All' && s.platform !== managerPlatformFilter) return false;
+                      if (managerSearchQuery.trim()) {
+                        const q = managerSearchQuery.toLowerCase();
+                        return (
+                          (s.name || '').toLowerCase().includes(q) ||
+                          (s.platform || '').toLowerCase().includes(q) ||
+                          (s.id || '').toLowerCase().includes(q)
+                        );
+                      }
+                      return true;
+                    })
+                    .map(svc => {
+                      const providerRate = svc.providerRatePer1000 || Math.max(0, (svc.ratePer1000 || 0) - (svc.markupPer1000 || 0));
+                      const sellingRate = svc.ratePer1000 || 0;
+                      const markup = svc.markupPer1000 !== undefined ? svc.markupPer1000 : Math.max(0, sellingRate - providerRate);
+
+                      return (
+                        <div 
+                          key={svc.id}
+                          className="bg-[#14082c] border border-[#281350] hover:border-purple-600/40 p-3 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-900/60 text-purple-200">
+                                {svc.platform}
+                              </span>
+                              <span className="text-[10px] font-mono text-purple-400">
+                                ID: {svc.id}
+                              </span>
+                            </div>
+                            <h4 className="text-xs font-bold text-white leading-snug">
+                              {svc.name}
+                            </h4>
+                            <div className="text-[10px] text-purple-300/60 flex items-center gap-2">
+                              <span>Min: {svc.min?.toLocaleString()}</span>
+                              <span>•</span>
+                              <span>Max: {svc.max?.toLocaleString()}</span>
+                            </div>
+                          </div>
+
+                          {/* 3-Step Pricing Breakdown */}
+                          <div className="grid grid-cols-3 gap-2 text-center shrink-0 bg-[#0f0520] p-2 rounded-xl border border-purple-900/30 sm:w-80">
+                            <div className="p-1 rounded bg-[#180932]">
+                              <span className="text-[9px] text-purple-300 block font-sans uppercase">OneGridHub</span>
+                              <span className="text-xs font-mono font-bold text-white">₦{providerRate.toLocaleString()}</span>
+                            </div>
+                            <div className="p-1 rounded bg-[#180932] border border-amber-500/20">
+                              <span className="text-[9px] text-amber-300 block font-sans uppercase">My Markup</span>
+                              <span className="text-xs font-mono font-bold text-amber-400">+₦{markup.toLocaleString()}</span>
+                            </div>
+                            <div className="p-1 rounded bg-[#180932] border border-emerald-500/20">
+                              <span className="text-[9px] text-emerald-300 block font-sans uppercase">Customer</span>
+                              <span className="text-xs font-mono font-bold text-emerald-400">₦{sellingRate.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1520,6 +1641,27 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   <span>Your Current Wallet:</span>
                   <span className="font-bold text-emerald-400">₦{walletBalance.toLocaleString()}</span>
                 </div>
+
+                {isOwner && (
+                  <div className="mt-2 pt-2 border-t border-amber-500/20 bg-amber-500/10 p-2.5 rounded-xl text-[11px] font-mono text-purple-200 space-y-1">
+                    <div className="flex items-center justify-between text-amber-300 font-bold font-sans">
+                      <span>👑 Owner Pricing Breakdown</span>
+                      <span className="text-[9px] bg-amber-400/20 px-1.5 py-0.5 rounded text-amber-200">OneGridHub</span>
+                    </div>
+                    <div className="flex items-center justify-between text-purple-300">
+                      <span>Provider Cost (Qty: {orderQuantity.toLocaleString()}):</span>
+                      <span className="text-white font-bold">
+                        ₦{Math.round(((orderModalService.providerRatePer1000 || Math.max(0, (orderModalService.ratePer1000 || 0) - (orderModalService.markupPer1000 || 0))) / 1000) * orderQuantity).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-amber-300">
+                      <span>Your Profit Margin:</span>
+                      <span className="font-bold">
+                        +₦{Math.max(0, calculatedPrice - Math.round(((orderModalService.providerRatePer1000 || Math.max(0, (orderModalService.ratePer1000 || 0) - (orderModalService.markupPer1000 || 0))) / 1000) * orderQuantity)).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-[#291350] flex items-center justify-between">
                   <span className="text-xs font-black text-white uppercase tracking-wider">Total Charge:</span>

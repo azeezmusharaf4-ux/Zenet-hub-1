@@ -1,8 +1,15 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserLocalPersistence, onIdTokenChanged, User } from 'firebase/auth';
-import { getFirestore, Firestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, Firestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
+
+// Set Firestore log level to error to avoid harmless stream cancellation RPC debug notices
+if (typeof window !== 'undefined') {
+  try {
+    setLogLevel('error');
+  } catch {}
+}
 
 const firebaseConfig = {
   apiKey: firebaseConfigData.apiKey,

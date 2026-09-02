@@ -83,13 +83,8 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
         setUsers(list);
         setLoadingUsers(false);
 
-        // Update selected user reference if active
-        if (selectedUser) {
-          const updated = list.find((u) => u.uid === selectedUser.uid);
-          if (updated) {
-            setSelectedUser(updated);
-          }
-        }
+        // Update selected user reference if active without re-subscribing
+        setSelectedUser((prev) => (prev ? (list.find((u) => u.uid === prev.uid) || prev) : null));
       }, (err) => {
         console.warn('Error listening to users for wallet override:', err);
         setLoadingUsers(false);
@@ -100,7 +95,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
       console.warn('Users listener error:', e);
       setLoadingUsers(false);
     }
-  }, [isAuthorized, selectedUser?.uid]);
+  }, [isAuthorized]);
 
   // Subscribe to recent wallet override transactions if authorized
   useEffect(() => {

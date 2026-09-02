@@ -542,8 +542,12 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     setPriceErrorMessage('');
     try {
       const headers = await getAuthHeaders();
+      const callerEmail = (userProfile?.email || auth?.currentUser?.email || '').toLowerCase().trim();
+      if (callerEmail) {
+        headers['x-caller-email'] = callerEmail;
+      }
       const { ok, data } = await safeFetchJson(
-        `/api/onegridhub/price?server=${encodeURIComponent(selectedServer)}&country=${encodeURIComponent(selectedCountry)}&service=${encodeURIComponent(selectedService)}&callerEmail=${encodeURIComponent(userProfile?.email || '')}`,
+        `/api/onegridhub/price?server=${encodeURIComponent(selectedServer)}&country=${encodeURIComponent(selectedCountry)}&service=${encodeURIComponent(selectedService)}&callerEmail=${encodeURIComponent(callerEmail)}`,
         { headers }
       );
       
@@ -1347,6 +1351,49 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     )}
                   </div>
 
+                  {/* Owner Pricing Breakdown - OneGridHub Original Price -> My Markup -> Final Customer Price */}
+                  {isOwner && isPriceAvailable && (
+                    <div className="bg-gradient-to-r from-amber-950/40 via-purple-950/60 to-amber-950/40 border border-amber-500/40 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-black text-amber-300">
+                        <span className="flex items-center gap-1.5">
+                          <span>👑 Owner Pricing Breakdown</span>
+                        </span>
+                        <span className="text-[9px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 uppercase tracking-wider">
+                          OneGridHub Upstream
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1 font-mono">
+                        <div className="bg-[#110524] p-2 rounded-lg border border-purple-900/50">
+                          <span className="text-[9px] font-bold text-purple-300/70 block uppercase font-sans tracking-wide">
+                            OneGridHub Price
+                          </span>
+                          <span className="text-xs sm:text-sm font-black text-white">
+                            ₦{providerPrice.toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        <div className="bg-[#110524] p-2 rounded-lg border border-amber-500/30">
+                          <span className="text-[9px] font-bold text-amber-300/80 block uppercase font-sans tracking-wide">
+                            My Markup
+                          </span>
+                          <span className="text-xs sm:text-sm font-black text-amber-400">
+                            +₦{markupAmount.toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        <div className="bg-[#110524] p-2 rounded-lg border border-emerald-500/30">
+                          <span className="text-[9px] font-bold text-emerald-300/80 block uppercase font-sans tracking-wide">
+                            Customer Price
+                          </span>
+                          <span className="text-xs sm:text-sm font-black text-emerald-400">
+                            ₦{calculatedPrice.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {priceLoading ? (
                     <div className="flex items-center space-x-2 py-2 text-xs text-purple-300">
                       <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
@@ -1377,6 +1424,11 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                             <span className="text-xs font-black text-emerald-400 font-mono mt-1">
                               ₦{opt.customerPrice.toLocaleString()}
                             </span>
+                            {isOwner && opt.providerCost !== undefined && (
+                              <span className="text-[9px] text-amber-300/80 font-mono block mt-0.5">
+                                Cost: ₦{opt.providerCost.toLocaleString()} • +₦{(opt.markup !== undefined ? opt.markup : (opt.customerPrice - opt.providerCost)).toLocaleString()}
+                              </span>
+                            )}
                           </div>
                         );
                       })}

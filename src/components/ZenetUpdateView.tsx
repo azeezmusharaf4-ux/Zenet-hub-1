@@ -159,7 +159,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
 
   // 2. Listen for User Orders in Firestore if logged in
   useEffect(() => {
-    if (!user) {
+    if (!user?.uid) {
       setMyOrders([]);
       return;
     }
@@ -186,7 +186,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]);
 
   // Filtered Products
   const filteredProducts = useMemo(() => {

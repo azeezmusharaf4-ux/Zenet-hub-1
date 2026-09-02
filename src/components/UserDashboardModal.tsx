@@ -122,7 +122,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
   const userReferralLink = typeof window !== 'undefined' ? `${window.location.origin}?ref=${userReferralCode}` : `https://zenethub.com/?ref=${userReferralCode}`;
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
     const q = query(collection(db, 'referrals'), where('referrerId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: ReferralRecord[] = [];
@@ -135,7 +135,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
       console.warn('Error reading referrals:', err);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]);
 
   // Reply message state in Inquiries tab
   const [replyText, setReplyText] = useState<{ [inquiryId: string]: string }>({});
