@@ -366,7 +366,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     const fetchServers = async () => {
       setServersLoading(true);
       try {
-        const { ok, data } = await safeFetchJson('/api/onegridhub/servers');
+        const { ok, data } = await safeFetchJson('/api/onegridhub/servers?action=servers');
         const serverList = Array.isArray(data) ? data : (data?.servers || data?.data || []);
         if (ok && serverList.length > 0) {
           setServers(serverList);
@@ -417,7 +417,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     const fetchCountries = async () => {
       setCountriesLoading(true);
       try {
-        const { ok, data } = await safeFetchJson(`/api/onegridhub/countries?server=${encodeURIComponent(selectedServer)}`);
+        const { ok, data } = await safeFetchJson(`/api/onegridhub/countries?action=countries&server=${encodeURIComponent(selectedServer)}`);
         const countryList = Array.isArray(data) ? data : (data?.countries || data?.data || []);
         if (ok && countryList.length > 0) {
           // Enrich countries with dial codes if missing
@@ -459,7 +459,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     const fetchServices = async () => {
       setServicesLoading(true);
       try {
-        const { ok, data } = await safeFetchJson(`/api/onegridhub/services?server=${encodeURIComponent(selectedServer)}&country=${encodeURIComponent(selectedCountry)}`);
+        const { ok, data } = await safeFetchJson(`/api/onegridhub/services?action=services&server=${encodeURIComponent(selectedServer)}&country=${encodeURIComponent(selectedCountry)}`);
         const serviceList = Array.isArray(data) ? data : (data?.services || data?.data || []);
         if (ok && serviceList.length > 0) {
           setServices(serviceList);
@@ -547,7 +547,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         headers['x-caller-email'] = callerEmail;
       }
       const { ok, data } = await safeFetchJson(
-        `/api/onegridhub/price?server=${encodeURIComponent(selectedServer)}&country=${encodeURIComponent(selectedCountry)}&service=${encodeURIComponent(selectedService)}&callerEmail=${encodeURIComponent(callerEmail)}`,
+        `/api/onegridhub/price?action=price&server=${encodeURIComponent(selectedServer)}&country=${encodeURIComponent(selectedCountry)}&service=${encodeURIComponent(selectedService)}&callerEmail=${encodeURIComponent(callerEmail)}`,
         { headers }
       );
       
@@ -626,7 +626,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     setOrdersLoading(true);
     try {
       const headers = await getAuthHeaders();
-      const { ok, data } = await safeFetchJson(`/api/onegridhub/orders?userId=${encodeURIComponent(userProfile.uid)}`, {
+      const { ok, data } = await safeFetchJson(`/api/onegridhub/orders?action=orders&userId=${encodeURIComponent(userProfile.uid)}`, {
         headers
       });
       if (ok && data) {
@@ -726,7 +726,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     pollingIntervalRef.current = setInterval(async () => {
       try {
         const headers = await getAuthHeaders();
-        const { ok, data } = await safeFetchJson(`/api/onegridhub/status?order_id=${encodeURIComponent(orderId)}&userId=${encodeURIComponent(userProfile?.uid || '')}`, {
+        const { ok, data } = await safeFetchJson(`/api/onegridhub/status?action=status&order_id=${encodeURIComponent(orderId)}&userId=${encodeURIComponent(userProfile?.uid || '')}`, {
           headers
         });
 

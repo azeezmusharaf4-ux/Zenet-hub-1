@@ -5043,4 +5043,5 @@ if (!process.env.NETLIFY && !process.env.AWS_LAMBDA_FUNCTION_NAME && !process.en
   startServer();
 }
 
+export { app };
 export default app;

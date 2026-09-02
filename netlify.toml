@@ -82,7 +82,7 @@
 # OneGridHub endpoints
 [[redirects]]
   from = "/api/onegridhub/*"
-  to = "/.netlify/functions/onegridhub/:splat"
+  to = "/.netlify/functions/onegridhub"
   status = 200
   force = true
 
@@ -95,7 +95,7 @@
 # Social Boost endpoints
 [[redirects]]
   from = "/api/social-boost/*"
-  to = "/.netlify/functions/social-boost/:splat"
+  to = "/.netlify/functions/social-boost"
   status = 200
   force = true
 
@@ -108,7 +108,7 @@
 # Unified Express API Serverless Function for all other /api/* routes
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "/.netlify/functions/api"
   status = 200
   force = true
 

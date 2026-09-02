@@ -372,7 +372,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         } catch {}
       }
 
-      const endpoint = `/api/social-boost/services?callerEmail=${encodeURIComponent(callerEmail)}`;
+      const endpoint = `/api/social-boost/services?action=services&callerEmail=${encodeURIComponent(callerEmail)}`;
       let data: any = null;
       try {
         const res = await fetch(endpoint, { headers });
@@ -440,8 +440,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     try {
       const token = await getSafeIdToken(auth.currentUser);
       const endpoint = isOwner && activeTab === 'manager' 
-        ? '/api/social-boost/orders?all=true' 
-        : `/api/social-boost/orders?userId=${encodeURIComponent(auth.currentUser.uid)}`;
+        ? '/api/social-boost/orders?action=orders&all=true' 
+        : `/api/social-boost/orders?action=orders&userId=${encodeURIComponent(auth.currentUser.uid)}`;
       
       const data = await safeApiFetch(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -649,7 +649,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ ...payload, action: 'order' })
       });
 
       if (!data || !data.success) {
@@ -671,7 +671,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   const handleRefreshStatus = async (orderId: string) => {
     setRefreshingOrderId(orderId);
     try {
-      const data = await safeApiFetch(`/api/social-boost/status/${orderId}`);
+      const data = await safeApiFetch(`/api/social-boost/status?action=status&orderId=${encodeURIComponent(orderId)}`);
       if (data && data.order) {
         setMyOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, ...data.order } : o));
       }
@@ -691,7 +691,11 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
       const token = await getSafeIdToken(auth.currentUser);
       const data = await safeApiFetch('/api/social-boost/sync-provider', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ action: 'sync-provider' })
       });
       if (data && data.success) {
         setSyncStatusMessage(data.message || 'Successfully synchronized real services from OneGridHub!');
@@ -719,7 +723,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(pricingSettings)
+        body: JSON.stringify({ ...pricingSettings, action: 'pricing-settings' })
       });
       if (data && data.success) {
         setSaveStatusMessage('Pricing rules and service visibility saved successfully!');

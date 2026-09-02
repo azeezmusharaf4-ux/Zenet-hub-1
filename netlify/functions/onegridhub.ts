@@ -146,19 +146,40 @@ export const handler = async (event: any) => {
       }
     }
 
-    const queryParams = event.queryStringParameters || {};
-    let action = (queryParams.action || body.action || '').toString().toLowerCase().trim();
+    const queryParams: Record<string, string> = { ...((event.queryStringParameters as Record<string, string>) || {}) };
 
     // Extract path candidates from event.path, rawUrl, and headers
     const pathCandidates: string[] = [];
     if (event.path) pathCandidates.push(event.path);
     if (event.rawUrl) {
       try {
-        pathCandidates.push(new URL(event.rawUrl).pathname);
+        const parsedUrl = new URL(event.rawUrl);
+        pathCandidates.push(parsedUrl.pathname + parsedUrl.search);
       } catch {}
     }
+    if (event.headers?.['x-nf-original-uri']) pathCandidates.push(event.headers['x-nf-original-uri']);
+    if (event.headers?.['x-rewrite-original-uri']) pathCandidates.push(event.headers['x-rewrite-original-uri']);
+    if (event.headers?.['x-bb-original-uri']) pathCandidates.push(event.headers['x-bb-original-uri']);
     if (event.headers?.['x-forwarded-uri']) pathCandidates.push(event.headers['x-forwarded-uri']);
+    if (event.headers?.['x-forwarded-url']) pathCandidates.push(event.headers['x-forwarded-url']);
     if (event.headers?.['x-original-url']) pathCandidates.push(event.headers['x-original-url']);
+
+    // Fallback: extract missing query parameters from raw URL or path candidate query strings
+    for (const p of pathCandidates) {
+      if (p && p.includes('?')) {
+        try {
+          const qs = p.split('?')[1];
+          const search = new URLSearchParams(qs);
+          for (const [k, v] of search.entries()) {
+            if (!queryParams[k]) {
+              queryParams[k] = v;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    let action = (queryParams.action || body.action || '').toString().toLowerCase().trim();
 
     if (!action) {
       const knownActions = [
@@ -299,16 +320,28 @@ export const handler = async (event: any) => {
       const server = normalizeServerId(queryParams.server || body.server || 'all1');
       if (apiKey) {
         try {
-          const res = await fetch(`${baseUrl}?action=countries&server=${encodeURIComponent(server)}&key=${encodeURIComponent(apiKey)}`, {
-            headers: { 'Accept': 'application/json' },
+          const q = new URLSearchParams({
+            action: 'countries',
+            endpoint: 'countries',
+            server,
+            key: apiKey,
+            api_key: apiKey
+          }).toString();
+          const res = await fetch(`${baseUrl}?${q}`, {
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Authorization': `Bearer ${apiKey}`,
+              'User-Agent': 'ZENET-Hub-Gateway/1.0'
+            },
             signal: AbortSignal.timeout(8000)
           });
           const data: any = await res.json();
-          if (data && data.status && Array.isArray(data.data) && data.data.length > 0) {
+          const rawCountries = Array.isArray(data) ? data : (data?.countries || data?.data || []);
+          if (Array.isArray(rawCountries) && rawCountries.length > 0) {
             return {
               statusCode: 200,
               headers,
-              body: JSON.stringify({ success: true, server, countries: data.data })
+              body: JSON.stringify({ success: true, server, countries: rawCountries, data: rawCountries })
             };
           }
         } catch (e) {
@@ -319,7 +352,7 @@ export const handler = async (event: any) => {
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ success: true, server, countries: DEFAULT_COUNTRIES })
+        body: JSON.stringify({ success: true, server, countries: DEFAULT_COUNTRIES, data: DEFAULT_COUNTRIES })
       };
     }
 
@@ -332,17 +365,31 @@ export const handler = async (event: any) => {
       let servicesList: any[] = [];
       if (apiKey) {
         try {
-          const res = await fetch(`${baseUrl}?action=services&server=${encodeURIComponent(server)}&country=${encodeURIComponent(country)}&key=${encodeURIComponent(apiKey)}`, {
-            headers: { 'Accept': 'application/json' },
+          const q = new URLSearchParams({
+            action: 'services',
+            endpoint: 'services',
+            server,
+            country,
+            key: apiKey,
+            api_key: apiKey
+          }).toString();
+          const res = await fetch(`${baseUrl}?${q}`, {
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Authorization': `Bearer ${apiKey}`,
+              'User-Agent': 'ZENET-Hub-Gateway/1.0'
+            },
             signal: AbortSignal.timeout(8000)
           });
           const data: any = await res.json();
-          if (data && data.status && Array.isArray(data.data) && data.data.length > 0) {
-            servicesList = data.data.map((s: any) => {
-              const baseCost = Number(s.price || s.rate || 600);
+          const rawServices = Array.isArray(data) ? data : (data?.services || data?.data || []);
+          if (Array.isArray(rawServices) && rawServices.length > 0) {
+            servicesList = rawServices.map((s: any) => {
+              const baseCost = Number(s.price || s.rate || s.cost || 600);
               const sellingPrice = calculateSellingPrice(baseCost, s.id || s.code, pricing);
               return {
-                ...s,
+                id: s.id || s.code,
+                name: s.name || s.id,
                 wholesalePrice: baseCost,
                 price: sellingPrice,
                 rate: sellingPrice
@@ -369,7 +416,7 @@ export const handler = async (event: any) => {
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ success: true, server, country, services: servicesList })
+        body: JSON.stringify({ success: true, server, country, services: servicesList, data: servicesList })
       };
     }
 
@@ -429,8 +476,21 @@ export const handler = async (event: any) => {
 
       if (apiKey) {
         try {
-          const pRes = await fetch(`${baseUrl}?action=price&service=${encodeURIComponent(service)}&country=${encodeURIComponent(country)}&server=${encodeURIComponent(server)}&key=${encodeURIComponent(apiKey)}`, {
-            headers: { 'Accept': 'application/json' },
+          const q = new URLSearchParams({
+            action: 'price',
+            endpoint: 'price',
+            service,
+            country,
+            server,
+            key: apiKey,
+            api_key: apiKey
+          }).toString();
+          const pRes = await fetch(`${baseUrl}?${q}`, {
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Authorization': `Bearer ${apiKey}`,
+              'User-Agent': 'ZENET-Hub-Gateway/1.0'
+            },
             signal: AbortSignal.timeout(6000)
           });
           const pData: any = await pRes.json();
@@ -568,13 +628,39 @@ export const handler = async (event: any) => {
 
       if (apiKey) {
         try {
-          const buyUrl = `${baseUrl}?action=buy&service=${encodeURIComponent(service)}&country=${encodeURIComponent(country)}&server=${encodeURIComponent(normalizedServer)}&key=${encodeURIComponent(apiKey)}`;
-          const pRes = await fetch(buyUrl, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(10000) });
-          const pData: any = await pRes.json();
-
-          if (pData && (pData.status || pData.order_id || pData.id || pData.data?.order_id)) {
-            providerOrderId = String(pData.order_id || pData.id || pData.data?.order_id || providerOrderId);
-            phoneNumber = String(pData.number || pData.phone || pData.data?.number || phoneNumber);
+          const q = new URLSearchParams({
+            action: 'buy',
+            endpoint: 'buy',
+            service,
+            country,
+            server: normalizedServer,
+            key: apiKey,
+            api_key: apiKey
+          }).toString();
+          const pRes = await fetch(`${baseUrl}?${q}`, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Authorization': `Bearer ${apiKey}`,
+              'User-Agent': 'ZENET-Hub-Gateway/1.0'
+            },
+            signal: AbortSignal.timeout(10000)
+          });
+          const text = await pRes.text();
+          if (text && text.trim().startsWith('ACCESS_NUMBER:')) {
+            const parts = text.trim().split(':');
+            if (parts.length >= 3) {
+              providerOrderId = parts[1].trim();
+              phoneNumber = parts.slice(2).join(':').trim();
+            }
+          } else {
+            try {
+              const pData = JSON.parse(text);
+              if (pData && (pData.status || pData.order_id || pData.id || pData.data?.order_id)) {
+                providerOrderId = String(pData.order_ref || pData.order_id || pData.id || pData.data?.order_id || providerOrderId);
+                phoneNumber = String(pData.phone || pData.number || pData.phone_number || pData.data?.number || phoneNumber);
+              }
+            } catch {}
           }
         } catch (pErr) {
           console.warn('[Netlify OneGridHub] Provider buy notice:', pErr);

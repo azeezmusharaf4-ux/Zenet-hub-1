@@ -135,8 +135,7 @@ export const handler = async (event: any) => {
       }
     }
 
-    const queryParams = event.queryStringParameters || {};
-    let action = (queryParams.action || body.action || '').toString().toLowerCase().trim();
+    const queryParams: Record<string, string> = { ...((event.queryStringParameters as Record<string, string>) || {}) };
     let orderIdParam = queryParams.orderId || queryParams.id || body.orderId || body.id || '';
 
     // Extract path candidates from event.path, rawUrl, and headers
@@ -144,11 +143,37 @@ export const handler = async (event: any) => {
     if (event.path) pathCandidates.push(event.path);
     if (event.rawUrl) {
       try {
-        pathCandidates.push(new URL(event.rawUrl).pathname);
+        const parsedUrl = new URL(event.rawUrl);
+        pathCandidates.push(parsedUrl.pathname + parsedUrl.search);
       } catch {}
     }
+    if (event.headers?.['x-nf-original-uri']) pathCandidates.push(event.headers['x-nf-original-uri']);
+    if (event.headers?.['x-rewrite-original-uri']) pathCandidates.push(event.headers['x-rewrite-original-uri']);
+    if (event.headers?.['x-bb-original-uri']) pathCandidates.push(event.headers['x-bb-original-uri']);
     if (event.headers?.['x-forwarded-uri']) pathCandidates.push(event.headers['x-forwarded-uri']);
+    if (event.headers?.['x-forwarded-url']) pathCandidates.push(event.headers['x-forwarded-url']);
     if (event.headers?.['x-original-url']) pathCandidates.push(event.headers['x-original-url']);
+
+    // Fallback: extract missing query parameters from raw URL or path candidate query strings
+    for (const p of pathCandidates) {
+      if (p && p.includes('?')) {
+        try {
+          const qs = p.split('?')[1];
+          const search = new URLSearchParams(qs);
+          for (const [k, v] of search.entries()) {
+            if (!queryParams[k]) {
+              queryParams[k] = v;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    if (!orderIdParam) {
+      orderIdParam = queryParams.orderId || queryParams.id || body.orderId || body.id || '';
+    }
+
+    let action = (queryParams.action || body.action || '').toString().toLowerCase().trim();
 
     if (!action) {
       const knownActions = [
@@ -251,7 +276,81 @@ export const handler = async (event: any) => {
         }
       }
 
-      // Fallback to BASE_SOCIAL_SERVICES if cache is empty
+      // If cache is empty or minimal, auto-fetch dynamic services from OneGridHub if key is present
+      if ((!serviceList || serviceList.length < 20) && apiKey) {
+        try {
+          const q = new URLSearchParams({
+            action: 'services',
+            endpoint: 'smm_services',
+            key: apiKey,
+            api_key: apiKey
+          }).toString();
+          const pUrl = `${getBaseUrl()}?${q}`;
+          const pRes = await fetch(pUrl, {
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Authorization': `Bearer ${apiKey}`,
+              'User-Agent': 'ZENET-Hub/1.0'
+            },
+            signal: AbortSignal.timeout(10000)
+          });
+          const pData: any = await pRes.json();
+
+          let rawServices: any[] = [];
+          if (Array.isArray(pData)) {
+            rawServices = pData;
+          } else if (pData && Array.isArray(pData.services)) {
+            rawServices = pData.services;
+          } else if (pData && Array.isArray(pData.data)) {
+            rawServices = pData.data;
+          }
+
+          if (rawServices.length > 0) {
+            const normalized = rawServices.map((s: any) => {
+              const sid = String(s.service || s.id || `smm-${Math.random()}`);
+              const sname = s.name || 'Social Media Service';
+              const scat = s.category || 'Social Services';
+              const { platform, category, type } = normalizeCategory(scat, sname);
+              const inputCfg = determineInputConfig(sname, type);
+              const rate = Number(s.rate || s.price || 1000);
+
+              return {
+                id: sid,
+                platform,
+                category,
+                name: sname,
+                type,
+                providerRatePer1000: rate,
+                min: Number(s.min || 10),
+                max: Number(s.max || 100000),
+                deliverySpeed: s.deliverySpeed || 'Instant - 24 Hours',
+                refill: Boolean(s.refill || s.refill === '1' || s.refill === true),
+                quality: s.quality || 'High Quality',
+                description: s.description || `${platform} ${type} with automated high-speed delivery.`,
+                inputLabel: inputCfg.inputLabel,
+                inputPlaceholder: inputCfg.inputPlaceholder,
+                inputType: inputCfg.inputType
+              };
+            });
+
+            serviceList = normalized;
+            lastSyncedAt = new Date().toISOString();
+
+            if (db) {
+              const catRef = doc(db, 'system_settings', 'social_boost_catalogue');
+              setDoc(catRef, {
+                services: normalized,
+                lastSyncedAt,
+                totalCount: normalized.length
+              }, { merge: true }).catch(() => {});
+            }
+          }
+        } catch (liveFetchErr: any) {
+          console.warn('[Netlify SocialBoost] Live services fetch notice:', liveFetchErr.message);
+        }
+      }
+
+      // Fallback to BASE_SOCIAL_SERVICES if cache and live fetch are empty
       if (!serviceList || serviceList.length === 0) {
         serviceList = [...BASE_SOCIAL_SERVICES];
       }
@@ -365,8 +464,21 @@ export const handler = async (event: any) => {
       }
 
       try {
-        const pUrl = `${getBaseUrl()}?action=services&key=${encodeURIComponent(apiKey)}`;
-        const pRes = await fetch(pUrl, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(15000) });
+        const q = new URLSearchParams({
+          action: 'services',
+          endpoint: 'smm_services',
+          key: apiKey,
+          api_key: apiKey
+        }).toString();
+        const pUrl = `${getBaseUrl()}?${q}`;
+        const pRes = await fetch(pUrl, {
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Authorization': `Bearer ${apiKey}`,
+            'User-Agent': 'ZENET-Hub/1.0'
+          },
+          signal: AbortSignal.timeout(15000)
+        });
         const pData: any = await pRes.json();
 
         let rawServices: any[] = [];
@@ -374,6 +486,8 @@ export const handler = async (event: any) => {
           rawServices = pData;
         } else if (pData && Array.isArray(pData.services)) {
           rawServices = pData.services;
+        } else if (pData && Array.isArray(pData.data)) {
+          rawServices = pData.data;
         }
 
         if (rawServices.length > 0) {
@@ -546,12 +660,17 @@ export const handler = async (event: any) => {
       // Submit order to OneGridHub SMM API if key configured
       let providerOrderId = null;
       let providerStatus = 'Processing';
-      if (apiKey && !isNaN(Number(targetService.id))) {
+      const rawServiceId = targetService.providerServiceId || targetService.service || targetService.id;
+      const cleanProviderSvcId = String(rawServiceId).replace(/^ogh-svc-/, '').replace(/^smm-/, '').trim();
+
+      if (apiKey && cleanProviderSvcId && !isNaN(Number(cleanProviderSvcId))) {
         try {
           const smmOrderParams = new URLSearchParams({
             action: 'add',
+            endpoint: 'smm_order',
             key: apiKey,
-            service: String(targetService.id),
+            api_key: apiKey,
+            service: cleanProviderSvcId,
             link: link.trim(),
             quantity: String(numQuantity)
           });
@@ -561,13 +680,18 @@ export const handler = async (event: any) => {
 
           const providerRes = await fetch(getBaseUrl(), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Accept': 'application/json, text/plain, */*',
+              'Authorization': `Bearer ${apiKey}`,
+              'User-Agent': 'ZENET-Hub/1.0'
+            },
             body: smmOrderParams.toString(),
             signal: AbortSignal.timeout(10000)
           });
           const pOrderData: any = await providerRes.json();
-          if (pOrderData && pOrderData.order) {
-            providerOrderId = pOrderData.order;
+          if (pOrderData && (pOrderData.order || pOrderData.order_id || pOrderData.id)) {
+            providerOrderId = pOrderData.order || pOrderData.order_id || pOrderData.id;
             providerStatus = 'In Progress';
           }
         } catch (pErr) {
