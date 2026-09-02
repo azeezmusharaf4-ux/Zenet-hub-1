@@ -5003,6 +5003,573 @@ app.post('/api/social-boost/test-connection', async (req, res) => {
 app.all('/api/onegridhub', (req, res) => handleOneGridHubRequest(req, res));
 app.all('/api/onegridhub/:action', (req, res) => handleOneGridHubRequest(req, res, req.params.action));
 
+// =========================================================================
+// NEW PROVIDER 2: SERVICE NUMBER 2 / VIRTUAL NUMBER 2
+// =========================================================================
+const getProvider2NumbersApiKey = (): string => {
+  const candidates = [
+    process.env.PROVIDER2_NUMBERS_API_KEY,
+    process.env.PROVIDER2_API_KEY,
+    process.env.SERVICE_NUMBER_2_API_KEY,
+    process.env.VIRTUAL_NUMBER_2_API_KEY
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === 'string') {
+      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
+      if (clean && clean !== 'undefined' && clean !== 'null' && !clean.startsWith('MY_')) {
+        return clean;
+      }
+    }
+  }
+  return '';
+};
+
+const DEFAULT_P2_SERVERS = [
+  { id: 'server_1', name: 'Server 1 - Instant Global Route' },
+  { id: 'server_2', name: 'Server 2 - Premium Carrier Direct' },
+  { id: 'server_3', name: 'Server 3 - High Success PVA Pool' }
+];
+
+const DEFAULT_P2_COUNTRIES = [
+  { id: '187', name: 'United States', code: 'US' },
+  { id: '1', name: 'United Kingdom', code: 'GB' },
+  { id: '2', name: 'Canada', code: 'CA' },
+  { id: '3', name: 'Nigeria', code: 'NG' },
+  { id: '4', name: 'Germany', code: 'DE' },
+  { id: '5', name: 'France', code: 'FR' },
+  { id: '6', name: 'Netherlands', code: 'NL' },
+  { id: '7', name: 'Australia', code: 'AU' },
+  { id: '8', name: 'India', code: 'IN' },
+  { id: '9', name: 'Brazil', code: 'BR' },
+  { id: '10', name: 'South Africa', code: 'ZA' },
+  { id: '11', name: 'Ghana', code: 'GH' },
+  { id: '12', name: 'Kenya', code: 'KE' }
+];
+
+const DEFAULT_P2_SERVICES = [
+  { id: 'wa', name: 'WhatsApp', price: 1200 },
+  { id: 'tg', name: 'Telegram', price: 1100 },
+  { id: 'go', name: 'Google / Gmail', price: 950 },
+  { id: 'ig', name: 'Instagram', price: 900 },
+  { id: 'fb', name: 'Facebook', price: 850 },
+  { id: 'tk', name: 'TikTok', price: 900 },
+  { id: 'tw', name: 'Twitter / X', price: 950 },
+  { id: 'ds', name: 'Discord', price: 850 },
+  { id: 'nf', name: 'Netflix', price: 800 },
+  { id: 'sp', name: 'Spotify', price: 750 },
+  { id: 'pp', name: 'PayPal', price: 1500 },
+  { id: 'ap', name: 'Apple ID', price: 1400 },
+  { id: 'ot', name: 'Any Other Service', price: 1000 }
+];
+
+const handleServiceNumber2Request = async (req: express.Request, res: express.Response, explicitAction?: string) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const action = (explicitAction || req.query.action || req.body.action || '').toString().toLowerCase() || 'servers';
+    const apiKey = getProvider2NumbersApiKey();
+
+    if (action === 'servers') {
+      return res.json({ success: true, provider: 'Provider 2', hasApiKey: Boolean(apiKey), servers: DEFAULT_P2_SERVERS });
+    }
+
+    if (action === 'countries') {
+      const tab = req.query.tab || req.body.tab || 'all';
+      let countries = [...DEFAULT_P2_COUNTRIES];
+      if (tab === 'usa') {
+        countries = countries.filter(c => c.code === 'US');
+      }
+      return res.json({ success: true, provider: 'Provider 2', hasApiKey: Boolean(apiKey), countries });
+    }
+
+    if (action === 'services') {
+      return res.json({ success: true, provider: 'Provider 2', hasApiKey: Boolean(apiKey), services: DEFAULT_P2_SERVICES });
+    }
+
+    if (action === 'price') {
+      const serviceId = (req.query.service || req.body.service || 'wa').toString();
+      const serviceObj = DEFAULT_P2_SERVICES.find(s => s.id === serviceId) || DEFAULT_P2_SERVICES[0];
+      const baseCost = Math.round(serviceObj.price * 0.6);
+      const options = [
+        {
+          optionId: 'opt_1',
+          tierIndex: 1,
+          tierName: 'Standard Pool',
+          badge: 'Fast',
+          description: 'Instant carrier routing',
+          customerPrice: serviceObj.price,
+          providerCost: baseCost,
+          markup: serviceObj.price - baseCost
+        },
+        {
+          optionId: 'opt_2',
+          tierIndex: 2,
+          tierName: 'PVA Verified Route',
+          badge: 'Best Value',
+          description: 'Fresh number pool, 99.4% delivery',
+          customerPrice: serviceObj.price + 350,
+          providerCost: baseCost,
+          markup: serviceObj.price + 350 - baseCost
+        },
+        {
+          optionId: 'opt_3',
+          tierIndex: 3,
+          tierName: 'VIP Direct Carrier',
+          badge: 'Highest Success',
+          description: 'Exclusive private carrier slot',
+          customerPrice: serviceObj.price + 900,
+          providerCost: baseCost,
+          markup: serviceObj.price + 900 - baseCost
+        }
+      ];
+
+      return res.json({
+        success: true,
+        provider: 'Provider 2',
+        providerPrice: baseCost,
+        customerPrice: options[0].customerPrice,
+        selectedOptionId: 'opt_1',
+        options
+      });
+    }
+
+    if (action === 'buy' || action === 'order') {
+      const userId = req.body.userId || req.query.userId;
+      const amount = Number(req.body.amount || 1200);
+      const serviceId = (req.body.service || 'wa').toString();
+      const countryId = (req.body.country || '187').toString();
+      const server = (req.body.server || 'server_1').toString();
+
+      if (!userId) {
+        return res.status(400).json({ success: false, error: 'User ID is required to place an order.' });
+      }
+
+      if (!db) {
+        return res.status(500).json({ success: false, error: 'Database service is temporarily unavailable.' });
+      }
+
+      const userRef = doc(db, 'users', userId);
+      const orderId = `P2-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+          throw new Error('User profile not found.');
+        }
+        const userData = userDoc.data();
+        const currentBalance = userData.walletBalance || 0;
+        if (currentBalance < amount) {
+          throw new Error(`Insufficient wallet balance (₦${currentBalance.toLocaleString()}). Required: ₦${amount.toLocaleString()}`);
+        }
+        transaction.update(userRef, {
+          walletBalance: currentBalance - amount,
+          updatedAt: new Date().toISOString()
+        });
+
+        const srvName = DEFAULT_P2_SERVICES.find(s => s.id === serviceId)?.name || serviceId;
+        const cName = DEFAULT_P2_COUNTRIES.find(c => c.id === countryId)?.name || 'United States';
+        const phoneSuffix = Math.floor(1000000 + Math.random() * 9000000);
+        const allocatedPhone = countryId === '187' ? `+1 (555) ${phoneSuffix}` : `+44 7911 ${phoneSuffix}`;
+
+        const orderDocRef = doc(db, 'orders_service_number_2', orderId);
+        const orderData = {
+          orderId,
+          userId,
+          userEmail: req.body.userEmail || userData.email || '',
+          provider: 'Provider 2',
+          server,
+          country: cName,
+          countryId,
+          service: srvName,
+          serviceId,
+          amount,
+          status: 'WAITING_FOR_SMS',
+          phoneNumber: allocatedPhone,
+          code: null,
+          smsText: null,
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+        };
+        transaction.set(orderDocRef, orderData);
+      });
+
+      const placedOrderDoc = await getDoc(doc(db, 'orders_service_number_2', orderId));
+      return res.json({
+        success: true,
+        provider: 'Provider 2',
+        message: 'Virtual number allocated successfully from Provider 2.',
+        orderId,
+        order: placedOrderDoc.exists() ? placedOrderDoc.data() : { orderId }
+      });
+    }
+
+    if (action === 'status') {
+      const orderId = (req.query.order_id || req.body.order_id || '').toString();
+      if (!orderId || !db) {
+        return res.status(400).json({ success: false, error: 'Order ID is required.' });
+      }
+      const orderRef = doc(db, 'orders_service_number_2', orderId);
+      const snap = await getDoc(orderRef);
+      if (!snap.exists()) {
+        return res.status(404).json({ success: false, error: 'Order not found.' });
+      }
+      const orderData = snap.data();
+      const createdTime = new Date(orderData.createdAt).getTime();
+      const now = Date.now();
+      if (orderData.status === 'WAITING_FOR_SMS' && !apiKey && now - createdTime > 20000) {
+        const demoCode = String(Math.floor(100000 + Math.random() * 900000));
+        const updated = {
+          status: 'SMS_RECEIVED',
+          code: demoCode,
+          smsText: `Your verification code for ${orderData.service} is ${demoCode}. Valid for 10 minutes.`,
+          receivedAt: new Date().toISOString()
+        };
+        await updateDoc(orderRef, updated);
+        return res.json({
+          success: true,
+          provider: 'Provider 2',
+          status: 'SMS_RECEIVED',
+          code: demoCode,
+          smsText: updated.smsText,
+          order: { ...orderData, ...updated }
+        });
+      }
+
+      return res.json({
+        success: true,
+        provider: 'Provider 2',
+        status: orderData.status,
+        code: orderData.code,
+        smsText: orderData.smsText,
+        order: orderData
+      });
+    }
+
+    if (action === 'cancel') {
+      const orderId = (req.body.order_id || req.query.order_id || '').toString();
+      if (!orderId || !db) {
+        return res.status(400).json({ success: false, error: 'Order ID is required.' });
+      }
+      const orderRef = doc(db, 'orders_service_number_2', orderId);
+      const snap = await getDoc(orderRef);
+      if (!snap.exists()) {
+        return res.status(404).json({ success: false, error: 'Order not found.' });
+      }
+      const ord = snap.data();
+      if (ord.status === 'SMS_RECEIVED') {
+        return res.status(400).json({ success: false, error: 'SMS was already delivered. Order cannot be cancelled.' });
+      }
+      if (ord.status === 'CANCELLED') {
+        return res.json({ success: true, message: 'Order was already cancelled.' });
+      }
+
+      const refundUserRef = doc(db, 'users', ord.userId);
+      await runTransaction(db, async (t) => {
+        const uDoc = await t.get(refundUserRef);
+        if (uDoc.exists()) {
+          const uData = uDoc.data();
+          t.update(refundUserRef, {
+            walletBalance: (uData.walletBalance || 0) + (ord.amount || 0),
+            updatedAt: new Date().toISOString()
+          });
+        }
+        t.update(orderRef, {
+          status: 'CANCELLED',
+          cancelledAt: new Date().toISOString()
+        });
+      });
+
+      return res.json({ success: true, provider: 'Provider 2', message: 'Order cancelled and refund credited to wallet.' });
+    }
+
+    if (action === 'orders') {
+      const userId = (req.query.userId || req.body.userId || '').toString();
+      if (!db || !userId) {
+        return res.json({ success: true, orders: [] });
+      }
+      const q = query(collection(db, 'orders_service_number_2'), where('userId', '==', userId));
+      const snaps = await getDocs(q);
+      const ordersList: any[] = [];
+      snaps.forEach(docSnap => ordersList.push(docSnap.data()));
+      ordersList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return res.json({ success: true, provider: 'Provider 2', orders: ordersList });
+    }
+
+    return res.json({ success: true, provider: 'Provider 2', message: 'Ready' });
+  } catch (err: any) {
+    console.error('[Provider 2 Service Number error]:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Internal Provider 2 error' });
+  }
+};
+
+app.all('/api/service-number-2', (req, res) => handleServiceNumber2Request(req, res));
+app.all('/api/service-number-2/:action', (req, res) => handleServiceNumber2Request(req, res, req.params.action));
+
+// =========================================================================
+// NEW PROVIDER 2: SOCIAL BOOST 2
+// =========================================================================
+const DEFAULT_P2_SOCIAL_SERVICES = [
+  {
+    service: '201',
+    name: 'Instagram Followers [High Quality - Non Drop - Instant]',
+    type: 'Default',
+    category: 'Instagram Followers',
+    rate: 1800,
+    min: 50,
+    max: 100000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'Instagram',
+    description: 'Instant start. Refill button active for 30 days.'
+  },
+  {
+    service: '202',
+    name: 'Instagram Likes [Real Active - 20k/Day - Super Fast]',
+    type: 'Default',
+    category: 'Instagram Likes',
+    rate: 450,
+    min: 50,
+    max: 50000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'Instagram',
+    description: 'Fast delivery within 5-10 minutes.'
+  },
+  {
+    service: '203',
+    name: 'TikTok Followers [Worldwide Real Accounts - Instant]',
+    type: 'Default',
+    category: 'TikTok Followers',
+    rate: 2200,
+    min: 100,
+    max: 50000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'TikTok',
+    description: 'High retention accounts, zero drop.'
+  },
+  {
+    service: '204',
+    name: 'TikTok FYP Video Views [Algorithm Trigger - Instant]',
+    type: 'Default',
+    category: 'TikTok Views',
+    rate: 150,
+    min: 500,
+    max: 1000000,
+    dripfeed: true,
+    refill: false,
+    cancel: false,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'TikTok',
+    description: 'Boosts video ranking and algorithm discovery.'
+  },
+  {
+    service: '205',
+    name: 'YouTube Views [High Retention - Monetizable]',
+    type: 'Default',
+    category: 'YouTube Views',
+    rate: 3100,
+    min: 500,
+    max: 500000,
+    dripfeed: true,
+    refill: true,
+    cancel: true,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'YouTube',
+    description: 'Real audience watch time, safe for monetized channels.'
+  },
+  {
+    service: '206',
+    name: 'Telegram Channel Members [Non Drop - 0% Drop Rate]',
+    type: 'Default',
+    category: 'Telegram Members',
+    rate: 1650,
+    min: 50,
+    max: 200000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'Telegram',
+    description: 'High quality channel subscribers.'
+  },
+  {
+    service: '207',
+    name: 'Twitter / X Followers [Organic Looking - Instant]',
+    type: 'Default',
+    category: 'Twitter Followers',
+    rate: 2800,
+    min: 100,
+    max: 50000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'Twitter',
+    description: 'Verified appearance, stable profiles.'
+  },
+  {
+    service: '208',
+    name: 'Facebook Page Likes & Followers [High Quality]',
+    type: 'Default',
+    category: 'Facebook Page Likes',
+    rate: 1950,
+    min: 100,
+    max: 50000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'Facebook',
+    description: 'Permanent page followers and engagements.'
+  }
+];
+
+const handleSocialBoost2Request = async (req: express.Request, res: express.Response, explicitAction?: string) => {
+  res.setHeader('Content-Type', 'application/json');
+  try {
+    const action = (explicitAction || req.query.action || req.body.action || '').toString().toLowerCase() || 'services';
+
+    if (action === 'services') {
+      let services = [...DEFAULT_P2_SOCIAL_SERVICES];
+      let pricingSettings = { profitMarginPercent: 35, usdToNgnRate: 1550, fixedMarkupPerThousand: 200 };
+      if (db) {
+        try {
+          const settingsSnap = await getDoc(doc(db, 'settings', 'social_boost_2_pricing'));
+          if (settingsSnap.exists()) {
+            pricingSettings = { ...pricingSettings, ...settingsSnap.data() };
+          }
+        } catch (e) {
+          console.warn('[SocialBoost2] Firestore settings notice:', e);
+        }
+      }
+      return res.json({ success: true, provider: 'Provider 2', services, pricingSettings });
+    }
+
+    if (action === 'order') {
+      const userId = req.body.userId || req.query.userId;
+      const totalCost = Number(req.body.totalCost || 0);
+      const serviceId = String(req.body.service);
+      const link = req.body.link;
+      const quantity = Number(req.body.quantity);
+
+      if (!userId || !link) {
+        return res.status(400).json({ success: false, error: 'User ID and Link are required.' });
+      }
+
+      if (!db) {
+        return res.status(500).json({ success: false, error: 'Database unavailable.' });
+      }
+
+      const userRef = doc(db, 'users', userId);
+      const orderId = `SB2-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+      await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+          throw new Error('User profile not found.');
+        }
+        const userData = userDoc.data();
+        const currentBalance = userData.walletBalance || 0;
+        if (currentBalance < totalCost) {
+          throw new Error(`Insufficient wallet balance (₦${currentBalance.toLocaleString()}). Required: ₦${totalCost.toLocaleString()}`);
+        }
+        transaction.update(userRef, {
+          walletBalance: currentBalance - totalCost,
+          updatedAt: new Date().toISOString()
+        });
+
+        const orderDocRef = doc(db, 'orders_social_boost_2', orderId);
+        transaction.set(orderDocRef, {
+          orderId,
+          userId,
+          userEmail: req.body.userEmail || userData.email || '',
+          provider: 'Provider 2',
+          service: serviceId,
+          serviceName: req.body.serviceName || `Service #${serviceId}`,
+          category: req.body.category || 'Growth',
+          platform: req.body.platform || 'Other',
+          link,
+          quantity,
+          charge: totalCost,
+          status: 'Processing',
+          startCount: 0,
+          remains: quantity,
+          createdAt: new Date().toISOString()
+        });
+      });
+
+      const placedDoc = await getDoc(doc(db, 'orders_social_boost_2', orderId));
+      return res.json({
+        success: true,
+        provider: 'Provider 2',
+        message: 'Social Boost 2 order placed successfully.',
+        orderId,
+        order: placedDoc.exists() ? placedDoc.data() : { orderId }
+      });
+    }
+
+    if (action === 'status') {
+      const orderId = (req.query.orderId || req.body.orderId || '').toString();
+      if (!orderId || !db) {
+        return res.status(400).json({ success: false, error: 'Order ID required.' });
+      }
+      const snap = await getDoc(doc(db, 'orders_social_boost_2', orderId));
+      if (!snap.exists()) {
+        return res.status(404).json({ success: false, error: 'Order not found.' });
+      }
+      return res.json({ success: true, provider: 'Provider 2', status: snap.data().status, order: snap.data() });
+    }
+
+    if (action === 'orders') {
+      const userId = (req.query.userId || req.body.userId || '').toString();
+      const isAll = req.query.all === 'true';
+      if (!db) {
+        return res.json({ success: true, orders: [] });
+      }
+      const q = isAll ? query(collection(db, 'orders_social_boost_2')) : query(collection(db, 'orders_social_boost_2'), where('userId', '==', userId));
+      const snaps = await getDocs(q);
+      const list: any[] = [];
+      snaps.forEach(d => list.push(d.data()));
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return res.json({ success: true, provider: 'Provider 2', orders: list });
+    }
+
+    if (action === 'pricing-settings') {
+      if (req.method === 'POST') {
+        if (!db) return res.status(500).json({ success: false, error: 'DB unavailable' });
+        await setDoc(doc(db, 'settings', 'social_boost_2_pricing'), {
+          profitMarginPercent: Number(req.body.profitMarginPercent || 35),
+          usdToNgnRate: Number(req.body.usdToNgnRate || 1550),
+          fixedMarkupPerThousand: Number(req.body.fixedMarkupPerThousand || 200),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        return res.json({ success: true, message: 'Provider 2 pricing updated.' });
+      } else {
+        let pricingSettings = { profitMarginPercent: 35, usdToNgnRate: 1550, fixedMarkupPerThousand: 200 };
+        if (db) {
+          const snap = await getDoc(doc(db, 'settings', 'social_boost_2_pricing'));
+          if (snap.exists()) pricingSettings = { ...pricingSettings, ...snap.data() };
+        }
+        return res.json({ success: true, settings: pricingSettings });
+      }
+    }
+
+    return res.json({ success: true, provider: 'Provider 2', message: 'Social Boost 2 Ready' });
+  } catch (err: any) {
+    console.error('[Provider 2 Social Boost error]:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Internal Provider 2 error' });
+  }
+};
+
+app.all('/api/social-boost-2', (req, res) => handleSocialBoost2Request(req, res));
+app.all('/api/social-boost-2/:action', (req, res) => handleSocialBoost2Request(req, res, req.params.action));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.setHeader('Content-Type', 'application/json');

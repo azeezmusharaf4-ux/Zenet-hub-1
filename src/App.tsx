@@ -51,8 +51,10 @@ import { AdminWalletsView } from './components/AdminWalletsView';
 import { ZenetUpdateModal } from './components/ZenetUpdateModal';
 import { ZenetUpdateAdminModal } from './components/ZenetUpdateAdminModal';
 import { SocialBoostView } from './components/SocialBoostView';
+import { VirtualNumbers2View } from './components/VirtualNumbers2View';
+import { SocialBoost2View } from './components/SocialBoost2View';
 import { PWAInstallBanner } from './components/PWAInstallPrompt';
-import { Phone, UserCheck } from 'lucide-react';
+import { Phone, UserCheck, PhoneCall, Flame } from 'lucide-react';
 
 import { 
   ShieldCheck, 
@@ -409,7 +411,9 @@ export default function App() {
     const VALID_PAGE_VIEWS: ActiveAppView[] = [
       'marketplace',
       'social-boost',
+      'social-boost-2',
       'virtual-numbers',
+      'virtual-numbers-2',
       'log-accounts',
       'categories',
       'support',
@@ -502,7 +506,9 @@ export default function App() {
       view === 'support' ||
       view === 'admin_wallets' ||
       view === 'social-boost' ||
+      view === 'social-boost-2' ||
       view === 'virtual-numbers' ||
+      view === 'virtual-numbers-2' ||
       view === 'log-accounts'
     ) {
       navigateRoute({ view, dashboardTab: null, walletModal: false, product: null, seller: null });
@@ -575,7 +581,9 @@ export default function App() {
       const validViews: ActiveAppView[] = [
         'marketplace',
         'social-boost',
+        'social-boost-2',
         'virtual-numbers',
+        'virtual-numbers-2',
         'log-accounts',
         'categories',
         'support',
@@ -1987,6 +1995,34 @@ export default function App() {
             />
           )}
 
+          {/* VIEW: SERVICE NUMBER 2 / VIRTUAL NUMBER 2 (NEW PROVIDER 2) */}
+          {activeView === 'virtual-numbers-2' && userProfile && (
+            <VirtualNumbers2View
+              userProfile={userProfile}
+              walletBalance={walletBalance}
+              onRefreshProfile={async () => {
+                if (!user) return;
+                const userRef = doc(db, 'users', user.uid);
+                const uSnap = await getDoc(userRef);
+                if (uSnap.exists()) {
+                  setUserProfile(uSnap.data() as UserProfile);
+                }
+              }}
+              onBackToMarketplace={() => setActiveView('marketplace')}
+              onOpenWallet={() => handleSelectView('wallet')}
+            />
+          )}
+
+          {/* VIEW: SOCIAL BOOST 2 (NEW PROVIDER 2) */}
+          {activeView === 'social-boost-2' && (
+            <SocialBoost2View
+              userProfile={userProfile}
+              walletBalance={walletBalance}
+              onBackToMarketplace={() => setActiveView('marketplace')}
+              onOpenWallet={() => handleSelectView('wallet')}
+            />
+          )}
+
           {/* VIEW 3: MARKETPLACE HOME */}
           {activeView === 'marketplace' && (
             <>
@@ -2023,8 +2059,8 @@ export default function App() {
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  {/* ROW 1 LEFT: Log Accounts */}
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {/* 1. Log Accounts */}
                   <button
                     id="main-service-log-accounts"
                     onClick={() => setActiveView('log-accounts')}
@@ -2041,24 +2077,24 @@ export default function App() {
                     </div>
                   </button>
 
-                  {/* ROW 1 RIGHT: Virtual Numbers */}
+                  {/* 2. Service Number */}
                   <button
                     id="main-service-virtual-numbers"
-                    onClick={() => setActiveView('virtual-numbers')}
+                    onClick={() => user ? setActiveView('virtual-numbers') : setAuthMode('login')}
                     className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#4d24a3] hover:bg-[#12082b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px]"
                   >
                     <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-[#bd93f9] border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center">
                       <Phone className="w-6.5 h-6.5" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-white text-sm sm:text-base">Virtual Numbers</h4>
+                      <h4 className="font-extrabold text-white text-sm sm:text-base">Service Number</h4>
                       <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
                         Buy active virtual phone numbers
                       </p>
                     </div>
                   </button>
 
-                  {/* ROW 2 LEFT: Social Boost */}
+                  {/* 3. Social Boost */}
                   <button
                     id="main-service-social-boost"
                     onClick={() => handleSelectView('social-boost')}
@@ -2075,7 +2111,7 @@ export default function App() {
                     </div>
                   </button>
 
-                  {/* ROW 2 RIGHT: Zenet update */}
+                  {/* 4. Zenet Update */}
                   <button
                     id="main-service-zenet-update"
                     onClick={() => setIsZenetUpdateModalOpen(true)}
@@ -2085,9 +2121,49 @@ export default function App() {
                       <Sparkles className="w-6.5 h-6.5" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-white text-sm sm:text-base">ZENET HUB Update</h4>
+                      <h4 className="font-extrabold text-white text-sm sm:text-base">Zenet Update</h4>
                       <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
                         Get the latest verified system updates and digital releases
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* 5. Service Number 2 */}
+                  <button
+                    id="main-service-virtual-numbers-2"
+                    onClick={() => user ? handleSelectView('virtual-numbers-2') : setAuthMode('login')}
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#8a4ff7] hover:bg-[#13072b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px] relative overflow-hidden"
+                  >
+                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-purple-600/30 text-purple-300 border border-purple-500/40 text-[9px] font-black uppercase tracking-wider">
+                      Provider 2
+                    </div>
+                    <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-purple-400 border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center">
+                      <PhoneCall className="w-6.5 h-6.5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-extrabold text-white text-sm sm:text-base">Service Number 2</h4>
+                      <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
+                        Buy Provider 2 virtual numbers & instant SMS
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* 6. Social Boost 2 */}
+                  <button
+                    id="main-service-social-boost-2"
+                    onClick={() => handleSelectView('social-boost-2')}
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#8a4ff7] hover:bg-[#13072b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px] relative overflow-hidden"
+                  >
+                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-[9px] font-black uppercase tracking-wider">
+                      Provider 2
+                    </div>
+                    <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-indigo-400 border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center">
+                      <Flame className="w-6.5 h-6.5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-extrabold text-white text-sm sm:text-base">Social Boost 2</h4>
+                      <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
+                        Provider 2 high-speed social boost & growth panel
                       </p>
                     </div>
                   </button>

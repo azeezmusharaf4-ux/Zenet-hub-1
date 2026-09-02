@@ -105,6 +105,32 @@
   status = 200
   force = true
 
+# NEW PROVIDER 2: Service Number 2 / Virtual Number 2 endpoints
+[[redirects]]
+  from = "/api/service-number-2/*"
+  to = "/.netlify/functions/service-number-2"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/service-number-2"
+  to = "/.netlify/functions/service-number-2"
+  status = 200
+  force = true
+
+# NEW PROVIDER 2: Social Boost 2 endpoints
+[[redirects]]
+  from = "/api/social-boost-2/*"
+  to = "/.netlify/functions/social-boost-2"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/social-boost-2"
+  to = "/.netlify/functions/social-boost-2"
+  status = 200
+  force = true
+
 # Unified Express API Serverless Function for all other /api/* routes
 [[redirects]]
   from = "/api/*"
