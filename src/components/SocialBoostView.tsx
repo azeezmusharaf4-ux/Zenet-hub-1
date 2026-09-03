@@ -324,6 +324,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const [refreshingOrderId, setRefreshingOrderId] = useState<string | null>(null);
+  const [refillingOrderId, setRefillingOrderId] = useState<string | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ orderId: string; text: string; isError?: boolean } | null>(null);
 
   // Owner Manager State
   const [pricingSettings, setPricingSettings] = useState<SocialBoostPricingSettings>({

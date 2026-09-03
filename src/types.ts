@@ -309,6 +309,8 @@ export interface ZenedUpdateOrder {
 
 export interface SocialBoostService {
   id: string;
+  service?: string | number; // Upstream service ID alias
+  rate?: number; // Upstream rate alias
   platform: 'TikTok' | 'Instagram' | 'Facebook' | 'YouTube' | 'Twitter/X' | 'Telegram' | 'Spotify' | 'Threads' | 'Other' | string;
   category: string;
   name: string;
@@ -340,15 +342,23 @@ export interface SocialBoostOrder {
   platform: string;
   serviceId: string;
   serviceName: string;
-  serviceType: string;
-  target: string;
+  serviceType?: string;
+  target?: string;
+  targetUrl?: string;
+  link?: string;
   quantity: number;
   charge: number; // in NGN
+  totalChargeNgn?: number;
   providerCost?: number;
   markup?: number;
   profit?: number;
   providerOrderId?: string;
+  provider?: string;
   status: 'pending' | 'in_progress' | 'processing' | 'completed' | 'partial' | 'canceled' | string;
+  refill?: boolean;
+  cancel?: boolean;
+  refillStatus?: string;
+  refillRequestedAt?: string;
   startCount?: number;
   remains?: number;
   createdAt: string;

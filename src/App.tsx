@@ -2018,8 +2018,17 @@ export default function App() {
             <SocialBoost2View
               userProfile={userProfile}
               walletBalance={walletBalance}
+              onRefreshProfile={async () => {
+                if (!user) return;
+                const userRef = doc(db, 'users', user.uid);
+                const uSnap = await getDoc(userRef);
+                if (uSnap.exists()) {
+                  setUserProfile(uSnap.data() as UserProfile);
+                }
+              }}
               onBackToMarketplace={() => setActiveView('marketplace')}
               onOpenWallet={() => handleSelectView('wallet')}
+              onSwitchToServer1={() => handleSelectView('social-boost')}
             />
           )}
 
