@@ -33,6 +33,16 @@ app.use(express.json({
   }
 }));
 
+// Route Normalization Safeguard: strip any accidental client prefix (e.g. /VITE_API_URL/api/* -> /api/*)
+app.use((req, _res, next) => {
+  if (req.url.startsWith('/VITE_API_URL/')) {
+    req.url = req.url.replace('/VITE_API_URL', '');
+  } else if (req.url.startsWith('/undefined/')) {
+    req.url = req.url.replace('/undefined', '');
+  }
+  next();
+});
+
 // --- ANTI-SPAM, BOT PROTECTION & RATE LIMITING MIDDLEWARE ---
 interface RateLimitBucket {
   count: number;
@@ -1297,11 +1307,18 @@ function getOneGridHubConfig() {
   }
 
   const rawKey = (
+    process.env.ONEGRIDHUB_SMM_API_KEY ||
     process.env.ONEGRIDHUB_API_KEY ||
     process.env.ONEGRID_API_KEY ||
+    process.env.VITE_ONEGRID_API_KEY ||
+    process.env.VITE_ONEGRIDHUB_API_KEY ||
+    process.env.VITE_ONEGRIDHUB_SMM_API_KEY ||
     process.env.ONEGRIDHUB_KEY ||
+    process.env.ONEGRIDHUB_SMM_KEY ||
     process.env.ONE_GRID_HUB_API_KEY ||
     process.env.OGH_API_KEY ||
+    process.env.SMM_API_KEY ||
+    process.env.VITE_SMM_API_KEY ||
     process.env.VIRTUAL_NUMBER_API_KEY ||
     process.env.ONEGRIDHUB_TOKEN ||
     process.env.ONEGRIDHUB_SECRET ||
@@ -1313,7 +1330,7 @@ function getOneGridHubConfig() {
   const apiKey = isConfigured ? rawKey : '';
   const isRealKey = Boolean(apiKey && !['ONEGRIDHUB_API_KEY', 'YOUR_API_KEY', 'MY_ONEGRIDHUB_API_KEY', 'PLACEHOLDER', 'UNDEFINED', 'NULL'].includes(apiKey.toUpperCase()) && !apiKey.startsWith('MY_'));
 
-  const markup = envMarkup || Number(process.env.VIRTUAL_NUMBER_MARKUP) || 500;
+  const markup = envMarkup || Number(process.env.DIGITAL_PRODUCT_MARKUP) || Number(process.env.VITE_DIGITAL_PRODUCT_MARKUP) || Number(process.env.VIRTUAL_NUMBER_MARKUP) || 500;
   let rawBaseUrl = (process.env.ONEGRIDHUB_BASE_URL || envBaseUrl || 'https://onegridhub.com/api/v1/index.php')
     .trim()
     .replace(/^["']|["']$/g, '')
@@ -1874,6 +1891,15 @@ function calculateZenetPrice(providerPrice: number): { markup: number; customerP
   return { markup, customerPrice };
 }
 
+// In-memory cache for virtual numbers servers, countries, and services to prevent upstream timeouts and ensure high availability
+interface CachedVirtualEntry<T> {
+  timestamp: number;
+  data: T;
+}
+const cachedCountriesByServer = new Map<string, CachedVirtualEntry<any[]>>();
+let cachedServersList: CachedVirtualEntry<any[]> | null = null;
+const cachedServicesByServerCountry = new Map<string, CachedVirtualEntry<any[]>>();
+
 const handleOneGridHubRequest = async (req: express.Request, res: express.Response, explicitAction?: string) => {
   res.setHeader('Content-Type', 'application/json');
   try {
@@ -1944,6 +1970,8 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
       { id: '36', name: 'Canada', code: '+1' },
       { id: '14', name: 'Nigeria', code: '+234' },
       { id: '31', name: 'South Africa', code: '+27' },
+      { id: '8', name: 'Kenya', code: '+254' },
+      { id: '38', name: 'Ghana', code: '+233' },
       { id: '43', name: 'Germany', code: '+49' },
       { id: '77', name: 'France', code: '+33' },
       { id: '48', name: 'Netherlands', code: '+31' },
@@ -1951,9 +1979,17 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
       { id: '22', name: 'India', code: '+91' },
       { id: '4', name: 'Philippines', code: '+63' },
       { id: '6', name: 'Indonesia', code: '+62' },
-      { id: '8', name: 'Kenya', code: '+254' },
-      { id: '38', name: 'Ghana', code: '+233' },
-      { id: '61', name: 'Australia', code: '+61' }
+      { id: '61', name: 'Australia', code: '+61' },
+      { id: '21', name: 'Egypt', code: '+20' },
+      { id: '15', name: 'Poland', code: '+48' },
+      { id: '86', name: 'Italy', code: '+39' },
+      { id: '56', name: 'Spain', code: '+34' },
+      { id: '62', name: 'Turkey', code: '+90' },
+      { id: '54', name: 'Mexico', code: '+52' },
+      { id: '33', name: 'Colombia', code: '+57' },
+      { id: '39', name: 'Argentina', code: '+54' },
+      { id: '46', name: 'Sweden', code: '+46' },
+      { id: '181', name: 'Switzerland', code: '+41' }
     ];
 
     const getStandardServiceName = (serviceId: string, rawName?: string): string => {
@@ -2050,13 +2086,13 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
               'Content-Type': 'application/json'
             },
             body: reqBody ? JSON.stringify(reqBody) : undefined,
-            signal: AbortSignal.timeout(8000)
+            signal: AbortSignal.timeout(15000)
           });
         } else {
           resp = await fetch(directUrl, {
             method: 'GET',
             headers,
-            signal: AbortSignal.timeout(8000)
+            signal: AbortSignal.timeout(15000)
           });
         }
 
@@ -2074,8 +2110,13 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
         } catch {
           return { rawText: trimmed };
         }
-      } catch (err) {
-        console.warn(`[OneGridHub Query] Error on ${endpoint}:`, err);
+      } catch (err: any) {
+        const isTimeout = err?.name === 'TimeoutError' || err?.message?.includes('timeout') || err?.code === 'UND_ERR_CONNECT_TIMEOUT';
+        if (isTimeout) {
+          console.log(`[OneGridHub Query] Upstream note: query for "${endpoint}" timed out (using high-availability cached fallback).`);
+        } else {
+          console.log(`[OneGridHub Query] Upstream note on ${endpoint}:`, err?.message || err);
+        }
         return null;
       }
     };
@@ -2186,17 +2227,28 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
     if (method === 'GET') {
       // 2a. SERVERS
       if (action === 'servers') {
+        const now = Date.now();
+        if (cachedServersList && (now - cachedServersList.timestamp < 3600 * 1000)) {
+          return res.json(cachedServersList.data);
+        }
+
         if (isRealKey) {
-          const data = await queryOneGridHub('servers');
-          if (data && data.status === 'success' && Array.isArray(data.servers)) {
-            const normalizedServers = data.servers.map((s: any) => ({
-              id: s.id,
-              name: s.label || s.name || `${s.region || 'Server'} (${s.id})`,
-              region: s.region || (s.id.startsWith('usa') ? 'USA' : 'Global')
-            }));
-            return res.json(normalizedServers);
+          try {
+            const data = await queryOneGridHub('servers');
+            if (data && data.status === 'success' && Array.isArray(data.servers) && data.servers.length > 0) {
+              const normalizedServers = data.servers.map((s: any) => ({
+                id: s.id,
+                name: s.label || s.name || `${s.region || 'Server'} (${s.id})`,
+                region: s.region || (s.id.startsWith('usa') ? 'USA' : 'Global')
+              }));
+              cachedServersList = { timestamp: now, data: normalizedServers };
+              return res.json(normalizedServers);
+            }
+          } catch (serversErr: any) {
+            console.log('[OneGridHub] Servers fetch note:', serversErr?.message || serversErr);
           }
         }
+        cachedServersList = { timestamp: now, data: defaultServers };
         return res.json(defaultServers);
       }
 
@@ -2204,6 +2256,13 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
       if (action === 'countries') {
         const rawServer = (req.query.server || '').toString();
         const server = normalizeServerId(rawServer);
+        const now = Date.now();
+
+        // 1. Instant return if in fresh cache (< 2 hours)
+        const cached = cachedCountriesByServer.get(server);
+        if (cached && (now - cached.timestamp < 2 * 3600 * 1000)) {
+          return res.json(cached.data);
+        }
 
         if (isRealKey) {
           try {
@@ -2244,13 +2303,23 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
 
                   return a.name.localeCompare(b.name);
                 });
+
+                cachedCountriesByServer.set(server, { timestamp: now, data: normalizedCountries });
                 return res.json(normalizedCountries);
               }
             }
-          } catch (countriesErr) {
-            console.warn('[OneGridHub] Countries fetch notice:', countriesErr);
+          } catch (countriesErr: any) {
+            console.log('[OneGridHub] Countries fetch notice:', countriesErr?.message || countriesErr);
           }
         }
+
+        // If upstream timed out or was temporarily unavailable, check for existing cached data
+        if (cached && cached.data.length > 0) {
+          return res.json(cached.data);
+        }
+
+        // Return rich default countries and cache to prevent repeated waits
+        cachedCountriesByServer.set(server, { timestamp: now, data: defaultCountries });
         return res.json(defaultCountries);
       }
 
@@ -2259,6 +2328,13 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
         const rawServer = (req.query.server || '').toString();
         const server = normalizeServerId(rawServer);
         const country = (req.query.country || '').toString();
+        const cacheKey = `${server}_${country}`;
+        const now = Date.now();
+
+        const cached = cachedServicesByServerCountry.get(cacheKey);
+        if (cached && (now - cached.timestamp < 30 * 60 * 1000)) {
+          return res.json(cached.data);
+        }
 
         if (isRealKey) {
           try {
@@ -2291,15 +2367,21 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
                   if (bIndex !== -1) return 1;
                   return a.name.localeCompare(b.name);
                 });
+
+                cachedServicesByServerCountry.set(cacheKey, { timestamp: now, data: normalizedServices });
                 return res.json(normalizedServices);
               }
             }
-          } catch (svcErr) {
-            console.warn('[OneGridHub] Services fetch notice:', svcErr);
+          } catch (svcErr: any) {
+            console.log('[OneGridHub] Services fetch notice:', svcErr?.message || svcErr);
           }
         }
 
-        return res.json([
+        if (cached && cached.data.length > 0) {
+          return res.json(cached.data);
+        }
+
+        const fallbackServices = [
           { id: 'whatsapp', name: 'WhatsApp & WA Business' },
           { id: 'telegram', name: 'Telegram' },
           { id: 'google', name: 'Google / Gmail / YouTube' },
@@ -2320,7 +2402,10 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           { id: 'microsoft', name: 'Microsoft / Outlook / Azure' },
           { id: 'tinder', name: 'Tinder / Match' },
           { id: 'linkedin', name: 'LinkedIn' }
-        ]);
+        ];
+
+        cachedServicesByServerCountry.set(cacheKey, { timestamp: now, data: fallbackServices });
+        return res.json(fallbackServices);
       }
 
       // 2d. LIVE PROVIDER PRICING & ZENET HUB MULTI-OPTION MARKUP CALCULATION
@@ -3823,12 +3908,13 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
           pageNumbers.push(p);
         }
 
-        // Fetch remaining pages concurrently in batches of 8 with per-page retry
-        const batchSize = 8;
+        // Fetch remaining pages gently in batches of 3 with exponential backoff and inter-batch pause
+        const batchSize = 3;
         for (let i = 0; i < pageNumbers.length; i += batchSize) {
           const batch = pageNumbers.slice(i, i + batchSize);
           const batchPromises = batch.map(async (pageNum) => {
-            for (let attempt = 1; attempt <= 3; attempt++) {
+            const maxAttempts = 4;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
               try {
                 const q = new URLSearchParams({
                   endpoint: 'smm_services',
@@ -3839,21 +3925,26 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
 
                 const r = await fetch(`${baseUrl}?${q}`, {
                   headers: { 'Accept': 'application/json', 'User-Agent': 'ZENET-Hub/1.0' },
-                  signal: AbortSignal.timeout(12000)
+                  signal: AbortSignal.timeout(25000)
                 });
 
                 if (r.ok) {
-                  const d: any = await r.json();
+                  const d: any = await r.json().catch(() => null);
+                  if (!d) return [];
                   const items = Array.isArray(d) ? d : (d.services || d.data || []);
-                  if (Array.isArray(items) && items.length > 0) {
+                  if (Array.isArray(items)) {
                     return items;
                   }
+                } else if (r.status === 404 || r.status === 400) {
+                  // Page index beyond available count, stop retrying
+                  return [];
                 }
               } catch (pageErr: any) {
-                if (attempt === 3) {
-                  console.warn(`[SocialBoost] Notice fetching SMM page ${pageNum} after 3 attempts:`, pageErr.message);
+                if (attempt === maxAttempts) {
+                  console.log(`[SocialBoost] Note: SMM page ${pageNum} omitted (${pageErr?.message || 'fetch failed'})`);
                 } else {
-                  await new Promise(resolve => setTimeout(resolve, 200 * attempt));
+                  const backoffMs = (attempt * 1200) + Math.floor(Math.random() * 400);
+                  await new Promise(resolve => setTimeout(resolve, backoffMs));
                 }
               }
             }
@@ -3866,6 +3957,11 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
               allRawServices.push(...pageServices);
             }
           }
+
+          // Gentle pause between batches to prevent upstream connection throttling
+          if (i + batchSize < pageNumbers.length) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
         }
       }
 
@@ -3874,17 +3970,28 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
       if (allRawServices.length > 0) {
         // Normalize all services
         const normalized = allRawServices.map((item, idx) => normalizeOneGridHubService(item, idx));
-        cachedLiveProviderServices = normalized;
+
+        // If a few individual pages dropped under network jitter, merge with existing cache to keep 100% of services
+        if (cachedLiveProviderServices.length > 0 && normalized.length < cachedLiveProviderServices.length) {
+          const existingMap = new Map(cachedLiveProviderServices.map(s => [s.providerServiceId || s.id, s]));
+          for (const item of normalized) {
+            existingMap.set(item.providerServiceId || item.id, item);
+          }
+          cachedLiveProviderServices = Array.from(existingMap.values());
+        } else {
+          cachedLiveProviderServices = normalized;
+        }
+
         lastCatalogueSyncTime = new Date().toISOString();
         
         // Save metadata snapshot
-        await saveSocialBoostCatalogueToDb(normalized);
+        await saveSocialBoostCatalogueToDb(cachedLiveProviderServices);
 
-        return normalized;
+        return cachedLiveProviderServices;
       }
       return cachedLiveProviderServices.length > 0 ? cachedLiveProviderServices : [];
     } catch (err: any) {
-      console.error('[SocialBoost] Error during full SMM services pagination fetch:', err);
+      console.log('[SocialBoost] SMM services sync note:', err?.message || err);
       return cachedLiveProviderServices.length > 0 ? cachedLiveProviderServices : [];
     } finally {
       activeSmmFetchPromise = null;
@@ -3993,55 +4100,7 @@ const queryOneGridHubSmm = async (action: string, params: Record<string, any> = 
     return null;
   }
 
-  // 3. Requesting SMM Refill
-  if (action === 'refill' || action === 'smm_refill') {
-    const orderId = params.order || params.order_id || params.orderId || params.id;
-    try {
-      const q = new URLSearchParams({
-        endpoint: 'smm_refill',
-        api_key: apiKey,
-        order: String(orderId)
-      }).toString();
-
-      const res = await fetch(`${baseUrl}?${q}`, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(7000)
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (e: any) {
-      console.warn('[SocialBoost SMM Refill] Refill query warning:', e.message);
-    }
-    return null;
-  }
-
-  // 4. Requesting SMM Order Cancel
-  if (action === 'cancel' || action === 'smm_cancel') {
-    const orderId = params.order || params.order_id || params.orderId || params.id;
-    try {
-      const q = new URLSearchParams({
-        endpoint: 'smm_cancel',
-        api_key: apiKey,
-        order: String(orderId)
-      }).toString();
-
-      const res = await fetch(`${baseUrl}?${q}`, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(7000)
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (e: any) {
-      console.warn('[SocialBoost SMM Cancel] Cancel query warning:', e.message);
-    }
-    return null;
-  }
-
-  // 5. Checking SMM Balance
+  // 3. Checking SMM Balance
   if (action === 'balance' || action === 'getBalance') {
     try {
       const q = new URLSearchParams({
@@ -4197,18 +4256,28 @@ const normalizeOneGridHubService = (item: any, index: number) => {
   };
 };
 
-// Background live sync on startup: load DB cache immediately, then fetch fresh upstream complete catalogue
+// Background live sync on startup: load DB cache immediately, then sync fresh upstream catalogue if needed
 setTimeout(async () => {
   try {
     await loadSocialBoostCatalogueFromDb();
+    
+    // Check if we already have a robust, fresh cache (< 12 hours old and >= 500 services)
+    const isCacheRecent = lastCatalogueSyncTime && 
+      (Date.now() - new Date(lastCatalogueSyncTime).getTime() < 12 * 60 * 60 * 1000);
+    
+    if (cachedLiveProviderServices.length >= 500 && isCacheRecent) {
+      console.log(`[SocialBoost] Warm cache active with ${cachedLiveProviderServices.length} services (last synced: ${lastCatalogueSyncTime}).`);
+      return;
+    }
+
     const live = await fetchAllOneGridHubSmmServices();
     if (Array.isArray(live) && live.length > 0) {
-      console.log(`[SocialBoost] Auto-synced & cached ALL ${live.length} dynamic live services from OneGridHub on startup.`);
+      console.log(`[SocialBoost] Auto-synced & cached ${live.length} dynamic live services from OneGridHub.`);
     }
   } catch (e: any) {
-    console.log('[SocialBoost] Initial background sync note:', e.message);
+    console.log('[SocialBoost] Background sync note:', e?.message || e);
   }
-}, 500);
+}, 1000);
 
 // 1. GET /api/social-boost/services
 app.get('/api/social-boost/services', async (req, res) => {
@@ -4231,9 +4300,9 @@ app.get('/api/social-boost/services', async (req, res) => {
     }
 
     if (cachedLiveProviderServices.length === 0) {
-      const fetched = await fetchAllOneGridHubSmmServices();
-      if (fetched.length === 0) {
-        await loadSocialBoostCatalogueFromDb();
+      await loadSocialBoostCatalogueFromDb();
+      if (cachedLiveProviderServices.length === 0) {
+        await fetchAllOneGridHubSmmServices();
       }
     }
 
@@ -4947,154 +5016,6 @@ const handleSocialBoostStatusCheck = async (req: express.Request, res: express.R
 app.get('/api/social-boost/status/:orderId', handleSocialBoostStatusCheck);
 app.get('/api/social-boost/status', handleSocialBoostStatusCheck);
 
-// 5a. POST /api/social-boost/refill
-app.post('/api/social-boost/refill', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ success: false, error: 'Please sign in to request a refill.' });
-    }
-    const uid = verifyFirebaseIdToken(authHeader, firebaseProjectId);
-    if (!uid || !db) {
-      return res.status(401).json({ success: false, error: 'Invalid or expired session.' });
-    }
-
-    const orderId = (req.body.orderId || req.body.id || req.query.orderId || '').toString();
-    if (!orderId) {
-      return res.status(400).json({ success: false, error: 'Order ID is required.' });
-    }
-
-    const orderRef = doc(db, 'social_boost_orders', orderId);
-    const snap = await getDoc(orderRef);
-    if (!snap.exists()) {
-      return res.status(404).json({ success: false, error: 'Order not found.' });
-    }
-
-    const orderData = snap.data();
-    if (orderData.userId !== uid) {
-      const uDoc = await getDoc(doc(db, 'users', uid));
-      const role = uDoc.data()?.role;
-      const email = (uDoc.data()?.email || '').toLowerCase();
-      if (email !== 'azeezmusharaf4@gmail.com' && role !== 'owner' && role !== 'admin') {
-        return res.status(403).json({ success: false, error: 'You do not have permission to modify this order.' });
-      }
-    }
-
-    let upstreamRes: any = null;
-    if (orderData.providerOrderId) {
-      upstreamRes = await queryOneGridHubSmm('refill', { order: orderData.providerOrderId });
-    }
-
-    const now = new Date().toISOString();
-    await updateDoc(orderRef, {
-      refillStatus: 'requested',
-      refillRequestedAt: now,
-      updatedAt: now
-    });
-
-    return res.json({
-      success: true,
-      message: 'Refill request submitted successfully to upstream provider.',
-      refillResponse: upstreamRes,
-      order: { ...orderData, refillStatus: 'requested', refillRequestedAt: now }
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message || 'Failed to submit refill request' });
-  }
-});
-
-// 5b. POST /api/social-boost/cancel
-app.post('/api/social-boost/cancel', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ success: false, error: 'Please sign in to cancel this order.' });
-    }
-    const uid = verifyFirebaseIdToken(authHeader, firebaseProjectId);
-    if (!uid || !db) {
-      return res.status(401).json({ success: false, error: 'Invalid or expired session.' });
-    }
-
-    const orderId = (req.body.orderId || req.body.id || req.query.orderId || '').toString();
-    if (!orderId) {
-      return res.status(400).json({ success: false, error: 'Order ID is required.' });
-    }
-
-    const orderRef = doc(db, 'social_boost_orders', orderId);
-    const snap = await getDoc(orderRef);
-    if (!snap.exists()) {
-      return res.status(404).json({ success: false, error: 'Order not found.' });
-    }
-
-    const orderData = snap.data();
-    if (orderData.userId !== uid) {
-      const uDoc = await getDoc(doc(db, 'users', uid));
-      const role = uDoc.data()?.role;
-      const email = (uDoc.data()?.email || '').toLowerCase();
-      if (email !== 'azeezmusharaf4@gmail.com' && role !== 'owner' && role !== 'admin') {
-        return res.status(403).json({ success: false, error: 'You do not have permission to cancel this order.' });
-      }
-    }
-
-    if (orderData.status === 'completed') {
-      return res.status(400).json({ success: false, error: 'Order has already been completed and cannot be canceled.' });
-    }
-    if (orderData.status === 'canceled') {
-      return res.json({ success: true, message: 'Order was already canceled.' });
-    }
-
-    let upstreamRes: any = null;
-    if (orderData.providerOrderId) {
-      upstreamRes = await queryOneGridHubSmm('cancel', { order: orderData.providerOrderId });
-    }
-
-    // Refund user wallet atomically
-    const refundAmount = Number(orderData.charge) || 0;
-    const userRef = doc(db, 'users', orderData.userId);
-    const now = new Date().toISOString();
-
-    await runTransaction(db, async (tx) => {
-      const uDocSnap = await tx.get(userRef);
-      if (uDocSnap.exists()) {
-        const currentBal = Number(uDocSnap.data().walletBalance) || 0;
-        tx.update(userRef, {
-          walletBalance: currentBal + refundAmount,
-          updatedAt: now
-        });
-      }
-      tx.update(orderRef, {
-        status: 'canceled',
-        canceledAt: now,
-        refundAmount,
-        updatedAt: now
-      });
-    });
-
-    // Record wallet refund transaction
-    const refundTxId = `REF-${orderId}-${Date.now()}`;
-    await setDoc(doc(db, 'wallet_transactions', refundTxId), {
-      id: refundTxId,
-      userId: orderData.userId,
-      userEmail: orderData.userEmail || '',
-      amount: refundAmount,
-      type: 'refund',
-      method: 'wallet',
-      status: 'successful',
-      description: `Refund for cancelled Social Boost order ${orderId}`,
-      createdAt: now
-    });
-
-    return res.json({
-      success: true,
-      message: `Order cancelled successfully. ₦${refundAmount.toLocaleString()} has been refunded to your wallet.`,
-      upstreamResponse: upstreamRes,
-      order: { ...orderData, status: 'canceled', canceledAt: now }
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message || 'Failed to cancel order' });
-  }
-});
-
 // 6. GET /api/social-boost/admin-stats (Owner Analytics)
 app.get('/api/social-boost/admin-stats', async (req, res) => {
   try {
@@ -5195,23 +5116,34 @@ app.post('/api/social-boost/test-connection', async (req, res) => {
   }
 });
 
-// Route handlers for /api/onegridhub and direct subpaths
+// Route handlers for /api/onegridhub and direct subpaths (including virtual-numbers aliases)
 app.all('/api/onegridhub', (req, res) => handleOneGridHubRequest(req, res));
 app.all('/api/onegridhub/:action', (req, res) => handleOneGridHubRequest(req, res, req.params.action));
+app.all('/api/virtual-numbers', (req, res) => handleOneGridHubRequest(req, res));
+app.all('/api/virtual-numbers/:action', (req, res) => handleOneGridHubRequest(req, res, req.params.action));
 
 // =========================================================================
 // NEW PROVIDER 2: XTRALOGSTOOLS / SERVICE NUMBER 2 / VIRTUAL NUMBER 2
 // =========================================================================
 const getXtraLogsToolsConfig = () => {
   const candidates = [
+    process.env.ESTRALOG_API_KEY,
+    process.env.ESTRALOGS_API_KEY,
+    process.env.ESTRALOG_TOOLS_API_KEY,
+    process.env.ESTRALOGS_TOOLS_API_KEY,
+    process.env.EXTRA_LOG_API_KEY,
+    process.env.EXTRA_LOGS_API_KEY,
+    process.env.EXTRA_LOG_TOOLS_API_KEY,
+    process.env.EXTRA_LOGS_TOOLS_API_KEY,
     process.env.XTRALOGSTOOLS_API_KEY,
     process.env.XTRALOGS_API_KEY,
     process.env.XTRALOGS_TOOLS_API_KEY,
     process.env.PROVIDER2_NUMBERS_API_KEY,
+    process.env.PROVIDER2_SOCIAL_BOOST_API_KEY,
+    process.env.PROVIDER2_SMM_API_KEY,
     process.env.PROVIDER2_API_KEY,
     process.env.SERVICE_NUMBER_2_API_KEY,
-    process.env.VIRTUAL_NUMBER_2_API_KEY,
-    '1a0375fba48d67fb0a534e0a2d2adcda' // User's active XtraLogsTools API Key
+    process.env.VIRTUAL_NUMBER_2_API_KEY
   ];
   let apiKey = '';
   for (const c of candidates) {
@@ -5225,8 +5157,16 @@ const getXtraLogsToolsConfig = () => {
   }
 
   const rawBase = (
+    process.env.ESTRALOG_BASE_URL ||
+    process.env.ESTRALOGS_BASE_URL ||
+    process.env.ESTRALOG_TOOLS_BASE_URL ||
+    process.env.EXTRA_LOG_BASE_URL ||
+    process.env.EXTRA_LOGS_BASE_URL ||
+    process.env.EXTRA_LOG_TOOLS_BASE_URL ||
+    process.env.EXTRA_LOGS_TOOLS_BASE_URL ||
     process.env.XTRALOGSTOOLS_BASE_URL ||
     process.env.PROVIDER2_NUMBERS_BASE_URL ||
+    process.env.PROVIDER2_SOCIAL_BOOST_BASE_URL ||
     'https://xtralogstools.com/api/v1/index.php'
   ).trim().replace(/^['"`]|['"`]$/g, '').trim();
 
@@ -5242,7 +5182,7 @@ const getXtraLogsToolsConfig = () => {
 
 const normalizeXtraLogsServer = (serverParam: string = '', tabParam: string = 'usa'): string => {
   const s = (serverParam || '').toLowerCase().trim();
-  if (['usa1', 'usa2', 'usa3', 'all1', 'all2', 'all3', 'auto'].includes(s)) {
+  if (['usa1', 'usa2', 'usa3', 'all1', 'all2', 'all3'].includes(s)) {
     return s;
   }
   if (s === 'server_1' || s === 'server1') {
@@ -5319,48 +5259,22 @@ const queryXtraLogsTools = async (
 };
 
 const DEFAULT_P2_SERVERS = [
-  { id: 'usa1', name: 'USA Server 1 - Instant Direct', region: 'USA' },
-  { id: 'usa2', name: 'USA Server 2 - Carrier Express', region: 'USA' },
-  { id: 'usa3', name: 'USA Server 3 - High Resilience', region: 'USA' },
-  { id: 'all1', name: 'Global Server 1 - All Countries', region: 'Global' },
-  { id: 'all2', name: 'Global Server 2 - High Speed Pool', region: 'Global' },
-  { id: 'all3', name: 'Global Server 3 - Redundant Routes', region: 'Global' }
-];
-
-const DEFAULT_P2_COUNTRIES = [
-  { id: '187', name: 'United States', code: 'US' },
-  { id: '1', name: 'United Kingdom', code: 'GB' },
-  { id: '2', name: 'Canada', code: 'CA' },
-  { id: '14', name: 'Nigeria', code: 'NG' },
-  { id: '24', name: 'Germany', code: 'DE' },
-  { id: '23', name: 'France', code: 'FR' },
-  { id: '3', name: 'Netherlands', code: 'NL' },
-  { id: '136', name: 'Australia', code: 'AU' },
-  { id: '15', name: 'India', code: 'IN' },
-  { id: '68', name: 'Brazil', code: 'BR' },
-  { id: '153', name: 'South Africa', code: 'ZA' },
-  { id: '42', name: 'Ghana', code: 'GH' },
-  { id: '16', name: 'Kenya', code: 'KE' }
-];
-
-const DEFAULT_P2_SERVICES = [
-  { id: 'whatsapp', name: 'WhatsApp', price: 1200 },
-  { id: 'telegram', name: 'Telegram', price: 1100 },
-  { id: 'google', name: 'Google / Gmail', price: 950 },
-  { id: 'instagram', name: 'Instagram', price: 900 },
-  { id: 'facebook', name: 'Facebook', price: 850 },
-  { id: 'tiktok', name: 'TikTok', price: 900 },
-  { id: 'x', name: 'Twitter / X', price: 950 },
-  { id: 'discord', name: 'Discord', price: 850 },
-  { id: 'netflix', name: 'Netflix', price: 800 },
-  { id: 'spotify', name: 'Spotify', price: 750 },
-  { id: 'paypal_du', name: 'PayPal', price: 1500 },
-  { id: 'apple', name: 'Apple ID', price: 1400 },
-  { id: 'other', name: 'Any Other Service', price: 1000 }
+  { id: 'usa1', name: 'USA 1', region: 'USA' },
+  { id: 'usa2', name: 'USA 2', region: 'USA' },
+  { id: 'all1', name: 'All Country 1', region: 'Global' },
+  { id: 'all2', name: 'All Country 2', region: 'Global' }
 ];
 
 const handleServiceNumber2Request = async (req: express.Request, res: express.Response, explicitAction?: string) => {
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   try {
     const action = (explicitAction || req.query.action || req.body.action || '').toString().toLowerCase() || 'servers';
     const { apiKey } = getXtraLogsToolsConfig();
@@ -5371,14 +5285,16 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
         const xtraData = await queryXtraLogsTools('servers');
         if (xtraData && xtraData.status === 'success' && Array.isArray(xtraData.servers)) {
           const mapped = xtraData.servers.map((s: any) => ({
-            id: s.id,
-            name: s.label || `${s.region} Server ${s.id}`,
-            region: s.region
+            id: String(s.id).toLowerCase(),
+            name: s.label || s.name || (s.id.toLowerCase().startsWith('usa') ? `USA ${s.id.slice(3)}` : `All Countries ${s.id.slice(3)}`),
+            region: s.region || (s.id.toLowerCase().startsWith('usa') ? 'USA' : 'Global')
           }));
-          return res.json({ success: true, provider: 'XtraLogsTools', hasApiKey: Boolean(apiKey), servers: mapped });
+          if (mapped.length > 0) {
+            return res.json({ success: true, provider: 'XtraLogsTools', hasApiKey: Boolean(apiKey), servers: mapped });
+          }
         }
       } catch (err: any) {
-        console.warn('[XtraLogsTools servers fallback]:', err.message);
+        console.warn('[XtraLogsTools servers error]:', err.message);
       }
       return res.json({ success: true, provider: 'XtraLogsTools', hasApiKey: Boolean(apiKey), servers: DEFAULT_P2_SERVERS });
     }
@@ -5392,22 +5308,32 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
       try {
         const xtraData = await queryXtraLogsTools('countries', { server });
         if (xtraData && xtraData.status === 'success' && Array.isArray(xtraData.countries) && xtraData.countries.length > 0) {
-          const countries = xtraData.countries.map((c: any) => ({
+          let countries = xtraData.countries.map((c: any) => ({
             id: String(c.id),
             name: c.name,
             code: String(c.id) === '187' || c.name.toLowerCase().includes('united states') ? 'US' : 'GLOBAL'
           }));
+          if (tab === 'usa' || server.startsWith('usa')) {
+            countries = countries.filter(c => c.code === 'US' || c.id === '187' || c.name.toLowerCase().includes('united states'));
+          }
           return res.json({ success: true, provider: 'XtraLogsTools', server, hasApiKey: Boolean(apiKey), countries });
         }
+        return res.status(400).json({
+          success: false,
+          provider: 'XtraLogsTools',
+          server,
+          error: xtraData?.message || 'No countries returned from Extra Log Tools API',
+          countries: []
+        });
       } catch (err: any) {
-        console.warn('[XtraLogsTools countries fallback]:', err.message);
+        return res.status(500).json({
+          success: false,
+          provider: 'XtraLogsTools',
+          server,
+          error: `Extra Log Tools API error: ${err.message}`,
+          countries: []
+        });
       }
-
-      let countries = [...DEFAULT_P2_COUNTRIES];
-      if (tab === 'usa' || server.startsWith('usa')) {
-        countries = countries.filter(c => c.code === 'US' || c.id === '187');
-      }
-      return res.json({ success: true, provider: 'XtraLogsTools', server, hasApiKey: Boolean(apiKey), countries });
     }
 
     // 3. SERVICES
@@ -5415,7 +5341,11 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
       const tab = (req.query.tab || req.body.tab || 'usa').toString().toLowerCase();
       const rawServer = (req.query.server || req.body.server || '').toString();
       const server = normalizeXtraLogsServer(rawServer, tab);
-      const country = (req.query.country || req.body.country || '187').toString();
+      const country = (req.query.country || req.body.country || '').toString();
+
+      if (!country) {
+        return res.status(400).json({ success: false, error: 'Country parameter is required', services: [] });
+      }
 
       try {
         const xtraData = await queryXtraLogsTools('services', { server, country });
@@ -5427,11 +5357,24 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
           }));
           return res.json({ success: true, provider: 'XtraLogsTools', server, country, hasApiKey: Boolean(apiKey), services });
         }
+        return res.status(400).json({
+          success: false,
+          provider: 'XtraLogsTools',
+          server,
+          country,
+          error: xtraData?.message || 'No services returned from Extra Log Tools API for selected country and server',
+          services: []
+        });
       } catch (err: any) {
-        console.warn('[XtraLogsTools services fallback]:', err.message);
+        return res.status(500).json({
+          success: false,
+          provider: 'XtraLogsTools',
+          server,
+          country,
+          error: `Extra Log Tools API error: ${err.message}`,
+          services: []
+        });
       }
-
-      return res.json({ success: true, provider: 'XtraLogsTools', server, country, hasApiKey: Boolean(apiKey), services: DEFAULT_P2_SERVICES });
     }
 
     // 4. PRICE / PRICES
@@ -5439,11 +5382,16 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
       const tab = (req.query.tab || req.body.tab || 'usa').toString().toLowerCase();
       const rawServer = (req.query.server || req.body.server || '').toString();
       const server = normalizeXtraLogsServer(rawServer, tab);
-      const country = (req.query.country || req.body.country || '187').toString();
-      let service = (req.query.service || req.body.service || 'whatsapp').toString();
+      const country = (req.query.country || req.body.country || '').toString();
+      const service = (req.query.service || req.body.service || '').toString();
 
-      let baseCost = 1000;
+      if (!country || !service) {
+        return res.status(400).json({ success: false, error: 'Both country and service parameters are required', inStock: false });
+      }
+
+      let baseCost = 0;
       let upstreamPriceFound = false;
+      let upstreamError = '';
 
       try {
         const xtraData = await queryXtraLogsTools('price', { server, country, service });
@@ -5453,17 +5401,34 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
             baseCost = Math.round(parsed);
             upstreamPriceFound = true;
           }
+        } else if (xtraData && xtraData.status === 'error') {
+          upstreamError = xtraData.message || (xtraData.code ? `Provider code: ${xtraData.code}` : 'Unavailable from Extra Log Tools');
         }
       } catch (err: any) {
-        console.warn('[XtraLogsTools price lookup]:', err.message);
+        upstreamError = err.message;
       }
 
-      if (!upstreamPriceFound) {
-        const matched = DEFAULT_P2_SERVICES.find(s => s.id === service);
-        if (matched) baseCost = Math.round(matched.price * 0.75);
+      if (!upstreamPriceFound || baseCost <= 0) {
+        return res.json({
+          success: false,
+          provider: 'XtraLogsTools',
+          server,
+          country,
+          service,
+          inStock: false,
+          available: false,
+          error: upstreamError || 'Provider reports: Service currently out of stock or unavailable on this server route.',
+          message: upstreamError || 'Provider reports: Service currently out of stock or unavailable on this server route.',
+          providerPrice: null,
+          customerPrice: null,
+          options: []
+        });
       }
 
-      // 3 carrier tiers: Standard, PVA Express Route, VIP Private Carrier Direct
+      // Live customer pricing with transparent carrier tiers: Standard, PVA Express Route, VIP Private Carrier Direct
+      const margin = Math.max(350, Math.round(baseCost * 0.25));
+      const customerPrice = Math.ceil((baseCost + margin) / 50) * 50;
+
       const options = [
         {
           optionId: 'opt_1',
@@ -5472,9 +5437,9 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
           carrierTier: 'Carrier Route 1 (Standard)',
           badge: 'Fast',
           description: 'Instant carrier routing',
-          customerPrice: baseCost + 400,
+          customerPrice,
           providerCost: baseCost,
-          markup: 400
+          markup: margin
         },
         {
           optionId: 'opt_2',
@@ -5483,9 +5448,9 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
           carrierTier: 'Carrier Route 2 (PVA Verified)',
           badge: 'Best Value',
           description: 'Fresh number pool, 99.4% delivery',
-          customerPrice: baseCost + 750,
+          customerPrice: customerPrice + 350,
           providerCost: baseCost,
-          markup: 750,
+          markup: margin + 350,
           isPopular: true
         },
         {
@@ -5495,9 +5460,9 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
           carrierTier: 'Carrier Route 3 (VIP Direct)',
           badge: 'Highest Success',
           description: 'Exclusive private carrier slot',
-          customerPrice: baseCost + 1200,
+          customerPrice: customerPrice + 750,
           providerCost: baseCost,
-          markup: 1200
+          markup: margin + 750
         }
       ];
 
@@ -5507,6 +5472,8 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
         server,
         country,
         service,
+        inStock: true,
+        available: true,
         providerPrice: baseCost,
         customerPrice: options[0].customerPrice,
         selectedOptionId: 'opt_1',
@@ -5521,11 +5488,15 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
       const tab = (req.body.tab || req.query.tab || 'usa').toString().toLowerCase();
       const rawServer = (req.body.server || req.query.server || 'usa1').toString();
       const server = normalizeXtraLogsServer(rawServer, tab);
-      const countryId = (req.body.country || req.query.country || '187').toString();
-      let serviceId = (req.body.service || req.query.service || 'whatsapp').toString();
+      const countryId = (req.body.country || req.query.country || '').toString();
+      const serviceId = (req.body.service || req.query.service || '').toString();
 
       if (!userId) {
         return res.status(400).json({ success: false, error: 'User ID is required to place an order.' });
+      }
+
+      if (!countryId || !serviceId) {
+        return res.status(400).json({ success: false, error: 'Country and Service IDs are required from Extra Log Tools.' });
       }
 
       if (!db) {
@@ -5564,40 +5535,19 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
         console.warn('[XtraLogsTools buy call error]:', err.message);
       }
 
-      // If upstream failed due to empty provider wallet or unavailable, protect user funds!
-      if (!isUpstreamAllocated) {
-        const errorMsg = xtraRes?.message || '';
+      // Strictly verify real upstream allocation from Extra Log Tools - no simulated mock numbers
+      if (!isUpstreamAllocated || !xtraRes?.phone) {
+        const errorMsg = xtraRes?.message || 'Upstream Extra Log Tools provider could not allocate a virtual number at this time.';
         const errorCode = xtraRes?.code || '';
 
-        if (errorCode === 'insufficient_funds' || errorMsg.toLowerCase().includes('insufficient')) {
-          return res.status(400).json({
-            success: false,
-            error: 'Provider wallet on XtraLogsTools is currently empty (₦0.00). Please fund your XtraLogsTools provider balance at https://xtralogstools.com to enable instant live number delivery. Your wallet balance was not charged.'
-          });
-        }
-
-        if (errorCode === 'unavailable' || errorMsg.toLowerCase().includes('unavailable') || errorMsg.toLowerCase().includes('not found')) {
-          return res.status(400).json({
-            success: false,
-            error: `Numbers for this service are temporarily out of stock on server ${server}. Please select another server (e.g. Server 2 or Server 3) or service. Your wallet balance was not charged.`
-          });
-        }
-
-        // If other upstream error, return informative error
-        if (xtraRes && xtraRes.message) {
-          return res.status(400).json({
-            success: false,
-            error: `XtraLogsTools Provider notice: ${xtraRes.message}. Your wallet balance was not charged.`
-          });
-        }
+        return res.status(400).json({
+          success: false,
+          error: `Extra Log Tools Provider response: ${errorMsg}${errorCode ? ` (${errorCode})` : ''}. Your wallet balance was not charged.`
+        });
       }
 
       const orderId = `XTRA-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      const allocatedPhone = isUpstreamAllocated && xtraRes.phone 
-        ? String(xtraRes.phone).startsWith('+') ? xtraRes.phone : `+${xtraRes.phone}`
-        : countryId === '187' 
-          ? `+1 (555) ${Math.floor(1000000 + Math.random() * 9000000)}`
-          : `+44 7911 ${Math.floor(1000000 + Math.random() * 9000000)}`;
+      const allocatedPhone = String(xtraRes.phone).startsWith('+') ? String(xtraRes.phone) : `+${xtraRes.phone}`;
 
       await runTransaction(db, async (transaction) => {
         const uDoc = await transaction.get(userRef);
@@ -5610,8 +5560,8 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
           updatedAt: new Date().toISOString()
         });
 
-        const srvName = DEFAULT_P2_SERVICES.find(s => s.id === serviceId)?.name || serviceId;
-        const cName = DEFAULT_P2_COUNTRIES.find(c => c.id === countryId)?.name || (countryId === '187' ? 'United States' : 'Global');
+        const srvName = req.body.serviceName || xtraRes?.service_name || serviceId;
+        const cName = req.body.countryName || xtraRes?.country_name || (countryId === '187' ? 'United States' : 'Global');
 
         const orderDocRef = doc(db, 'orders_service_number_2', orderId);
         const orderData = {
@@ -5706,34 +5656,12 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
         }
       }
 
-      // Demo fallback if order has no upstream reference and 20 seconds elapsed
-      const createdTime = new Date(orderData.createdAt).getTime();
-      const now = Date.now();
-      if (!orderData.orderRef && orderData.status === 'WAITING_FOR_SMS' && now - createdTime > 20000) {
-        const demoCode = String(Math.floor(100000 + Math.random() * 900000));
-        const updated = {
-          status: 'SMS_RECEIVED',
-          code: demoCode,
-          smsText: `Your verification code for ${orderData.service} is ${demoCode}. Valid for 10 minutes.`,
-          receivedAt: new Date().toISOString()
-        };
-        await updateDoc(orderRef, updated);
-        return res.json({
-          success: true,
-          provider: 'XtraLogsTools',
-          status: 'SMS_RECEIVED',
-          code: demoCode,
-          smsText: updated.smsText,
-          order: { ...orderData, ...updated }
-        });
-      }
-
       return res.json({
         success: true,
         provider: 'XtraLogsTools',
         status: orderData.status,
-        code: orderData.code,
-        smsText: orderData.smsText,
+        code: orderData.code || '',
+        smsText: orderData.smsText || '',
         order: orderData
       });
     }
@@ -5787,10 +5715,7 @@ const handleServiceNumber2Request = async (req: express.Request, res: express.Re
 
     // 8. ORDERS
     if (action === 'orders') {
-      let userId = (req.query.userId || req.body.userId || '').toString();
-      if (!userId && req.headers.authorization) {
-        userId = verifyFirebaseIdToken(req.headers.authorization, firebaseProjectId) || '';
-      }
+      const userId = (req.query.userId || req.body.userId || '').toString();
       if (!db || !userId) {
         return res.json({ success: true, orders: [] });
       }
@@ -5877,7 +5802,6 @@ const getProvider2SocialBoostConfig = () => {
 };
 
 const DEFAULT_P2_SOCIAL_SERVICES = [
-  // 1. Instagram
   {
     service: '201',
     name: 'Instagram Followers [High Quality - Non Drop - Instant]',
@@ -5909,37 +5833,6 @@ const DEFAULT_P2_SOCIAL_SERVICES = [
     description: 'Fast delivery within 5-10 minutes.'
   },
   {
-    service: '209',
-    name: 'Instagram Video & Reels Views [Algorithm Boost - Instant]',
-    type: 'Default',
-    category: 'Instagram Views',
-    rate: 350,
-    min: 100,
-    max: 1000000,
-    dripfeed: true,
-    refill: false,
-    cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Instagram',
-    description: 'Instant start, helps videos reach Explore and Reels tab.'
-  },
-  {
-    service: '210',
-    name: 'Instagram Custom Comments [English/Random Real Accounts]',
-    type: 'Default',
-    category: 'Instagram Comments',
-    rate: 4200,
-    min: 10,
-    max: 5000,
-    dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Instagram',
-    description: 'Custom organic comments to skyrocket post engagement.'
-  },
-  // 2. TikTok
-  {
     service: '203',
     name: 'TikTok Followers [Worldwide Real Accounts - Instant]',
     type: 'Default',
@@ -5970,37 +5863,6 @@ const DEFAULT_P2_SOCIAL_SERVICES = [
     description: 'Boosts video ranking and algorithm discovery.'
   },
   {
-    service: '211',
-    name: 'TikTok Video Likes [Real Active Profiles - Instant]',
-    type: 'Default',
-    category: 'TikTok Likes',
-    rate: 650,
-    min: 50,
-    max: 100000,
-    dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'TikTok',
-    description: 'Organic pace delivery from verified active accounts.'
-  },
-  {
-    service: '212',
-    name: 'TikTok Video Shares & Saves [Algorithm Multiplier]',
-    type: 'Default',
-    category: 'TikTok Engagement',
-    rate: 450,
-    min: 100,
-    max: 100000,
-    dripfeed: true,
-    refill: false,
-    cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'TikTok',
-    description: 'Signals viral interest to the TikTok recommendation engine.'
-  },
-  // 3. YouTube
-  {
     service: '205',
     name: 'YouTube Views [High Retention - Monetizable]',
     type: 'Default',
@@ -6015,37 +5877,6 @@ const DEFAULT_P2_SOCIAL_SERVICES = [
     platform: 'YouTube',
     description: 'Real audience watch time, safe for monetized channels.'
   },
-  {
-    service: '213',
-    name: 'YouTube Channel Subscribers [Non Drop - 30 Days Refill]',
-    type: 'Default',
-    category: 'YouTube Subscribers',
-    rate: 4500,
-    min: 50,
-    max: 20000,
-    dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'YouTube',
-    description: 'Permanent subscribers from authentic Google-linked accounts.'
-  },
-  {
-    service: '214',
-    name: 'YouTube Video Likes [Instant - Non Drop]',
-    type: 'Default',
-    category: 'YouTube Likes',
-    rate: 950,
-    min: 50,
-    max: 50000,
-    dripfeed: false,
-    refill: true,
-    cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'YouTube',
-    description: 'Fast like velocity to increase search rank and CTR.'
-  },
-  // 4. Telegram
   {
     service: '206',
     name: 'Telegram Channel Members [Non Drop - 0% Drop Rate]',
@@ -6062,37 +5893,6 @@ const DEFAULT_P2_SOCIAL_SERVICES = [
     description: 'High quality channel subscribers.'
   },
   {
-    service: '216',
-    name: 'Telegram Post Views [Instant Delivery - All Posts]',
-    type: 'Default',
-    category: 'Telegram Views',
-    rate: 180,
-    min: 100,
-    max: 100000,
-    dripfeed: false,
-    refill: false,
-    cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Telegram',
-    description: 'Rapid post impression counts on public and private channels.'
-  },
-  {
-    service: '217',
-    name: 'Telegram Emoji Reactions [Mixed High Engagement]',
-    type: 'Default',
-    category: 'Telegram Reactions',
-    rate: 290,
-    min: 50,
-    max: 50000,
-    dripfeed: false,
-    refill: true,
-    cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Telegram',
-    description: 'Positive reactions (👍, ❤️, 🔥, 🎉) delivered seamlessly.'
-  },
-  // 5. Twitter / X
-  {
     service: '207',
     name: 'Twitter / X Followers [Organic Looking - Instant]',
     type: 'Default',
@@ -6107,37 +5907,6 @@ const DEFAULT_P2_SOCIAL_SERVICES = [
     platform: 'Twitter',
     description: 'Verified appearance, stable profiles.'
   },
-  {
-    service: '218',
-    name: 'Twitter / X Retweets & Reposts [Fast Delivery]',
-    type: 'Default',
-    category: 'Twitter Retweets',
-    rate: 1850,
-    min: 50,
-    max: 20000,
-    dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Twitter',
-    description: 'Amplifies tweet reach across global feeds.'
-  },
-  {
-    service: '219',
-    name: 'Twitter / X Post Likes & Favorites [Real Profiles]',
-    type: 'Default',
-    category: 'Twitter Likes',
-    rate: 1450,
-    min: 50,
-    max: 50000,
-    dripfeed: false,
-    refill: true,
-    cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Twitter',
-    description: 'Boosts tweet engagement score and timeline prominence.'
-  },
-  // 6. Facebook
   {
     service: '208',
     name: 'Facebook Page Likes & Followers [High Quality]',
@@ -6154,130 +5923,94 @@ const DEFAULT_P2_SOCIAL_SERVICES = [
     description: 'Permanent page followers and engagements.'
   },
   {
-    service: '220',
-    name: 'Facebook Post Likes & Reactions [Mixed Active Profiles]',
-    type: 'Default',
-    category: 'Facebook Likes',
-    rate: 850,
-    min: 50,
-    max: 50000,
-    dripfeed: false,
-    refill: true,
-    cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Facebook',
-    description: 'Likes and love reactions on Facebook posts or photos.'
-  },
-  // 7. Spotify
-  {
-    service: '222',
-    name: 'Spotify Track Plays / Streams [Royalty Eligible - Global]',
-    type: 'Default',
-    category: 'Spotify Plays',
-    rate: 1200,
-    min: 500,
-    max: 1000000,
-    dripfeed: true,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Spotify',
-    description: 'Algorithmic stream delivery, safe for artist royalties.'
-  },
-  {
-    service: '224',
-    name: 'Spotify Artist & Playlist Followers [Organic Velocity]',
-    type: 'Default',
-    category: 'Spotify Followers',
-    rate: 1400,
-    min: 100,
-    max: 100000,
-    dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Spotify',
-    description: 'High quality artist followers to trigger Spotify algorithmic radios.'
-  },
-  // 8. Discord
-  {
-    service: '225',
-    name: 'Discord Server Members [Online + Offline Mixed]',
+    service: '209',
+    name: 'Discord Server Members [Online Active - Real Profiles]',
     type: 'Default',
     category: 'Discord Members',
-    rate: 2600,
-    min: 50,
-    max: 50000,
+    rate: 3500,
+    min: 100,
+    max: 15000,
     dripfeed: false,
     refill: true,
     cancel: true,
     provider: 'Provider 2 High-Speed Pool',
     platform: 'Discord',
-    description: 'High reputation accounts that join your Discord guild smoothly.'
+    description: 'Real active server members with custom avatars.'
   },
-  // 9. LinkedIn
   {
-    service: '227',
-    name: 'LinkedIn Connections & Followers [Professional Profiles]',
+    service: '210',
+    name: 'LinkedIn Connections & Followers [Professional HQ]',
     type: 'Default',
-    category: 'LinkedIn Followers',
-    rate: 4800,
+    category: 'LinkedIn Connections',
+    rate: 5400,
     min: 50,
-    max: 10000,
+    max: 5000,
     dripfeed: false,
     refill: true,
     cancel: true,
     provider: 'Provider 2 High-Speed Pool',
     platform: 'LinkedIn',
-    description: 'Corporate and business profiles to establish B2B authority.'
+    description: 'Corporate & business network growth.'
   },
-  // 10. Snapchat
   {
-    service: '229',
-    name: 'Snapchat Story Views [Fast Delivery]',
+    service: '211',
+    name: 'Spotify Track Plays [Royalty Eligible - Global Streams]',
     type: 'Default',
-    category: 'Snapchat Views',
+    category: 'Spotify Plays',
     rate: 950,
-    min: 100,
+    min: 500,
     max: 50000,
-    dripfeed: false,
-    refill: false,
-    cancel: false,
+    dripfeed: true,
+    refill: true,
+    cancel: true,
     provider: 'Provider 2 High-Speed Pool',
-    platform: 'Snapchat',
-    description: 'Public story view impressions from global Snapchat accounts.'
+    platform: 'Spotify',
+    description: 'Safe for artist royalties and algorithm charting.'
   },
-  // 11. Threads
   {
-    service: '231',
-    name: 'Threads Followers [Meta Network - Instant]',
+    service: '212',
+    name: 'Snapchat Public Profile Followers [Real US/EU]',
     type: 'Default',
-    category: 'Threads Followers',
-    rate: 2100,
-    min: 50,
-    max: 50000,
+    category: 'Snapchat Followers',
+    rate: 3800,
+    min: 100,
+    max: 10000,
     dripfeed: false,
     refill: true,
     cancel: true,
     provider: 'Provider 2 High-Speed Pool',
-    platform: 'Threads',
-    description: 'Meta Threads followers delivered at an organic pace.'
+    platform: 'Snapchat',
+    description: 'Aged profiles for Snapchat creators.'
   },
-  // 12. Website Traffic
   {
-    service: '233',
-    name: 'Global Website Visitors [Analytics Tracked - High Retention]',
+    service: '213',
+    name: 'Global Website Visitors [Organic Direct SEO Traffic]',
     type: 'Default',
     category: 'Website Traffic',
-    rate: 650,
+    rate: 850,
     min: 1000,
-    max: 1000000,
+    max: 500000,
     dripfeed: true,
     refill: false,
     cancel: false,
     provider: 'Provider 2 High-Speed Pool',
     platform: 'Website',
-    description: 'Desktop and mobile web traffic visible in Google Analytics.'
+    description: 'Google Analytics tracked, high dwell time.'
+  },
+  {
+    service: '214',
+    name: 'Multi-Network Social Growth & Engagement Boost',
+    type: 'Default',
+    category: 'Special Growth',
+    rate: 2100,
+    min: 100,
+    max: 20000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'Provider 2 High-Speed Pool',
+    platform: 'Other',
+    description: 'Cross-platform engagement package.'
   }
 ];
 
@@ -6286,9 +6019,8 @@ const handleSocialBoost2Request = async (req: express.Request, res: express.Resp
   try {
     const action = (explicitAction || req.query.action || req.body.action || '').toString().toLowerCase() || 'services';
 
-    // 1. SERVICES LIST
     if (action === 'services') {
-      let services = [...DEFAULT_P2_SOCIAL_SERVICES];
+      let rawServices = [...DEFAULT_P2_SOCIAL_SERVICES];
       let pricingSettings = { profitMarginPercent: 35, usdToNgnRate: 1550, fixedMarkupPerThousand: 200 };
       if (db) {
         try {
@@ -6300,23 +6032,33 @@ const handleSocialBoost2Request = async (req: express.Request, res: express.Resp
           console.warn('[SocialBoost2] Firestore settings notice:', e);
         }
       }
+      const services = rawServices.map((s: any) => ({
+        ...s,
+        id: String(s.id || s.service),
+        service: String(s.service || s.id),
+        pricePerThousandNgn: Number(s.pricePerThousandNgn || s.rate || 1500),
+        rate: Number(s.rate || s.pricePerThousandNgn || 1500),
+      }));
       return res.json({ success: true, provider: 'Provider 2', services, pricingSettings });
     }
 
-    // 2. ORDER PLACEMENT
     if (action === 'order') {
-      let userId = req.body.userId || req.query.userId;
-      if (!userId && req.headers.authorization) {
-        userId = verifyFirebaseIdToken(req.headers.authorization, firebaseProjectId);
+      const userId = req.body.userId || req.query.userId;
+      const totalCost = Number(req.body.totalCost || req.body.amountNgn || 0);
+      const serviceId = String(req.body.service || req.body.serviceId || '');
+      const link = (req.body.link || req.body.target || req.body.targetUrl || '').toString().trim();
+      const quantity = Number(req.body.quantity || 0);
+
+      if (!userId || !link) {
+        return res.status(400).json({ success: false, error: 'User ID and Link are required.' });
       }
 
-      const totalCost = Number(req.body.totalCost || req.body.amountNgn || 0);
-      const serviceId = String(req.body.service || req.body.serviceId || '201');
-      const link = req.body.link || req.body.target;
-      const quantity = Number(req.body.quantity);
+      if (!serviceId || quantity <= 0) {
+        return res.status(400).json({ success: false, error: 'Valid service and quantity are required.' });
+      }
 
-      if (!userId || !link || !quantity || quantity <= 0) {
-        return res.status(400).json({ success: false, error: 'User ID, Target Link, and Quantity are required.' });
+      if (totalCost <= 0) {
+        return res.status(400).json({ success: false, error: 'Invalid total order cost.' });
       }
 
       if (!db) {
@@ -6324,97 +6066,92 @@ const handleSocialBoost2Request = async (req: express.Request, res: express.Resp
       }
 
       const userRef = doc(db, 'users', userId);
-      const orderId = `SB2-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
-      let userEmail = req.body.userEmail || '';
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        return res.status(404).json({ success: false, error: 'User profile not found.' });
+      }
+      const userData = userSnap.data();
+      const currentBalance = userData.walletBalance || 0;
+      if (currentBalance < totalCost) {
+        return res.status(400).json({
+          success: false,
+          error: `Insufficient wallet balance (₦${currentBalance.toLocaleString()}). Required: ₦${totalCost.toLocaleString()}`
+        });
+      }
 
-      // Atomically check wallet balance and deduct cost
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
-          throw new Error('User profile not found.');
+      const { apiKey } = getXtraLogsToolsConfig();
+      let upstreamOrderId: string | null = null;
+      if (apiKey) {
+        try {
+          const upstreamRes = await queryXtraLogsTools('smm_order', {
+            service: serviceId,
+            link,
+            quantity
+          }, 'POST');
+
+          if (upstreamRes) {
+            if (upstreamRes.status === 'success' && (upstreamRes.order || upstreamRes.order_id)) {
+              upstreamOrderId = String(upstreamRes.order || upstreamRes.order_id);
+            } else if (upstreamRes.status === 'error') {
+              const upstreamMsg = upstreamRes.message || 'Upstream provider error';
+              const upstreamCode = upstreamRes.code ? ` (${upstreamRes.code})` : '';
+              return res.status(400).json({
+                success: false,
+                error: `EstraLog Tools response: ${upstreamMsg}${upstreamCode}. Your wallet balance was not charged.`
+              });
+            }
+          }
+        } catch (err: any) {
+          console.warn('[EstraLog Tools smm_order notice]:', err.message);
         }
-        const userData = userDoc.data();
-        userEmail = userEmail || userData.email || '';
-        const currentBalance = userData.walletBalance || 0;
-        if (currentBalance < totalCost) {
-          throw new Error(`Insufficient wallet balance (₦${currentBalance.toLocaleString()}). Required: ₦${totalCost.toLocaleString()}. Please fund your wallet.`);
+      }
+
+      const orderId = `SB2-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+      await runTransaction(db, async (transaction) => {
+        const uDoc = await transaction.get(userRef);
+        if (!uDoc.exists()) throw new Error('User profile not found.');
+        const uBal = uDoc.data().walletBalance || 0;
+        if (uBal < totalCost) {
+          throw new Error(`Insufficient wallet balance (₦${uBal.toLocaleString()}). Required: ₦${totalCost.toLocaleString()}`);
         }
         transaction.update(userRef, {
-          walletBalance: currentBalance - totalCost,
+          walletBalance: uBal - totalCost,
           updatedAt: new Date().toISOString()
+        });
+
+        const orderDocRef = doc(db, 'orders_social_boost_2', orderId);
+        transaction.set(orderDocRef, {
+          orderId,
+          providerOrderId: upstreamOrderId,
+          userId,
+          userEmail: req.body.userEmail || userData.email || '',
+          provider: 'EstraLog Tools',
+          service: serviceId,
+          serviceName: req.body.serviceName || `Service #${serviceId}`,
+          category: req.body.category || 'Growth',
+          platform: req.body.platform || 'Other',
+          link,
+          quantity,
+          charge: totalCost,
+          status: 'Processing',
+          startCount: 0,
+          remains: quantity,
+          createdAt: new Date().toISOString()
         });
       });
 
-      // Dispatch to XtraLogsTools SMM API
-      let providerOrderId = '';
-      try {
-        const xtraSmmRes = await queryXtraLogsTools('smm_order', {
-          service: serviceId,
-          link: link.trim(),
-          quantity
-        }, 'POST');
-        if (xtraSmmRes && (xtraSmmRes.order || xtraSmmRes.order_id)) {
-          providerOrderId = String(xtraSmmRes.order || xtraSmmRes.order_id);
-        }
-      } catch (err: any) {
-        console.warn('[SocialBoost2 Upstream SMM Order notice]:', err.message);
-      }
-
-      // Record in Firestore orders_social_boost_2
-      const now = new Date().toISOString();
-      const orderData = {
-        id: orderId,
-        orderId,
-        userId,
-        userEmail,
-        provider: 'Provider 2',
-        serviceId,
-        service: serviceId,
-        serviceName: req.body.serviceName || `Service #${serviceId}`,
-        category: req.body.category || 'Growth',
-        platform: req.body.platform || 'Other',
-        target: link.trim(),
-        targetUrl: link.trim(),
-        link: link.trim(),
-        quantity,
-        charge: totalCost,
-        totalChargeNgn: totalCost,
-        providerOrderId: providerOrderId || `XTR-${Date.now()}`,
-        status: 'Processing',
-        startCount: 0,
-        remains: quantity,
-        refill: true,
-        cancel: true,
-        createdAt: now,
-        updatedAt: now
-      };
-
-      await setDoc(doc(db, 'orders_social_boost_2', orderId), orderData);
-
-      // Record in wallet_transactions
-      await setDoc(doc(db, 'wallet_transactions', orderId), {
-        id: orderId,
-        userId,
-        userEmail,
-        amount: totalCost,
-        type: 'purchase',
-        method: 'wallet',
-        status: 'successful',
-        description: `Server 2 Social Boost: ${orderData.serviceName} (${quantity.toLocaleString()} units) for ${link.trim()}`,
-        createdAt: now
-      });
-
+      const placedDoc = await getDoc(doc(db, 'orders_social_boost_2', orderId));
       return res.json({
         success: true,
-        provider: 'Provider 2',
-        message: 'Social Boost 2 order placed successfully.',
+        provider: 'EstraLog Tools',
+        message: 'Social Boost order submitted successfully.',
         orderId,
-        providerOrderId: orderData.providerOrderId,
-        order: orderData
+        providerOrderId: upstreamOrderId,
+        order: placedDoc.exists() ? placedDoc.data() : { orderId }
       });
     }
 
-    // 3. LIVE STATUS CHECK
     if (action === 'status') {
       const orderId = (req.query.orderId || req.body.orderId || '').toString();
       if (!orderId || !db) {
@@ -6426,138 +6163,29 @@ const handleSocialBoost2Request = async (req: express.Request, res: express.Resp
         return res.status(404).json({ success: false, error: 'Order not found.' });
       }
       const orderData = snap.data();
-
-      // If order has providerOrderId, poll XtraLogsTools smm_status
-      if (orderData.providerOrderId && orderData.status !== 'Completed' && orderData.status !== 'Cancelled') {
+      const { apiKey } = getXtraLogsToolsConfig();
+      if (orderData.providerOrderId && apiKey) {
         try {
-          const liveStatus = await queryXtraLogsTools('smm_status', { order: orderData.providerOrderId });
-          if (liveStatus && liveStatus.status) {
-            const mappedStatus = String(liveStatus.status);
-            const startCount = Number(liveStatus.start_count) || orderData.startCount || 0;
-            const remains = Number(liveStatus.remains) || 0;
-            const now = new Date().toISOString();
+          const upstreamStatus = await queryXtraLogsTools('smm_status', { order: orderData.providerOrderId });
+          if (upstreamStatus && upstreamStatus.status === 'success' && upstreamStatus.state) {
             await updateDoc(orderRef, {
-              status: mappedStatus,
-              startCount,
-              remains,
-              updatedAt: now
+              status: upstreamStatus.state,
+              remains: upstreamStatus.remains !== undefined ? upstreamStatus.remains : orderData.remains,
+              updatedAt: new Date().toISOString()
             });
-            orderData.status = mappedStatus;
-            orderData.startCount = startCount;
-            orderData.remains = remains;
+            orderData.status = upstreamStatus.state;
           }
-        } catch (e: any) {
-          console.warn('[SocialBoost2 Status poll notice]:', e.message);
+        } catch (err: any) {
+          console.warn('[EstraLog smm_status check notice]:', err.message);
         }
       }
-      return res.json({ success: true, provider: 'Provider 2', status: orderData.status, order: orderData });
+      return res.json({ success: true, provider: 'EstraLog Tools', status: orderData.status, order: orderData });
     }
 
-    // 4. REFILL WHERE SUPPORTED
-    if (action === 'refill') {
-      const orderId = (req.body.orderId || req.query.orderId || '').toString();
-      if (!orderId || !db) {
-        return res.status(400).json({ success: false, error: 'Order ID required.' });
-      }
-      const orderRef = doc(db, 'orders_social_boost_2', orderId);
-      const snap = await getDoc(orderRef);
-      if (!snap.exists()) {
-        return res.status(404).json({ success: false, error: 'Order not found.' });
-      }
-      const orderData = snap.data();
-
-      let xtraRefillRes: any = null;
-      if (orderData.providerOrderId) {
-        try {
-          xtraRefillRes = await queryXtraLogsTools('smm_refill', { order: orderData.providerOrderId }, 'POST');
-        } catch (e: any) {
-          console.warn('[SocialBoost2 Refill notice]:', e.message);
-        }
-      }
-      const now = new Date().toISOString();
-      await updateDoc(orderRef, {
-        refillStatus: 'requested',
-        refillRequestedAt: now,
-        updatedAt: now
-      });
-      return res.json({
-        success: true,
-        message: 'Refill request submitted successfully to Server 2 provider.',
-        providerResponse: xtraRefillRes,
-        order: { ...orderData, refillStatus: 'requested', refillRequestedAt: now }
-      });
-    }
-
-    // 5. CANCEL & REFUND WHERE SUPPORTED
-    if (action === 'cancel') {
-      const orderId = (req.body.orderId || req.query.orderId || '').toString();
-      if (!orderId || !db) {
-        return res.status(400).json({ success: false, error: 'Order ID required.' });
-      }
-      const orderRef = doc(db, 'orders_social_boost_2', orderId);
-      const snap = await getDoc(orderRef);
-      if (!snap.exists()) {
-        return res.status(404).json({ success: false, error: 'Order not found.' });
-      }
-      const ord = snap.data();
-      if (ord.status === 'Completed' || ord.status === 'completed') {
-        return res.status(400).json({ success: false, error: 'Order has already been completed and cannot be canceled.' });
-      }
-      if (ord.status === 'Cancelled' || ord.status === 'canceled') {
-        return res.json({ success: true, message: 'Order was already cancelled.' });
-      }
-
-      let xtraCancelRes: any = null;
-      if (ord.providerOrderId) {
-        try {
-          xtraCancelRes = await queryXtraLogsTools('smm_cancel', { order: ord.providerOrderId }, 'POST');
-        } catch (e: any) {
-          console.warn('[SocialBoost2 Cancel notice]:', e.message);
-        }
-      }
-
-      const refundAmount = Number(ord.charge || ord.totalChargeNgn || 0);
-      const refundUserRef = doc(db, 'users', ord.userId);
-      const now = new Date().toISOString();
-
-      await runTransaction(db, async (t) => {
-        const uDoc = await t.get(refundUserRef);
-        if (uDoc.exists()) {
-          const bal = Number(uDoc.data().walletBalance) || 0;
-          t.update(refundUserRef, { walletBalance: bal + refundAmount, updatedAt: now });
-        }
-        t.update(orderRef, { status: 'Cancelled', cancelledAt: now, updatedAt: now });
-      });
-
-      const refundTxId = `REF-SB2-${orderId}-${Date.now()}`;
-      await setDoc(doc(db, 'wallet_transactions', refundTxId), {
-        id: refundTxId,
-        userId: ord.userId,
-        userEmail: ord.userEmail || '',
-        amount: refundAmount,
-        type: 'refund',
-        method: 'wallet',
-        status: 'successful',
-        description: `Refund for cancelled Server 2 Social Boost order ${orderId}`,
-        createdAt: now
-      });
-
-      return res.json({
-        success: true,
-        message: `Order cancelled successfully. ₦${refundAmount.toLocaleString()} has been refunded to your wallet.`,
-        providerResponse: xtraCancelRes,
-        order: { ...ord, status: 'Cancelled' }
-      });
-    }
-
-    // 6. ORDERS LIST
     if (action === 'orders') {
-      let userId = (req.query.userId || req.body.userId || '').toString();
-      if (!userId && req.headers.authorization) {
-        userId = verifyFirebaseIdToken(req.headers.authorization, firebaseProjectId) || '';
-      }
+      const userId = (req.query.userId || req.body.userId || '').toString();
       const isAll = req.query.all === 'true';
-      if (!db || (!userId && !isAll)) {
+      if (!db) {
         return res.json({ success: true, orders: [] });
       }
       const q = isAll ? query(collection(db, 'orders_social_boost_2')) : query(collection(db, 'orders_social_boost_2'), where('userId', '==', userId));
@@ -6568,7 +6196,6 @@ const handleSocialBoost2Request = async (req: express.Request, res: express.Resp
       return res.json({ success: true, provider: 'Provider 2', orders: list });
     }
 
-    // 7. PRICING SETTINGS
     if (action === 'pricing-settings') {
       if (req.method === 'POST') {
         if (!db) return res.status(500).json({ success: false, error: 'DB unavailable' });

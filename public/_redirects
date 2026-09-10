@@ -1,3 +1,24 @@
+# API route rewrites to Netlify functions
+/api/admin/manage-role      /.netlify/functions/admin-manage-role     200!
+/api/admin/wallets/override /.netlify/functions/admin-wallets-override 200!
+/api/admin/wallets/adjust   /.netlify/functions/admin-wallets-override 200!
+/api/paystack/initialize    /.netlify/functions/paystack-initialize   200!
+/api/paystack/verify/*      /.netlify/functions/paystack-verify       200!
+/api/paystack/verify        /.netlify/functions/paystack-verify       200!
+/api/paystack/webhook       /.netlify/functions/paystack-webhook      200!
+/api/wallet/purchase        /.netlify/functions/wallet-purchase       200!
+/api/health                 /.netlify/functions/health                200!
+/api/onegridhub/*           /.netlify/functions/onegridhub            200!
+/api/onegridhub             /.netlify/functions/onegridhub            200!
+/api/social-boost/*         /.netlify/functions/social-boost          200!
+/api/social-boost           /.netlify/functions/social-boost          200!
+/api/service-number-2/*     /.netlify/functions/service-number-2      200!
+/api/service-number-2       /.netlify/functions/service-number-2      200!
+/api/social-boost-2/*       /.netlify/functions/social-boost-2        200!
+/api/social-boost-2         /.netlify/functions/social-boost-2        200!
+/api/*                      /.netlify/functions/api                   200!
+/api                        /.netlify/functions/api                   200!
+
 # Single Page App (SPA) redirect rule for Netlify
 /*    /index.html   200
 

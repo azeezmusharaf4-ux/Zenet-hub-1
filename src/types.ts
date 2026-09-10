@@ -342,23 +342,15 @@ export interface SocialBoostOrder {
   platform: string;
   serviceId: string;
   serviceName: string;
-  serviceType?: string;
-  target?: string;
-  targetUrl?: string;
-  link?: string;
+  serviceType: string;
+  target: string;
   quantity: number;
   charge: number; // in NGN
-  totalChargeNgn?: number;
   providerCost?: number;
   markup?: number;
   profit?: number;
   providerOrderId?: string;
-  provider?: string;
   status: 'pending' | 'in_progress' | 'processing' | 'completed' | 'partial' | 'canceled' | string;
-  refill?: boolean;
-  cancel?: boolean;
-  refillStatus?: string;
-  refillRequestedAt?: string;
   startCount?: number;
   remains?: number;
   createdAt: string;
@@ -384,6 +376,7 @@ export interface SocialBoostPricingSettings {
 export type ActiveAppView = 
   | 'landing'
   | 'marketplace' 
+  | 'server-tool'
   | 'virtual-numbers'
   | 'virtual-numbers-2'
   | 'log-accounts'

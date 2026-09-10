@@ -1,39 +1,66 @@
 @import "tailwindcss";
 
+/* =========================================================
+   BMB SMART CHAIN / ZENET HUB - CORE DESIGN SYSTEM & ENGINE
+   High-Contrast, Crisp Typography, Razor-Sharp Mobile CSS
+   ========================================================= */
+
+/* 1. Root & Reset */
 *, ::before, ::after {
   box-sizing: border-box;
 }
 
 html {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
-  touch-action: manipulation;
-  scroll-behavior: smooth;
+  text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
   width: 100%;
-  min-height: 100%;
+  max-width: 100vw;
+  overflow-x: clip !important;
 }
 
 body {
-  background-color: #0F0F17;
-  color: #f8fafc;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-overflow-scrolling: touch;
+  text-rendering: optimizeLegibility;
   margin: 0;
   padding: 0;
   width: 100%;
+  max-width: 100vw;
   min-height: 100vh;
   min-height: 100dvh;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  overflow-x: clip !important;
 }
 
 #root {
   width: 100%;
+  max-width: 100vw;
   min-height: 100vh;
   min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: clip !important;
+  position: relative;
 }
 
-/* Ensure SVG elements never blow up or distort on WebKit / Safari */
+/* 2. Global Typography Polish */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em;
+  color: #0F172A !important;
+}
+
+/* Ensure SVG elements never stretch, skew, or distort */
 svg {
   flex-shrink: 0;
   max-width: 100%;
@@ -43,13 +70,18 @@ button svg, a svg {
   flex-shrink: 0;
 }
 
-/* Remove 300ms tap delay and tap highlights on iOS Safari */
-button, a, input, select, textarea, [role="button"] {
-  -webkit-tap-highlight-color: transparent;
+/* 3. Mobile Touch & Interaction Hygiene */
+button, 
+a, 
+[role="button"],
+input, 
+select, 
+textarea {
+  -webkit-tap-highlight-color: transparent !important;
   touch-action: manipulation;
 }
 
-/* Prevent iOS Safari from forcibly auto-zooming and distorting layout on input focus */
+/* Prevent iOS Safari from auto-zooming and breaking layouts on input focus */
 @media screen and (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]), 
   select, 
@@ -58,348 +90,410 @@ button, a, input, select, textarea, [role="button"] {
   }
 }
 
-/* Scrollable containers iOS momentum touch scrolling */
+/* Ensure mobile buttons have comfortable min-height */
+@media screen and (max-width: 640px) {
+  button:not(.inline-btn):not([class*="p-1"]):not([class*="p-0"]):not([class*="w-"]):not([class*="h-"]),
+  .btn-touch {
+    min-height: 42px;
+  }
+}
+
+/* Mobile Safe Area Inset Support */
+.safe-top-header {
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
+}
+
+.safe-top-drawer {
+  padding-top: max(env(safe-area-inset-top, 0px), 1rem);
+}
+
+.safe-area-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 1rem);
+}
+
+/* Scrollable containers momentum touch scrolling */
 .overflow-y-auto, .overflow-x-auto, [data-scrollable] {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
-/* Custom Purple Theme Scrollbar */
+/* Refined, unobtrusive custom scrollbars */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(22, 10, 45, 0.6);
+  background: #F1F5F9;
   border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(168, 85, 247, 0.45);
+  background: #CBD5E1;
   border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(168, 85, 247, 0.8);
+  background: #94A3B8;
 }
 
-/* Safe Area Utility */
-.safe-area-top {
-  padding-top: env(safe-area-inset-top, 0px);
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-/* Light Theme Root Settings */
-html.light, .light {
-  color-scheme: light;
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-html.light body, .light body {
-  background-color: #F8F9FC;
-  color: #0f172a;
-}
+/* =========================================================
+   LIGHT THEME SURFACE & CARD SYSTEM (BMB SMART CHAIN)
+   ========================================================= */
 
-/* ==========================================
-   LIGHT MODE COMPLETE UI OVERRIDES
-   ========================================== */
-
-/* 1. Main Canvas & Dark Containers Overrides */
-html.light .bg-\[\#0F0F17\],
-html.light .bg-\[\#0b0518\],
-html.light .bg-\[\#0A0713\],
-html.light .bg-\[\#090514\],
-html.light .bg-\[\#05020d\],
-html.light .bg-\[\#05020c\],
-html.light .bg-\[\#06030c\],
-html.light .bg-\[\#07030e\],
-html.light .bg-\[\#090315\],
-html.light .bg-\[\#0a0416\],
-html.light .bg-\[\#0d061c\],
-html.light .bg-slate-950 {
-  background-color: #F8F9FC !important;
+/* 1. Main Backgrounds & Page Containers */
+.bg-\[\#0F0F17\],
+.bg-\[\#0b0518\],
+.bg-\[\#0A0713\],
+.bg-\[\#090514\],
+.bg-\[\#05020d\],
+.bg-\[\#05020c\],
+.bg-\[\#06030c\],
+.bg-\[\#07030e\],
+.bg-\[\#070311\],
+.bg-\[\#090315\],
+.bg-\[\#0a0416\],
+.bg-\[\#0d061c\],
+.bg-\[\#0b0616\],
+.bg-\[\#0d0718\],
+.bg-\[\#0c051a\],
+.bg-slate-950 {
+  background-color: #F8FAFC !important;
   color: #0F172A !important;
 }
 
-/* 2. Card, Modal & Main Content Panels */
-html.light .bg-\[\#171827\],
-html.light .bg-\[\#130a24\],
-html.light .bg-\[\#150c2a\],
-html.light .bg-\[\#150c2a\]\/95,
-html.light .bg-\[\#150c2a\]\/80,
-html.light .bg-\[\#180e30\],
-html.light .bg-\[\#180e30\]\/90,
-html.light .bg-\[\#190d33\],
-html.light .bg-\[\#180c33\],
-html.light .bg-\[\#120826\],
-html.light .bg-\[\#0e061e\],
-html.light .bg-\[\#1c0e3b\],
-html.light .bg-\[\#1a0e35\],
-html.light .bg-\[\#140a27\],
-html.light .bg-\[\#170c2e\],
-html.light .bg-\[\#100720\],
-html.light .bg-slate-900 {
+/* 2. Cards, Modals & Main Content Panels */
+.bg-\[\#171827\],
+.bg-\[\#130a24\],
+.bg-\[\#150c2a\],
+.bg-\[\#150c2a\]\/95,
+.bg-\[\#150c2a\]\/80,
+.bg-\[\#180e30\],
+.bg-\[\#180e30\]\/90,
+.bg-\[\#190d33\],
+.bg-\[\#180c33\],
+.bg-\[\#120826\],
+.bg-\[\#0e061e\],
+.bg-\[\#0c051f\],
+.bg-\[\#1c0e3b\],
+.bg-\[\#1a0e35\],
+.bg-\[\#140a27\],
+.bg-\[\#170c2e\],
+.bg-\[\#100720\],
+.bg-slate-900 {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   border-color: #E2E8F0 !important;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0,0,0,0.03) !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* General Dark Hex Background Fallback to Light Panel */
-html.light [class*="bg-[#0"]:not(.bg-gradient-to-r):not(.bg-gradient-to-tr):not(button),
-html.light [class*="bg-[#1"]:not(.bg-gradient-to-r):not(.bg-gradient-to-tr):not(button) {
-  background-color: #FFFFFF;
-  color: #0F172A;
-}
-
-/* 3. Nested Sub-Panels, Hover States & Input Backgrounds */
-html.light .bg-\[\#1a0f34\],
-html.light .bg-\[\#1e1039\],
-html.light .bg-\[\#1d0f3b\],
-html.light .bg-\[\#20123d\],
-html.light .bg-\[\#1f123c\],
-html.light .bg-\[\#1f113e\],
-html.light .bg-\[\#231542\],
-html.light .bg-\[\#231544\],
-html.light .bg-\[\#1a0e33\],
-html.light .bg-\[\#1e123a\],
-html.light .bg-\[\#1f103d\],
-html.light .bg-\[\#170c30\],
-html.light .bg-\[\#2b184d\],
-html.light .bg-slate-800 {
-  background-color: #F1F5F9 !important;
+/* 3. Nested Sub-Panels, Filter Rows & Secondary Cards */
+.bg-\[\#1a0f34\],
+.bg-\[\#1e1039\],
+.bg-\[\#1d0f3b\],
+.bg-\[\#20123d\],
+.bg-\[\#24114f\],
+.bg-\[\#170830\],
+.bg-\[\#1f123c\],
+.bg-\[\#1f113e\],
+.bg-\[\#231542\],
+.bg-\[\#231544\],
+.bg-\[\#1a0e33\],
+.bg-\[\#1e123a\],
+.bg-\[\#1f103d\],
+.bg-\[\#170c30\],
+.bg-\[\#2b184d\],
+.bg-\[\#1a0d3b\],
+.bg-\[\#190d34\],
+.bg-\[\#25144b\],
+.bg-\[\#211145\],
+.bg-slate-800 {
+  background-color: #F8FAFC !important;
   color: #0F172A !important;
   border-color: #E2E8F0 !important;
 }
 
-/* 4. Borders & Dividers */
-html.light [class*="border-[#"],
-html.light .border-slate-800,
-html.light .border-slate-700 {
+/* 4. Fine Borders & Dividers */
+[class*="border-\[\#"],
+.border-slate-800,
+.border-slate-700 {
   border-color: #E2E8F0 !important;
 }
 
-/* 5. Text Legibility & High Contrast Color Overrides */
-
-/* Primary Headings & Bold Titles */
-html.light h1, html.light h2, html.light h3, html.light h4, html.light h5, html.light h6,
-html.light .text-white,
-html.light .text-slate-100,
-html.light .text-slate-200,
-html.light .text-purple-100,
-html.light .text-purple-200 {
+/* 5. High-Contrast Text Legibility */
+.text-white:not(button *):not(a *):not(.badge-text):not([class*="bg-"]):not([class*="from-"]):not([class*="to-"]) {
   color: #0F172A !important;
 }
 
-/* Secondary & Muted Body Text */
-html.light .text-purple-300\/60,
-html.light .text-purple-300\/70,
-html.light .text-purple-300\/80,
-html.light .text-purple-200\/80,
-html.light .text-slate-400,
-html.light .text-slate-300 {
+.text-slate-100,
+.text-slate-200,
+.text-purple-100,
+.text-purple-200 {
+  color: #0F172A !important;
+}
+
+/* Secondary & Muted Body Text - Highly Legible Slate */
+.text-purple-300\/40,
+.text-purple-300\/50,
+.text-purple-300\/60,
+.text-purple-300\/70,
+.text-purple-300\/80,
+.text-purple-200\/80,
+.text-purple-400\/60,
+.text-slate-400,
+.text-slate-300 {
   color: #475569 !important;
 }
 
-/* Brand Purple Text & Links */
-html.light .text-purple-300,
-html.light .text-purple-400 {
-  color: #6B21A8 !important; /* Deep vibrant purple for 100% legibility */
+/* Brand Violet / Purple Text & Links */
+.text-purple-300,
+.text-purple-400,
+.text-\[\#9e67fa\],
+.text-\[\#a16eff\],
+.text-\[\#c1a0ff\] {
+  color: #6D28D9 !important;
 }
 
-/* Green / Emerald Prices, Balances & PVA Badges */
-html.light .text-emerald-300,
-html.light .text-emerald-400,
-html.light .text-emerald-200,
-html.light .text-green-300,
-html.light .text-green-400,
-html.light .text-\[\#00ff88\] {
-  color: #047857 !important; /* Emerald-700 for high-contrast prices & positive numbers */
+/* =========================================================
+   BMB SMART CHAIN YELLOW / GOLD / AMBER ACCENTS
+   ========================================================= */
+
+/* Deep Amber / Gold Accents */
+.text-amber-300,
+.text-amber-400,
+.text-yellow-300,
+.text-yellow-400 {
+  color: #D97706 !important; /* Rich deep amber with > 5:1 contrast */
+  font-weight: 700 !important;
 }
 
-/* Blue Platform Badges & Handles */
-html.light .text-blue-300,
-html.light .text-blue-400,
-html.light .text-blue-200 {
+/* Amber / Yellow Badges - Rich background with ultra-dark, bold text */
+.bg-amber-100,
+.bg-amber-200 {
+  background-color: #FEF3C7 !important;
+  color: #92400E !important;
+  border-color: #FCD34D !important;
+}
+
+.bg-yellow-400,
+.bg-yellow-500,
+.bg-amber-400,
+.bg-amber-500 {
+  color: #0F172A !important;
+  font-weight: 800 !important;
+}
+
+/* Green / Emerald Prices & Balances */
+.text-emerald-300,
+.text-emerald-400,
+.text-emerald-200,
+.text-green-300,
+.text-green-400,
+.text-\[\#00ff88\] {
+  color: #047857 !important; /* Deep emerald-700 for razor-sharp prices */
+  font-weight: 800 !important;
+}
+
+/* Blue Platform Badges */
+.text-blue-300,
+.text-blue-400,
+.text-blue-200 {
   color: #1D4ED8 !important;
 }
 
-/* Cyan Platform Badges */
-html.light .text-cyan-300,
-html.light .text-cyan-400,
-html.light .text-cyan-200 {
-  color: #0E7490 !important;
-}
-
-/* Pink / Magenta Badges */
-html.light .text-pink-300,
-html.light .text-pink-400,
-html.light .text-pink-200 {
-  color: #BE185D !important;
-}
-
-/* Rose / Red Badges & Errors */
-html.light .text-rose-300,
-html.light .text-rose-400,
-html.light .text-rose-200,
-html.light .text-red-300,
-html.light .text-red-400 {
+/* Red / Rose Badges & Errors */
+.text-rose-300,
+.text-rose-400,
+.text-rose-200,
+.text-red-300,
+.text-red-400 {
   color: #BE123C !important;
 }
 
-/* Amber / Yellow Badges & Stars */
-html.light .text-amber-300,
-html.light .text-amber-400,
-html.light .text-yellow-200,
-html.light .text-yellow-300 {
-  color: #B45309 !important;
-}
-
-/* Sky Blue Badges */
-html.light .text-sky-200,
-html.light .text-sky-300,
-html.light .text-sky-400 {
-  color: #0369A1 !important;
-}
-
-/* Indigo Badges */
-html.light .text-indigo-200,
-html.light .text-indigo-300,
-html.light .text-indigo-400 {
-  color: #4338CA !important;
-}
-
-/* Orange Badges */
-html.light .text-orange-300,
-html.light .text-orange-400 {
-  color: #C2410C !important;
-}
-
-/* 6. Soft Colored Badges & Chips in Light Mode */
-html.light .bg-blue-950\/80,
-html.light .bg-blue-950 {
+/* =========================================================
+   VIBRANT BADGES & STATUS PILLS IN LIGHT MODE
+   ========================================================= */
+.bg-blue-950\/80,
+.bg-blue-950 {
   background-color: #EFF6FF !important;
   color: #1D4ED8 !important;
   border-color: #BFDBFE !important;
 }
 
-html.light .bg-pink-950\/80,
-html.light .bg-pink-950 {
+.bg-pink-950\/80,
+.bg-pink-950 {
   background-color: #FDF2F8 !important;
   color: #BE185D !important;
   border-color: #FBCFE8 !important;
 }
 
-html.light .bg-cyan-950\/80,
-html.light .bg-cyan-950 {
+.bg-cyan-950\/80,
+.bg-cyan-950 {
   background-color: #ECFEFF !important;
   color: #0E7490 !important;
   border-color: #A5F3FC !important;
 }
 
-html.light .bg-rose-950\/80,
-html.light .bg-rose-950 {
+.bg-rose-950\/80,
+.bg-rose-950 {
   background-color: #FFF1F2 !important;
   color: #BE123C !important;
   border-color: #FECDD3 !important;
 }
 
-html.light .bg-purple-950\/80,
-html.light .bg-purple-950 {
+.bg-purple-950\/80,
+.bg-purple-950 {
   background-color: #F3E8FF !important;
   color: #6B21A8 !important;
   border-color: #E9D5FF !important;
 }
 
-html.light .bg-emerald-950\/80,
-html.light .bg-emerald-950,
-html.light .bg-emerald-950\/70 {
+.bg-emerald-950\/80,
+.bg-emerald-950,
+.bg-emerald-950\/70 {
   background-color: #ECFDF5 !important;
   color: #047857 !important;
   border-color: #A7F3D0 !important;
 }
 
-html.light .bg-indigo-950\/80,
-html.light .bg-indigo-950,
-html.light .bg-indigo-950\/70 {
-  background-color: #EEF2FF !important;
-  color: #4338CA !important;
-  border-color: #C7D2FE !important;
-}
-
-html.light .bg-amber-950\/80,
-html.light .bg-amber-950,
-html.light .bg-amber-950\/70 {
+.bg-amber-950\/80,
+.bg-amber-950,
+.bg-amber-950\/70 {
   background-color: #FEF3C7 !important;
-  color: #B45309 !important;
+  color: #92400E !important;
   border-color: #FDE68A !important;
 }
 
-html.light .bg-sky-950\/80,
-html.light .bg-sky-950 {
-  background-color: #E0F2FE !important;
-  color: #0369A1 !important;
-  border-color: #BAE6FD !important;
-}
-
-/* 7. PRESERVE WHITE TEXT ON GRADIENT & SOLID DARK BUTTONS */
-html.light .bg-gradient-to-r,
-html.light .bg-gradient-to-tr,
-html.light .bg-gradient-to-br,
-html.light button.bg-purple-600,
-html.light button.bg-purple-700,
-html.light button.bg-indigo-600,
-html.light button.bg-emerald-600,
-html.light button.bg-rose-600,
-html.light button.bg-blue-600,
-html.light a.bg-gradient-to-r,
-html.light .bg-purple-600,
-html.light .bg-purple-700,
-html.light .bg-emerald-600,
-html.light .bg-indigo-600 {
+/* =========================================================
+   PRESERVE WHITE TEXT ON COLORED / GRADIENT ACTION BUTTONS
+   ========================================================= */
+button.bg-purple-600,
+button.bg-purple-700,
+button.bg-\[\#7C3AED\],
+button.bg-\[\#5B21B6\],
+button.bg-indigo-600,
+button.bg-emerald-600,
+button.bg-rose-600,
+button.bg-blue-600,
+button.bg-black,
+button.bg-slate-900,
+.bg-purple-600,
+.bg-purple-700,
+.bg-\[\#7C3AED\],
+.bg-\[\#5B21B6\],
+.bg-emerald-600,
+.bg-indigo-600,
+.bg-slate-900,
+.bg-gradient-to-r,
+.bg-gradient-to-tr,
+.bg-gradient-to-br {
   color: #FFFFFF !important;
 }
 
-html.light .bg-gradient-to-r *,
-html.light .bg-gradient-to-tr *,
-html.light .bg-gradient-to-br *,
-html.light button.bg-purple-600 *,
-html.light button.bg-purple-700 *,
-html.light button.bg-indigo-600 *,
-html.light button.bg-emerald-600 *,
-html.light .bg-purple-600 *,
-html.light .bg-purple-700 * {
+button.bg-purple-600 *,
+button.bg-purple-700 *,
+button.bg-\[\#7C3AED\] *,
+button.bg-\[\#5B21B6\] *,
+button.bg-indigo-600 *,
+button.bg-emerald-600 *,
+button.bg-rose-600 *,
+button.bg-blue-600 *,
+button.bg-black *,
+button.bg-slate-900 *,
+.bg-purple-600 *,
+.bg-purple-700 *,
+.bg-\[\#7C3AED\] *,
+.bg-\[\#5B21B6\] *,
+.bg-gradient-to-r *,
+.bg-gradient-to-tr *,
+.bg-gradient-to-br * {
   color: #FFFFFF !important;
 }
 
-/* 8. Modal Backdrop Inversion */
-html.light .bg-slate-950\/90,
-html.light .bg-black\/80,
-html.light .bg-black\/70,
-html.light .bg-\[\#05020d\]\/80,
-html.light .bg-\[\#06030c\]\/85 {
-  background-color: rgba(15, 23, 42, 0.45) !important;
-  backdrop-filter: blur(8px) !important;
+/* Amber/Yellow buttons must have crisp black text */
+button.bg-amber-400,
+button.bg-amber-500,
+button.bg-yellow-400,
+button.bg-yellow-500,
+button.bg-amber-400 *,
+button.bg-amber-500 *,
+button.bg-yellow-400 *,
+button.bg-yellow-500 * {
+  color: #0F172A !important;
+  font-weight: 800 !important;
 }
 
-/* 9. Form Inputs & Textareas */
-html.light input,
-html.light select,
-html.light textarea {
+/* 6. Modal Backdrops & Overlays */
+.bg-slate-950\/90,
+.bg-black\/80,
+.bg-black\/70,
+.bg-black\/60,
+.bg-black\/50,
+.bg-black\/40,
+.bg-\[\#05020d\]\/80,
+.bg-\[\#06030c\]\/85 {
+  background-color: rgba(15, 23, 42, 0.55) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+
+/* 7. Form Inputs, Selects & Textareas */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   border-color: #CBD5E1 !important;
+  font-weight: 500;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-html.light input::placeholder,
-html.light textarea::placeholder {
-  color: #94A3B8 !important;
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: #D97706 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15) !important;
 }
 
-/* 10. Tables & Dashboard Cards */
-html.light table th {
-  background-color: #F1F5F9 !important;
-  color: #334155 !important;
+input::placeholder,
+textarea::placeholder {
+  color: #64748B !important;
+  opacity: 0.85;
+  font-weight: 400;
 }
 
-html.light table tr:hover {
+/* 8. Tables & Data Grids */
+table th {
   background-color: #F8FAFC !important;
+  color: #0F172A !important;
+  border-color: #E2E8F0 !important;
+  font-weight: 700 !important;
+}
+
+table td {
+  border-color: #E2E8F0 !important;
+  color: #1E293B !important;
+}
+
+table tr:hover {
+  background-color: #F1F5F9 !important;
+}
+
+/* 9. Safety against card clipping or breaking on mobile */
+.listing-card,
+[class*="ListingCard"] {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Ensure no horizontal flex items blow out viewport */
+.flex-1 {
+  min-width: 0;
 }

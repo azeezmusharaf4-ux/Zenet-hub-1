@@ -17,7 +17,8 @@ import {
   Briefcase,
   Wallet,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  Cpu
 } from 'lucide-react';
 import { UserProfile, ActiveAppView } from '../types';
 
@@ -60,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { id: 'marketplace' as ActiveAppView, label: 'Marketplace', icon: ShoppingCart },
+    { id: 'server-tool' as ActiveAppView, label: 'Server Tool (Extra Log)', icon: Cpu, badge: 'TOOLS' },
     { id: 'profile' as ActiveAppView, label: 'Dashboard', icon: Home },
     { id: 'orders' as ActiveAppView, label: 'Orders & History', icon: Scroll, badge: ordersCount > 0 ? String(ordersCount) : undefined },
     ...(isAdmin ? [{ id: 'messages' as ActiveAppView, label: 'Notifications & Messages', icon: MessageSquare, badge: unreadMessagesCount > 0 ? String(unreadMessagesCount) : undefined }] : []),
@@ -73,27 +75,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 bg-[#0c051a] border-r border-[#210f3f] h-screen sticky top-0 z-30 shrink-0 select-none p-4">
+    <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-[#E9E2FA] h-screen sticky top-0 z-30 shrink-0 select-none p-4">
       
       {/* Brand Header */}
-      <div className="pb-4 mb-3 border-b border-[#210f3f] flex items-center space-x-3">
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 via-pink-600 to-indigo-600 p-0.5 shadow-lg shadow-purple-600/30">
-          <div className="w-full h-full bg-[#0c051a] rounded-[14px] flex items-center justify-center">
-            <Store className="w-5 h-5 text-purple-300" />
-          </div>
+      <div className="pb-4 mb-3 border-b border-[#E9E2FA] flex items-center space-x-3">
+        <div className="w-10 h-10 rounded-2xl bg-[#EDE9FE] border border-[#E9E2FA] flex items-center justify-center">
+          <Store className="w-5 h-5 text-[#7C3AED]" />
         </div>
         <div className="flex flex-col">
-          <span className="font-black text-base text-white tracking-tight leading-none">
+          <span className="font-extrabold text-base text-[#171329] tracking-tight leading-none">
             ZENET HUB
           </span>
-          <span className="text-[10px] font-extrabold text-purple-400/60 uppercase tracking-widest block mt-1">
+          <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-wider block mt-1">
             MARKETPLACE
           </span>
         </div>
       </div>
 
       {/* Main Navigation Menu */}
-      <div className="flex-1 space-y-1.5 py-1 overflow-y-auto scrollbar-none">
+      <div className="flex-1 space-y-1 py-1 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
@@ -102,24 +102,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => handleNavClick(item.id)}
-              className={`w-full text-left px-3 py-2.5 rounded-2xl flex items-center justify-between transition cursor-pointer text-xs font-bold ${
+              className={`w-full text-left px-3 py-2.5 rounded-2xl flex items-center justify-between transition cursor-pointer text-xs font-semibold ${
                 isActive
-                  ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 text-white shadow-lg shadow-purple-600/30 font-black'
-                  : 'text-purple-200/80 hover:bg-[#180a33] hover:text-white'
+                  ? 'bg-[#7C3AED] text-white shadow-sm font-bold'
+                  : 'text-[#716B82] hover:bg-[#F8F7FF] hover:text-[#171329]'
               }`}
             >
               <div className="flex items-center space-x-3">
                 <div className={`p-1.5 rounded-xl flex items-center justify-center shrink-0 ${
-                  isActive ? 'bg-white/20 text-white' : 'bg-[#1a0c38] text-purple-300 border border-[#2d1859]'
+                  isActive ? 'bg-white/20 text-white' : 'bg-[#F8F7FF] text-[#716B82] border border-[#E9E2FA]'
                 }`}>
                   <Icon className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold tracking-wide">{item.label}</span>
+                <span className="text-xs tracking-wide">{item.label}</span>
               </div>
 
               {item.badge && (
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                  isActive ? 'bg-white/30 text-white' : 'bg-purple-600/30 text-purple-300 border border-purple-500/30'
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  isActive ? 'bg-white/30 text-white' : 'bg-[#EDE9FE] text-[#7C3AED]'
                 }`}>
                   {item.badge}
                 </span>
@@ -130,8 +130,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* ADMIN & SELLER CONTROLS NEAR BOTTOM */}
         {(isAdmin || userProfile?.role === 'seller') && (
-          <div className="pt-3 mt-2 border-t border-[#210f3f] space-y-2">
-            <span className="text-[9px] font-black uppercase tracking-wider text-purple-400/60 px-3 block">
+          <div className="pt-3 mt-2 border-t border-[#E9E2FA] space-y-2">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-[#716B82] px-3 block">
               {isAdmin ? 'MANAGEMENT & ADMIN' : 'SELLER CONTROL'}
             </span>
 
@@ -140,75 +140,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 id="sidebar-add-product-generate-update"
                 onClick={onOpenZenetUpdateGenerator}
-                className="relative overflow-hidden w-full text-left px-3.5 py-3 rounded-2xl flex items-center space-x-3 transition duration-300 cursor-pointer bg-gradient-to-r from-[#211145] via-[#321669] to-[#1d0b3d] hover:from-[#2a1458] hover:via-[#3e1b82] hover:to-[#250e4f] border border-[#a16eff]/60 text-white shadow-[0_0_15px_rgba(125,76,247,0.3)] hover:shadow-[0_0_22px_rgba(125,76,247,0.5)] group my-1"
+                className="w-full text-left px-3 py-2.5 rounded-2xl flex items-center space-x-3 transition cursor-pointer bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] hover:border-[#C4B5FD] text-[#171329] group my-1"
               >
-                <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-40 group-hover:animate-pulse" />
-                <div className="p-2 rounded-xl bg-[#1b0d3d] text-amber-300 border border-amber-500/40 shrink-0 shadow-[0_0_10px_rgba(245,158,11,0.25)]">
-                  <Sparkles className="w-4 h-4 text-amber-300" />
+                <div className="p-1.5 rounded-xl bg-[#EDE9FE] text-[#7C3AED] shrink-0">
+                  <Sparkles className="w-4 h-4 text-[#7C3AED]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="text-[11px] sm:text-xs font-black text-white tracking-tight block">
-                    Add Product to Generate Update
+                  <span className="text-[11px] font-bold text-[#171329] block truncate">
+                    Generate Update
                   </span>
-                  <span className="text-[9px] text-purple-300/80 font-semibold block mt-0.5 leading-none">
-                    ZENET HUB Update Products
+                  <span className="text-[9px] text-[#716B82] block leading-none truncate">
+                    Update Products
                   </span>
                 </div>
-                <span className="bg-amber-400 text-black text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase shrink-0">
                   OWNER
                 </span>
               </button>
             )}
 
             {onOpenSellerDashboard && (
-              isAdmin ? (
-                /* Beautiful Deep Blue & Purple Glowing Button for Admin version */
-                <button
-                  onClick={onOpenSellerDashboard}
-                  className="relative overflow-hidden w-full text-left px-3.5 py-3 rounded-2xl flex items-center space-x-3 transition duration-300 cursor-pointer bg-gradient-to-r from-[#101438] via-[#211145] to-[#140b30] hover:from-[#14194c] hover:via-[#2b1759] hover:to-[#1b0f3d] border border-[#5c3bf5]/55 text-white shadow-[0_0_15px_rgba(92,59,245,0.25)] hover:shadow-[0_0_22px_rgba(92,59,245,0.45)] hover:border-[#7c5df7] group"
-                >
-                  <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-40 group-hover:animate-pulse" />
-                  <div className="p-2 rounded-xl bg-[#1b144c] text-blue-300 border border-blue-500/30 shrink-0 shadow-[0_0_8px_rgba(59,130,246,0.25)]">
-                    <Briefcase className="w-4 h-4 text-[#8ea8ff]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[11px] sm:text-xs font-black text-white tracking-tight block">
-                      Seller Dashboard Hub — ADMIN
-                    </span>
-                    <span className="text-[9px] text-[#909cff] font-semibold block mt-0.5 leading-none">
-                      Authorized Admin System
-                    </span>
-                  </div>
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#5c3bf5] animate-ping shrink-0" />
-                </button>
-              ) : (
-                /* Regular Seller button */
-                <button
-                  onClick={onOpenSellerDashboard}
-                  className="w-full text-left px-3 py-2.5 rounded-2xl flex items-center space-x-3 transition cursor-pointer text-xs font-bold text-purple-200 hover:bg-[#180a33] hover:text-white"
-                >
-                  <div className="p-1.5 rounded-xl bg-[#1a0c38] text-purple-300 border border-[#2d1859] shrink-0">
-                    <Briefcase className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-bold tracking-wide">
-                    Seller Dashboard Hub
+              <button
+                onClick={onOpenSellerDashboard}
+                className="w-full text-left px-3 py-2.5 rounded-2xl flex items-center space-x-3 transition cursor-pointer bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] hover:border-[#C4B5FD] text-[#171329] group"
+              >
+                <div className="p-1.5 rounded-xl bg-[#EDE9FE] text-[#7C3AED] shrink-0">
+                  <Briefcase className="w-4 h-4 text-[#7C3AED]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[11px] font-bold text-[#171329] block truncate">
+                    Seller Dashboard
                   </span>
-                </button>
-              )
+                  <span className="text-[9px] text-[#716B82] block leading-none truncate">
+                    {isAdmin ? 'Admin Console' : 'Seller Control'}
+                  </span>
+                </div>
+              </button>
             )}
 
             {isOwner && onOpenAdmin && (
               <button
                 onClick={onOpenAdmin}
-                className="w-full text-left px-4 py-2.5 rounded-full flex items-center justify-between space-x-3 transition cursor-pointer bg-[#2b0816] hover:bg-[#3b0c1f] border border-rose-500/70 text-white shadow-lg shadow-rose-950/50 my-1"
+                className="w-full text-left px-3 py-2.5 rounded-2xl flex items-center justify-between space-x-3 transition cursor-pointer bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 my-1"
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
-                  <ShieldCheck className="w-5 h-5 text-[#ff3b68] shrink-0" />
-                  <span className="text-xs sm:text-sm font-extrabold text-white tracking-tight truncate">
-                    Admin Control Center
+                  <ShieldCheck className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span className="text-xs font-bold text-rose-900 truncate">
+                    Admin Center
                   </span>
                 </div>
-                <span className="bg-[#ff2e63] text-black font-black text-[10px] sm:text-[11px] px-3 py-0.5 sm:py-1 rounded-full uppercase tracking-wider shrink-0 shadow-sm">
+                <span className="bg-rose-600 text-white font-bold text-[9px] px-2 py-0.5 rounded-full uppercase shrink-0">
                   OWNER
                 </span>
               </button>
@@ -218,30 +199,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Bottom Logged In User Section */}
-      <div className="pt-3 mt-auto border-t border-[#210f3f]">
+      <div className="pt-3 mt-auto border-t border-[#E9E2FA]">
         {user ? (
-          <div className="p-3 bg-[#120726] border border-[#231242] rounded-2xl space-y-2.5">
+          <div className="p-3 bg-[#F8F7FF] border border-[#E9E2FA] rounded-2xl space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="truncate pr-2">
-                <p className="text-[9px] font-black uppercase tracking-wider text-purple-300/50">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-[#716B82]">
                   LOGGED IN AS
                 </p>
-                <p className="text-xs font-extrabold text-white truncate mt-0.5">
+                <p className="text-xs font-bold text-[#171329] truncate mt-0.5">
                   {user.displayName || userProfile?.displayName || user.email?.split('@')[0]}
                 </p>
               </div>
 
               {isOwner ? (
-                <span className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 flex items-center space-x-1 shadow-sm">
-                  <ShieldCheck className="w-3 h-3 text-slate-950" />
-                  OWNER
+                <span className="bg-amber-100 text-amber-800 font-bold text-[9px] px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 flex items-center space-x-1">
+                  <ShieldCheck className="w-3 h-3 text-amber-700" />
+                  <span>OWNER</span>
                 </span>
               ) : isAdmin ? (
-                <span className="bg-purple-600 text-white font-black text-[9px] px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 flex items-center space-x-1 shadow-sm">
+                <span className="bg-[#EDE9FE] text-[#7C3AED] font-bold text-[9px] px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
                   ADMIN
                 </span>
               ) : (
-                <span className="bg-purple-950 text-purple-300 border border-purple-500/30 font-bold text-[9px] px-2 py-0.5 rounded-md uppercase shrink-0">
+                <span className="bg-[#EDE9FE] text-[#7C3AED] font-bold text-[9px] px-2 py-0.5 rounded-md uppercase shrink-0">
                   {userProfile?.role || 'BUYER'}
                 </span>
               )}
@@ -249,16 +230,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               onClick={onLogout}
-              className="w-full flex items-center justify-center space-x-2 py-2 px-3 bg-[#1e0e3a] hover:bg-[#2b1354] text-purple-200 hover:text-white rounded-xl border border-[#351963] transition font-bold text-xs cursor-pointer"
+              className="w-full flex items-center justify-center space-x-2 py-2 px-3 bg-white hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#7C3AED] rounded-xl border border-[#E9E2FA] hover:border-[#C4B5FD] transition font-semibold text-xs cursor-pointer"
             >
-              <LogOut className="w-4 h-4 text-purple-400" />
+              <LogOut className="w-4 h-4" />
               <span>Sign out</span>
             </button>
           </div>
         ) : (
           <button
             onClick={() => onOpenAuth('login')}
-            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-extrabold py-3 px-4 rounded-2xl shadow-lg transition cursor-pointer"
+            className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white text-xs font-bold py-3 px-4 rounded-2xl shadow-sm transition cursor-pointer"
           >
             Sign In / Register
           </button>

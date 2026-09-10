@@ -324,9 +324,6 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const [refreshingOrderId, setRefreshingOrderId] = useState<string | null>(null);
-  const [refillingOrderId, setRefillingOrderId] = useState<string | null>(null);
-  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
-  const [actionFeedback, setActionFeedback] = useState<{ orderId: string; text: string; isError?: boolean } | null>(null);
 
   // Owner Manager State
   const [pricingSettings, setPricingSettings] = useState<SocialBoostPricingSettings>({
@@ -640,10 +637,18 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     try {
       const token = await getSafeIdToken(auth.currentUser);
       const payload = {
+        userId: auth.currentUser.uid,
+        userEmail: auth.currentUser.email || userProfile?.email || '',
         serviceId: orderModalService.id,
+        service: orderModalService.id,
         target,
+        link: target,
+        targetUrl: target,
         quantity: orderQuantity,
-        comments: orderModalService.inputType === 'custom_comments' ? orderCommentsText : undefined
+        amountNgn: calculatedPrice,
+        totalCost: calculatedPrice,
+        comments: orderModalService.inputType === 'custom_comments' ? orderCommentsText : undefined,
+        customComments: orderModalService.inputType === 'custom_comments' ? orderCommentsText : undefined
       };
 
       const data = await safeApiFetch('/api/social-boost/order', {
@@ -747,29 +752,29 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#090314] text-white select-none pb-28">
+    <div className="min-h-screen bg-[#F8F7FF] text-[#171329] select-none pb-28">
       
       {/* 1. TOP HEADER & NAVIGATION BAR */}
-      <div className="sticky top-0 z-30 bg-[#0c041c]/95 backdrop-blur-md border-b border-[#230f44] px-4 py-3.5">
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-[#E9E2FA] px-4 py-3.5 shadow-sm">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           
           {/* Back Button & Title */}
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={onBackToMarketplace}
-              className="w-10 h-10 rounded-xl bg-[#170932] hover:bg-[#25104e] border border-[#2e155b] flex items-center justify-center text-purple-300 hover:text-white transition cursor-pointer shrink-0 shadow-md active:scale-95"
+              className="w-10 h-10 rounded-xl bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] flex items-center justify-center text-[#7C3AED] hover:text-[#5B21B6] transition cursor-pointer shrink-0 shadow-sm active:scale-95"
               title="Back to Marketplace"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2 truncate">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-[#171329] flex items-center gap-2 truncate">
                 <span>Boost Services</span>
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white shrink-0">
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#EDE9FE] text-[#7C3AED] shrink-0 border border-[#E9E2FA]">
                   Automated SMM
                 </span>
               </h1>
-              <p className="text-[11px] text-purple-300/60 font-medium truncate">
+              <p className="text-[11px] text-[#716B82] font-medium truncate">
                 Instant social media growth for Instagram, TikTok, YouTube & more
               </p>
             </div>
@@ -779,16 +784,16 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onOpenWallet}
-              className="flex items-center gap-2 bg-[#170932] hover:bg-[#220e48] border border-[#2e155b] px-3 py-1.5 rounded-xl transition cursor-pointer shadow-sm active:scale-95"
+              className="flex items-center gap-2 bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] px-3 py-1.5 rounded-xl transition cursor-pointer shadow-sm active:scale-95"
             >
-              <Wallet className="w-4 h-4 text-purple-400" />
+              <Wallet className="w-4 h-4 text-[#7C3AED]" />
               <div className="flex flex-col text-left">
-                <span className="text-[9px] font-bold text-purple-300/70 leading-none">Wallet</span>
-                <span className="text-xs font-black text-emerald-400 leading-tight">
+                <span className="text-[9px] font-semibold text-[#716B82] leading-none">Wallet</span>
+                <span className="text-xs font-bold text-[#047857] leading-tight">
                   ₦{walletBalance.toLocaleString()}
                 </span>
               </div>
-              <span className="text-[10px] font-black bg-purple-600 text-white px-1.5 py-0.5 rounded-md ml-0.5">
+              <span className="text-[10px] font-bold bg-[#7C3AED] text-white px-2 py-0.5 rounded-md ml-0.5">
                 + Fund
               </span>
             </button>
@@ -796,13 +801,13 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         </div>
 
         {/* Sub-Tabs: Marketplace Catalogue | My Orders | Owner Manager */}
-        <div className="max-w-4xl mx-auto flex items-center gap-1.5 mt-3 pt-2 border-t border-[#1e0c3d]">
+        <div className="max-w-4xl mx-auto flex items-center gap-1.5 mt-3 pt-2 border-t border-[#E9E2FA]">
           <button
             onClick={() => setActiveTab('marketplace')}
-            className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'marketplace'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-600/30'
-                : 'text-purple-300/70 hover:text-white bg-[#130728] hover:bg-[#1c0b39]'
+                ? 'bg-[#7C3AED] text-white shadow-sm'
+                : 'text-[#716B82] hover:text-[#171329] bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA]'
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
@@ -811,16 +816,16 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'orders'
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-600/30'
-                : 'text-purple-300/70 hover:text-white bg-[#130728] hover:bg-[#1c0b39]'
+                ? 'bg-[#7C3AED] text-white shadow-sm'
+                : 'text-[#716B82] hover:text-[#171329] bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA]'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
             <span>My Orders</span>
             {myOrders.length > 0 && (
-              <span className="bg-purple-900 text-purple-200 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+              <span className="bg-[#EDE9FE] text-[#7C3AED] text-[10px] px-1.5 py-0.2 rounded-full font-bold">
                 {myOrders.length}
               </span>
             )}
@@ -829,10 +834,10 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           {isOwner && (
             <button
               onClick={() => setActiveTab('manager')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                 activeTab === 'manager'
-                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
-                  : 'text-amber-400 hover:text-amber-300 bg-[#130728] hover:bg-[#1c0b39]'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200'
               }`}
             >
               <Sliders className="w-3.5 h-3.5" />
@@ -853,19 +858,19 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             {/* 1. LARGE PROMINENT SEARCH BAR (Matching Reference Screenshot Top Search) */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Search className="w-5 h-5 text-purple-400" />
+                <Search className="w-5 h-5 text-[#7C3AED]" />
               </div>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search for followers, likes, views, platforms..."
-                className="w-full bg-[#14072b] hover:bg-[#180933] focus:bg-[#180933] border-2 border-[#2b1458] focus:border-cyan-400 text-white placeholder-purple-300/40 text-sm sm:text-base font-semibold rounded-2xl pl-12 pr-10 py-3.5 transition shadow-lg outline-none"
+                className="w-full bg-white hover:bg-white focus:bg-white border border-[#E9E2FA] focus:border-[#7C3AED] text-[#171329] placeholder-[#716B82]/60 text-sm sm:text-base font-medium rounded-2xl pl-12 pr-10 py-3.5 transition shadow-sm outline-none"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-purple-400 hover:text-white cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#716B82] hover:text-[#171329] cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -874,9 +879,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
             {/* Error Banner with Retry (Only shown if no services loaded) */}
             {servicesError && services.length === 0 && !isLoadingServices && (
-              <div className="p-4 bg-rose-950/40 border border-rose-500/40 rounded-2xl flex items-center justify-between gap-3 text-rose-300 text-xs">
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between gap-3 text-rose-800 text-xs">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>{servicesError}</span>
                 </div>
                 <button
@@ -897,13 +902,13 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                 {[1, 2, 3, 4, 5, 6].map(i => (
                   <div 
                     key={i} 
-                    className="h-16 rounded-2xl bg-[#130728] border border-[#230f44] animate-pulse flex items-center justify-between px-5"
+                    className="h-16 rounded-2xl bg-white border border-[#E9E2FA] animate-pulse flex items-center justify-between px-5"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-purple-900/30" />
-                      <div className="w-32 h-4 rounded bg-purple-900/30" />
+                      <div className="w-8 h-8 rounded-xl bg-[#EDE9FE]" />
+                      <div className="w-32 h-4 rounded bg-[#EDE9FE]" />
                     </div>
-                    <div className="w-8 h-8 rounded-xl bg-purple-900/30" />
+                    <div className="w-8 h-8 rounded-xl bg-[#EDE9FE]" />
                   </div>
                 ))}
               </div>
@@ -911,15 +916,15 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
             {/* Empty Search Result (Only if user has typed a query that matched nothing) */}
             {!isLoadingServices && services.length > 0 && platformsData.length === 0 && searchQuery.trim() !== '' && (
-              <div className="p-10 text-center bg-[#120728] border border-[#26124a] rounded-3xl space-y-3">
-                <Flame className="w-10 h-10 text-purple-400/40 mx-auto" />
-                <h3 className="text-sm sm:text-base font-black text-white">No services found</h3>
-                <p className="text-xs text-purple-300/60 max-w-sm mx-auto">
+              <div className="p-10 text-center bg-white border border-[#E9E2FA] rounded-3xl space-y-3 shadow-sm">
+                <Flame className="w-10 h-10 text-[#7C3AED]/40 mx-auto" />
+                <h3 className="text-sm sm:text-base font-bold text-[#171329]">No services found</h3>
+                <p className="text-xs text-[#716B82] max-w-sm mx-auto">
                   No boost services matched "{searchQuery}". Try searching for another keyword like "followers", "likes" or "views".
                 </p>
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black cursor-pointer transition"
+                  className="px-4 py-2 bg-[#7C3AED] hover:bg-[#5B21B6] text-white rounded-xl text-xs font-bold cursor-pointer transition"
                 >
                   Clear Search
                 </button>
@@ -928,10 +933,10 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
             {/* No services loaded fallback */}
             {!isLoadingServices && services.length === 0 && !servicesError && (
-              <div className="p-10 text-center bg-[#120728] border border-[#26124a] rounded-3xl space-y-3">
-                <TrendingUp className="w-10 h-10 text-purple-400/40 mx-auto" />
-                <h3 className="text-sm sm:text-base font-black text-white">Loading Boost Services</h3>
-                <p className="text-xs text-purple-300/60 max-w-sm mx-auto">
+              <div className="p-10 text-center bg-white border border-[#E9E2FA] rounded-3xl space-y-3 shadow-sm">
+                <TrendingUp className="w-10 h-10 text-[#7C3AED]/40 mx-auto" />
+                <h3 className="text-sm sm:text-base font-bold text-[#171329]">Loading Boost Services</h3>
+                <p className="text-xs text-[#716B82] max-w-sm mx-auto">
                   Connecting to live provider gateway...
                 </p>
                 <button
@@ -939,14 +944,14 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                     setIsLoadingServices(true);
                     fetchServices();
                   }}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black cursor-pointer transition"
+                  className="px-4 py-2 bg-[#7C3AED] hover:bg-[#5B21B6] text-white rounded-xl text-xs font-bold cursor-pointer transition"
                 >
                   Refresh Services
                 </button>
               </div>
             )}
 
-            {/* 2. PLATFORM CARDS LIST (Large Rounded Dark Pill/Card Rows matching Reference Screenshot) */}
+            {/* 2. PLATFORM CARDS LIST (Large Rounded White Pill/Card Rows matching Reference Screenshot) */}
             {!isLoadingServices && platformsData.length > 0 && (
               <div className="space-y-3 pt-1">
                 {platformsData.map(({ platform, services: platformServices, subCategories, minPrice }) => {
@@ -969,12 +974,12 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   return (
                     <div
                       key={platform}
-                      className="bg-[#120728] border border-[#241049] hover:border-[#38186f] rounded-2xl overflow-hidden transition shadow-lg"
+                      className="bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 rounded-2xl overflow-hidden transition shadow-sm"
                     >
                       {/* CARD HEADER ROW: [Platform Icon] [PLATFORM NAME] [+] */}
                       <div
                         onClick={() => togglePlatform(platform)}
-                        className="px-5 py-4 flex items-center justify-between cursor-pointer select-none transition bg-[#14082c] hover:bg-[#1b0a39] active:scale-[0.99]"
+                        className="px-5 py-4 flex items-center justify-between cursor-pointer select-none transition bg-white hover:bg-[#F8F7FF] active:scale-[0.99]"
                       >
                         {/* Left: Icon & Platform Name */}
                         <div className="flex items-center gap-3.5 min-w-0">
@@ -982,17 +987,17 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                             <Icon className={`w-5 h-5 ${visuals.iconColor}`} />
                           </div>
                           <div className="min-w-0">
-                            <h2 className="text-sm sm:text-base font-black tracking-wider text-cyan-400 uppercase truncate">
+                            <h2 className="text-sm sm:text-base font-bold tracking-tight text-[#171329] uppercase truncate">
                               {visuals.displayName}
                             </h2>
-                            <p className="text-[11px] text-purple-300/60 font-medium truncate">
+                            <p className="text-[11px] text-[#716B82] font-medium truncate">
                               {platformServices.length} {platformServices.length === 1 ? 'service' : 'services'} available
                               {minPrice !== Infinity && ` • From ₦${minPrice.toLocaleString()}/1k`}
                             </p>
                           </div>
                         </div>
 
-                        {/* Right: Modern Cyan Plus / Minus Button */}
+                        {/* Right: Plus / Minus Button */}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1001,8 +1006,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                           }}
                           className={`w-9 h-9 rounded-xl flex items-center justify-center transition shrink-0 ${
                             isExpanded
-                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rotate-90'
-                              : 'bg-[#1b0b38] hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 border border-[#31165c] hover:border-cyan-500/40'
+                              ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] rotate-90'
+                              : 'bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA]'
                           }`}
                           aria-label={isExpanded ? "Collapse platform services" : "Expand platform services"}
                         >
@@ -1012,12 +1017,12 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
                       {/* EXPANDED CONTENT: Real services from the API for this platform */}
                       {isExpanded && (
-                        <div className="p-4 sm:p-5 bg-[#0f0522] border-t border-[#230f44] space-y-4 animate-in fade-in duration-200">
+                        <div className="p-4 sm:p-5 bg-[#F8F7FF] border-t border-[#E9E2FA] space-y-4 animate-in fade-in duration-200">
                           
                           {/* Sub-Category Filter Chips (if more than 1 category) */}
                           {subCategories.length > 2 && (
                             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
-                              <span className="text-[10px] font-black uppercase text-purple-400/60 shrink-0 mr-1">
+                              <span className="text-[10px] font-bold uppercase text-[#716B82] shrink-0 mr-1">
                                 Filter:
                               </span>
                               {subCategories.map(cat => {
@@ -1028,8 +1033,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                                     onClick={() => setPlatformCategoryFilter(prev => ({ ...prev, [platform]: cat }))}
                                     className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
                                       isCatSelected
-                                        ? 'bg-cyan-500 text-black font-black shadow-md shadow-cyan-500/30'
-                                        : 'bg-[#180b33] text-purple-300/70 hover:text-white border border-[#2b1556]'
+                                        ? 'bg-[#7C3AED] text-white shadow-sm'
+                                        : 'bg-white text-[#716B82] hover:text-[#171329] border border-[#E9E2FA]'
                                     }`}
                                   >
                                     {cat}
@@ -1051,7 +1056,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                                   {displayedServices.map(service => (
                                     <div
                                       key={service.id}
-                                      className="bg-[#150930] hover:bg-[#1a0c3b] border border-[#2b1556] hover:border-purple-500/60 rounded-2xl p-4 transition space-y-3 shadow-md"
+                                      className="bg-white hover:bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 rounded-2xl p-4 transition space-y-3 shadow-sm"
                                     >
                                       {/* Service Header & Price Row */}
                                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -1059,66 +1064,66 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                                           
                                           {/* Badges */}
                                           <div className="flex flex-wrap items-center gap-1.5">
-                                            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-purple-900/60 text-purple-200 border border-purple-700/40">
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA]">
                                               {service.type || 'Service'}
                                             </span>
                                             {service.isCheapest && (
-                                              <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-[#047857] border border-emerald-200">
                                                 ⭐ Lowest Rate
                                               </span>
                                             )}
                                             {service.isBestValue && (
-                                              <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-pink-950 text-pink-300 border border-pink-500/40">
+                                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-[#7C3AED] border border-purple-200">
                                                 🔥 Best Value
                                               </span>
                                             )}
                                             {service.refill && (
-                                              <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-blue-950 text-blue-300 border border-blue-500/40">
+                                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
                                                 🛡️ Refill Guarantee
                                               </span>
                                             )}
                                           </div>
 
                                           {/* Service Name */}
-                                          <h3 className="text-xs sm:text-sm font-black text-white leading-snug break-words">
+                                          <h3 className="text-xs sm:text-sm font-bold text-[#171329] leading-snug break-words">
                                             {service.name}
                                           </h3>
 
                                           {/* Service Description */}
                                           {service.description && (
-                                            <p className="text-[11px] text-purple-300/70 leading-relaxed">
+                                            <p className="text-[11px] text-[#716B82] leading-relaxed">
                                               {service.description}
                                             </p>
                                           )}
                                         </div>
 
                                         {/* Selling Rate */}
-                                        <div className="text-left sm:text-right shrink-0 bg-[#100624] sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none border sm:border-0 border-[#241049]">
-                                          <span className="text-[9px] font-black text-purple-400 uppercase block">
+                                        <div className="text-left sm:text-right shrink-0 bg-[#F8F7FF] sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:rounded-none border sm:border-0 border-[#E9E2FA]">
+                                          <span className="text-[9px] font-semibold text-[#716B82] uppercase block">
                                             Rate / 1,000 Units
                                           </span>
-                                          <span className="text-base sm:text-lg font-black text-emerald-400 block">
+                                          <span className="text-base sm:text-lg font-bold text-[#047857] block">
                                             ₦{(service.ratePer1000 || 0).toLocaleString()}
                                           </span>
                                           {isOwner && (
-                                            <div className="mt-1 text-[10px] font-mono text-purple-300/90 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded text-left sm:text-right whitespace-nowrap">
-                                              <span className="text-purple-300">Cost: ₦{(service.providerRatePer1000 || Math.max(0, (service.ratePer1000 || 0) - (service.markupPer1000 || 0))).toLocaleString()}</span>
-                                              <span className="mx-1 text-amber-400">→</span>
-                                              <span className="text-amber-300 font-bold">+₦{(service.markupPer1000 !== undefined ? service.markupPer1000 : Math.round((service.ratePer1000 || 0) * 0.35)).toLocaleString()} markup</span>
+                                            <div className="mt-1 text-[10px] font-mono text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded text-left sm:text-right whitespace-nowrap">
+                                              <span className="text-amber-800">Cost: ₦{(service.providerRatePer1000 || Math.max(0, (service.ratePer1000 || 0) - (service.markupPer1000 || 0))).toLocaleString()}</span>
+                                              <span className="mx-1 text-amber-500">→</span>
+                                              <span className="text-amber-700 font-bold">+₦{(service.markupPer1000 !== undefined ? service.markupPer1000 : Math.round((service.ratePer1000 || 0) * 0.35)).toLocaleString()} markup</span>
                                             </div>
                                           )}
                                         </div>
                                       </div>
 
                                       {/* Service Specs & Order Trigger Button */}
-                                      <div className="pt-2.5 border-t border-[#200d42] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-purple-300/70 font-medium">
-                                          <span>Min: <strong className="text-white font-bold">{service.min?.toLocaleString()}</strong></span>
+                                      <div className="pt-2.5 border-t border-[#E9E2FA] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div className="flex flex-wrap items-center gap-3 text-[11px] text-[#716B82] font-medium">
+                                          <span>Min: <strong className="text-[#171329] font-bold">{service.min?.toLocaleString()}</strong></span>
                                           <span>•</span>
-                                          <span>Max: <strong className="text-white font-bold">{service.max?.toLocaleString()}</strong></span>
+                                          <span>Max: <strong className="text-[#171329] font-bold">{service.max?.toLocaleString()}</strong></span>
                                           <span>•</span>
-                                          <span className="text-amber-300 font-bold flex items-center gap-1">
-                                            <Rocket className="w-3 h-3 text-amber-400" />
+                                          <span className="text-amber-700 font-semibold flex items-center gap-1">
+                                            <Rocket className="w-3 h-3 text-amber-600" />
                                             {service.deliverySpeed || 'Instant Start Delivery'}
                                           </span>
                                         </div>
@@ -1126,7 +1131,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                                         {/* Order Button */}
                                         <button
                                           onClick={() => handleOpenOrderModal(service)}
-                                          className="w-full sm:w-auto px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 hover:opacity-90 active:scale-95 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-md shadow-purple-600/30 flex items-center justify-center gap-1.5"
+                                          className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#5B21B6] active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
                                         >
                                           <Rocket className="w-3.5 h-3.5" />
                                           <span>Order Now</span>
@@ -1137,8 +1142,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
                                   {/* Pagination & Show More Controls */}
                                   {hasMore && (
-                                    <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-[#14082c] p-3.5 rounded-2xl border border-[#26124a]">
-                                      <span className="text-xs text-purple-300/70 font-medium">
+                                    <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-white p-3.5 rounded-2xl border border-[#E9E2FA]">
+                                      <span className="text-xs text-[#716B82] font-medium">
                                         Showing <strong>{displayedServices.length}</strong> of <strong>{filteredPlatformServices.length}</strong> services
                                       </span>
                                       <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1148,7 +1153,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                                             ...prev,
                                             [platform]: (prev[platform] || 30) + 30
                                           }))}
-                                          className="flex-1 sm:flex-initial px-4 py-1.5 rounded-xl bg-[#230f44] hover:bg-[#2f145c] text-purple-200 hover:text-white text-xs font-black transition cursor-pointer border border-[#3b1973]"
+                                          className="flex-1 sm:flex-initial px-4 py-1.5 rounded-xl bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#7C3AED] text-xs font-bold transition cursor-pointer border border-[#E9E2FA]"
                                         >
                                           + Show 30 More
                                         </button>
@@ -1158,7 +1163,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                                             ...prev,
                                             [platform]: filteredPlatformServices.length
                                           }))}
-                                          className="flex-1 sm:flex-initial px-4 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-black transition cursor-pointer border border-cyan-500/40"
+                                          className="flex-1 sm:flex-initial px-4 py-1.5 rounded-xl bg-[#EDE9FE] hover:bg-[#DDD6FE] text-[#5B21B6] text-xs font-bold transition cursor-pointer border border-[#C4B5FD]"
                                         >
                                           Show All ({filteredPlatformServices.length})
                                         </button>
@@ -1184,15 +1189,15 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         {/* ========================================================================= */}
         {activeTab === 'orders' && (
           <div className="space-y-4 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between bg-[#120728] p-4 rounded-2xl border border-[#26124a]">
+            <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-[#E9E2FA] shadow-sm">
               <div>
-                <h2 className="text-sm sm:text-base font-black text-white">Your Boosting Orders</h2>
-                <p className="text-xs text-purple-300/60">Live status synchronized directly with provider gateway</p>
+                <h2 className="text-sm sm:text-base font-bold text-[#171329]">Your Boosting Orders</h2>
+                <p className="text-xs text-[#716B82]">Live status synchronized directly with provider gateway</p>
               </div>
               <button
                 onClick={fetchOrders}
                 disabled={isLoadingOrders}
-                className="px-3.5 py-1.5 bg-[#1a0a38] hover:bg-[#250f50] border border-[#31165c] rounded-xl text-xs font-black text-purple-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+                className="px-3.5 py-1.5 bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] rounded-xl text-xs font-bold text-[#7C3AED] hover:text-[#5B21B6] flex items-center gap-1.5 cursor-pointer transition shadow-sm"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders ? 'animate-spin' : ''}`} />
                 <span>Refresh</span>
@@ -1202,19 +1207,19 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             {isLoadingOrders ? (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className="h-24 bg-[#120728] rounded-2xl border border-[#230f44] animate-pulse" />
+                  <div key={i} className="h-24 bg-white rounded-2xl border border-[#E9E2FA] animate-pulse" />
                 ))}
               </div>
             ) : myOrders.length === 0 ? (
-              <div className="p-12 text-center bg-[#120728] border border-[#26124a] rounded-3xl space-y-3">
-                <Clock className="w-12 h-12 text-purple-400/40 mx-auto" />
-                <h3 className="text-sm font-black text-white">No boost orders placed yet</h3>
-                <p className="text-xs text-purple-300/60 max-w-sm mx-auto">
+              <div className="p-12 text-center bg-white border border-[#E9E2FA] rounded-3xl space-y-3 shadow-sm">
+                <Clock className="w-12 h-12 text-[#7C3AED]/30 mx-auto" />
+                <h3 className="text-sm font-bold text-[#171329]">No boost orders placed yet</h3>
+                <p className="text-xs text-[#716B82] max-w-sm mx-auto">
                   Choose any platform above (Instagram, TikTok, YouTube, etc.) to place your first automated growth order.
                 </p>
                 <button
                   onClick={() => setActiveTab('marketplace')}
-                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-xs font-black cursor-pointer shadow-md"
+                  className="px-5 py-2.5 bg-[#7C3AED] hover:bg-[#5B21B6] text-white rounded-xl text-xs font-bold cursor-pointer shadow-sm transition"
                 >
                   Browse Boost Services
                 </button>
@@ -1228,25 +1233,25 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   return (
                     <div
                       key={order.id || order.orderId}
-                      className="p-4 bg-[#120728] border border-[#26124a] rounded-2xl space-y-3 shadow-md"
+                      className="p-4 bg-white border border-[#E9E2FA] rounded-2xl space-y-3 shadow-sm"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2.5 border-b border-[#230f44]">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2.5 border-b border-[#E9E2FA]">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={`w-9 h-9 rounded-xl ${visuals.iconBg} flex items-center justify-center shrink-0`}>
                             <Icon className={`w-4 h-4 ${visuals.iconColor}`} />
                           </div>
                           <div className="min-w-0">
-                            <h4 className="text-xs sm:text-sm font-black text-white truncate">
+                            <h4 className="text-xs sm:text-sm font-bold text-[#171329] truncate">
                               {order.serviceName}
                             </h4>
-                            <div className="flex items-center gap-2 text-[10px] text-purple-300/60">
-                              <span>ID: <strong className="text-white font-mono">{order.orderId}</strong></span>
+                            <div className="flex items-center gap-2 text-[10px] text-[#716B82]">
+                              <span>ID: <strong className="text-[#171329] font-mono">{order.orderId}</strong></span>
                               <button
                                 onClick={() => handleCopyOrderId(order.orderId)}
-                                className="text-purple-400 hover:text-white cursor-pointer"
+                                className="text-[#7C3AED] hover:text-[#5B21B6] cursor-pointer"
                                 title="Copy Order ID"
                               >
-                                {copiedOrderId === order.orderId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                {copiedOrderId === order.orderId ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                               </button>
                               <span>•</span>
                               <span>{new Date(order.createdAt).toLocaleString()}</span>
@@ -1256,14 +1261,14 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
                         {/* Status Pill */}
                         <div className="flex items-center gap-2 sm:justify-end">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                             order.status === 'completed'
-                              ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                              ? 'bg-emerald-50 border-emerald-200 text-[#047857]'
                               : order.status === 'in_progress' || order.status === 'processing'
-                              ? 'bg-blue-950/60 border-blue-500/40 text-blue-300'
+                              ? 'bg-blue-50 border-blue-200 text-blue-700'
                               : order.status === 'canceled'
-                              ? 'bg-red-950/60 border-red-500/40 text-red-300'
-                              : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
+                              ? 'bg-red-50 border-red-200 text-red-700'
+                              : 'bg-amber-50 border-amber-200 text-amber-800'
                           }`}>
                             {order.status || 'Processing'}
                           </span>
@@ -1271,7 +1276,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                           <button
                             onClick={() => handleRefreshStatus(order.orderId)}
                             disabled={refreshingOrderId === order.orderId}
-                            className="p-1.5 bg-[#1a0c3a] hover:bg-[#251152] text-purple-300 hover:text-white rounded-lg border border-[#30165c] transition cursor-pointer"
+                            className="p-1.5 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#7C3AED] hover:text-[#5B21B6] rounded-lg border border-[#E9E2FA] transition cursor-pointer"
                             title="Check Live Status"
                           >
                             <RefreshCw className={`w-3.5 h-3.5 ${refreshingOrderId === order.orderId ? 'animate-spin' : ''}`} />
@@ -1281,21 +1286,21 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
                       {/* Details Grid */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                        <div className="bg-[#170b33] p-2.5 rounded-xl border border-[#27124f]">
-                          <span className="text-[9px] font-bold uppercase text-purple-400/60 block">Target Link / User</span>
-                          <span className="text-white font-bold truncate block">{order.target}</span>
+                        <div className="bg-[#F8F7FF] p-2.5 rounded-xl border border-[#E9E2FA]">
+                          <span className="text-[9px] font-semibold uppercase text-[#716B82] block">Target Link / User</span>
+                          <span className="text-[#171329] font-semibold truncate block">{order.target}</span>
                         </div>
-                        <div className="bg-[#170b33] p-2.5 rounded-xl border border-[#27124f]">
-                          <span className="text-[9px] font-bold uppercase text-purple-400/60 block">Quantity</span>
-                          <span className="text-white font-bold block">{order.quantity.toLocaleString()}</span>
+                        <div className="bg-[#F8F7FF] p-2.5 rounded-xl border border-[#E9E2FA]">
+                          <span className="text-[9px] font-semibold uppercase text-[#716B82] block">Quantity</span>
+                          <span className="text-[#171329] font-bold block">{order.quantity.toLocaleString()}</span>
                         </div>
-                        <div className="bg-[#170b33] p-2.5 rounded-xl border border-[#27124f]">
-                          <span className="text-[9px] font-bold uppercase text-purple-400/60 block">Total Charged</span>
-                          <span className="text-emerald-400 font-black block">₦{order.charge.toLocaleString()}</span>
+                        <div className="bg-[#F8F7FF] p-2.5 rounded-xl border border-[#E9E2FA]">
+                          <span className="text-[9px] font-semibold uppercase text-[#716B82] block">Total Charged</span>
+                          <span className="text-[#047857] font-bold block">₦{order.charge.toLocaleString()}</span>
                         </div>
-                        <div className="bg-[#170b33] p-2.5 rounded-xl border border-[#27124f]">
-                          <span className="text-[9px] font-bold uppercase text-purple-400/60 block">Start / Remains</span>
-                          <span className="text-purple-200 font-bold block">
+                        <div className="bg-[#F8F7FF] p-2.5 rounded-xl border border-[#E9E2FA]">
+                          <span className="text-[9px] font-semibold uppercase text-[#716B82] block">Start / Remains</span>
+                          <span className="text-[#171329] font-medium block">
                             {order.startCount !== undefined ? order.startCount.toLocaleString() : 'N/A'} / {order.remains !== undefined ? order.remains.toLocaleString() : '0'}
                           </span>
                         </div>
@@ -1315,15 +1320,15 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           <div className="space-y-4 animate-in fade-in duration-200">
             
             {/* Header & Upstream Sync */}
-            <div className="bg-gradient-to-r from-[#170836] to-[#250d52] border border-[#3b1979] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="bg-white border border-[#E9E2FA] rounded-2xl p-5 space-y-4 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/40">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
                       ONEGRIDHUB OWNER SUITE
                     </span>
                   </div>
-                  <h2 className="text-base sm:text-lg font-black text-white mt-1">
+                  <h2 className="text-base sm:text-lg font-bold text-[#171329] mt-1">
                     Social Boosting Service & Price Controller
                   </h2>
                 </div>
@@ -1332,7 +1337,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   <button
                     onClick={handleSyncOneGridHub}
                     disabled={isSyncingProvider}
-                    className="px-3.5 py-2 bg-[#200e47] hover:bg-[#2c1361] border border-purple-500/40 text-purple-200 hover:text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-md"
+                    className="px-3.5 py-2 bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#7C3AED] hover:text-[#5B21B6] rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingProvider ? 'animate-spin' : ''}`} />
                     <span>Sync from OneGridHub</span>
@@ -1341,7 +1346,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   <button
                     onClick={handleSaveManagerSettings}
                     disabled={isSavingManagerSettings}
-                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-600/30"
+                    className="px-4 py-2 bg-[#7C3AED] hover:bg-[#5B21B6] text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>Save All Settings</span>
@@ -1350,21 +1355,21 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               </div>
 
               {syncStatusMessage && (
-                <div className="p-3 bg-[#110526] border border-purple-500/40 rounded-xl text-xs text-purple-200">
+                <div className="p-3 bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl text-xs text-[#716B82]">
                   {syncStatusMessage}
                 </div>
               )}
 
               {saveStatusMessage && (
-                <div className="p-3 bg-emerald-950/50 border border-emerald-500/40 rounded-xl text-xs text-emerald-200">
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
                   {saveStatusMessage}
                 </div>
               )}
 
               {/* Global Markup Rules */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                <div className="bg-[#120626]/80 p-3 rounded-xl border border-[#2b1458] space-y-1">
-                  <label className="text-[10px] font-black uppercase text-purple-300 block">
+                <div className="bg-[#F8F7FF] p-3 rounded-xl border border-[#E9E2FA] space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-[#716B82] block">
                     Default Profit Markup (%)
                   </label>
                   <div className="flex items-center gap-2">
@@ -1374,14 +1379,14 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       max={300}
                       value={pricingSettings.defaultMarkupPercent}
                       onChange={e => setPricingSettings(prev => ({ ...prev, defaultMarkupPercent: Number(e.target.value) }))}
-                      className="w-full bg-[#180b33] border border-[#2e1758] rounded-lg px-2.5 py-1 text-xs text-white font-bold"
+                      className="w-full bg-white border border-[#E9E2FA] rounded-lg px-2.5 py-1 text-xs text-[#171329] font-bold focus:border-[#7C3AED] outline-none"
                     />
-                    <span className="text-xs text-purple-300 font-black">%</span>
+                    <span className="text-xs text-[#716B82] font-bold">%</span>
                   </div>
                 </div>
 
-                <div className="bg-[#120626]/80 p-3 rounded-xl border border-[#2b1458] space-y-1">
-                  <label className="text-[10px] font-black uppercase text-purple-300 block">
+                <div className="bg-[#F8F7FF] p-3 rounded-xl border border-[#E9E2FA] space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-[#716B82] block">
                     Minimum Markup Per 1k (₦)
                   </label>
                   <div className="flex items-center gap-2">
@@ -1392,20 +1397,20 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       step={50}
                       value={pricingSettings.minMarkupPer1k}
                       onChange={e => setPricingSettings(prev => ({ ...prev, minMarkupPer1k: Number(e.target.value) }))}
-                      className="w-full bg-[#180b33] border border-[#2e1758] rounded-lg px-2.5 py-1 text-xs text-white font-bold"
+                      className="w-full bg-white border border-[#E9E2FA] rounded-lg px-2.5 py-1 text-xs text-[#171329] font-bold focus:border-[#7C3AED] outline-none"
                     />
-                    <span className="text-xs text-purple-300 font-black">₦</span>
+                    <span className="text-xs text-[#716B82] font-bold">₦</span>
                   </div>
                 </div>
 
-                <div className="bg-[#120626]/80 p-3 rounded-xl border border-[#2b1458] space-y-1">
-                  <label className="text-[10px] font-black uppercase text-purple-300 block">
+                <div className="bg-[#F8F7FF] p-3 rounded-xl border border-[#E9E2FA] space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-[#716B82] block">
                     Price Rounding
                   </label>
                   <select
                     value={pricingSettings.pricingStyle || 'natural'}
                     onChange={e => setPricingSettings(prev => ({ ...prev, pricingStyle: e.target.value as any }))}
-                    className="w-full bg-[#180b33] border border-[#2e1758] rounded-lg px-2.5 py-1 text-xs text-white font-bold"
+                    className="w-full bg-white border border-[#E9E2FA] rounded-lg px-2.5 py-1 text-xs text-[#171329] font-bold focus:border-[#7C3AED] outline-none"
                   >
                     <option value="natural">Exact Calculation (e.g. ₦1,245)</option>
                     <option value="tiered">Round to ₦50 (e.g. ₦1,250)</option>
@@ -1415,16 +1420,16 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               </div>
 
               {/* Service Pricing Breakdown Table & Search */}
-              <div className="bg-[#100624] border border-[#26124c] rounded-2xl p-4 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#241049]">
+              <div className="bg-[#F8F7FF] border border-[#E9E2FA] rounded-2xl p-4 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E9E2FA]">
                   <div>
-                    <h3 className="text-sm font-black text-white flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-[#171329] flex items-center gap-2">
                       <span>Services Pricing Controller & Provider Cost Breakdown</span>
-                      <span className="text-[10px] bg-purple-900/60 text-purple-200 px-2 py-0.5 rounded font-mono">
+                      <span className="text-[10px] bg-[#EDE9FE] text-[#7C3AED] px-2 py-0.5 rounded font-mono font-bold">
                         {services.length} Services
                       </span>
                     </h3>
-                    <p className="text-[11px] text-purple-300/60 mt-0.5">
+                    <p className="text-[11px] text-[#716B82] mt-0.5">
                       Inspect wholesale prices from OneGridHub, calculated markups, and final customer prices.
                     </p>
                   </div>
@@ -1433,20 +1438,20 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                 {/* Filter Controls */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="relative">
-                    <Search className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Search className="w-4 h-4 text-[#7C3AED] absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       placeholder="Search service name or ID..."
                       value={managerSearchQuery}
                       onChange={e => setManagerSearchQuery(e.target.value)}
-                      className="w-full bg-[#180b33] border border-[#2e1758] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-purple-400/40 focus:outline-none focus:border-cyan-400"
+                      className="w-full bg-white border border-[#E9E2FA] rounded-xl pl-9 pr-3 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 focus:outline-none focus:border-[#7C3AED]"
                     />
                   </div>
 
                   <select
                     value={managerPlatformFilter}
                     onChange={e => setManagerPlatformFilter(e.target.value)}
-                    className="bg-[#180b33] border border-[#2e1758] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                    className="bg-white border border-[#E9E2FA] rounded-xl px-3 py-2 text-xs text-[#171329] focus:outline-none focus:border-[#7C3AED] cursor-pointer"
                   >
                     <option value="All">All Platforms ({services.length})</option>
                     {Array.from(new Set(services.map(s => s.platform).filter(Boolean))).sort().map(p => (
@@ -1480,21 +1485,21 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       return (
                         <div 
                           key={svc.id}
-                          className="bg-[#14082c] border border-[#281350] hover:border-purple-600/40 p-3 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          className="bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 p-3 rounded-xl transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
                         >
                           <div className="space-y-1 min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-900/60 text-purple-200">
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-[#EDE9FE] text-[#7C3AED]">
                                 {svc.platform}
                               </span>
-                              <span className="text-[10px] font-mono text-purple-400">
+                              <span className="text-[10px] font-mono text-[#716B82]">
                                 ID: {svc.id}
                               </span>
                             </div>
-                            <h4 className="text-xs font-bold text-white leading-snug">
+                            <h4 className="text-xs font-bold text-[#171329] leading-snug">
                               {svc.name}
                             </h4>
-                            <div className="text-[10px] text-purple-300/60 flex items-center gap-2">
+                            <div className="text-[10px] text-[#716B82] flex items-center gap-2">
                               <span>Min: {svc.min?.toLocaleString()}</span>
                               <span>•</span>
                               <span>Max: {svc.max?.toLocaleString()}</span>
@@ -1502,18 +1507,18 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                           </div>
 
                           {/* 3-Step Pricing Breakdown */}
-                          <div className="grid grid-cols-3 gap-2 text-center shrink-0 bg-[#0f0520] p-2 rounded-xl border border-purple-900/30 sm:w-80">
-                            <div className="p-1 rounded bg-[#180932]">
-                              <span className="text-[9px] text-purple-300 block font-sans uppercase">OneGridHub</span>
-                              <span className="text-xs font-mono font-bold text-white">₦{providerRate.toLocaleString()}</span>
+                          <div className="grid grid-cols-3 gap-2 text-center shrink-0 bg-[#F8F7FF] p-2 rounded-xl border border-[#E9E2FA] sm:w-80">
+                            <div className="p-1 rounded bg-white border border-[#E9E2FA]">
+                              <span className="text-[9px] text-[#716B82] block font-sans uppercase">OneGridHub</span>
+                              <span className="text-xs font-mono font-bold text-[#171329]">₦{providerRate.toLocaleString()}</span>
                             </div>
-                            <div className="p-1 rounded bg-[#180932] border border-amber-500/20">
-                              <span className="text-[9px] text-amber-300 block font-sans uppercase">My Markup</span>
-                              <span className="text-xs font-mono font-bold text-amber-400">+₦{markup.toLocaleString()}</span>
+                            <div className="p-1 rounded bg-white border border-amber-200">
+                              <span className="text-[9px] text-amber-800 block font-sans uppercase">Markup</span>
+                              <span className="text-xs font-mono font-bold text-amber-700">+₦{markup.toLocaleString()}</span>
                             </div>
-                            <div className="p-1 rounded bg-[#180932] border border-emerald-500/20">
-                              <span className="text-[9px] text-emerald-300 block font-sans uppercase">Customer</span>
-                              <span className="text-xs font-mono font-bold text-emerald-400">₦{sellingRate.toLocaleString()}</span>
+                            <div className="p-1 rounded bg-white border border-emerald-200">
+                              <span className="text-[9px] text-emerald-800 block font-sans uppercase">Customer</span>
+                              <span className="text-xs font-mono font-bold text-[#047857]">₦{sellingRate.toLocaleString()}</span>
                             </div>
                           </div>
                         </div>
@@ -1530,15 +1535,15 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
       {/* ORDER CONFIGURATION MODAL / DRAWER */}
       {/* ========================================================================= */}
       {orderModalService && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div 
-            className="bg-[#130728] border border-[#2e155c] rounded-3xl max-w-lg w-full p-5 sm:p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            className="bg-white border border-[#E9E2FA] rounded-3xl max-w-lg w-full p-5 sm:p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             {/* Close Button */}
             <button
               onClick={handleCloseOrderModal}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-[#1b0a39] hover:bg-[#270f52] text-purple-300 hover:text-white transition cursor-pointer"
+              className="absolute top-4 right-4 p-2 rounded-xl bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] border border-[#E9E2FA] transition cursor-pointer"
               aria-label="Close Order Dialog"
             >
               <X className="w-5 h-5" />
@@ -1547,14 +1552,14 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             {/* Modal Header */}
             <div className="space-y-1.5 pr-8">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-900/60 text-purple-200">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#EDE9FE] text-[#7C3AED]">
                   {orderModalService.platform}
                 </span>
-                <span className="text-[10px] font-black text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                <span className="text-[10px] font-bold text-[#047857] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                   ₦{orderModalService.ratePer1000?.toLocaleString()} / 1,000
                 </span>
               </div>
-              <h3 className="text-base sm:text-lg font-black text-white leading-tight">
+              <h3 className="text-base sm:text-lg font-bold text-[#171329] leading-tight">
                 {orderModalService.name}
               </h3>
             </div>
@@ -1564,9 +1569,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               
               {/* Target Link / Username */}
               <div className="space-y-1.5">
-                <label className="text-xs font-black text-purple-200 flex items-center justify-between">
+                <label className="text-xs font-bold text-[#171329] flex items-center justify-between">
                   <span>{orderModalService.inputLabel || `${orderModalService.platform} Target Link or @Username`}</span>
-                  <span className="text-[10px] text-purple-400">Required</span>
+                  <span className="text-[10px] text-[#7C3AED] font-semibold">Required</span>
                 </label>
                 
                 {orderModalService.inputType === 'custom_comments' ? (
@@ -1575,7 +1580,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                     value={orderCommentsText}
                     onChange={e => setOrderCommentsText(e.target.value)}
                     placeholder={orderModalService.inputPlaceholder || 'Enter comments (1 comment per line)'}
-                    className="w-full bg-[#180b33] border border-[#2e1758] rounded-xl p-3 text-xs text-white placeholder-purple-400/40 focus:outline-none focus:border-cyan-400 transition"
+                    className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl p-3 text-xs text-[#171329] placeholder-[#716B82]/50 focus:outline-none focus:border-[#7C3AED] transition"
                     required
                   />
                 ) : (
@@ -1584,7 +1589,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                     value={orderTargetUrl}
                     onChange={e => setOrderTargetUrl(e.target.value)}
                     placeholder={orderModalService.inputPlaceholder || `https://${orderModalService.platform.toLowerCase().replace(/[^a-z0-9]/g, '')}.com/... or @username`}
-                    className="w-full bg-[#180b33] border border-[#2e1758] rounded-xl px-3.5 py-3 text-xs text-white placeholder-purple-400/40 focus:outline-none focus:border-cyan-400 transition"
+                    className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl px-3.5 py-3 text-xs text-[#171329] placeholder-[#716B82]/50 focus:outline-none focus:border-[#7C3AED] transition"
                     required
                   />
                 )}
@@ -1593,10 +1598,10 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               {/* Quantity Selector with Quick Presets */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-purple-200">
+                  <label className="text-xs font-bold text-[#171329]">
                     Order Quantity
                   </label>
-                  <span className="text-[11px] text-purple-300/70 font-semibold">
+                  <span className="text-[11px] text-[#716B82] font-semibold">
                     Min: {orderModalService.min?.toLocaleString()} • Max: {orderModalService.max?.toLocaleString()}
                   </span>
                 </div>
@@ -1608,7 +1613,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   step={50}
                   value={orderQuantity}
                   onChange={e => setOrderQuantity(Number(e.target.value))}
-                  className="w-full bg-[#180b33] border border-[#2e1758] rounded-xl px-3.5 py-2.5 text-sm font-black text-white focus:outline-none focus:border-cyan-400 transition"
+                  className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl px-3.5 py-2.5 text-sm font-bold text-[#171329] focus:outline-none focus:border-[#7C3AED] transition"
                   required
                 />
 
@@ -1623,8 +1628,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                         onClick={() => setOrderQuantity(amt)}
                         className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
                           orderQuantity === amt
-                            ? 'bg-cyan-500 text-black border-cyan-400 font-black shadow-sm'
-                            : 'bg-[#180b33] text-purple-300 border-[#2b1754] hover:bg-[#221048]'
+                            ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm'
+                            : 'bg-[#F8F7FF] text-[#7C3AED] border-[#E9E2FA] hover:bg-[#EDE9FE]'
                         }`}
                       >
                         +{amt.toLocaleString()}
@@ -1635,66 +1640,69 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               </div>
 
               {/* Price Calculation Box */}
-              <div className="bg-[#180c35] border border-[#2f185c] rounded-2xl p-4 space-y-2">
-                <div className="flex items-center justify-between text-xs text-purple-300/80">
+              <div className="bg-[#F8F7FF] border border-[#E9E2FA] rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between text-xs text-[#716B82]">
                   <span>Selling Rate:</span>
-                  <span>₦{orderModalService.ratePer1000?.toLocaleString()} / 1,000 units</span>
+                  <span className="font-semibold text-[#171329]">₦{orderModalService.ratePer1000?.toLocaleString()} / 1,000 units</span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-purple-300/80">
+                <div className="flex items-center justify-between text-xs text-[#716B82]">
                   <span>Selected Quantity:</span>
-                  <span className="font-bold text-white">{orderQuantity.toLocaleString()} units</span>
+                  <span className="font-bold text-[#171329]">{orderQuantity.toLocaleString()} units</span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-purple-300/80">
+                <div className="flex items-center justify-between text-xs text-[#716B82]">
                   <span>Your Current Wallet:</span>
-                  <span className="font-bold text-emerald-400">₦{walletBalance.toLocaleString()}</span>
+                  <span className="font-bold text-[#047857]">₦{walletBalance.toLocaleString()}</span>
                 </div>
 
                 {isOwner && (
-                  <div className="mt-2 pt-2 border-t border-amber-500/20 bg-amber-500/10 p-2.5 rounded-xl text-[11px] font-mono text-purple-200 space-y-1">
-                    <div className="flex items-center justify-between text-amber-300 font-bold font-sans">
+                  <div className="mt-2 pt-2 border-t border-amber-200 bg-amber-50 p-2.5 rounded-xl text-[11px] font-mono text-amber-900 space-y-1">
+                    <div className="flex items-center justify-between text-amber-800 font-bold font-sans">
                       <span>👑 Owner Pricing Breakdown</span>
-                      <span className="text-[9px] bg-amber-400/20 px-1.5 py-0.5 rounded text-amber-200">OneGridHub</span>
+                      <span className="text-[9px] bg-amber-200 px-1.5 py-0.5 rounded text-amber-900">OneGridHub</span>
                     </div>
-                    <div className="flex items-center justify-between text-purple-300">
+                    <div className="flex items-center justify-between text-amber-800">
                       <span>Provider Cost (Qty: {orderQuantity.toLocaleString()}):</span>
-                      <span className="text-white font-bold">
+                      <span className="text-[#171329] font-bold">
                         ₦{Math.round(((orderModalService.providerRatePer1000 || Math.max(0, (orderModalService.ratePer1000 || 0) - (orderModalService.markupPer1000 || 0))) / 1000) * orderQuantity).toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-amber-300">
+                    <div className="flex items-center justify-between text-amber-800">
                       <span>Your Profit Margin:</span>
-                      <span className="font-bold">
+                      <span className="font-bold text-amber-700">
                         +₦{Math.max(0, calculatedPrice - Math.round(((orderModalService.providerRatePer1000 || Math.max(0, (orderModalService.ratePer1000 || 0) - (orderModalService.markupPer1000 || 0))) / 1000) * orderQuantity)).toLocaleString()}
                       </span>
                     </div>
                   </div>
                 )}
 
-                <div className="pt-2 border-t border-[#291350] flex items-center justify-between">
-                  <span className="text-xs font-black text-white uppercase tracking-wider">Total Charge:</span>
-                  <span className="text-xl font-black text-emerald-400">
+                <div className="pt-2 border-t border-[#E9E2FA] flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#171329] uppercase tracking-wider">Total Charge:</span>
+                  <span className="text-xl font-bold text-[#047857]">
                     ₦{calculatedPrice.toLocaleString()}
                   </span>
                 </div>
               </div>
 
-              {/* Error Message */}
+              {/* Error Message with clear toast/banner alert */}
               {orderError && (
-                <div className="p-3 bg-red-950/50 border border-red-500/40 rounded-xl flex items-start gap-2 text-xs text-red-200">
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <span>{orderError}</span>
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2.5 text-xs text-rose-800 shadow-sm animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1 flex-1">
+                    <span className="font-bold block">Unable to complete order</span>
+                    <span className="leading-relaxed">{orderError}</span>
+                  </div>
                 </div>
               )}
 
               {/* Success Feedback */}
               {orderSuccess && (
-                <div className="p-3 bg-emerald-950/50 border border-emerald-500/40 rounded-xl space-y-2 text-xs text-emerald-200">
-                  <div className="flex items-center gap-2 font-bold text-emerald-300">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2.5 text-xs text-emerald-900 shadow-sm animate-in fade-in">
+                  <div className="flex items-center gap-2 font-bold text-emerald-800">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
                     <span>Order Placed Successfully!</span>
                   </div>
-                  <p className="text-[11px] text-emerald-200/80">
-                    Order ID: <strong>{orderSuccess.orderId}</strong>. Processing automatically via provider gateway.
+                  <p className="text-[11px] text-emerald-800/90 leading-relaxed">
+                    Order ID: <strong className="font-mono">{orderSuccess.orderId}</strong>. Processing automatically via provider gateway.
                   </p>
                   <button
                     type="button"
@@ -1702,7 +1710,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       handleCloseOrderModal();
                       setActiveTab('orders');
                     }}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-center"
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-center shadow-sm transition cursor-pointer"
                   >
                     View in Order History
                   </button>
@@ -1719,7 +1727,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                         handleCloseOrderModal();
                         onOpenWallet();
                       }}
-                      className="w-full py-3.5 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+                      className="w-full py-3.5 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                     >
                       <Wallet className="w-4 h-4" />
                       <span>Insufficient Balance — Fund Wallet (₦{walletBalance.toLocaleString()})</span>
@@ -1728,7 +1736,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                     <button
                       type="submit"
                       disabled={isSubmittingOrder}
-                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 hover:opacity-90 active:scale-[0.99] text-white font-black text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30"
+                      className="w-full py-3.5 rounded-2xl bg-[#7C3AED] hover:bg-[#5B21B6] active:scale-[0.99] text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-[#7C3AED]/20"
                     >
                       {isSubmittingOrder ? (
                         <>

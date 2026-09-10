@@ -22,6 +22,7 @@ export const SocialBoost2View: React.FC<SocialBoost2ViewProps> = ({
   return (
     <Server2View
       initialPage="boost-accounts"
+      hideSwitcherTabs={true}
       userProfile={userProfile}
       walletBalance={walletBalance}
       onRefreshProfile={async () => {

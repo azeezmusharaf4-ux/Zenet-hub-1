@@ -22,6 +22,7 @@ export const VirtualNumbers2View: React.FC<VirtualNumbers2ViewProps> = ({
   return (
     <Server2View
       initialPage="buy-numbers"
+      hideSwitcherTabs={true}
       userProfile={userProfile || null}
       walletBalance={walletBalance}
       onRefreshProfile={async () => {

@@ -8,12 +8,14 @@ import {
   ShieldCheck, 
   Sparkles, 
   TrendingUp,
-  Layers
+  Layers,
+  ArrowLeft
 } from 'lucide-react';
 
 interface CategoriesViewProps {
   listings: AccountListing[];
   onSelectCategory: (category: CategoryType) => void;
+  onBackToMarketplace?: () => void;
 }
 
 interface CategoryInfo {
@@ -182,13 +184,29 @@ const CATEGORY_CATALOG: CategoryInfo[] = [
 
 export const CategoriesView: React.FC<CategoriesViewProps> = ({
   listings,
-  onSelectCategory
+  onSelectCategory,
+  onBackToMarketplace
 }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-200 max-w-7xl mx-auto pb-12">
       
       {/* Category Header Banner */}
       <div className="bg-gradient-to-r from-purple-950/90 via-[#170a33] to-indigo-950/90 border border-[#381d6d] p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-2xl">
+        {onBackToMarketplace && (
+          <button
+            type="button"
+            onClick={() => {
+              window.scrollTo({ top: 0, behavior: 'instant' });
+              onBackToMarketplace();
+            }}
+            className="inline-flex items-center gap-2 text-purple-300 hover:text-white font-extrabold text-xs transition bg-[#170c30] px-4 py-2.5 rounded-xl border border-purple-900/40 cursor-pointer shadow-sm mb-4 active:scale-95"
+            title="Back to Marketplace"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Marketplace</span>
+          </button>
+        )}
+
         <div className="relative z-10 space-y-2 max-w-2xl">
           <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
             <Layers className="w-3.5 h-3.5 text-purple-400" />

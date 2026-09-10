@@ -10,6 +10,10 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
     ],
+    build: {
+      target: 'es2018',
+      minify: 'esbuild' as const,
+    },
     css: {
       postcss: {
         plugins: [

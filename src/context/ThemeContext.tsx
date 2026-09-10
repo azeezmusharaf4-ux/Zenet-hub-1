@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect } from 'react';
 
-export type ThemeMode = 'dark';
-export type EffectiveTheme = 'dark';
+export type ThemeMode = 'light';
+export type EffectiveTheme = 'light';
 
 interface ThemeContextType {
   theme: ThemeMode;
@@ -10,21 +10,21 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
-  effectiveTheme: 'dark',
+  theme: 'light',
+  effectiveTheme: 'light',
   setTheme: () => {},
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.add('dark');
-    root.classList.remove('light');
-    root.setAttribute('data-theme', 'dark');
+    root.classList.add('light');
+    root.classList.remove('dark');
+    root.setAttribute('data-theme', 'light');
   }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme: 'dark', effectiveTheme: 'dark', setTheme: () => {} }}>
+    <ThemeContext.Provider value={{ theme: 'light', effectiveTheme: 'light', setTheme: () => {} }}>
       {children}
     </ThemeContext.Provider>
   );

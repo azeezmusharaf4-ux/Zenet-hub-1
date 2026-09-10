@@ -271,11 +271,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-[#06030e]/90 backdrop-blur-xl overflow-y-auto w-full max-w-full overscroll-contain">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto w-full max-w-full overscroll-contain">
       
       {/* Outer Container Card - 2 Column on Desktop */}
       <div 
-        className="bg-[#0f0722]/95 border border-[#2b1752] rounded-2xl sm:rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl relative my-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col md:flex-row text-purple-100 min-h-0"
+        className="bg-white border border-[#E9E2FA] rounded-2xl sm:rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl relative my-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col md:flex-row text-[#171329] min-h-0"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -283,7 +283,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {!hideCloseButton && (
           <button
             onClick={onClose}
-            className="absolute top-3.5 right-3.5 z-20 p-2 text-purple-300/70 hover:text-white bg-[#1a0c3a]/80 hover:bg-[#281358] border border-[#371b6e] rounded-full transition cursor-pointer shrink-0"
+            className="absolute top-3.5 right-3.5 z-20 p-2 text-[#716B82] hover:text-[#171329] bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] rounded-full transition cursor-pointer shrink-0"
             title="Close"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -291,30 +291,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         {/* LEFT COLUMN: Brand Experience & Features (Desktop/Tablet) */}
-        <div className="hidden md:flex md:w-5/12 bg-gradient-to-br from-[#180a3a] via-[#12062d] to-[#0a031a] p-8 lg:p-10 flex-col justify-between relative overflow-y-auto border-r border-[#26124a] min-h-0">
+        <div className="hidden md:flex md:w-5/12 bg-[#F8F7FF] p-8 lg:p-10 flex-col justify-between relative overflow-y-auto border-r border-[#E9E2FA] min-h-0">
           
-          {/* Ambient Glows */}
-          <div className="absolute top-0 left-0 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-pink-600/15 rounded-full blur-3xl pointer-events-none"></div>
-
           {/* Top Section */}
           <div className="relative z-10 space-y-6">
             
-            {/* Pulsing Pill Tag */}
-            <div className="inline-flex items-center gap-2 bg-purple-900/40 border border-purple-500/40 text-purple-200 text-xs font-bold px-3.5 py-1.5 rounded-full shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            {/* Secure Pill Tag */}
+            <div className="inline-flex items-center gap-2 bg-[#EDE9FE] border border-[#C4B5FD] text-[#5B21B6] text-xs font-bold px-3.5 py-1.5 rounded-full shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-[#7C3AED] shrink-0"></span>
               <span>Create your secure account</span>
             </div>
 
             {/* Main Headline */}
             <div className="space-y-3">
-              <h1 className="text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
+              <h1 className="text-3xl lg:text-4xl font-black text-[#171329] tracking-tight leading-tight">
                 Start your <br />
-                <span className="bg-gradient-to-r from-purple-400 via-fuchsia-300 to-pink-400 bg-clip-text text-transparent">
-                  premium digital service
+                <span className="text-[#7C3AED]">
+                  digital service
                 </span> journey.
               </h1>
-              <p className="text-xs lg:text-sm text-purple-200/70 leading-relaxed">
+              <p className="text-xs lg:text-sm text-[#716B82] leading-relaxed">
                 Create your ZENET HUB account to access your dashboard, escrow wallet, order history, verified listings, and 24/7 support.
               </p>
             </div>
@@ -323,45 +319,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="grid grid-cols-2 gap-3 pt-2">
               
               {/* Feature 1 */}
-              <div className="bg-[#190b3a]/70 border border-[#2e175a] p-3.5 rounded-2xl space-y-1.5 backdrop-blur-md hover:border-purple-500/50 transition duration-200">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+              <div className="bg-white border border-[#E9E2FA] p-3.5 rounded-2xl space-y-1.5 shadow-sm hover:border-[#C4B5FD] transition duration-200">
+                <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] border border-[#E9E2FA] flex items-center justify-center text-[#7C3AED] shrink-0">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h4 className="font-extrabold text-white text-xs">Fast setup</h4>
-                <p className="text-[11px] text-purple-300/60 leading-snug">
+                <h4 className="font-extrabold text-[#171329] text-xs">Fast setup</h4>
+                <p className="text-[11px] text-[#716B82] leading-snug">
                   Create your account & enter your dashboard in seconds.
                 </p>
               </div>
 
               {/* Feature 2 */}
-              <div className="bg-[#190b3a]/70 border border-[#2e175a] p-3.5 rounded-2xl space-y-1.5 backdrop-blur-md hover:border-purple-500/50 transition duration-200">
-                <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+              <div className="bg-white border border-[#E9E2FA] p-3.5 rounded-2xl space-y-1.5 shadow-sm hover:border-[#C4B5FD] transition duration-200">
+                <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] border border-[#E9E2FA] flex items-center justify-center text-[#7C3AED] shrink-0">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
-                <h4 className="font-extrabold text-white text-xs">Secure access</h4>
-                <p className="text-[11px] text-purple-300/60 leading-snug">
+                <h4 className="font-extrabold text-[#171329] text-xs">Secure access</h4>
+                <p className="text-[11px] text-[#716B82] leading-snug">
                   Protected with encrypted escrow safeguards.
                 </p>
               </div>
 
               {/* Feature 3 */}
-              <div className="bg-[#190b3a]/70 border border-[#2e175a] p-3.5 rounded-2xl space-y-1.5 backdrop-blur-md hover:border-purple-500/50 transition duration-200">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shrink-0">
+              <div className="bg-white border border-[#E9E2FA] p-3.5 rounded-2xl space-y-1.5 shadow-sm hover:border-[#C4B5FD] transition duration-200">
+                <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] border border-[#E9E2FA] flex items-center justify-center text-[#7C3AED] shrink-0">
                   <Wallet className="w-4 h-4" />
                 </div>
-                <h4 className="font-extrabold text-white text-xs">Wallet ready</h4>
-                <p className="text-[11px] text-purple-300/60 leading-snug">
+                <h4 className="font-extrabold text-[#171329] text-xs">Wallet ready</h4>
+                <p className="text-[11px] text-[#716B82] leading-snug">
                   Fund your dedicated wallet for instant checkouts.
                 </p>
               </div>
 
               {/* Feature 4 */}
-              <div className="bg-[#190b3a]/70 border border-[#2e175a] p-3.5 rounded-2xl space-y-1.5 backdrop-blur-md hover:border-purple-500/50 transition duration-200">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300 shrink-0">
+              <div className="bg-white border border-[#E9E2FA] p-3.5 rounded-2xl space-y-1.5 shadow-sm hover:border-[#C4B5FD] transition duration-200">
+                <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] border border-[#E9E2FA] flex items-center justify-center text-[#7C3AED] shrink-0">
                   <TrendingUp className="w-4 h-4" />
                 </div>
-                <h4 className="font-extrabold text-white text-xs">Referral ready</h4>
-                <p className="text-[11px] text-purple-300/60 leading-snug">
+                <h4 className="font-extrabold text-[#171329] text-xs">Referral ready</h4>
+                <p className="text-[11px] text-[#716B82] leading-snug">
                   Earn bonuses when inviting friends with your code.
                 </p>
               </div>
@@ -371,7 +367,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           {/* Bottom Branding Tag */}
-          <div className="relative z-10 pt-6 border-t border-[#231244] flex items-center justify-between text-xs text-purple-300/50 font-semibold">
+          <div className="relative z-10 pt-6 border-t border-[#E9E2FA] flex items-center justify-between text-xs text-[#716B82] font-semibold">
             <span>ZENET HUB Marketplace</span>
             <span>Verified & Safe</span>
           </div>
@@ -379,16 +375,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* RIGHT COLUMN: Registration Form & Auth Card */}
-        <div className="w-full md:w-7/12 p-4 sm:p-7 lg:p-9 flex flex-col justify-between overflow-y-auto flex-1 min-h-0">
+        <div className="w-full md:w-7/12 p-4 sm:p-7 lg:p-9 flex flex-col justify-between overflow-y-auto flex-1 min-h-0 bg-white">
           {statusMsg ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-4 sm:p-6 space-y-6 my-auto animate-in fade-in zoom-in duration-300">
-              <div className="w-16 h-16 rounded-full bg-purple-600/10 border border-purple-500/20 flex items-center justify-center relative shrink-0">
-                <span className="absolute inset-0 rounded-full border-2 border-purple-500/20 border-t-purple-500 animate-spin"></span>
-                <CheckCircle2 className="w-8 h-8 text-purple-400 animate-pulse" />
+              <div className="w-16 h-16 rounded-full bg-[#EDE9FE] border border-[#C4B5FD] flex items-center justify-center relative shrink-0">
+                <span className="absolute inset-0 rounded-full border-2 border-[#C4B5FD] border-t-[#7C3AED] animate-spin"></span>
+                <CheckCircle2 className="w-8 h-8 text-[#7C3AED] animate-pulse" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-white">Login Successful</h3>
-                <p className="text-sm text-purple-300/70 leading-relaxed max-w-sm">
+                <h3 className="text-xl font-bold text-[#171329]">Login Successful</h3>
+                <p className="text-sm text-[#716B82] leading-relaxed max-w-sm">
                   {statusMsg}
                 </p>
               </div>
@@ -398,13 +394,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             
             {/* Top Tag & Title */}
             <div>
-              <span className="text-[10px] font-black tracking-widest text-purple-400 uppercase block mb-1">
+              <span className="text-[10px] font-black tracking-widest text-[#7C3AED] uppercase block mb-1">
                 {mode === 'forgot' ? 'ACCOUNT RECOVERY' : mode === 'login' ? 'WELCOME BACK' : 'REGISTER ACCOUNT'}
               </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-[#171329] tracking-tight">
                 {mode === 'forgot' ? 'Reset Password' : mode === 'login' ? 'Log In to Account' : 'Create Account'}
               </h2>
-              <p className="text-xs sm:text-sm text-purple-300/70 mt-1">
+              <p className="text-xs sm:text-sm text-[#716B82] mt-1">
                 {mode === 'forgot' 
                   ? 'Enter your account email to receive a password reset link.' 
                   : mode === 'login' 
@@ -415,9 +411,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             {/* Error Banner */}
             {error && (
-              <div className="bg-rose-950/80 border border-rose-800 text-rose-300 p-3 sm:p-3.5 rounded-2xl flex flex-col gap-2 text-xs animate-in fade-in">
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 sm:p-3.5 rounded-2xl flex flex-col gap-2 text-xs animate-in fade-in">
                 <div className="flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
                   <span className="leading-relaxed">{error}</span>
                 </div>
                 {mode === 'login' && (error.includes('Invalid email or password') || error.includes('Create Account') || error.includes('invalid-credential')) && (
@@ -428,7 +424,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       if (password) setConfirmPassword(password);
                       setError('');
                     }}
-                    className="self-start mt-1 bg-rose-900/60 hover:bg-rose-800/80 text-rose-100 font-extrabold text-[11px] px-3 py-1.5 rounded-xl border border-rose-700/60 transition cursor-pointer flex items-center gap-1.5"
+                    className="self-start mt-1 bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-[11px] px-3 py-1.5 rounded-xl border border-rose-300 transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span>Create an account now →</span>
                   </button>
@@ -438,8 +434,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             {/* Success Message Banner */}
             {successMsg && (
-              <div className="bg-emerald-950/80 border border-emerald-800 text-emerald-300 p-3 sm:p-3.5 rounded-2xl flex items-start gap-2.5 text-xs animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 sm:p-3.5 rounded-2xl flex items-start gap-2.5 text-xs animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
                 <span className="leading-relaxed">{successMsg}</span>
               </div>
             )}
@@ -451,7 +447,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 bg-[#160a2d] hover:bg-[#200f40] text-white font-bold py-3 px-4 rounded-2xl border border-[#31195a] shadow-md transition cursor-pointer text-xs sm:text-sm disabled:opacity-50 active:scale-[0.99] shrink-0 min-h-[44px]"
+                  className="w-full flex items-center justify-center gap-3 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#171329] font-bold py-3 px-4 rounded-2xl border border-[#E9E2FA] shadow-sm transition cursor-pointer text-xs sm:text-sm disabled:opacity-50 active:scale-[0.99] shrink-0 min-h-[44px]"
                 >
                   <svg 
                     width="18" 
@@ -481,11 +477,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </button>
 
                 <div className="relative flex items-center justify-center my-3 sm:my-4">
-                  <div className="border-t border-[#261248] w-full" />
-                  <span className="bg-[#0f0722] px-3 text-[11px] text-purple-300/40 uppercase tracking-widest font-bold shrink-0">
+                  <div className="border-t border-[#E9E2FA] w-full" />
+                  <span className="bg-white px-3 text-[11px] text-[#716B82] uppercase tracking-widest font-bold shrink-0">
                     or fill details
                   </span>
-                  <div className="border-t border-[#261248] w-full" />
+                  <div className="border-t border-[#E9E2FA] w-full" />
                 </div>
               </div>
             )}
@@ -497,16 +493,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {mode === 'forgot' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-purple-200 font-bold mb-1.5">Email Address</label>
+                    <label className="block text-[#171329] font-bold mb-1.5">Email Address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                       <input
                         type="email"
                         placeholder="name@domain.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-10 pr-4 py-3 rounded-2xl border border-[#31195a] focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/40 transition text-base sm:text-sm"
+                        className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-10 pr-4 py-3 rounded-2xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-sm"
                       />
                     </div>
                   </div>
@@ -514,7 +510,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 hover:opacity-90 text-white font-extrabold py-3.5 rounded-2xl shadow-lg transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 min-h-[46px]"
+                    className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-extrabold py-3.5 rounded-2xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 min-h-[46px]"
                   >
                     {loading ? 'Sending...' : 'Send Reset Link →'}
                   </button>
@@ -522,7 +518,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="button"
                     onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
-                    className="w-full text-center text-xs text-purple-300 hover:text-white font-bold transition flex items-center justify-center gap-1.5 pt-2 cursor-pointer"
+                    className="w-full text-center text-xs text-[#716B82] hover:text-[#171329] font-bold transition flex items-center justify-center gap-1.5 pt-2 cursor-pointer"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Back to Log In</span>
@@ -537,71 +533,71 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     
                     {/* Username Field */}
                     <div>
-                      <label className="block text-purple-200 font-bold mb-1 text-xs">Username</label>
+                      <label className="block text-[#171329] font-bold mb-1 text-xs">Username</label>
                       <div className="relative">
-                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                         <input
                           type="text"
                           placeholder="alex_zenet"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           required
-                          className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#31195a] focus:outline-none focus:border-purple-500 transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
                         />
                       </div>
                     </div>
 
                     {/* Full Name Field */}
                     <div>
-                      <label className="block text-purple-200 font-bold mb-1 text-xs">Full Name</label>
+                      <label className="block text-[#171329] font-bold mb-1 text-xs">Full Name</label>
                       <div className="relative">
-                        <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                        <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                         <input
                           type="text"
                           placeholder="Alex Johnson"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
-                          className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#31195a] focus:outline-none focus:border-purple-500 transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
                         />
                       </div>
                     </div>
 
                     {/* Email Field */}
                     <div>
-                      <label className="block text-purple-200 font-bold mb-1 text-xs">Email Address</label>
+                      <label className="block text-[#171329] font-bold mb-1 text-xs">Email Address</label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                         <input
                           type="email"
                           placeholder="name@domain.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required
-                          className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#31195a] focus:outline-none focus:border-purple-500 transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
                         />
                       </div>
                     </div>
 
                     {/* Phone Number Field */}
                     <div>
-                      <label className="block text-purple-200 font-bold mb-1 text-xs">Phone Number</label>
+                      <label className="block text-[#171329] font-bold mb-1 text-xs">Phone Number</label>
                       <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                         <input
                           type="tel"
                           placeholder="08012345678"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#31195a] focus:outline-none focus:border-purple-500 transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
                         />
                       </div>
                     </div>
 
                     {/* Password Field */}
                     <div>
-                      <label className="block text-purple-200 font-bold mb-1 text-xs">Password</label>
+                      <label className="block text-[#171329] font-bold mb-1 text-xs">Password</label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                         <input
                           type={showPassword ? 'text' : 'password'}
                           placeholder="••••••••"
@@ -609,12 +605,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           onChange={(e) => setPassword(e.target.value)}
                           required
                           minLength={6}
-                          className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#31195a] focus:outline-none focus:border-purple-500 transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 hover:text-white"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329]"
                         >
                           {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
@@ -623,9 +619,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                     {/* Confirm Password Field */}
                     <div>
-                      <label className="block text-purple-200 font-bold mb-1 text-xs">Confirm Password</label>
+                      <label className="block text-[#171329] font-bold mb-1 text-xs">Confirm Password</label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                         <input
                           type={showConfirmPassword ? 'text' : 'password'}
                           placeholder="••••••••"
@@ -633,12 +629,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           required
                           minLength={6}
-                          className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#31195a] focus:outline-none focus:border-purple-500 transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
                         />
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 hover:text-white"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329]"
                         >
                           {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
@@ -650,16 +646,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {/* Password Strength Bar */}
                   {password && (
                     <div className="space-y-1 pt-1">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-purple-300/70">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-[#716B82]">
                         <span>Password Strength</span>
-                        <span className="font-extrabold text-white">{strength.label}</span>
+                        <span className="font-extrabold text-[#171329]">{strength.label}</span>
                       </div>
-                      <div className="h-1.5 w-full bg-[#1b0d36] rounded-full overflow-hidden flex gap-1">
-                        <div className={`h-full flex-1 rounded-full ${strength.score >= 1 ? strength.color : 'bg-slate-800'}`}></div>
-                        <div className={`h-full flex-1 rounded-full ${strength.score >= 2 ? strength.color : 'bg-slate-800'}`}></div>
-                        <div className={`h-full flex-1 rounded-full ${strength.score >= 3 ? strength.color : 'bg-slate-800'}`}></div>
+                      <div className="h-1.5 w-full bg-[#EDE9FE] rounded-full overflow-hidden flex gap-1">
+                        <div className={`h-full flex-1 rounded-full ${strength.score >= 1 ? strength.color : 'bg-slate-200'}`}></div>
+                        <div className={`h-full flex-1 rounded-full ${strength.score >= 2 ? strength.color : 'bg-slate-200'}`}></div>
+                        <div className={`h-full flex-1 rounded-full ${strength.score >= 3 ? strength.color : 'bg-slate-200'}`}></div>
                       </div>
-                      <p className="text-[10px] text-purple-300/50">
+                      <p className="text-[10px] text-[#716B82]">
                         Use at least 6 characters for your password.
                       </p>
                     </div>
@@ -668,11 +664,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {/* Referral Code (Optional) */}
                   <div className="pt-1">
                     <div className="flex items-center justify-between mb-1">
-                      <label className="text-purple-200 font-bold flex items-center gap-1 text-xs">
-                        <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <label className="text-[#171329] font-bold flex items-center gap-1 text-xs">
+                        <Gift className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                         <span>Referral Code</span>
                       </label>
-                      <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Optional</span>
+                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Optional</span>
                     </div>
                     <div className="relative">
                       <input
@@ -680,14 +676,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         placeholder="e.g. ZN-7A9B2"
                         value={referralCode}
                         onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                        className="w-full bg-[#160a2d] text-amber-300 font-mono text-base sm:text-xs tracking-wider px-3 py-2.5 sm:py-2 rounded-xl border border-[#31195a] focus:outline-none focus:border-amber-500 placeholder:text-purple-300/30"
+                        className="w-full bg-[#F8F7FF] text-[#7C3AED] font-mono font-bold text-base sm:text-xs tracking-wider px-3 py-2.5 sm:py-2 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white placeholder:text-[#716B82]/40"
                       />
                     </div>
                   </div>
 
                   {/* Terms & Privacy Notice */}
-                  <div className="bg-[#150a2b]/80 border border-[#2d1852] p-3 rounded-2xl flex items-start gap-2 text-[11px] text-purple-200/80 leading-relaxed mt-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 mt-1.5 shadow-sm"></span>
+                  <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-3 rounded-2xl flex items-start gap-2 text-[11px] text-[#716B82] leading-relaxed mt-2">
+                    <span className="w-2 h-2 rounded-full bg-[#7C3AED] shrink-0 mt-1.5 shadow-sm"></span>
                     <span>
                       By creating an account, you agree to use ZENET HUB Marketplace responsibly and keep your login details private.
                     </span>
@@ -697,7 +693,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 hover:opacity-90 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-purple-600/30 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-3 active:scale-[0.99] min-h-[46px]"
+                    className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-black py-3.5 rounded-2xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-3 active:scale-[0.99] min-h-[46px]"
                   >
                     {loading ? (
                       <>
@@ -713,14 +709,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </button>
 
                   {/* Toggle to Login */}
-                  <div className="pt-3 text-center border-t border-[#231244]">
-                    <span className="text-xs text-purple-300/60 block mb-2 font-semibold">Already registered?</span>
+                  <div className="pt-3 text-center border-t border-[#E9E2FA]">
+                    <span className="text-xs text-[#716B82] block mb-2 font-semibold">Already registered?</span>
                     <button
                       type="button"
                       onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
-                      className="w-full bg-[#180c38] hover:bg-[#25134e] text-purple-200 hover:text-white font-bold py-2.5 px-4 rounded-xl border border-[#361c6b] transition cursor-pointer text-xs min-h-[42px]"
+                      className="w-full bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] font-bold py-2.5 px-4 rounded-xl border border-[#E9E2FA] transition cursor-pointer text-xs min-h-[42px]"
                     >
-                      Already have an account? <span className="text-fuchsia-400 underline ml-1">Login now</span>
+                      Already have an account? <span className="text-[#7C3AED] font-bold ml-1">Login now</span>
                     </button>
                   </div>
                 </>
@@ -730,45 +726,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {mode === 'login' && (
                 <>
                   <div>
-                    <label className="block text-purple-200 font-bold mb-1 text-xs">Email Address</label>
+                    <label className="block text-[#171329] font-bold mb-1 text-xs">Email Address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                       <input
                         type="email"
                         placeholder="name@domain.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#31195a] focus:outline-none focus:border-purple-500 transition text-base sm:text-xs"
+                        className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
                       />
                     </div>
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-purple-200 font-bold text-xs">Password</label>
+                      <label className="block text-[#171329] font-bold text-xs">Password</label>
                       <button
                         type="button"
                         onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); }}
-                        className="text-xs font-bold text-fuchsia-400 hover:text-fuchsia-300 transition cursor-pointer py-1"
+                        className="text-xs font-bold text-[#7C3AED] hover:text-[#5B21B6] transition cursor-pointer py-1"
                       >
                         Forgot Password?
                       </button>
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 shrink-0" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        className="w-full bg-[#160a2d] text-white placeholder-purple-300/40 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#31195a] focus:outline-none focus:border-purple-500 transition text-base sm:text-xs"
+                        className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 hover:text-white p-1"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] p-1"
                       >
                         {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
@@ -779,7 +775,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 hover:opacity-90 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-purple-600/30 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-3 active:scale-[0.99] min-h-[46px]"
+                    className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-black py-3.5 rounded-2xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-3 active:scale-[0.99] min-h-[46px]"
                   >
                     {loading ? (
                       <>
@@ -795,14 +791,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </button>
 
                   {/* Switch to Signup */}
-                  <div className="pt-3 text-center border-t border-[#231244]">
-                    <span className="text-xs text-purple-300/60 block mb-2 font-semibold">New to ZENET HUB?</span>
+                  <div className="pt-3 text-center border-t border-[#E9E2FA]">
+                    <span className="text-xs text-[#716B82] block mb-2 font-semibold">New to ZENET HUB?</span>
                     <button
                       type="button"
                       onClick={() => { setMode('signup'); setError(''); setSuccessMsg(''); }}
-                      className="w-full bg-[#180c38] hover:bg-[#25134e] text-purple-200 hover:text-white font-bold py-2.5 px-4 rounded-xl border border-[#361c6b] transition cursor-pointer text-xs min-h-[42px]"
+                      className="w-full bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] font-bold py-2.5 px-4 rounded-xl border border-[#E9E2FA] transition cursor-pointer text-xs min-h-[42px]"
                     >
-                      Don't have an account yet? <span className="text-fuchsia-400 underline ml-1">Register now</span>
+                      Don't have an account yet? <span className="text-[#7C3AED] font-bold ml-1">Register now</span>
                     </button>
                   </div>
                 </>
@@ -814,7 +810,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {/* Copyright Footer */}
-          <div className="pt-6 text-center text-[10px] text-purple-300/40 font-semibold border-t border-[#231244] mt-6">
+          <div className="pt-6 text-center text-[10px] text-[#716B82] font-semibold border-t border-[#E9E2FA] mt-6">
             © {new Date().getFullYear()} ZENET HUB Marketplace. All rights reserved.
           </div>
 

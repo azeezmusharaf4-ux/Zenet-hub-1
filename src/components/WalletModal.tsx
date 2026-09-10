@@ -231,41 +231,39 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#05020d]/85 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
       <div 
-        className="bg-[#120826] border border-[#2e1954] rounded-2xl sm:rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-purple-100 flex flex-col max-h-[92vh]"
+        className="bg-white border border-[#E9E2FA] rounded-2xl sm:rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-[#171329] flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="bg-[#0c051a] px-4 sm:px-6 py-4 border-b border-[#241344] flex items-center justify-between shrink-0">
+        <div className="bg-white px-4 sm:px-6 py-4 border-b border-[#E9E2FA] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500 p-0.5 shadow-md shrink-0">
-              <div className="w-full h-full bg-[#0c051a] rounded-[14px] flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-purple-300" />
-              </div>
+            <div className="w-10 h-10 rounded-2xl bg-[#EDE9FE] border border-[#E9E2FA] flex items-center justify-center text-[#7C3AED] shrink-0">
+              <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base sm:text-lg">Fund Wallet</h3>
-              <p className="text-xs text-purple-300/70">Instant Paystack Gateway • Transfer, OPay, Bank & USSD</p>
+              <h3 className="font-extrabold text-[#171329] text-base sm:text-lg">Fund Wallet</h3>
+              <p className="text-xs text-[#716B82]">Instant Paystack Gateway • Transfer, OPay, Bank & USSD</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 text-purple-300 hover:text-white bg-[#1a0e33] border border-[#2e1850] rounded-full transition cursor-pointer"
+            className="p-2 text-[#716B82] hover:text-[#171329] bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] rounded-full transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Selection */}
-        <div className="bg-[#0e061e] px-4 py-2.5 border-b border-[#241344] flex gap-2 text-xs font-semibold shrink-0">
+        <div className="bg-[#F8F7FF] px-4 py-2.5 border-b border-[#E9E2FA] flex gap-2 text-xs font-semibold shrink-0">
           <button
             onClick={() => setActiveTab('fund')}
             className={`px-4 py-2 rounded-xl transition cursor-pointer ${
               activeTab === 'fund'
-                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 text-white font-black shadow-md'
-                : 'text-purple-300/70 hover:text-white'
+                ? 'bg-[#7C3AED] text-white font-bold shadow-sm'
+                : 'text-[#716B82] hover:text-[#171329]'
             }`}
           >
             Fund Wallet
@@ -274,8 +272,8 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             onClick={() => setActiveTab('overview')}
             className={`px-4 py-2 rounded-xl transition cursor-pointer ${
               activeTab === 'overview'
-                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 text-white font-black shadow-md'
-                : 'text-purple-300/70 hover:text-white'
+                ? 'bg-[#7C3AED] text-white font-bold shadow-sm'
+                : 'text-[#716B82] hover:text-[#171329]'
             }`}
           >
             Balance & Escrow
@@ -284,8 +282,8 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             onClick={() => setActiveTab('history')}
             className={`px-4 py-2 rounded-xl transition cursor-pointer ${
               activeTab === 'history'
-                ? 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 text-white font-black shadow-md'
-                : 'text-purple-300/70 hover:text-white'
+                ? 'bg-[#7C3AED] text-white font-bold shadow-sm'
+                : 'text-[#716B82] hover:text-[#171329]'
             }`}
           >
             History ({transactions.length})
@@ -300,23 +298,23 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             <form onSubmit={handlePaystackCheckout} className="space-y-5 animate-in fade-in duration-150">
               
               {/* CURRENT BALANCE BANNER */}
-              <div className="bg-gradient-to-r from-purple-900/40 via-[#180c35] to-indigo-900/40 border border-[#2d1852] p-4 rounded-2xl flex items-center justify-between">
+              <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-4 rounded-2xl flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold text-purple-300/70 uppercase tracking-widest block">Your Balance</span>
-                  <span className="text-xl font-black text-white font-mono">₦{walletBalance.toLocaleString()} <span className="text-xs text-purple-300/60 font-sans font-normal">NGN</span></span>
+                  <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block">Your Balance</span>
+                  <span className="text-xl font-black text-[#171329] font-mono">₦{walletBalance.toLocaleString()} <span className="text-xs text-[#716B82] font-sans font-normal">NGN</span></span>
                 </div>
-                <div className="bg-purple-950/80 border border-purple-500/30 text-purple-300 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                <div className="bg-[#EDE9FE] border border-[#C4B5FD] text-[#5B21B6] px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#7C3AED]" />
                   <span>Escrow Ready</span>
                 </div>
               </div>
 
               {/* SUCCESS MESSAGE */}
               {successMessage && (
-                <div className="bg-emerald-950/90 border border-emerald-500/50 text-emerald-200 p-4 rounded-2xl flex items-start gap-3 shadow-lg animate-in fade-in zoom-in-95">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-2xl flex items-start gap-3 shadow-sm animate-in fade-in zoom-in-95">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <span className="font-extrabold text-emerald-300 text-sm block">Deposit Verified!</span>
+                    <span className="font-extrabold text-emerald-800 text-sm block">Deposit Verified!</span>
                     <p className="text-xs leading-relaxed">{successMessage}</p>
                   </div>
                 </div>
@@ -324,10 +322,10 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
               {/* ERROR MESSAGE */}
               {errorMessage && (
-                <div className="bg-rose-950/90 border border-rose-500/50 text-rose-200 p-4 rounded-2xl flex items-start gap-3 shadow-lg animate-in fade-in zoom-in-95">
-                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl flex items-start gap-3 shadow-sm animate-in fade-in zoom-in-95">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <span className="font-extrabold text-rose-300 text-sm block">Funding Notice</span>
+                    <span className="font-extrabold text-rose-800 text-sm block">Funding Notice</span>
                     <p className="text-xs leading-relaxed">{errorMessage}</p>
                   </div>
                 </div>
@@ -335,7 +333,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
               {/* AMOUNT SELECTION */}
               <div className="space-y-3">
-                <label className="text-xs font-black uppercase tracking-wider text-purple-200 block">
+                <label className="text-xs font-black uppercase tracking-wider text-[#171329] block">
                   Select or Enter Funding Amount (NGN)
                 </label>
 
@@ -348,8 +346,8 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                       onClick={() => handleSelectQuickAmount(qVal)}
                       className={`py-2 px-2 rounded-xl text-xs font-extrabold transition cursor-pointer border ${
                         amount === qVal
-                          ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white border-purple-400 shadow-md shadow-purple-600/30'
-                          : 'bg-[#180b33] hover:bg-[#220f47] text-purple-200 border-[#2d1852]'
+                          ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm'
+                          : 'bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#171329] border-[#E9E2FA]'
                       }`}
                     >
                       ₦{qVal.toLocaleString()}
@@ -359,7 +357,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
                 {/* Custom Amount Input Box */}
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-purple-300 text-base font-mono">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-[#7C3AED] text-base font-mono">
                     ₦
                   </span>
                   <input
@@ -367,9 +365,9 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                     value={customAmountStr}
                     onChange={handleCustomAmountChange}
                     placeholder="Enter custom amount..."
-                    className="w-full bg-[#0c051a] border border-[#2b164f] focus:border-purple-500 text-white font-mono font-black text-lg py-3.5 pl-10 pr-16 rounded-2xl outline-none transition"
+                    className="w-full bg-[#F8F7FF] border border-[#E9E2FA] focus:border-[#7C3AED] focus:bg-white text-[#171329] font-mono font-black text-lg py-3.5 pl-10 pr-16 rounded-2xl outline-none transition"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-purple-300/60 uppercase">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#716B82] uppercase">
                     NGN
                   </span>
                 </div>
@@ -379,11 +377,11 @@ export const WalletModal: React.FC<WalletModalProps> = ({
               <button
                 type="submit"
                 disabled={isProcessing || !amount || amount < 100}
-                className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white font-black text-sm py-4 px-6 rounded-2xl shadow-xl shadow-purple-600/30 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+                className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-black text-sm py-4 px-6 rounded-2xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
               >
                 {isProcessing ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-purple-200" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
                     <span>{stepMessage || 'Processing Paystack Checkout...'}</span>
                   </>
                 ) : (
@@ -394,8 +392,8 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                 )}
               </button>
 
-              <div className="flex items-center justify-center gap-2 text-[11px] text-purple-300/70 pt-1">
-                <Lock className="w-3.5 h-3.5 text-purple-400" />
+              <div className="flex items-center justify-center gap-2 text-[11px] text-[#716B82] pt-1">
+                <Lock className="w-3.5 h-3.5 text-[#7C3AED]" />
                 <span>256-bit Encrypted SSL Gateway powered by Paystack</span>
               </div>
 
@@ -407,20 +405,20 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             <div className="space-y-5 animate-in fade-in duration-150">
               
               {/* Balance Card */}
-              <div className="bg-gradient-to-br from-purple-900/40 via-[#180c35] to-indigo-900/40 border border-[#381d6d] p-6 rounded-3xl relative overflow-hidden shadow-xl space-y-3">
+              <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-6 rounded-3xl relative overflow-hidden shadow-sm space-y-3">
                 <div className="flex items-center justify-between relative z-10">
-                  <span className="text-xs uppercase tracking-widest text-purple-300/70 font-bold">Total Wallet Balance</span>
-                  <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span className="text-xs uppercase tracking-widest text-[#716B82] font-bold">Total Wallet Balance</span>
+                  <span className="bg-[#EDE9FE] text-[#5B21B6] border border-[#C4B5FD] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-[#7C3AED]" />
                     Escrow Vault Active
                   </span>
                 </div>
 
                 <div className="relative z-10">
-                  <h2 className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                    ₦{walletBalance.toLocaleString()} <span className="text-base text-purple-300/60 font-sans font-bold">NGN</span>
+                  <h2 className="text-3xl sm:text-4xl font-black text-[#171329] font-mono tracking-tight">
+                    ₦{walletBalance.toLocaleString()} <span className="text-base text-[#716B82] font-sans font-bold">NGN</span>
                   </h2>
-                  <p className="text-xs text-purple-300/70 pt-1">
+                  <p className="text-xs text-[#716B82] pt-1">
                     Instant Marketplace Checkout • Auto-Deduction on Buy
                   </p>
                 </div>
@@ -428,7 +426,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                 <div className="pt-2 relative z-10">
                   <button
                     onClick={() => setActiveTab('fund')}
-                    className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white font-extrabold py-3 px-4 rounded-xl shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition cursor-pointer text-xs sm:text-sm"
+                    className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-extrabold py-3 px-4 rounded-xl shadow-sm flex items-center justify-center gap-2 transition cursor-pointer text-xs sm:text-sm"
                   >
                     <Wallet className="w-4 h-4" />
                     <span>Fund Wallet via Paystack</span>
@@ -437,11 +435,11 @@ export const WalletModal: React.FC<WalletModalProps> = ({
               </div>
 
               {/* Escrow Guarantee Callout */}
-              <div className="bg-[#170c30]/70 border border-[#2d1952] p-4 rounded-2xl flex items-start gap-3">
-                <Lock className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+              <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-4 rounded-2xl flex items-start gap-3">
+                <Lock className="w-5 h-5 text-[#7C3AED] shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <h4 className="font-extrabold text-white text-xs">Wallet Purchase & Escrow Protection</h4>
-                  <p className="text-xs text-purple-300/70 leading-relaxed">
+                  <h4 className="font-extrabold text-[#171329] text-xs">Wallet Purchase & Escrow Protection</h4>
+                  <p className="text-xs text-[#716B82] leading-relaxed">
                     When you purchase a product on ZENET HUB, funds are safely held in escrow. Digital product credentials are unlocked instantly upon purchase!
                   </p>
                 </div>
@@ -453,29 +451,29 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           {/* TAB 3: HISTORY */}
           {activeTab === 'history' && (
             <div className="space-y-3 animate-in fade-in duration-150">
-              <h4 className="font-extrabold text-white text-sm">Wallet Ledger & Deposits</h4>
+              <h4 className="font-extrabold text-[#171329] text-sm">Wallet Ledger & Deposits</h4>
 
               {transactions.length === 0 ? (
-                <div className="text-center py-8 text-purple-300/60 text-xs">
+                <div className="text-center py-8 text-[#716B82] text-xs">
                   No wallet transactions recorded yet.
                 </div>
               ) : (
                 transactions.map((tx) => (
-                  <div key={tx.id} className="bg-[#170c30] border border-[#2d1952] p-3.5 rounded-2xl flex items-center justify-between text-xs">
+                  <div key={tx.id} className="bg-[#F8F7FF] border border-[#E9E2FA] p-3.5 rounded-2xl flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
-                        tx.type === 'deposit' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30' : 'bg-purple-950 text-purple-300 border border-purple-500/30'
+                        tx.type === 'deposit' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA]'
                       }`}>
                         {tx.type === 'deposit' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                       </div>
                       <div>
-                        <span className="font-bold text-white block">{tx.description}</span>
-                        <span className="text-[10px] text-purple-300/50 font-mono">{tx.date}</span>
+                        <span className="font-bold text-[#171329] block">{tx.description}</span>
+                        <span className="text-[10px] text-[#716B82] font-mono">{tx.date}</span>
                       </div>
                     </div>
 
                     <span className={`font-mono font-extrabold text-sm ${
-                      tx.type === 'deposit' ? 'text-emerald-400' : 'text-purple-200'
+                      tx.type === 'deposit' ? 'text-emerald-600' : 'text-[#7C3AED]'
                     }`}>
                       {tx.type === 'deposit' ? '+' : '-'}₦{tx.amount.toLocaleString()}
                     </span>

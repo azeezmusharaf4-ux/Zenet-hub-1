@@ -130,6 +130,14 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Clear running intervals on unmount to prevent background leaks and unmounted state updates
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, []);
+
   // Helper to obtain secure Firebase Auth headers
   const getAuthHeaders = async () => {
     const headers: Record<string, string> = {
@@ -463,7 +471,14 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         const serviceList = Array.isArray(data) ? data : (data?.services || data?.data || []);
         if (ok && serviceList.length > 0) {
           setServices(serviceList);
-          setSelectedService(prev => (prev && serviceList.some((s: any) => s.id === prev) ? prev : ''));
+          setSelectedService(prev => {
+            if (prev && serviceList.some((s: any) => s.id === prev)) return prev;
+            const popular = serviceList.find((s: any) => {
+              const n = (s.name || '').toLowerCase();
+              return n.includes('whatsapp') || n.includes('telegram') || n.includes('google') || n.includes('openai');
+            }) || serviceList[0];
+            return popular?.id || '';
+          });
         } else {
           setServices([]);
           setSelectedService('');
@@ -941,17 +956,17 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     <div className="w-full max-w-xl mx-auto px-2 sm:px-0">
       
       {/* 1. TOP HEADER (Matching Screenshots) */}
-      <div className="flex items-center justify-between bg-[#080d1f]/90 text-white px-4 py-3.5 rounded-2xl mb-6 shadow-md border border-purple-950/40">
+      <div className="flex items-center justify-between bg-white text-[#171329] px-4 py-3.5 rounded-2xl mb-6 shadow-sm border border-[#E9E2FA]">
         <button
           type="button"
           onClick={activeStep === 'activation' ? () => setActiveStep('selection') : onBackToMarketplace}
-          className="p-2 bg-[#160c2d] hover:bg-[#251347] text-white rounded-xl transition cursor-pointer border border-purple-900/40 flex items-center justify-center"
+          className="p-2 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#171329] rounded-xl transition cursor-pointer border border-[#E9E2FA] flex items-center justify-center"
           title="Back to Marketplace"
         >
-          <ArrowLeft className="w-5 h-5 text-white" />
+          <ArrowLeft className="w-5 h-5 text-[#171329]" />
         </button>
 
-        <h1 className="text-base sm:text-lg font-black tracking-wide text-[#38bdf8] flex items-center space-x-1.5">
+        <h1 className="text-base sm:text-lg font-bold tracking-tight text-[#171329] flex items-center space-x-1.5">
           <span>Global Virtual Numbers</span>
         </h1>
 
@@ -959,7 +974,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
           {isOwner && (
             <button
               onClick={() => setIsOwnerSettingsOpen(true)}
-              className="flex items-center space-x-1 px-2.5 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:text-white rounded-lg text-[11px] font-black transition cursor-pointer"
+              className="flex items-center space-x-1 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:text-amber-900 rounded-lg text-[11px] font-bold transition cursor-pointer"
               title="Configure Pricing Engine"
             >
               <Settings className="w-3.5 h-3.5" />
@@ -967,24 +982,24 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
             </button>
           )}
 
-          <div className="relative p-2 bg-[#160c2d] text-purple-200 rounded-xl border border-purple-900/40 flex items-center justify-center">
-            <Bell className="w-5 h-5 text-purple-200" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          <div className="relative p-2 bg-[#F8F7FF] text-[#716B82] rounded-xl border border-[#E9E2FA] flex items-center justify-center">
+            <Bell className="w-5 h-5 text-[#716B82]" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full shrink-0 shadow-sm" />
           </div>
         </div>
       </div>
 
       {infoMessage && (
-        <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between">
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
           <span>{infoMessage}</span>
-          <button onClick={() => setInfoMessage('')} className="text-emerald-400 hover:text-white font-extrabold cursor-pointer">×</button>
+          <button onClick={() => setInfoMessage('')} className="text-emerald-700 hover:text-emerald-900 font-extrabold cursor-pointer">×</button>
         </div>
       )}
 
       {errorMessage && (
-        <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between">
+        <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
           <span>{errorMessage}</span>
-          <button onClick={() => setErrorMessage('')} className="text-red-400 hover:text-white font-extrabold cursor-pointer">×</button>
+          <button onClick={() => setErrorMessage('')} className="text-rose-700 hover:text-rose-900 font-extrabold cursor-pointer">×</button>
         </div>
       )}
 
@@ -993,7 +1008,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         <div className="space-y-6">
           
           {/* 2. COUNTRY TYPE SWITCH (Large Segmented Control) */}
-          <div className="bg-[#0c061d] p-1.5 rounded-[28px] border border-[#27144d] shadow-sm flex items-center">
+          <div className="bg-white p-1.5 rounded-[28px] border border-[#E9E2FA] shadow-sm flex items-center">
             <button
               type="button"
               onClick={() => {
@@ -1003,10 +1018,10 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 setSelectedCountry('187');
                 setSelectedService('');
               }}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-[22px] text-xs sm:text-sm font-black transition-all duration-200 cursor-pointer ${
+              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-[22px] text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
                 isUsaMode
-                  ? 'bg-[#220f4b] text-white border border-purple-500/50 shadow-md shadow-purple-950/50'
-                  : 'text-purple-300/70 hover:text-white hover:bg-purple-950/30'
+                  ? 'bg-[#7C3AED] text-white shadow-sm'
+                  : 'text-[#716B82] hover:text-[#171329] hover:bg-[#F8F7FF]'
               }`}
             >
               <span>🇺🇸 USA Numbers</span>
@@ -1021,10 +1036,10 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 setSelectedCountry('');
                 setSelectedService('');
               }}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-[22px] text-xs sm:text-sm font-black transition-all duration-200 cursor-pointer ${
+              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-[22px] text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
                 !isUsaMode
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30'
-                  : 'text-purple-300/70 hover:text-white hover:bg-purple-950/30'
+                  ? 'bg-[#7C3AED] text-white shadow-sm'
+                  : 'text-[#716B82] hover:text-[#171329] hover:bg-[#F8F7FF]'
               }`}
             >
               <Globe className="w-4 h-4" />
@@ -1034,18 +1049,18 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
           {/* 3. SMS SERVER SELECTION */}
           <div className="space-y-2.5">
-            <span className="text-[10px] font-black text-purple-300/60 uppercase tracking-widest block pl-1">
+            <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block pl-1">
               CHOOSE SMS SERVER
             </span>
 
             <div className="grid grid-cols-3 gap-2.5">
               {serversLoading ? (
-                <div className="col-span-3 text-xs text-purple-400 flex items-center justify-center space-x-2 py-3">
-                  <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
+                <div className="col-span-3 text-xs text-[#7C3AED] flex items-center justify-center space-x-2 py-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#7C3AED]" />
                   <span>Loading servers...</span>
                 </div>
               ) : displayedServers.length === 0 ? (
-                <div className="col-span-3 text-xs text-purple-400 text-center py-2">
+                <div className="col-span-3 text-xs text-[#716B82] text-center py-2">
                   No servers available.
                 </div>
               ) : (
@@ -1053,8 +1068,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   const isSelected = selectedServer === s.id;
                   
                   const buttonStyle = isSelected
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-400 shadow-md shadow-purple-600/30'
-                    : 'bg-[#12082b] text-purple-200 border-[#27144d] hover:border-purple-500/50 hover:bg-[#1a0c3b]';
+                    ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm'
+                    : 'bg-white text-[#716B82] border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] hover:text-[#171329]';
 
                   const iconPrefix = isUsaMode ? '🇺🇸' : <Globe className="w-3.5 h-3.5 inline mr-1" />;
 
@@ -1066,7 +1081,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                         setSelectedServer(s.id);
                         setSelectedService('');
                       }}
-                      className={`flex items-center justify-center py-3 px-3 rounded-full text-xs font-black transition-all border cursor-pointer ${buttonStyle}`}
+                      className={`flex items-center justify-center py-3 px-3 rounded-full text-xs font-bold transition-all border cursor-pointer ${buttonStyle}`}
                     >
                       <span className="truncate flex items-center justify-center">
                         <span className="mr-1.5">{typeof iconPrefix === 'string' ? iconPrefix : iconPrefix}</span>
@@ -1080,13 +1095,13 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
           </div>
 
           {/* 4. SERVER CONTENT CARD */}
-          <div className="bg-[#0c061d] border border-[#251347] rounded-[30px] shadow-xl relative z-10">
+          <div className="bg-white border border-[#E9E2FA] rounded-[30px] shadow-sm relative z-10 overflow-hidden">
             
             {/* Header Banner */}
-            <div className={`${serverConfig.headerBg} rounded-t-[29px] px-5 py-3.5 flex items-center justify-between text-white`}>
+            <div className={`${serverConfig.headerBg} px-5 py-3.5 flex items-center justify-between text-white`}>
               <div className="flex items-center space-x-2.5">
-                <span className={`w-2.5 h-2.5 ${serverConfig.dotColor} rounded-full animate-ping shrink-0`} />
-                <span className="text-xs sm:text-sm font-black tracking-wide uppercase">
+                <span className={`w-2.5 h-2.5 ${serverConfig.dotColor} rounded-full shrink-0 shadow-sm`} />
+                <span className="text-xs sm:text-sm font-bold tracking-wide uppercase">
                   {serverConfig.headerTitle}
                 </span>
               </div>
@@ -1104,70 +1119,70 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     setIsServiceModalOpen(false);
                     setCountrySearchQuery('');
                   }}
-                  className="w-full flex items-center justify-between space-x-4 bg-[#120826] border border-[#271448] hover:border-purple-500/50 p-4 rounded-2xl transition cursor-pointer text-left focus:outline-none group"
+                  className="w-full flex items-center justify-between space-x-4 bg-[#F8F7FF] border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-white p-4 rounded-2xl transition cursor-pointer text-left focus:outline-none group shadow-sm"
                 >
                   <div className="flex items-center space-x-3.5 flex-1 min-w-0">
                     <div className={`w-11 h-11 rounded-xl ${serverConfig.iconBg} text-white shrink-0 flex items-center justify-center shadow-sm`}>
                       <Globe className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-[10px] font-black text-purple-300/60 uppercase tracking-widest block mb-0.5">
+                      <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block mb-0.5">
                         COUNTRY
                       </span>
                       {countriesLoading ? (
-                        <div className="text-xs text-purple-400 font-medium flex items-center space-x-2">
+                        <div className="text-xs text-[#7C3AED] font-medium flex items-center space-x-2">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           <span>Loading countries...</span>
                         </div>
                       ) : selectedCountry && currentCountryObj ? (
-                        <span className="text-sm font-black text-white truncate block">
+                        <span className="text-sm font-bold text-[#171329] truncate block">
                           {`${getCountryFlagEmoji(currentCountryObj.id || currentCountryObj.code || currentCountryObj.name)} ${currentCountryObj.name || currentCountryObj.id}${getCountryDialCode(currentCountryObj.id, currentCountryObj.name, currentCountryObj.code) ? ` (${getCountryDialCode(currentCountryObj.id, currentCountryObj.name, currentCountryObj.code)})` : ''}`}
                         </span>
                       ) : selectedCountry ? (
-                        <span className="text-sm font-black text-white truncate block">
+                        <span className="text-sm font-bold text-[#171329] truncate block">
                           {getCountryDisplayName(selectedCountry)}
                         </span>
                       ) : (
-                        <span className="text-sm font-bold text-purple-300/60 truncate block">
+                        <span className="text-sm font-medium text-[#716B82]/70 truncate block">
                           Select Country
                         </span>
                       )}
                     </div>
                   </div>
-                  <ChevronRight className={`w-5 h-5 text-purple-400 shrink-0 transition-transform ${isCountryModalOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`w-5 h-5 text-[#716B82] shrink-0 transition-transform ${isCountryModalOpen ? 'rotate-90' : ''}`} />
                 </button>
 
                 {/* Country Dropdown / Modal */}
                 {isCountryModalOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#120826] border border-purple-500/50 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-3.5 backdrop-blur-xl">
+                  <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-white border border-[#E9E2FA] rounded-2xl shadow-xl p-3.5">
                     <div className="relative mb-3">
-                      <Search className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Search className="w-4 h-4 text-[#716B82] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         type="text"
                         value={countrySearchQuery}
                         onChange={(e) => setCountrySearchQuery(e.target.value)}
                         placeholder="Search country (e.g. United, UK, Nigeria, Ghana)..."
                         autoFocus
-                        className="w-full bg-[#180d33] border border-purple-900/60 focus:border-purple-400 rounded-xl pl-9.5 pr-8 py-2.5 text-xs text-white placeholder-purple-300/40 font-bold focus:outline-none transition shadow-inner"
+                        className="w-full bg-[#F8F7FF] border border-[#E9E2FA] focus:border-[#7C3AED] rounded-xl pl-9.5 pr-8 py-2.5 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-sm"
                       />
                       {countrySearchQuery && (
                         <button
                           type="button"
                           onClick={() => setCountrySearchQuery('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 hover:text-white cursor-pointer p-1"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] cursor-pointer p-1"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
 
-                    {/* Scrollable list displaying ~5 country rows with smooth vertical scrolling */}
+                    {/* Scrollable list */}
                     <div 
                       className="max-h-[250px] overflow-y-auto overflow-x-hidden space-y-1.5 pr-1.5 custom-scrollbar touch-pan-y overscroll-contain"
                       style={{ WebkitOverflowScrolling: 'touch' }}
                     >
                       {filteredCountries.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-purple-300/40 font-bold">
+                        <div className="py-8 text-center text-xs text-[#716B82] font-bold">
                           No matching country found
                         </div>
                       ) : (
@@ -1187,8 +1202,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                               }}
                               className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left cursor-pointer touch-manipulation select-none ${
                                 isSelected
-                                  ? 'bg-purple-600 text-white shadow-sm ring-1 ring-purple-400'
-                                  : 'text-purple-200 hover:bg-purple-950/60 hover:text-white bg-[#160a2f]/70 active:bg-purple-900/60'
+                                  ? 'bg-[#7C3AED] text-white shadow-sm'
+                                  : 'text-[#171329] hover:bg-[#F8F7FF] active:bg-[#EDE9FE]'
                               }`}
                             >
                               <div className="flex items-center space-x-3 truncate">
@@ -1198,8 +1213,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                               {dialCode && (
                                 <span className={`text-[11px] font-mono font-bold shrink-0 ml-2 px-2 py-0.5 rounded-md ${
                                   isSelected
-                                    ? 'bg-purple-700 text-white'
-                                    : 'bg-purple-950/80 text-purple-300 border border-purple-800/40'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-[#F8F7FF] text-[#7C3AED] border border-[#E9E2FA]'
                                 }`}>
                                   {dialCode}
                                 </span>
@@ -1222,67 +1237,67 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     setIsCountryModalOpen(false);
                     setServiceSearchQuery('');
                   }}
-                  className="w-full flex items-center justify-between space-x-4 bg-[#120826] border border-[#271448] hover:border-purple-500/50 p-4 rounded-2xl transition cursor-pointer text-left focus:outline-none group"
+                  className="w-full flex items-center justify-between space-x-4 bg-[#F8F7FF] border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-white p-4 rounded-2xl transition cursor-pointer text-left focus:outline-none group shadow-sm"
                 >
                   <div className="flex items-center space-x-3.5 flex-1 min-w-0">
                     <div className={`w-11 h-11 rounded-xl ${serverConfig.iconBg} text-white shrink-0 flex items-center justify-center shadow-sm`}>
                       <Smartphone className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-[10px] font-black text-purple-300/60 uppercase tracking-widest block mb-0.5">
+                      <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block mb-0.5">
                         SERVICE
                       </span>
                       {!selectedCountry ? (
-                        <span className="text-sm font-bold text-purple-300/40 truncate block">
+                        <span className="text-sm font-medium text-[#716B82]/70 truncate block">
                           Select Country First
                         </span>
                       ) : servicesLoading ? (
-                        <div className="text-xs text-purple-400 font-medium flex items-center space-x-2">
+                        <div className="text-xs text-[#7C3AED] font-medium flex items-center space-x-2">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           <span>Loading services...</span>
                         </div>
                       ) : currentServiceObj ? (
-                        <span className="text-sm font-black text-white truncate block">
+                        <span className="text-sm font-bold text-[#171329] truncate block">
                           {getServiceDisplayName(currentServiceObj.id, currentServiceObj.name)}
                         </span>
                       ) : selectedService ? (
-                        <span className="text-sm font-black text-white truncate block">
+                        <span className="text-sm font-bold text-[#171329] truncate block">
                           {getServiceDisplayName(selectedService)}
                         </span>
                       ) : (
-                        <span className="text-sm font-bold text-purple-300/60 truncate block">
+                        <span className="text-sm font-medium text-[#716B82]/70 truncate block">
                           Select Service
                         </span>
                       )}
                     </div>
                   </div>
-                  <ChevronRight className={`w-5 h-5 text-purple-400 shrink-0 transition-transform ${isServiceModalOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`w-5 h-5 text-[#716B82] shrink-0 transition-transform ${isServiceModalOpen ? 'rotate-90' : ''}`} />
                 </button>
 
                 {/* Service Dropdown / Modal */}
                 {isServiceModalOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#120826] border border-purple-500/50 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-3.5 backdrop-blur-xl">
+                  <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-white border border-[#E9E2FA] rounded-2xl shadow-xl p-3.5">
                     {!selectedCountry ? (
-                      <div className="py-6 text-center text-xs text-purple-300/60 font-bold">
+                      <div className="py-6 text-center text-xs text-[#716B82] font-bold">
                         Please select a country first to view available services
                       </div>
                     ) : (
                       <>
                         <div className="relative mb-3">
-                          <Search className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <Search className="w-4 h-4 text-[#716B82] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           <input
                             type="text"
                             value={serviceSearchQuery}
                             onChange={(e) => setServiceSearchQuery(e.target.value)}
                             placeholder="Search service (e.g. WhatsApp, Telegram, Google, TikTok)..."
                             autoFocus
-                            className="w-full bg-[#180d33] border border-purple-900/60 focus:border-purple-400 rounded-xl pl-9.5 pr-8 py-2.5 text-xs text-white placeholder-purple-300/40 font-bold focus:outline-none transition shadow-inner"
+                            className="w-full bg-[#F8F7FF] border border-[#E9E2FA] focus:border-[#7C3AED] rounded-xl pl-9.5 pr-8 py-2.5 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-sm"
                           />
                           {serviceSearchQuery && (
                             <button
                               type="button"
                               onClick={() => setServiceSearchQuery('')}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400 hover:text-white cursor-pointer p-1"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] cursor-pointer p-1"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -1294,7 +1309,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                           style={{ WebkitOverflowScrolling: 'touch' }}
                         >
                           {filteredServices.length === 0 ? (
-                            <div className="py-8 text-center text-xs text-purple-300/40 font-bold">
+                            <div className="py-8 text-center text-xs text-[#716B82] font-bold">
                               {servicesLoading ? 'Loading services...' : 'No service available for this country'}
                             </div>
                           ) : (
@@ -1312,16 +1327,16 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                                   }}
                                   className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left cursor-pointer touch-manipulation select-none ${
                                     isSelected
-                                      ? 'bg-purple-600 text-white shadow-sm ring-1 ring-purple-400'
-                                      : 'text-purple-200 hover:bg-purple-950/60 hover:text-white bg-[#160a2f]/70 active:bg-purple-900/60'
+                                      ? 'bg-[#7C3AED] text-white shadow-sm'
+                                      : 'text-[#171329] hover:bg-[#F8F7FF] active:bg-[#EDE9FE]'
                                   }`}
                                 >
                                   <span className="truncate font-semibold">{displayName}</span>
                                   {s.price ? (
-                                    <span className={`text-[10px] font-black shrink-0 ml-2 px-2 py-0.5 rounded-md ${
+                                    <span className={`text-[10px] font-bold shrink-0 ml-2 px-2 py-0.5 rounded-md ${
                                       isSelected
-                                        ? 'bg-purple-700 text-white'
-                                        : 'bg-purple-950/80 text-emerald-300 border border-purple-800/40'
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-emerald-50 text-[#047857] border border-emerald-200'
                                     }`}>
                                       ₦{(Number(s.price) + 300).toLocaleString()}
                                     </span>
@@ -1339,13 +1354,13 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
               {/* Price Options Preview when Country & Service are Selected */}
               {selectedCountry && selectedService && (
-                <div className="bg-[#120826] border border-[#271448] p-4 rounded-2xl space-y-3">
+                <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-4 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[10px] font-black text-purple-300/60 uppercase tracking-widest">
+                    <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest">
                       {priceOptions.length > 1 ? 'Select Line Quality / Tier' : 'Line Price'}
                     </span>
                     {isPriceAvailable && (
-                      <span className="font-mono font-black text-emerald-400 text-sm">
+                      <span className="font-mono font-bold text-[#047857] text-sm">
                         ₦{calculatedPrice.toLocaleString()}
                       </span>
                     )}
@@ -1353,40 +1368,40 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
                   {/* Owner Pricing Breakdown - OneGridHub Original Price -> My Markup -> Final Customer Price */}
                   {isOwner && isPriceAvailable && (
-                    <div className="bg-gradient-to-r from-amber-950/40 via-purple-950/60 to-amber-950/40 border border-amber-500/40 rounded-xl p-3 space-y-2">
-                      <div className="flex items-center justify-between text-[11px] font-black text-amber-300">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-amber-900">
                         <span className="flex items-center gap-1.5">
                           <span>👑 Owner Pricing Breakdown</span>
                         </span>
-                        <span className="text-[9px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 uppercase tracking-wider">
+                        <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-300 uppercase tracking-wider">
                           OneGridHub Upstream
                         </span>
                       </div>
                       
                       <div className="grid grid-cols-3 gap-2 text-center pt-1 font-mono">
-                        <div className="bg-[#110524] p-2 rounded-lg border border-purple-900/50">
-                          <span className="text-[9px] font-bold text-purple-300/70 block uppercase font-sans tracking-wide">
+                        <div className="bg-white p-2 rounded-lg border border-amber-200 shadow-xs">
+                          <span className="text-[9px] font-bold text-[#716B82] block uppercase font-sans tracking-wide">
                             OneGridHub Price
                           </span>
-                          <span className="text-xs sm:text-sm font-black text-white">
+                          <span className="text-xs sm:text-sm font-bold text-[#171329]">
                             ₦{providerPrice.toLocaleString()}
                           </span>
                         </div>
                         
-                        <div className="bg-[#110524] p-2 rounded-lg border border-amber-500/30">
-                          <span className="text-[9px] font-bold text-amber-300/80 block uppercase font-sans tracking-wide">
+                        <div className="bg-white p-2 rounded-lg border border-amber-200 shadow-xs">
+                          <span className="text-[9px] font-bold text-amber-700 block uppercase font-sans tracking-wide">
                             My Markup
                           </span>
-                          <span className="text-xs sm:text-sm font-black text-amber-400">
+                          <span className="text-xs sm:text-sm font-bold text-amber-800">
                             +₦{markupAmount.toLocaleString()}
                           </span>
                         </div>
                         
-                        <div className="bg-[#110524] p-2 rounded-lg border border-emerald-500/30">
-                          <span className="text-[9px] font-bold text-emerald-300/80 block uppercase font-sans tracking-wide">
+                        <div className="bg-white p-2 rounded-lg border border-emerald-200 shadow-xs">
+                          <span className="text-[9px] font-bold text-[#047857] block uppercase font-sans tracking-wide">
                             Customer Price
                           </span>
-                          <span className="text-xs sm:text-sm font-black text-emerald-400">
+                          <span className="text-xs sm:text-sm font-bold text-[#047857]">
                             ₦{calculatedPrice.toLocaleString()}
                           </span>
                         </div>
@@ -1395,8 +1410,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   )}
 
                   {priceLoading ? (
-                    <div className="flex items-center space-x-2 py-2 text-xs text-purple-300">
-                      <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                    <div className="flex items-center space-x-2 py-2 text-xs text-[#7C3AED]">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#7C3AED]" />
                       <span>Checking real-time carrier rates...</span>
                     </div>
                   ) : isPriceAvailable && priceOptions.length > 1 ? (
@@ -1409,23 +1424,23 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                             onClick={() => handleSelectOption(opt)}
                             className={`p-2.5 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
                               isSelected
-                                ? 'bg-purple-950/60 border-purple-500 shadow ring-1 ring-purple-500'
-                                : 'bg-[#150a2b]/80 border-[#271448] hover:border-purple-800/60'
+                                ? 'bg-[#EDE9FE] border-[#7C3AED] shadow-sm ring-1 ring-[#7C3AED]'
+                                : 'bg-white border-[#E9E2FA] hover:border-[#7C3AED]/40'
                             }`}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-black text-white">{opt.tierName}</span>
+                              <span className="text-[11px] font-bold text-[#171329]">{opt.tierName}</span>
                               {opt.badge && (
-                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-[#EDE9FE] text-[#7C3AED]">
                                   {opt.badge}
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs font-black text-emerald-400 font-mono mt-1">
+                            <span className="text-xs font-bold text-[#047857] font-mono mt-1">
                               ₦{opt.customerPrice.toLocaleString()}
                             </span>
                             {isOwner && opt.providerCost !== undefined && (
-                              <span className="text-[9px] text-amber-300/80 font-mono block mt-0.5">
+                              <span className="text-[9px] text-amber-700 font-mono block mt-0.5">
                                 Cost: ₦{opt.providerCost.toLocaleString()} • +₦{(opt.markup !== undefined ? opt.markup : (opt.customerPrice - opt.providerCost)).toLocaleString()}
                               </span>
                             )}
@@ -1434,15 +1449,15 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                       })}
                     </div>
                   ) : !isPriceAvailable && (
-                    <div className="py-2 px-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-300 font-bold flex items-center space-x-2">
-                      <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                    <div className="py-2 px-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 font-bold flex items-center space-x-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                       <span>{priceErrorMessage || 'This service is currently unavailable for the chosen country.'}</span>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-purple-900/30 text-purple-300/70">
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#E9E2FA] text-[#716B82]">
                     <span>Wallet Balance:</span>
-                    <span className="font-mono font-bold text-white">₦{walletBalance.toLocaleString()}</span>
+                    <span className="font-mono font-bold text-[#171329]">₦{walletBalance.toLocaleString()}</span>
                   </div>
                 </div>
               )}
@@ -1452,7 +1467,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 <button
                   type="button"
                   disabled
-                  className={`w-full py-4 px-6 rounded-[22px] font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center shadow-lg ${serverConfig.buttonBg} opacity-50 cursor-not-allowed`}
+                  className={`w-full py-4 px-6 rounded-[22px] font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center shadow-md ${serverConfig.buttonBg} opacity-50 cursor-not-allowed`}
                 >
                   {serverConfig.buttonIcon}
                   <span>{serverConfig.buttonText}</span>
@@ -1461,7 +1476,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 <button
                   type="button"
                   onClick={onOpenWallet}
-                  className="w-full py-4 px-6 rounded-[22px] font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-lg active:scale-95 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
+                  className="w-full py-4 px-6 rounded-[22px] font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md bg-amber-600 hover:bg-amber-500 text-white"
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   <span>FUND ACCOUNT (₦{(calculatedPrice - walletBalance).toLocaleString()} Needed)</span>
@@ -1471,7 +1486,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   type="button"
                   onClick={handleBuyNumber}
                   disabled={buyingLoading || priceLoading || !isPriceAvailable || calculatedPrice <= 0}
-                  className={`w-full py-4 px-6 rounded-[22px] font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center shadow-lg active:scale-95 cursor-pointer ${serverConfig.buttonBg} disabled:opacity-50 disabled:pointer-events-none`}
+                  className={`w-full py-4 px-6 rounded-[22px] font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center shadow-md active:scale-95 cursor-pointer ${serverConfig.buttonBg} disabled:opacity-50 disabled:pointer-events-none`}
                 >
                   {buyingLoading ? (
                     <>
@@ -1499,24 +1514,24 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
           <div className="space-y-4 pt-4">
             
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-white text-base tracking-wide flex items-center space-x-2">
-                <Clock className="w-4.5 h-4.5 text-[#38bdf8]" />
+              <h3 className="font-bold text-[#171329] text-base tracking-tight flex items-center space-x-2">
+                <Clock className="w-4.5 h-4.5 text-[#7C3AED]" />
                 <span>My Orders</span>
               </h3>
-              <span className="text-xs font-black bg-sky-500/20 text-sky-300 px-3 py-1 rounded-full">
+              <span className="text-xs font-bold bg-[#EDE9FE] text-[#7C3AED] px-3 py-1 rounded-full">
                 {orders.length} {orders.length === 1 ? 'orders' : 'orders'}
               </span>
             </div>
 
             {ordersLoading ? (
-              <div className="flex flex-col items-center justify-center py-8 text-purple-300/40 text-xs">
-                <Loader2 className="w-6 h-6 animate-spin text-purple-500 mb-2" />
+              <div className="flex flex-col items-center justify-center py-8 text-[#716B82] text-xs">
+                <Loader2 className="w-6 h-6 animate-spin text-[#7C3AED] mb-2" />
                 Loading your orders...
               </div>
             ) : orders.length === 0 ? (
-              <div className="text-center py-10 bg-[#0c061d] border border-[#251347] rounded-[28px]">
-                <Phone className="w-8 h-8 text-purple-300/20 mx-auto mb-2" />
-                <p className="text-xs font-bold text-purple-300/50">No virtual numbers purchased yet</p>
+              <div className="text-center py-10 bg-white border border-dashed border-[#E9E2FA] rounded-[28px] shadow-sm">
+                <Phone className="w-8 h-8 text-[#716B82]/30 mx-auto mb-2" />
+                <p className="text-xs font-bold text-[#716B82]">No virtual numbers purchased yet</p>
               </div>
             ) : (
               <div className="space-y-3.5">
@@ -1533,37 +1548,37 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   return (
                     <div 
                       key={o.orderId}
-                      className="bg-[#0c061d] border border-[#251347] rounded-[26px] overflow-hidden shadow-lg p-4 space-y-3"
+                      className="bg-white border border-[#E9E2FA] rounded-[26px] overflow-hidden shadow-sm p-4 space-y-3"
                     >
                       {/* Top Row */}
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-2">
-                          <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full text-white ${serverPillBg} uppercase`}>
+                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full text-white ${serverPillBg} uppercase`}>
                             {serverPill}
                           </span>
-                          <span className="font-black text-white truncate max-w-[180px]">
+                          <span className="font-bold text-[#171329] truncate max-w-[180px]">
                             {getServiceDisplayName(o.service, o.serviceName || o.service)}
                           </span>
                         </div>
-                        <span className="text-[11px] text-purple-300/60 font-semibold">
+                        <span className="text-[11px] text-[#716B82] font-semibold">
                           {formatDateSimple(o.createdAt)}
                         </span>
                       </div>
 
                       {/* Number & Copy Row */}
                       <div className="flex items-center space-x-3">
-                        <span className="text-base sm:text-lg font-black text-[#009ee2] tracking-wider underline cursor-pointer">
+                        <span className="text-base sm:text-lg font-bold text-[#7C3AED] tracking-wider underline cursor-pointer">
                           {o.phoneNumber}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleCopy(o.phoneNumber, o.orderId)}
-                          className="flex items-center space-x-1 px-2.5 py-1 bg-[#1a0e36] hover:bg-[#25144d] border border-purple-900/40 text-purple-200 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                          className="flex items-center space-x-1 px-2.5 py-1 bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#171329] rounded-lg text-xs font-bold transition cursor-pointer"
                         >
                           {copiedText === o.orderId ? (
                             <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span className="text-emerald-400">Copied</span>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="text-emerald-700">Copied</span>
                             </>
                           ) : (
                             <>
@@ -1575,28 +1590,28 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                       </div>
 
                       {/* Info & Status Badges Row */}
-                      <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-purple-950/40 text-xs">
+                      <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-[#E9E2FA] text-xs">
                         <div className="flex items-center space-x-2">
-                          <span className="text-purple-300/80 font-bold flex items-center space-x-1">
+                          <span className="text-[#716B82] font-bold flex items-center space-x-1">
                             <Globe className="w-3.5 h-3.5 mr-1 inline" />
                             <span>{getCountryDisplayName(o.country)}</span>
                           </span>
-                          <span className="bg-sky-500/10 text-[#38bdf8] font-black px-2 py-0.5 rounded-lg">
+                          <span className="bg-emerald-50 border border-emerald-200 text-[#047857] font-bold px-2 py-0.5 rounded-lg">
                             ₦{(Number(o.customerPrice || o.price || 0)).toLocaleString()}
                           </span>
                         </div>
 
                         <div>
                           {isCompleted ? (
-                            <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-black px-2.5 py-1 rounded-full uppercase">
+                            <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
                               COMPLETED
                             </span>
                           ) : isWaiting ? (
-                            <span className="bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-black px-2.5 py-1 rounded-full uppercase animate-pulse">
+                            <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase animate-pulse">
                               AWAITING SMS
                             </span>
                           ) : (
-                            <span className="bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] font-black px-2.5 py-1 rounded-full uppercase">
+                            <span className="bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
                               {o.status || 'EXPIRED'}
                             </span>
                           )}
@@ -1605,17 +1620,17 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
                       {/* Received OTP Box */}
                       {isCompleted && o.code && (
-                        <div className="bg-sky-500/10 border border-sky-400/20 rounded-xl p-3 text-center space-y-1">
-                          <span className="text-[10px] font-black text-sky-400 uppercase tracking-wider block">OTP RECEIVED</span>
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center space-y-1">
+                          <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">OTP RECEIVED</span>
                           <div className="flex items-center justify-center space-x-2">
-                            <span className="text-xl font-black text-sky-200 tracking-widest">{o.code}</span>
+                            <span className="text-xl font-bold text-emerald-900 tracking-widest">{o.code}</span>
                             <button
                               type="button"
                               onClick={() => handleCopy(o.code, `${o.orderId}-code`)}
-                              className="p-1.5 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 rounded-lg transition"
+                              className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition"
                               title="Copy OTP"
                             >
-                              {copiedText === `${o.orderId}-code` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              {copiedText === `${o.orderId}-code` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
                           </div>
                         </div>
@@ -1625,7 +1640,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleBuyAgain(o)}
-                        className="w-full py-2 bg-[#160c2d] hover:bg-[#251347] border border-purple-900/40 text-purple-300 hover:text-white text-xs font-black rounded-xl transition flex items-center justify-center cursor-pointer"
+                        className="w-full py-2 bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#171329] hover:text-[#7C3AED] text-xs font-bold rounded-xl transition flex items-center justify-center cursor-pointer"
                       >
                         + Buy Again
                       </button>
@@ -1643,58 +1658,58 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
       {/* STEP 2: ACTIVE ACTIVATION SCREEN */}
       {activeStep === 'activation' && activeOrder && (
-        <div className="bg-[#0c061d] border border-[#251347] rounded-[30px] overflow-hidden shadow-2xl space-y-5 p-6">
+        <div className="bg-white border border-[#E9E2FA] rounded-[30px] overflow-hidden shadow-sm space-y-5 p-6">
           
           <div className="text-center space-y-1">
-            <h3 className="font-black text-lg text-white tracking-wide uppercase">Active SMS Verification</h3>
-            <p className="text-xs text-purple-200/70 font-semibold">
-              Order ID: <span className="font-mono text-[11px] bg-purple-950/60 px-2 py-0.5 rounded text-white">{activeOrder.orderId}</span>
+            <h3 className="font-bold text-lg text-[#171329] tracking-tight uppercase">Active SMS Verification</h3>
+            <p className="text-xs text-[#716B82] font-semibold">
+              Order ID: <span className="font-mono text-[11px] bg-[#F8F7FF] border border-[#E9E2FA] px-2 py-0.5 rounded text-[#171329]">{activeOrder.orderId}</span>
             </p>
           </div>
 
-          <div className="flex flex-col items-center justify-center p-6 bg-[#120826] rounded-2xl border border-[#271448] text-center space-y-3">
+          <div className="flex flex-col items-center justify-center p-6 bg-[#F8F7FF] rounded-2xl border border-[#E9E2FA] text-center space-y-3">
             {pollingStatus === 'WAITING' ? (
               <>
                 <div className="relative">
-                  <Loader2 className="w-12 h-12 text-purple-500 animate-spin" />
-                  <span className="absolute inset-0 flex items-center justify-center text-xs font-black text-white">
+                  <Loader2 className="w-12 h-12 text-[#7C3AED] animate-spin" />
+                  <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[#171329]">
                     {formatTime(elapsedSeconds)}
                   </span>
                 </div>
-                <h4 className="text-sm font-black text-white uppercase tracking-wider animate-pulse">Awaiting SMS Code...</h4>
-                <p className="text-[11px] text-purple-300/60 leading-relaxed max-w-sm">
+                <h4 className="text-sm font-bold text-[#171329] uppercase tracking-wider animate-pulse">Awaiting SMS Code...</h4>
+                <p className="text-[11px] text-[#716B82] leading-relaxed max-w-sm">
                   Please use the virtual phone number below to request your verification code. This screen will automatically update as soon as the SMS is received.
                 </p>
               </>
             ) : pollingStatus === 'RECEIVED' ? (
               <>
-                <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-200">
                   <Check className="w-6 h-6 animate-bounce" />
                 </div>
-                <h4 className="text-sm font-black text-emerald-400 uppercase tracking-wider">Verification Complete!</h4>
-                <p className="text-xs text-purple-300/80">The carrier gateway has delivered your OTP successfully.</p>
+                <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-wider">Verification Complete!</h4>
+                <p className="text-xs text-emerald-700">The carrier gateway has delivered your OTP successfully.</p>
               </>
             ) : (
               <>
-                <div className="w-12 h-12 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-200">
                   <XCircle className="w-6 h-6" />
                 </div>
-                <h4 className="text-sm font-black text-red-400 uppercase tracking-wider">Session Terminated</h4>
-                <p className="text-xs text-purple-300/80">This purchase session was cancelled or timed out.</p>
+                <h4 className="text-sm font-bold text-rose-800 uppercase tracking-wider">Session Terminated</h4>
+                <p className="text-xs text-rose-700">This purchase session was cancelled or timed out.</p>
               </>
             )}
           </div>
 
           {/* Virtual Phone Number Box */}
           <div className="space-y-1.5">
-            <span className="text-[10px] font-black text-purple-300/50 uppercase tracking-widest block">Your Virtual Phone Number</span>
-            <div className="flex items-center justify-between bg-[#150a2b] border border-[#271448] p-4 rounded-2xl">
-              <span className="text-lg sm:text-xl font-black text-white tracking-wider font-mono">
+            <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block">Your Virtual Phone Number</span>
+            <div className="flex items-center justify-between bg-white border border-[#E9E2FA] p-4 rounded-2xl shadow-xs">
+              <span className="text-lg sm:text-xl font-bold text-[#171329] tracking-wider font-mono">
                 {activeOrder.phoneNumber}
               </span>
               <button
                 onClick={() => handleCopy(activeOrder.phoneNumber, 'number')}
-                className="flex items-center space-x-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-black rounded-xl transition cursor-pointer"
+                className="flex items-center space-x-1.5 px-4 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs"
               >
                 {copiedText === 'number' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedText === 'number' ? 'Copied' : 'Copy'}</span>
@@ -1705,24 +1720,24 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
           {/* OTP Code Box */}
           {pollingStatus === 'RECEIVED' && verificationCode && (
             <div className="space-y-4 pt-2">
-              <span className="text-[10px] font-black text-purple-300/50 uppercase tracking-widest block">Delivered Verification Code</span>
+              <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block">Delivered Verification Code</span>
               
-              <div className="bg-sky-500/10 border border-sky-500/30 rounded-2xl p-6 text-center space-y-4">
-                <span className="text-xs font-black text-sky-400 uppercase tracking-wider block">OTP RECEIVED ✓</span>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center space-y-4">
+                <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">OTP RECEIVED ✓</span>
                 
-                <span className="text-4xl sm:text-5xl font-black text-sky-300 tracking-[0.4em] block pl-4 font-mono">
+                <span className="text-4xl sm:text-5xl font-extrabold text-emerald-900 tracking-[0.4em] block pl-4 font-mono">
                   {verificationCode.split('').join(' ')}
                 </span>
 
                 <button
                   onClick={() => handleCopy(verificationCode, 'code')}
-                  className="mx-auto flex items-center space-x-2 px-5 py-2.5 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-xs font-black rounded-xl border border-sky-400/40 transition cursor-pointer"
+                  className="mx-auto flex items-center space-x-2 px-5 py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-bold rounded-xl border border-emerald-300 transition cursor-pointer"
                 >
                   {copiedText === 'code' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedText === 'code' ? 'Copied OTP' : 'Copy OTP'}</span>
                 </button>
 
-                <span className="text-[10px] text-purple-300/50 block">Message: "{smsContent}"</span>
+                <span className="text-[10px] text-[#716B82] block">Message: "{smsContent}"</span>
               </div>
             </div>
           )}
@@ -1733,7 +1748,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
               <button
                 onClick={handleCancelOrder}
                 disabled={cancellingLoading}
-                className="w-full py-3.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center space-x-2 cursor-pointer shadow-lg"
+                className="w-full py-3.5 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition flex items-center justify-center space-x-2 cursor-pointer shadow-sm"
               >
                 {cancellingLoading ? (
                   <>
@@ -1755,7 +1770,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
               }}
-              className="w-full py-3.5 px-4 bg-[#1a0f34] hover:bg-[#231542] text-purple-300 hover:text-white text-xs font-black uppercase tracking-wider rounded-xl border border-purple-900/40 transition flex items-center justify-center space-x-2 cursor-pointer"
+              className="w-full py-3.5 px-4 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#171329] hover:text-[#7C3AED] text-xs font-bold uppercase tracking-wider rounded-xl border border-[#E9E2FA] transition flex items-center justify-center space-x-2 cursor-pointer"
             >
               <span>Back to Selection</span>
             </button>
@@ -1766,34 +1781,34 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
       {/* OWNER PRICING ENGINE MODAL */}
       {isOwner && isOwnerSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#0f0721] border border-purple-700/40 rounded-3xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white border border-[#E9E2FA] rounded-3xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-6 text-[#171329]">
             
-            <div className="flex items-center justify-between border-b border-purple-900/40 pb-4">
+            <div className="flex items-center justify-between border-b border-[#E9E2FA] pb-4">
               <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-gradient-to-br from-amber-500 to-purple-600 rounded-2xl shadow-lg">
+                <div className="p-2.5 bg-gradient-to-br from-amber-500 to-purple-600 rounded-2xl shadow-sm text-white">
                   <Settings className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-black text-base sm:text-lg text-white tracking-wide">
+                  <h3 className="font-bold text-base sm:text-lg text-[#171329] tracking-tight">
                     Virtual Number Pricing Engine
                   </h3>
-                  <p className="text-xs text-purple-300/70">
+                  <p className="text-xs text-[#716B82]">
                     Control dynamic pricing generated from OneGridHub
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsOwnerSettingsOpen(false)}
-                className="p-2 bg-purple-950/40 hover:bg-purple-900 text-purple-300 hover:text-white rounded-xl transition cursor-pointer"
+                className="p-2 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] rounded-xl transition cursor-pointer border border-[#E9E2FA]"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {settingsSaveSuccess && (
-              <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-xl flex items-center space-x-2">
-                <Check className="w-4 h-4 text-emerald-400" />
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center space-x-2">
+                <Check className="w-4 h-4 text-emerald-600" />
                 <span>{settingsSaveSuccess}</span>
               </div>
             )}
@@ -1801,8 +1816,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
             <div className="space-y-5 text-xs">
               <div className="space-y-2">
                 <div className="flex justify-between font-bold">
-                  <span className="text-purple-200">Customer Options per Service:</span>
-                  <span className="font-mono text-amber-300 font-extrabold">{ownerSettings.optionsCount} Tiers</span>
+                  <span className="text-[#171329]">Customer Options per Service:</span>
+                  <span className="font-mono text-amber-700 font-extrabold">{ownerSettings.optionsCount} Tiers</span>
                 </div>
                 <input
                   type="range"
@@ -1811,14 +1826,14 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   step="1"
                   value={ownerSettings.optionsCount}
                   onChange={(e) => setOwnerSettings(prev => ({ ...prev, optionsCount: Number(e.target.value) }))}
-                  className="w-full accent-purple-500 cursor-pointer"
+                  className="w-full accent-[#7C3AED] cursor-pointer"
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between font-bold">
-                  <span className="text-purple-200">Minimum Baseline Markup (Tier 1):</span>
-                  <span className="font-mono text-emerald-400 font-extrabold">₦{ownerSettings.minMarkup.toLocaleString()}</span>
+                  <span className="text-[#171329]">Minimum Baseline Markup (Tier 1):</span>
+                  <span className="font-mono text-[#047857] font-extrabold">₦{ownerSettings.minMarkup.toLocaleString()}</span>
                 </div>
                 <input
                   type="range"
@@ -1827,14 +1842,14 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   step="50"
                   value={ownerSettings.minMarkup}
                   onChange={(e) => setOwnerSettings(prev => ({ ...prev, minMarkup: Number(e.target.value) }))}
-                  className="w-full accent-emerald-500 cursor-pointer"
+                  className="w-full accent-[#047857] cursor-pointer"
                 />
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between font-bold">
-                  <span className="text-purple-200">Maximum Top-Tier Markup:</span>
-                  <span className="font-mono text-indigo-300 font-extrabold">₦{ownerSettings.maxMarkup.toLocaleString()}</span>
+                  <span className="text-[#171329]">Maximum Top-Tier Markup:</span>
+                  <span className="font-mono text-[#7C3AED] font-extrabold">₦{ownerSettings.maxMarkup.toLocaleString()}</span>
                 </div>
                 <input
                   type="range"
@@ -1843,20 +1858,20 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   step="100"
                   value={ownerSettings.maxMarkup}
                   onChange={(e) => setOwnerSettings(prev => ({ ...prev, maxMarkup: Number(e.target.value) }))}
-                  className="w-full accent-indigo-500 cursor-pointer"
+                  className="w-full accent-[#7C3AED] cursor-pointer"
                 />
               </div>
 
               <div className="space-y-2">
-                <span className="text-purple-200 font-bold block">Pricing Aesthetic Style:</span>
+                <span className="text-[#171329] font-bold block">Pricing Aesthetic Style:</span>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setOwnerSettings(prev => ({ ...prev, pricingStyle: 'natural' }))}
                     className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
                       ownerSettings.pricingStyle === 'natural'
-                        ? 'bg-purple-600 text-white border-purple-400 font-extrabold shadow'
-                        : 'bg-[#170c30] text-purple-300 border-purple-900/40 hover:bg-[#251347]'
+                        ? 'bg-[#7C3AED] text-white border-[#7C3AED] font-bold shadow-sm'
+                        : 'bg-[#F8F7FF] text-[#716B82] border-[#E9E2FA] hover:bg-white hover:text-[#171329]'
                     }`}
                   >
                     <div className="font-bold">Natural / Organic</div>
@@ -1868,8 +1883,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     onClick={() => setOwnerSettings(prev => ({ ...prev, pricingStyle: 'clean' }))}
                     className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
                       ownerSettings.pricingStyle === 'clean'
-                        ? 'bg-purple-600 text-white border-purple-400 font-extrabold shadow'
-                        : 'bg-[#170c30] text-purple-300 border-purple-900/40 hover:bg-[#251347]'
+                        ? 'bg-[#7C3AED] text-white border-[#7C3AED] font-bold shadow-sm'
+                        : 'bg-[#F8F7FF] text-[#716B82] border-[#E9E2FA] hover:bg-white hover:text-[#171329]'
                     }`}
                   >
                     <div className="font-bold">Clean 50s</div>
@@ -1881,8 +1896,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     onClick={() => setOwnerSettings(prev => ({ ...prev, pricingStyle: 'tiered' }))}
                     className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
                       ownerSettings.pricingStyle === 'tiered'
-                        ? 'bg-purple-600 text-white border-purple-400 font-extrabold shadow'
-                        : 'bg-[#170c30] text-purple-300 border-purple-900/40 hover:bg-[#251347]'
+                        ? 'bg-[#7C3AED] text-white border-[#7C3AED] font-bold shadow-sm'
+                        : 'bg-[#F8F7FF] text-[#716B82] border-[#E9E2FA] hover:bg-white hover:text-[#171329]'
                     }`}
                   >
                     <div className="font-bold">Tiered Standard</div>
@@ -1892,11 +1907,11 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-purple-900/40">
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-[#E9E2FA]">
               <button
                 type="button"
                 onClick={() => setIsOwnerSettingsOpen(false)}
-                className="px-4 py-2.5 rounded-xl bg-[#170c30] hover:bg-[#251347] text-purple-300 text-xs font-bold transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#171329] text-xs font-bold transition cursor-pointer border border-[#E9E2FA]"
               >
                 Close
               </button>
@@ -1904,7 +1919,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 type="button"
                 onClick={() => handleSavePricingSettings()}
                 disabled={isSavingSettings}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition cursor-pointer shadow-lg flex items-center space-x-2 disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold transition cursor-pointer shadow-sm flex items-center space-x-2 disabled:opacity-50"
               >
                 {isSavingSettings ? (
                   <>

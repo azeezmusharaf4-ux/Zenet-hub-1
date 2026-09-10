@@ -5,12 +5,16 @@ const getApiKey = (): string => {
   const candidates = [
     process.env.ONEGRIDHUB_API_KEY,
     process.env.ONEGRID_API_KEY,
+    process.env.VITE_ONEGRID_API_KEY,
+    process.env.VITE_ONEGRIDHUB_API_KEY,
     process.env.ONEGRIDHUB_KEY,
     process.env.ONE_GRID_HUB_API_KEY,
     process.env.OGH_API_KEY,
     process.env.SIM_API_KEY,
     process.env.VIRTUAL_NUMBER_API_KEY,
     process.env.SMM_API_KEY,
+    process.env.ONEGRIDHUB_SMM_API_KEY,
+    process.env.VITE_SMM_API_KEY,
     process.env.ONEGRIDHUB_TOKEN,
     process.env.ONEGRIDHUB_SECRET
   ];
@@ -333,7 +337,7 @@ export const handler = async (event: any) => {
               'Authorization': `Bearer ${apiKey}`,
               'User-Agent': 'ZENET-Hub-Gateway/1.0'
             },
-            signal: AbortSignal.timeout(8000)
+            signal: AbortSignal.timeout(15000)
           });
           const data: any = await res.json();
           const rawCountries = Array.isArray(data) ? data : (data?.countries || data?.data || []);
@@ -344,8 +348,8 @@ export const handler = async (event: any) => {
               body: JSON.stringify({ success: true, server, countries: rawCountries, data: rawCountries })
             };
           }
-        } catch (e) {
-          console.warn('[Netlify OneGridHub] Countries API fetch notice:', e);
+        } catch (e: any) {
+          console.log('[Netlify OneGridHub] Countries API notice:', e?.message || e);
         }
       }
 

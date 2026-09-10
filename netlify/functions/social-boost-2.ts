@@ -1,30 +1,5 @@
 import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
-
-// Helper to resolve Provider 2 Social Boost API Key
-const getProvider2SocialApiKey = (): string => {
-  const candidates = [
-    process.env.PROVIDER2_SOCIAL_BOOST_API_KEY,
-    process.env.PROVIDER2_SMM_API_KEY,
-    process.env.SOCIAL_BOOST_2_API_KEY
-  ];
-  for (const c of candidates) {
-    if (c && typeof c === 'string') {
-      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
-      if (clean && clean !== 'undefined' && clean !== 'null' && !clean.startsWith('MY_')) {
-        return clean;
-      }
-    }
-  }
-  return '';
-};
-
-// Helper to resolve Provider 2 Social Boost Base URL
-const getProvider2SocialBaseUrl = (): string => {
-  return (process.env.PROVIDER2_SOCIAL_BOOST_BASE_URL || process.env.PROVIDER2_SMM_BASE_URL || 'https://api.provider2-smm.com/v2')
-    .trim()
-    .replace(/^['"`]|['"`]$/g, '')
-    .replace(/\/+$/, '');
-};
+import { getEstraLogConfig, queryEstraLog } from './_estralog';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,128 +10,263 @@ const CORS_HEADERS = {
 
 const DEFAULT_PROVIDER2_SERVICES = [
   {
-    service: '201',
-    name: 'Instagram Followers [High Quality - Non Drop - Instant]',
+    id: '101',
+    service: '101',
+    name: 'Telegram Channel/Group Members [Non-Drop - High Quality]',
     type: 'Default',
-    category: 'Instagram Followers',
-    rate: 1800,
-    min: 50,
-    max: 100000,
+    category: 'Telegram Members',
+    platform: 'Telegram',
+    rate: 1450,
+    pricePerThousandNgn: 1450,
+    min: 100,
+    max: 50000,
     dripfeed: false,
     refill: true,
     cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Instagram',
+    provider: 'EstraLog Tools High-Speed Pool',
     description: 'Instant start. Refill button active for 30 days.'
   },
   {
-    service: '202',
-    name: 'Instagram Likes [Real Active - 20k/Day - Super Fast]',
+    id: '102',
+    service: '102',
+    name: 'Telegram Post Views [Instant Fast - Lifetime Guarantee]',
+    type: 'Default',
+    category: 'Telegram Post Views',
+    platform: 'Telegram',
+    rate: 450,
+    pricePerThousandNgn: 450,
+    min: 500,
+    max: 100000,
+    dripfeed: true,
+    refill: false,
+    cancel: false,
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'Lightning fast view counter increments.'
+  },
+  {
+    id: '103',
+    service: '103',
+    name: 'Instagram Real Followers [Instant Start - 30 Days Refill]',
+    type: 'Default',
+    category: 'Instagram Followers',
+    platform: 'Instagram',
+    rate: 1950,
+    pricePerThousandNgn: 1950,
+    min: 100,
+    max: 20000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'Real active looking accounts with profile pictures.'
+  },
+  {
+    id: '104',
+    service: '104',
+    name: 'Instagram HQ Likes [Fast Delivery]',
     type: 'Default',
     category: 'Instagram Likes',
-    rate: 450,
-    min: 50,
+    platform: 'Instagram',
+    rate: 750,
+    pricePerThousandNgn: 750,
+    min: 100,
     max: 50000,
     dripfeed: false,
     refill: false,
     cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Instagram',
+    provider: 'EstraLog Tools High-Speed Pool',
     description: 'Fast delivery within 5-10 minutes.'
   },
   {
-    service: '203',
-    name: 'TikTok Followers [Worldwide Real Accounts - Instant]',
+    id: '105',
+    service: '105',
+    name: 'Facebook Page Likes + Followers [Real Global]',
+    type: 'Default',
+    category: 'Facebook Page Likes',
+    platform: 'Facebook',
+    rate: 2200,
+    pricePerThousandNgn: 2200,
+    min: 100,
+    max: 10000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'Permanent page followers and engagements.'
+  },
+  {
+    id: '106',
+    service: '106',
+    name: 'TikTok Active Followers [Organic Quality]',
     type: 'Default',
     category: 'TikTok Followers',
-    rate: 2200,
+    platform: 'TikTok',
+    rate: 2400,
+    pricePerThousandNgn: 2400,
     min: 100,
     max: 50000,
     dripfeed: false,
     refill: true,
     cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'TikTok',
+    provider: 'EstraLog Tools High-Speed Pool',
     description: 'High retention accounts, zero drop.'
   },
   {
-    service: '204',
-    name: 'TikTok FYP Video Views [Algorithm Trigger - Instant]',
+    id: '107',
+    service: '107',
+    name: 'TikTok FYP Likes [Instant Fast]',
     type: 'Default',
-    category: 'TikTok Views',
-    rate: 150,
-    min: 500,
-    max: 1000000,
+    category: 'TikTok Likes & Views',
+    platform: 'TikTok',
+    rate: 650,
+    pricePerThousandNgn: 650,
+    min: 200,
+    max: 100000,
     dripfeed: true,
     refill: false,
     cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'TikTok',
+    provider: 'EstraLog Tools High-Speed Pool',
     description: 'Boosts video ranking and algorithm discovery.'
   },
   {
-    service: '205',
-    name: 'YouTube Views [High Retention - Monetizable]',
+    id: '108',
+    service: '108',
+    name: 'YouTube Channel Subscribers [Monetizable]',
     type: 'Default',
-    category: 'YouTube Views',
-    rate: 3100,
-    min: 500,
-    max: 500000,
+    category: 'YouTube Subscribers',
+    platform: 'YouTube',
+    rate: 6800,
+    pricePerThousandNgn: 6800,
+    min: 50,
+    max: 5000,
     dripfeed: true,
     refill: true,
     cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'YouTube',
+    provider: 'EstraLog Tools High-Speed Pool',
     description: 'Real audience watch time, safe for monetized channels.'
   },
   {
-    service: '206',
-    name: 'Telegram Channel Members [Non Drop - 0% Drop Rate]',
-    type: 'Default',
-    category: 'Telegram Members',
-    rate: 1650,
-    min: 50,
-    max: 200000,
-    dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Telegram',
-    description: 'High quality channel subscribers.'
-  },
-  {
-    service: '207',
-    name: 'Twitter / X Followers [Organic Looking - Instant]',
+    id: '109',
+    service: '109',
+    name: 'Twitter / X High Quality Followers',
     type: 'Default',
     category: 'Twitter Followers',
-    rate: 2800,
+    platform: 'Twitter',
+    rate: 3200,
+    pricePerThousandNgn: 3200,
     min: 100,
-    max: 50000,
+    max: 10000,
     dripfeed: false,
     refill: true,
     cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Twitter',
+    provider: 'EstraLog Tools High-Speed Pool',
     description: 'Verified appearance, stable profiles.'
   },
   {
-    service: '208',
-    name: 'Facebook Page Likes & Followers [High Quality]',
+    id: '110',
+    service: '110',
+    name: 'Discord Server Members [Online Active]',
     type: 'Default',
-    category: 'Facebook Page Likes',
-    rate: 1950,
+    category: 'Discord Members',
+    platform: 'Discord',
+    rate: 3500,
+    pricePerThousandNgn: 3500,
     min: 100,
-    max: 50000,
+    max: 10000,
     dripfeed: false,
     refill: true,
     cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Facebook',
-    description: 'Permanent page followers and engagements.'
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'Active looking Discord members with online presence.'
+  },
+  {
+    id: '111',
+    service: '111',
+    name: 'LinkedIn Connections & Followers',
+    type: 'Default',
+    category: 'LinkedIn Connections',
+    platform: 'LinkedIn',
+    rate: 5400,
+    pricePerThousandNgn: 5400,
+    min: 50,
+    max: 5000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'Corporate professional profiles for LinkedIn networking.'
+  },
+  {
+    id: '112',
+    service: '112',
+    name: 'Spotify Track Plays [Royalty Eligible]',
+    type: 'Default',
+    category: 'Spotify Plays',
+    platform: 'Spotify',
+    rate: 950,
+    pricePerThousandNgn: 950,
+    min: 500,
+    max: 50000,
+    dripfeed: true,
+    refill: false,
+    cancel: false,
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'Streams counted towards Spotify discovery algorithm.'
+  },
+  {
+    id: '113',
+    service: '113',
+    name: 'Snapchat Public Profile Followers',
+    type: 'Default',
+    category: 'Snapchat Followers',
+    platform: 'Snapchat',
+    rate: 3800,
+    pricePerThousandNgn: 3800,
+    min: 100,
+    max: 10000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'Followers for public Snapchat profiles.'
+  },
+  {
+    id: '114',
+    service: '114',
+    name: 'Global Website Visitors [Organic Direct]',
+    type: 'Default',
+    category: 'Website Traffic',
+    platform: 'Website',
+    rate: 850,
+    pricePerThousandNgn: 850,
+    min: 1000,
+    max: 500000,
+    dripfeed: true,
+    refill: false,
+    cancel: false,
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'High retention web traffic from global desktop & mobile.'
+  },
+  {
+    id: '115',
+    service: '115',
+    name: 'Multi-Network Social Growth & Engagement Boost',
+    type: 'Default',
+    category: 'Special Growth',
+    platform: 'Other',
+    rate: 2100,
+    pricePerThousandNgn: 2100,
+    min: 100,
+    max: 20000,
+    dripfeed: false,
+    refill: true,
+    cancel: true,
+    provider: 'EstraLog Tools High-Speed Pool',
+    description: 'Cross-platform engagement package.'
   }
 ];
 
-export const handler = async (event: any, context: any) => {
+export const handler = async (event: any) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ ok: true }) };
   }
@@ -173,10 +283,9 @@ export const handler = async (event: any, context: any) => {
 
   const pathParts = (event.path || '').split('/').filter(Boolean);
   const lastPart = pathParts[pathParts.length - 1];
-  const action = queryParams.action || body.action || (lastPart !== 'social-boost-2' ? lastPart : '') || 'services';
+  const action = (queryParams.action || body.action || (lastPart !== 'social-boost-2' ? lastPart : '') || 'services').toLowerCase();
 
-  const apiKey = getProvider2SocialApiKey();
-  const baseUrl = getProvider2SocialBaseUrl();
+  const { apiKey } = getEstraLogConfig();
   const db = getDb();
 
   try {
@@ -214,7 +323,7 @@ export const handler = async (event: any, context: any) => {
         headers: CORS_HEADERS,
         body: JSON.stringify({
           success: true,
-          provider: 'Provider 2',
+          provider: 'EstraLog Tools',
           hasApiKey: Boolean(apiKey),
           services,
           pricingSettings
@@ -222,13 +331,13 @@ export const handler = async (event: any, context: any) => {
       };
     }
 
-    // 2. PLACE ORDER (With Firestore Wallet escrow check & deduction)
+    // 2. PLACE ORDER
     if (action === 'order') {
       const userId = body.userId || queryParams.userId;
-      const totalCost = Number(body.totalCost || 0);
-      const serviceId = String(body.service);
-      const link = body.link;
-      const quantity = Number(body.quantity);
+      const totalCost = Number(body.totalCost || body.amountNgn || 0);
+      const serviceId = String(body.service || body.serviceId || '');
+      const link = (body.link || body.target || body.targetUrl || '').toString().trim();
+      const quantity = Number(body.quantity || 0);
 
       if (!userId) {
         return {
@@ -242,7 +351,23 @@ export const handler = async (event: any, context: any) => {
         return {
           statusCode: 400,
           headers: CORS_HEADERS,
-          body: JSON.stringify({ success: false, error: 'Target link or username is required.' })
+          body: JSON.stringify({ success: false, error: 'Target link or profile URL is required.' })
+        };
+      }
+
+      if (!serviceId || quantity <= 0) {
+        return {
+          statusCode: 400,
+          headers: CORS_HEADERS,
+          body: JSON.stringify({ success: false, error: 'Valid service and quantity are required.' })
+        };
+      }
+
+      if (totalCost <= 0) {
+        return {
+          statusCode: 400,
+          headers: CORS_HEADERS,
+          body: JSON.stringify({ success: false, error: 'Invalid total order cost.' })
         };
       }
 
@@ -255,33 +380,82 @@ export const handler = async (event: any, context: any) => {
       }
 
       const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      if (!userDoc.exists()) {
+        return {
+          statusCode: 404,
+          headers: CORS_HEADERS,
+          body: JSON.stringify({ success: false, error: 'User profile not found.' })
+        };
+      }
+
+      const userData = userDoc.data();
+      const currentBalance = userData.walletBalance || 0;
+      if (currentBalance < totalCost) {
+        return {
+          statusCode: 400,
+          headers: CORS_HEADERS,
+          body: JSON.stringify({
+            success: false,
+            error: `Insufficient wallet balance (₦${currentBalance.toLocaleString()}). Required: ₦${totalCost.toLocaleString()}`
+          })
+        };
+      }
+
+      // Query live EstraLog Tools smm_order endpoint if available
+      let upstreamOrderId: string | null = null;
+      if (apiKey) {
+        try {
+          const upstreamRes = await queryEstraLog('smm_order', {
+            service: serviceId,
+            link,
+            quantity
+          }, 'POST');
+
+          if (upstreamRes) {
+            if (upstreamRes.status === 'success' && (upstreamRes.order || upstreamRes.order_id)) {
+              upstreamOrderId = String(upstreamRes.order || upstreamRes.order_id);
+            } else if (upstreamRes.status === 'error') {
+              const upstreamMsg = upstreamRes.message || 'Upstream provider error';
+              const upstreamCode = upstreamRes.code ? ` (${upstreamRes.code})` : '';
+              return {
+                statusCode: 400,
+                headers: CORS_HEADERS,
+                body: JSON.stringify({
+                  success: false,
+                  error: `EstraLog Tools response: ${upstreamMsg}${upstreamCode}. Your wallet balance was not charged.`
+                })
+              };
+            }
+          }
+        } catch (err: any) {
+          console.warn('[EstraLog Tools smm_order notice]:', err.message);
+        }
+      }
+
       const orderId = `SB2-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
 
+      // Execute atomic wallet deduction and order registration
       await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) {
-          throw new Error('User profile not found.');
+        const uSnap = await transaction.get(userRef);
+        if (!uSnap.exists()) throw new Error('User profile not found.');
+        const uBal = uSnap.data().walletBalance || 0;
+        if (uBal < totalCost) {
+          throw new Error(`Insufficient wallet balance (₦${uBal.toLocaleString()}). Required: ₦${totalCost.toLocaleString()}`);
         }
 
-        const userData = userDoc.data();
-        const currentBalance = userData.walletBalance || 0;
-
-        if (currentBalance < totalCost) {
-          throw new Error(`Insufficient wallet balance (₦${currentBalance.toLocaleString()}). Required: ₦${totalCost.toLocaleString()}`);
-        }
-
-        const newBalance = currentBalance - totalCost;
         transaction.update(userRef, {
-          walletBalance: newBalance,
+          walletBalance: uBal - totalCost,
           updatedAt: new Date().toISOString()
         });
 
         const orderDocRef = doc(db, 'orders_social_boost_2', orderId);
         const orderRecord = {
           orderId,
+          providerOrderId: upstreamOrderId,
           userId,
           userEmail: body.userEmail || userData.email || '',
-          provider: 'Provider 2',
+          provider: 'EstraLog Tools',
           service: serviceId,
           serviceName: body.serviceName || `Service #${serviceId}`,
           category: body.category || 'Growth',
@@ -306,9 +480,10 @@ export const handler = async (event: any, context: any) => {
         headers: CORS_HEADERS,
         body: JSON.stringify({
           success: true,
-          provider: 'Provider 2',
-          message: 'Social Boost 2 order submitted successfully.',
+          provider: 'EstraLog Tools',
+          message: 'Social Boost order submitted successfully.',
           orderId,
+          providerOrderId: upstreamOrderId,
           order: placedOrder
         })
       };
@@ -335,14 +510,33 @@ export const handler = async (event: any, context: any) => {
         };
       }
 
+      const orderData = snap.data();
+
+      // Check live upstream status if providerOrderId exists
+      if (orderData.providerOrderId && apiKey) {
+        try {
+          const upstreamStatus = await queryEstraLog('smm_status', { order: orderData.providerOrderId });
+          if (upstreamStatus && upstreamStatus.status === 'success' && upstreamStatus.state) {
+            await updateDoc(orderRef, {
+              status: upstreamStatus.state,
+              remains: upstreamStatus.remains !== undefined ? upstreamStatus.remains : orderData.remains,
+              updatedAt: new Date().toISOString()
+            });
+            orderData.status = upstreamStatus.state;
+          }
+        } catch (err: any) {
+          console.warn('[EstraLog smm_status check notice]:', err.message);
+        }
+      }
+
       return {
         statusCode: 200,
         headers: CORS_HEADERS,
         body: JSON.stringify({
           success: true,
-          provider: 'Provider 2',
-          status: snap.data().status,
-          order: snap.data()
+          provider: 'EstraLog Tools',
+          status: orderData.status,
+          order: orderData
         })
       };
     }
@@ -386,7 +580,7 @@ export const handler = async (event: any, context: any) => {
         headers: CORS_HEADERS,
         body: JSON.stringify({
           success: true,
-          provider: 'Provider 2',
+          provider: 'EstraLog Tools',
           orders: ordersList
         })
       };
@@ -408,7 +602,7 @@ export const handler = async (event: any, context: any) => {
         return {
           statusCode: 200,
           headers: CORS_HEADERS,
-          body: JSON.stringify({ success: true, message: 'Provider 2 pricing settings updated.' })
+          body: JSON.stringify({ success: true, message: 'EstraLog Tools pricing settings updated.' })
         };
       } else {
         let pricingSettings = {
@@ -433,15 +627,15 @@ export const handler = async (event: any, context: any) => {
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ success: true, provider: 'Provider 2', message: 'Social Boost 2 Ready' })
+      body: JSON.stringify({ success: true, provider: 'EstraLog Tools', message: 'EstraLog Tools Boost Ready' })
     };
 
   } catch (err: any) {
-    console.error('[Provider 2 Social Boost Error]:', err);
+    console.error('[EstraLog Tools Social Boost Error]:', err);
     return {
       statusCode: 500,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ success: false, error: err.message || 'Internal Provider 2 error' })
+      body: JSON.stringify({ success: false, error: err.message || 'Internal EstraLog Tools error' })
     };
   }
 };

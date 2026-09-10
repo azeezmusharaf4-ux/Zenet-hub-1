@@ -31,7 +31,8 @@ import {
   Inbox,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react';
 import { UserProfile, SupportTicket, TicketMessage } from '../types';
 
@@ -41,6 +42,7 @@ interface SupportViewProps {
   isOwner?: boolean;
   isAdmin?: boolean;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
+  onBackToMarketplace?: () => void;
 }
 
 export const SupportView: React.FC<SupportViewProps> = ({
@@ -48,7 +50,8 @@ export const SupportView: React.FC<SupportViewProps> = ({
   userProfile,
   isOwner = false,
   isAdmin = false,
-  onOpenAuth
+  onOpenAuth,
+  onBackToMarketplace
 }) => {
   const effectiveIsOwner = isOwner || userProfile?.role === 'owner' || user?.email === 'azeezmusharaf4@gmail.com';
   const effectiveIsAdmin = isAdmin || effectiveIsOwner || userProfile?.role === 'admin';
@@ -260,6 +263,21 @@ export const SupportView: React.FC<SupportViewProps> = ({
       
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-purple-950/90 via-[#170a33] to-indigo-950/90 border border-[#381d6d] p-6 sm:p-8 rounded-3xl space-y-3 shadow-2xl relative overflow-hidden">
+        {onBackToMarketplace && (
+          <button
+            type="button"
+            onClick={() => {
+              window.scrollTo({ top: 0, behavior: 'instant' });
+              onBackToMarketplace();
+            }}
+            className="inline-flex items-center gap-2 text-purple-300 hover:text-white font-extrabold text-xs transition bg-[#170c30] px-4 py-2 rounded-xl border border-purple-900/40 cursor-pointer shadow-sm relative z-10 active:scale-95"
+            title="Back to Marketplace"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Marketplace</span>
+          </button>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-3 relative z-10">
           <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
             <HelpCircle className="w-3.5 h-3.5 text-purple-400" />

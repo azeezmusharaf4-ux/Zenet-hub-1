@@ -1712,8 +1712,8 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
             </div>
 
             {uploadingImage && (
-              <div className="text-[11px] text-cyan-400 animate-pulse bg-cyan-950/20 border border-cyan-800/30 p-2 rounded-xl flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <div className="text-[11px] text-cyan-400 bg-cyan-950/20 border border-cyan-800/30 p-2 rounded-xl flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0 shadow-sm" />
                 <span>Uploading screenshots to Firebase Storage...</span>
               </div>
             )}

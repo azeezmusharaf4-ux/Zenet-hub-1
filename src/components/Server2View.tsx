@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Phone, 
   Rocket, 
@@ -12,6 +12,7 @@ import {
   Copy, 
   Check, 
   AlertTriangle, 
+  AlertCircle,
   CheckCircle2, 
   Loader2, 
   ShieldCheck, 
@@ -31,7 +32,11 @@ import {
   Sparkles,
   Link2,
   Hash,
-  ArrowRight
+  ArrowRight,
+  Cpu,
+  PhoneCall,
+  Flame,
+  Wrench
 } from 'lucide-react';
 import { UserProfile, SocialBoostService, SocialBoostOrder, SocialBoostPricingSettings } from '../types';
 import { auth, getSafeIdToken } from '../lib/firebase';
@@ -41,11 +46,13 @@ export type Server2Page = 'front' | 'buy-numbers' | 'boost-accounts';
 
 interface Server2ViewProps {
   initialPage?: Server2Page;
+  hideSwitcherTabs?: boolean;
   userProfile: UserProfile | null;
   walletBalance: number;
   onRefreshProfile?: () => Promise<void>;
   onBackToMarketplace: () => void;
   onOpenWallet: () => void;
+  onSwitchToServer1?: () => void;
 }
 
 interface ServiceNumber2Server {
@@ -148,14 +155,29 @@ const SMM_PLATFORMS: PlatformItem[] = [
 
 export const Server2View: React.FC<Server2ViewProps> = ({
   initialPage = 'front',
+  hideSwitcherTabs = false,
   userProfile,
   walletBalance,
   onRefreshProfile,
   onBackToMarketplace,
-  onOpenWallet
+  onOpenWallet,
+  onSwitchToServer1
 }) => {
   // Navigation between the 3 views
   const [currentPage, setCurrentPage] = useState<Server2Page>(initialPage);
+
+  // Synchronize currentPage if initialPage prop changes
+  useEffect(() => {
+    if (initialPage) {
+      setCurrentPage(initialPage);
+    }
+  }, [initialPage]);
+
+  // Global helper to return to marketplace and scroll to the top
+  const handleBackToMarket = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    onBackToMarketplace();
+  };
 
   // General Notification messages
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -181,24 +203,29 @@ export const Server2View: React.FC<Server2ViewProps> = ({
   // =========================================================================
   const [activeTab, setActiveTab] = useState<'usa' | 'all'>('usa');
   const [servers, setServers] = useState<ServiceNumber2Server[]>([
-    { id: 'usa1', name: 'Server 1 - Instant Carrier Direct' },
-    { id: 'usa2', name: 'Server 2 - Express Gateway' },
-    { id: 'usa3', name: 'Server 3 - High Resilience' },
+    { id: 'usa1', name: 'USA 1' },
+    { id: 'usa2', name: 'USA 2' },
   ]);
   const [selectedServer, setSelectedServer] = useState<string>('usa1');
 
   const [countries, setCountries] = useState<ServiceNumber2Country[]>([]);
   const [countriesLoading, setCountriesLoading] = useState<boolean>(false);
-  const [selectedCountry, setSelectedCountry] = useState<string>('187'); // Default USA or popular
+  const [selectedCountry, setSelectedCountry] = useState<string>('187');
 
   const [services, setServices] = useState<ServiceNumber2Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState<boolean>(false);
   const [selectedService, setSelectedService] = useState<string>('');
 
   const [priceOptions, setPriceOptions] = useState<ServiceNumber2PriceOption[]>([]);
-  const [selectedOptionId, setSelectedOptionId] = useState<string>('standard');
-  const [calculatedPrice, setCalculatedPrice] = useState<number>(1200);
+  const [selectedOptionId, setSelectedOptionId] = useState<string>('opt_1');
+  const selectedOptionIdRef = useRef<string>(selectedOptionId);
+  useEffect(() => {
+    selectedOptionIdRef.current = selectedOptionId;
+  }, [selectedOptionId]);
+  const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
   const [pricesLoading, setPricesLoading] = useState<boolean>(false);
+  const [isServiceInStock, setIsServiceInStock] = useState<boolean>(false);
+  const [stockMessage, setStockMessage] = useState<string>('');
 
   // Modals for Buy Numbers
   const [isCountryModalOpen, setIsCountryModalOpen] = useState<boolean>(false);
@@ -217,139 +244,146 @@ export const Server2View: React.FC<Server2ViewProps> = ({
   const [smsContent, setSmsContent] = useState<string>('');
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
-  // Load Countries for Buy Numbers
-  const fetchCountries = useCallback(async () => {
+  // Load Countries for Buy Numbers directly from live Extra Log Tools API
+  const fetchCountries = useCallback(async (serverToUse: string, tabToUse: 'usa' | 'all') => {
     setCountriesLoading(true);
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch(`/api/service-number-2/countries?server=${encodeURIComponent(selectedServer)}&tab=${activeTab}`, {
+      const data: any = await safeApiFetch(`/api/service-number-2/countries?server=${encodeURIComponent(serverToUse)}&tab=${tabToUse}`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
-      const data = await res.json();
-      if (data.countries && Array.isArray(data.countries) && data.countries.length > 0) {
+      if (data && data.success && Array.isArray(data.countries) && data.countries.length > 0) {
         setCountries(data.countries);
-        if (!selectedCountry || activeTab === 'usa') {
-          const usa = data.countries.find((c: any) => c.code === 'US' || c.id === '187' || c.name.toLowerCase().includes('united states'));
-          setSelectedCountry(usa?.id || data.countries[0].id);
-        }
+        setSelectedCountry((prev) => {
+          if (tabToUse === 'usa') {
+            const usa = data.countries.find((c: any) => c.code === 'US' || c.id === '187' || c.name?.toLowerCase().includes('united states'));
+            return usa?.id || data.countries[0]?.id || '187';
+          }
+          if (prev && data.countries.some((c: any) => c.id === prev)) {
+            return prev;
+          }
+          const defaultCountry = data.countries.find((c: any) => c.name?.toLowerCase().includes('united states') || c.id === '187') || data.countries[0];
+          return defaultCountry?.id || '';
+        });
       } else {
-        // Fallback robust country list
-        setCountries([
-          { id: '187', name: 'United States', code: 'US', flag: '🇺🇸' },
-          { id: '1', name: 'United Kingdom', code: 'GB', flag: '🇬🇧' },
-          { id: '2', name: 'Canada', code: 'CA', flag: '🇨🇦' },
-          { id: '3', name: 'Germany', code: 'DE', flag: '🇩🇪' },
-          { id: '4', name: 'France', code: 'FR', flag: '🇫🇷' },
-          { id: '5', name: 'Nigeria', code: 'NG', flag: '🇳🇬' },
-          { id: '6', name: 'South Africa', code: 'ZA', flag: '🇿🇦' },
-          { id: '7', name: 'Kenya', code: 'KE', flag: '🇰🇪' },
-          { id: '8', name: 'Ghana', code: 'GH', flag: '🇬🇭' },
-          { id: '9', name: 'India', code: 'IN', flag: '🇮🇳' },
-          { id: '10', name: 'Brazil', code: 'BR', flag: '🇧🇷' },
-          { id: '11', name: 'Russia', code: 'RU', flag: '🇷🇺' },
-          { id: '12', name: 'Indonesia', code: 'ID', flag: '🇮🇩' },
-          { id: '13', name: 'Netherlands', code: 'NL', flag: '🇳🇱' },
-          { id: '14', name: 'Australia', code: 'AU', flag: '🇦🇺' },
-          { id: '15', name: 'Spain', code: 'ES', flag: '🇪🇸' },
-        ]);
+        setCountries([]);
+        setSelectedCountry(tabToUse === 'usa' ? '187' : '');
+        if (data && data.error) {
+          setErrorMessage(`Extra Log Tools: ${data.error}`);
+        }
       }
-    } catch {
-      setCountries([
-        { id: '187', name: 'United States', code: 'US', flag: '🇺🇸' },
-        { id: '1', name: 'United Kingdom', code: 'GB', flag: '🇬🇧' },
-        { id: '2', name: 'Canada', code: 'CA', flag: '🇨🇦' },
-        { id: '5', name: 'Nigeria', code: 'NG', flag: '🇳🇬' },
-      ]);
+    } catch (err: any) {
+      setCountries([]);
+      setSelectedCountry(tabToUse === 'usa' ? '187' : '');
+      setErrorMessage(`Extra Log Tools connection error: ${err.message}`);
     } finally {
       setCountriesLoading(false);
     }
-  }, [selectedServer, selectedCountry, activeTab]);
+  }, []);
 
-  // Load Services for Buy Numbers
-  const fetchServices = useCallback(async () => {
-    if (!selectedCountry) return;
+  // Load Services for Buy Numbers directly from live Extra Log Tools API
+  const fetchServices = useCallback(async (serverToUse: string, countryToUse: string, tabToUse: 'usa' | 'all') => {
+    if (!countryToUse) {
+      setServices([]);
+      setSelectedService('');
+      return;
+    }
     setServicesLoading(true);
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch(`/api/service-number-2/services?server=${encodeURIComponent(selectedServer)}&country=${encodeURIComponent(selectedCountry)}&tab=${activeTab}`, {
+      const data: any = await safeApiFetch(`/api/service-number-2/services?server=${encodeURIComponent(serverToUse)}&country=${encodeURIComponent(countryToUse)}&tab=${tabToUse}`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
-      const data = await res.json();
-      if (data.services && Array.isArray(data.services) && data.services.length > 0) {
+      if (data && data.success && Array.isArray(data.services) && data.services.length > 0) {
         setServices(data.services);
-        if (!selectedService) {
-          setSelectedService(data.services[0].id);
-        }
+        setSelectedService((prev) => {
+          if (prev && data.services.some((s: any) => s.id === prev)) return prev;
+          const popular = data.services.find((s: any) => {
+            const n = (s.name || '').toLowerCase();
+            return n.includes('whatsapp') || n.includes('telegram') || n.includes('google') || n.includes('openai');
+          }) || data.services[0];
+          return popular?.id || '';
+        });
       } else {
-        setServices([
-          { id: 'whatsapp', name: 'WhatsApp', code: 'whatsapp' },
-          { id: 'telegram', name: 'Telegram', code: 'telegram' },
-          { id: 'google', name: 'Google / Gmail / YouTube', code: 'google' },
-          { id: 'instagram', name: 'Instagram', code: 'instagram' },
-          { id: 'facebook', name: 'Facebook', code: 'facebook' },
-          { id: 'tiktok', name: 'TikTok', code: 'tiktok' },
-          { id: 'x', name: 'Twitter / X', code: 'x' },
-          { id: 'discord', name: 'Discord', code: 'discord' },
-          { id: 'netflix', name: 'Netflix', code: 'netflix' },
-          { id: 'other', name: 'Any Other Service', code: 'other' }
-        ]);
-        if (!selectedService) setSelectedService('whatsapp');
+        setServices([]);
+        setSelectedService('');
+        if (data && data.error) {
+          setStockMessage(`Extra Log Tools: ${data.error}`);
+        }
       }
-    } catch {
-      setServices([
-        { id: 'whatsapp', name: 'WhatsApp', code: 'whatsapp' },
-        { id: 'telegram', name: 'Telegram', code: 'telegram' },
-        { id: 'google', name: 'Google / Gmail', code: 'google' },
-        { id: 'other', name: 'Any Other Service', code: 'other' }
-      ]);
-      if (!selectedService) setSelectedService('whatsapp');
+    } catch (err: any) {
+      setServices([]);
+      setSelectedService('');
+      setStockMessage(`Extra Log Tools connection error: ${err.message}`);
     } finally {
       setServicesLoading(false);
     }
-  }, [selectedCountry, selectedServer, selectedService, activeTab]);
+  }, []);
 
-  // Load Prices for selected service
-  const fetchPrices = useCallback(async () => {
-    if (!selectedCountry || !selectedService) return;
+  // Load Prices for selected service directly from live Extra Log Tools API
+  const fetchPrices = useCallback(async (serverToUse: string, countryToUse: string, serviceToUse: string, tabToUse: 'usa' | 'all') => {
+    if (!countryToUse || !serviceToUse) {
+      setIsServiceInStock(false);
+      setStockMessage('');
+      setPriceOptions([]);
+      setCalculatedPrice(0);
+      return;
+    }
     setPricesLoading(true);
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch(
-        `/api/service-number-2/prices?server=${encodeURIComponent(selectedServer)}&country=${encodeURIComponent(selectedCountry)}&service=${encodeURIComponent(selectedService)}&tab=${activeTab}`,
+      const data: any = await safeApiFetch(
+        `/api/service-number-2/prices?server=${encodeURIComponent(serverToUse)}&country=${encodeURIComponent(countryToUse)}&service=${encodeURIComponent(serviceToUse)}&tab=${tabToUse}`,
         { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } }
       );
-      const data = await res.json();
-      if (data.options && Array.isArray(data.options) && data.options.length > 0) {
+      if (data && data.success && data.inStock && Array.isArray(data.options) && data.options.length > 0) {
+        setIsServiceInStock(true);
+        setStockMessage('');
         setPriceOptions(data.options);
-        const sel = data.options.find((o: any) => o.optionId === selectedOptionId) || data.options[0];
-        setCalculatedPrice(sel.customerPrice || 1200);
+        const sel = data.options.find((o: any) => o.optionId === selectedOptionIdRef.current) || data.options[0];
+        if (sel) {
+          setSelectedOptionId(sel.optionId);
+          setCalculatedPrice(sel.customerPrice || 1200);
+        }
       } else {
-        const fallbackOptions: ServiceNumber2PriceOption[] = [
-          { optionId: 'opt_1', carrierTier: 'Carrier Route 1 (Standard)', successRate: '96%', costInNgn: 800, customerPrice: 1200 },
-          { optionId: 'opt_2', carrierTier: 'Carrier Route 2 (Fast Delivery)', successRate: '99%', costInNgn: 1100, customerPrice: 1650, isPopular: true },
-          { optionId: 'opt_3', carrierTier: 'Carrier Route 3 (VIP Direct)', successRate: '99.8%', costInNgn: 1400, customerPrice: 2100 }
-        ];
-        setPriceOptions(fallbackOptions);
-        setCalculatedPrice(1200);
+        setIsServiceInStock(false);
+        const providerNotice = data?.error || data?.message || 'Service currently unavailable from Extra Log Tools on this server.';
+        setStockMessage(providerNotice);
+        setPriceOptions([]);
+        setCalculatedPrice(0);
       }
-    } catch {
-      setCalculatedPrice(1200);
+    } catch (err: any) {
+      setIsServiceInStock(false);
+      setStockMessage(`Extra Log Tools price error: ${err.message}`);
+      setPriceOptions([]);
+      setCalculatedPrice(0);
     } finally {
       setPricesLoading(false);
     }
-  }, [selectedCountry, selectedService, selectedServer, selectedOptionId, activeTab]);
+  }, []);
 
   useEffect(() => {
-    fetchCountries();
-  }, [fetchCountries]);
+    fetchCountries(selectedServer, activeTab);
+  }, [selectedServer, activeTab, fetchCountries]);
 
   useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+    if (selectedCountry) {
+      fetchServices(selectedServer, selectedCountry, activeTab);
+    } else {
+      setServices([]);
+      setSelectedService('');
+    }
+  }, [selectedServer, selectedCountry, activeTab, fetchServices]);
 
   useEffect(() => {
-    fetchPrices();
-  }, [fetchPrices]);
+    if (selectedCountry && selectedService) {
+      fetchPrices(selectedServer, selectedCountry, selectedService, activeTab);
+    } else {
+      setIsServiceInStock(false);
+      setPriceOptions([]);
+      setCalculatedPrice(0);
+    }
+  }, [selectedServer, selectedCountry, selectedService, activeTab, fetchPrices]);
 
   // Polling SMS timer & status
   useEffect(() => {
@@ -359,15 +393,18 @@ export const Server2View: React.FC<Server2ViewProps> = ({
         setElapsedSeconds((prev) => prev + 2);
         try {
           const token = await getSafeIdToken(auth.currentUser);
-          const res = await safeApiFetch(`/api/service-number-2/sms?orderId=${encodeURIComponent(activeNumberOrder.orderId)}`, {
+          const data: any = await safeApiFetch(`/api/service-number-2/sms?orderId=${encodeURIComponent(activeNumberOrder.orderId)}`, {
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
           });
-          const data = await res.json();
-          if (data.status === 'SMS_RECEIVED' || data.code) {
+          if (data && (data.status === 'SMS_RECEIVED' || data.code)) {
             setPollingStatus('RECEIVED');
             setVerificationCode(data.code || '');
             setSmsContent(data.smsText || data.fullSms || '');
             setInfoMessage('SMS Verification Code Received!');
+          } else if (data && data.status === 'CANCELLED') {
+            setPollingStatus('CANCELLED');
+            setErrorMessage('Order cancelled by provider. Full refund credited to your wallet.');
+            setActiveNumberOrder(null);
           }
         } catch {
           // Keep polling smoothly
@@ -377,12 +414,16 @@ export const Server2View: React.FC<Server2ViewProps> = ({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [activeNumberOrder, pollingStatus]);
+  }, [activeNumberOrder?.orderId, pollingStatus]);
 
-  // Buy Number Action
+  // Buy Number Action directly through Extra Log Tools live endpoint
   const handleBuyNumber = async () => {
     if (!selectedCountry || !selectedService) {
       setErrorMessage('Please select both Country and Service first.');
+      return;
+    }
+    if (!isServiceInStock) {
+      setErrorMessage(stockMessage || 'This service is currently unavailable on this server.');
       return;
     }
     if (walletBalance < calculatedPrice) {
@@ -394,7 +435,7 @@ export const Server2View: React.FC<Server2ViewProps> = ({
     setErrorMessage('');
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch('/api/service-number-2/buy', {
+      const data: any = await safeApiFetch('/api/service-number-2/buy', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -407,24 +448,29 @@ export const Server2View: React.FC<Server2ViewProps> = ({
           tab: activeTab,
           country: selectedCountry,
           service: selectedService,
+          countryName: selectedCountryObj?.name || '',
+          serviceName: selectedServiceObj?.name || '',
           optionId: selectedOptionId,
           amount: calculatedPrice,
           price: calculatedPrice
         })
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to allocate number from XtraLogsTools');
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || data?.message || 'Failed to allocate live number from Extra Log Tools');
       }
 
-      const allocatedPhone = data.order?.phoneNumber || data.phoneNumber || '+1 (555) 000-0000';
+      const allocatedPhone = data.order?.phoneNumber || data.phoneNumber;
+      if (!allocatedPhone) {
+        throw new Error(data.error || 'Extra Log Tools did not return an allocated number.');
+      }
       const allocatedOrderId = data.orderId || data.order?.orderId || `XTRA-${Date.now()}`;
 
       setActiveNumberOrder({
         orderId: allocatedOrderId,
         phoneNumber: allocatedPhone,
-        service: selectedService,
-        country: selectedCountry,
+        service: selectedServiceObj?.name || selectedService,
+        country: selectedCountryObj?.name || selectedCountry,
         amount: calculatedPrice,
         status: 'ACTIVE'
       });
@@ -447,7 +493,7 @@ export const Server2View: React.FC<Server2ViewProps> = ({
     setCancellingNumberLoading(true);
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch('/api/service-number-2/cancel', {
+      const data: any = await safeApiFetch('/api/service-number-2/cancel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -455,9 +501,8 @@ export const Server2View: React.FC<Server2ViewProps> = ({
         },
         body: JSON.stringify({ orderId: activeNumberOrder.orderId })
       });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Could not cancel number');
+      if (!data || data.error || !data.success) {
+        throw new Error(data?.error || 'Could not cancel number');
       }
       setInfoMessage('Order cancelled. 100% full refund has been credited to your wallet balance.');
       setActiveNumberOrder(null);
@@ -474,11 +519,10 @@ export const Server2View: React.FC<Server2ViewProps> = ({
   const fetchNumberOrders = async () => {
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch('/api/service-number-2/orders', {
+      const data: any = await safeApiFetch('/api/service-number-2/orders', {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
-      const data = await res.json();
-      if (data.orders && Array.isArray(data.orders)) {
+      if (data && data.orders && Array.isArray(data.orders)) {
         setNumberOrders(data.orders);
       }
     } catch {
@@ -500,26 +544,28 @@ export const Server2View: React.FC<Server2ViewProps> = ({
   const [smmOrderingLoading, setSmmOrderingLoading] = useState<boolean>(false);
   const [isBoostHistoryOpen, setIsBoostHistoryOpen] = useState<boolean>(false);
   const [boostOrders, setBoostOrders] = useState<SocialBoostOrder[]>([]);
-  const [refreshingBoostOrderId, setRefreshingBoostOrderId] = useState<string | null>(null);
-  const [refillingBoostOrderId, setRefillingBoostOrderId] = useState<string | null>(null);
-  const [cancellingBoostOrderId, setCancellingBoostOrderId] = useState<string | null>(null);
-  const [boostActionFeedback, setBoostActionFeedback] = useState<{ orderId: string; text: string; isError?: boolean } | null>(null);
 
   // Load SMM Services from Provider 2 API
   const fetchSmmServices = useCallback(async () => {
     setSmmLoading(true);
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch('/api/social-boost-2/services', {
+      const data: any = await safeApiFetch('/api/social-boost-2/services', {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
-      const data = await res.json();
-      if (data.services && Array.isArray(data.services) && data.services.length > 0) {
-        setSmmServices(data.services.map((s: any) => ({
-          ...s,
-          id: String(s.service || s.id),
-          pricePerThousandNgn: s.rate || s.pricePerThousandNgn || 1500
-        })));
+      if (data && data.services && Array.isArray(data.services) && data.services.length > 0) {
+        const mapped = data.services.map((s: any) => ({
+          id: String(s.service || s.id || Math.random()),
+          platform: s.platform || 'Other',
+          category: s.category || `${s.platform || 'Social'} Growth`,
+          name: s.name || `Service #${s.service || s.id}`,
+          min: Number(s.min || 100),
+          max: Number(s.max || 50000),
+          rate: Number(s.rate || 1500),
+          pricePerThousandNgn: Number(s.pricePerThousandNgn || s.rate || 1500),
+          description: s.description || ''
+        }));
+        setSmmServices(mapped);
       } else {
         // High quality fallback services for all 12 platforms
         setSmmServices([
@@ -627,29 +673,30 @@ export const Server2View: React.FC<Server2ViewProps> = ({
     setErrorMessage('');
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch('/api/social-boost-2/order', {
+      const data: any = await safeApiFetch('/api/social-boost-2/order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
+          userId: auth.currentUser?.uid,
+          userEmail: auth.currentUser?.email || userProfile?.email || '',
           serviceId: activeSmmService.id,
           service: activeSmmService.service || activeSmmService.id,
-          serviceName: activeSmmService.name,
-          platform: activeSmmService.platform || selectedPlatformId,
-          category: activeSmmService.category || 'Growth',
           link: targetLink.trim(),
+          target: targetLink.trim(),
+          targetUrl: targetLink.trim(),
           quantity,
           amountNgn: smmTotalNgn,
-          totalCost: smmTotalNgn
+          totalCost: smmTotalNgn,
+          action: 'order'
         })
       });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to submit boost order');
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to submit boost order');
       }
-      setInfoMessage(`Boost order placed successfully! Order ID: ${data.orderId || data.order || 'Approved'}`);
+      setInfoMessage(`Boost order placed successfully! Order ID: ${data.orderId || data.order?.id || data.order || 'Confirmed'}`);
       setTargetLink('');
       if (onRefreshProfile) await onRefreshProfile();
       fetchBoostOrders();
@@ -664,96 +711,14 @@ export const Server2View: React.FC<Server2ViewProps> = ({
   const fetchBoostOrders = async () => {
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch('/api/social-boost-2/orders', {
+      const data: any = await safeApiFetch('/api/social-boost-2/orders', {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
-      const data = await res.json();
-      if (data.orders && Array.isArray(data.orders)) {
+      if (data && data.orders && Array.isArray(data.orders)) {
         setBoostOrders(data.orders);
       }
     } catch {
       // ignore
-    }
-  };
-
-  // Handle single boost order status check
-  const handleRefreshBoostStatus = async (orderId: string) => {
-    setRefreshingBoostOrderId(orderId);
-    setBoostActionFeedback(null);
-    try {
-      const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch(`/api/social-boost-2/status?orderId=${encodeURIComponent(orderId)}`, {
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
-      });
-      const data = await res.json();
-      if (data.order) {
-        setBoostOrders(prev => prev.map(o => (o.id === orderId || o.orderId === orderId) ? { ...o, ...data.order } : o));
-        setBoostActionFeedback({ orderId, text: `Live Status: ${data.order.status || data.status}` });
-      }
-    } catch (e: any) {
-      setBoostActionFeedback({ orderId, text: 'Status check unavailable', isError: true });
-    } finally {
-      setRefreshingBoostOrderId(null);
-    }
-  };
-
-  // Handle refill for eligible boost order
-  const handleRefillBoostOrder = async (orderId: string) => {
-    setRefillingBoostOrderId(orderId);
-    setBoostActionFeedback(null);
-    try {
-      const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch('/api/social-boost-2/refill', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ orderId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBoostActionFeedback({ orderId, text: data.message || 'Refill requested!' });
-        setBoostOrders(prev => prev.map(o => (o.id === orderId || o.orderId === orderId) ? { ...o, refillStatus: 'requested' } : o));
-      } else {
-        setBoostActionFeedback({ orderId, text: data.error || 'Refill request could not be processed.', isError: true });
-      }
-    } catch (e: any) {
-      setBoostActionFeedback({ orderId, text: e.message || 'Error submitting refill.', isError: true });
-    } finally {
-      setRefillingBoostOrderId(null);
-    }
-  };
-
-  // Handle cancel & refund for boost order
-  const handleCancelBoostOrder = async (orderId: string) => {
-    if (!window.confirm('Are you sure you want to cancel this Server 2 boost order? Eligible funds will be refunded to your wallet.')) {
-      return;
-    }
-    setCancellingBoostOrderId(orderId);
-    setBoostActionFeedback(null);
-    try {
-      const token = await getSafeIdToken(auth.currentUser);
-      const res = await safeApiFetch('/api/social-boost-2/cancel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ orderId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBoostActionFeedback({ orderId, text: data.message || 'Order cancelled & refunded to wallet.' });
-        setBoostOrders(prev => prev.map(o => (o.id === orderId || o.orderId === orderId) ? { ...o, status: 'Cancelled' } : o));
-        if (onRefreshProfile) await onRefreshProfile();
-      } else {
-        setBoostActionFeedback({ orderId, text: data.error || 'Order could not be cancelled.', isError: true });
-      }
-    } catch (e: any) {
-      setBoostActionFeedback({ orderId, text: e.message || 'Error cancelling order.', isError: true });
-    } finally {
-      setCancellingBoostOrderId(null);
     }
   };
 
@@ -764,9 +729,10 @@ export const Server2View: React.FC<Server2ViewProps> = ({
       if (usa) return usa;
       return { id: '187', name: 'United States', code: 'US', flag: '🇺🇸' };
     }
+    if (!selectedCountry) return null;
     const found = countries.find(c => c.id === selectedCountry);
     if (found) return found;
-    return countries[0] || { id: '187', name: 'United States', code: 'US', flag: '🇺🇸' };
+    return null;
   }, [countries, selectedCountry, activeTab]);
   const selectedServiceObj = services.find(s => s.id === selectedService);
 
@@ -788,111 +754,176 @@ export const Server2View: React.FC<Server2ViewProps> = ({
       
       {/* Toast Alert Notifications */}
       {errorMessage && (
-        <div className="mb-4 bg-red-950/80 border border-red-500/50 text-red-200 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-lg animate-in fade-in">
+        <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold p-3.5 rounded-2xl flex items-center justify-between shadow-sm animate-in fade-in">
           <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          <button onClick={() => setErrorMessage('')} className="text-red-400 hover:text-white font-extrabold text-base cursor-pointer">×</button>
+          <button onClick={() => setErrorMessage('')} className="text-rose-500 hover:text-rose-800 font-bold text-base cursor-pointer">×</button>
         </div>
       )}
 
       {infoMessage && (
-        <div className="mb-4 bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-lg animate-in fade-in">
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold p-3.5 rounded-2xl flex items-center justify-between shadow-sm animate-in fade-in">
           <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{infoMessage}</span>
           </div>
-          <button onClick={() => setInfoMessage('')} className="text-emerald-400 hover:text-white font-extrabold text-base cursor-pointer">×</button>
+          <button onClick={() => setInfoMessage('')} className="text-emerald-600 hover:text-emerald-900 font-bold text-base cursor-pointer">×</button>
+        </div>
+      )}
+
+      {/* Top Global Server Tool Mode Switcher - Only shown in multi-tool mode */}
+      {!hideSwitcherTabs && initialPage === 'front' && (
+        <div className="mb-5 bg-white border border-[#E9E2FA] p-1.5 rounded-2xl flex items-center justify-between shadow-sm">
+          <div className="flex items-center space-x-1 sm:space-x-1.5 flex-1">
+            <button
+              type="button"
+              id="server-tool-tab-front"
+              onClick={() => setCurrentPage('front')}
+              className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                currentPage === 'front'
+                  ? 'bg-[#7C3AED] text-white shadow-sm'
+                  : 'text-[#716B82] hover:text-[#171329] hover:bg-[#F8F7FF]'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span>Server Tool</span>
+            </button>
+
+            <button
+              type="button"
+              id="server-tool-tab-numbers"
+              onClick={() => setCurrentPage('buy-numbers')}
+              className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                currentPage === 'buy-numbers'
+                  ? 'bg-[#7C3AED] text-white shadow-sm'
+                  : 'text-[#716B82] hover:text-[#171329] hover:bg-[#F8F7FF]'
+              }`}
+            >
+              <PhoneCall className="w-3.5 h-3.5" />
+              <span>Number Service</span>
+            </button>
+
+            <button
+              type="button"
+              id="server-tool-tab-boost"
+              onClick={() => setCurrentPage('boost-accounts')}
+              className={`px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                currentPage === 'boost-accounts'
+                  ? 'bg-[#7C3AED] text-white shadow-sm'
+                  : 'text-[#716B82] hover:text-[#171329] hover:bg-[#F8F7FF]'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              <span>Boosting Service</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleBackToMarket}
+            className="px-2.5 py-1.5 text-[11px] font-bold text-[#7C3AED] hover:text-[#5B21B6] hover:bg-[#EDE9FE] rounded-xl transition cursor-pointer flex items-center space-x-1 ml-1 shrink-0"
+            title="Exit Server Tool to Marketplace"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            <span className="hidden sm:inline">Exit</span>
+          </button>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 1. SERVER 2 FRONT PAGE (SCREENSHOT 1: IMG_2713.jpeg)                       */}
+      {/* 1. SERVER 2 FRONT PAGE                                                     */}
       {/* ========================================================================= */}
       {currentPage === 'front' && (
         <div className="space-y-6 animate-in fade-in">
           
           {/* Header Bar */}
-          <div className="flex items-center justify-between bg-[#12082b] border border-[#27134d] px-4 py-3 rounded-2xl shadow-md">
+          <div className="flex items-center justify-between bg-white border border-[#E9E2FA] px-4 py-3 rounded-2xl shadow-sm">
             <button
-              onClick={onBackToMarketplace}
-              className="p-2 bg-[#1a0c3b] hover:bg-[#251252] text-white rounded-xl border border-purple-800/40 transition cursor-pointer flex items-center justify-center"
+              onClick={handleBackToMarket}
+              className="p-2 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] rounded-xl border border-[#E9E2FA] transition cursor-pointer flex items-center justify-center"
               title="Back to Marketplace"
             >
-              <ArrowLeft className="w-5 h-5 text-white" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
 
             <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-              <h1 className="text-base font-black tracking-wide text-white">
+              <span className="w-2.5 h-2.5 bg-[#7C3AED] rounded-full shrink-0 shadow-sm" />
+              <h1 className="text-base font-bold tracking-wide text-[#171329]">
                 Server 2 Portal
               </h1>
-              <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="bg-[#EDE9FE] text-[#7C3AED] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border border-[#E9E2FA]">
                 V2
               </span>
             </div>
 
             <button
               onClick={onOpenWallet}
-              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-black rounded-full shadow-md shadow-red-600/30 transition cursor-pointer flex items-center space-x-1"
+              className="px-3.5 py-1.5 bg-[#7C3AED] hover:bg-[#5B21B6] text-white text-xs font-bold rounded-full shadow-sm transition cursor-pointer flex items-center space-x-1"
             >
               <span>+ Fund</span>
             </button>
           </div>
 
           {/* Balance Widget */}
-          <div className="bg-[#0e0622] border border-[#261352] p-4 rounded-2xl shadow-inner flex items-center justify-between">
+          <div className="bg-white border border-[#E9E2FA] p-4 rounded-2xl shadow-sm flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-purple-300/60 block mb-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#716B82] block mb-0.5">
                 AVAILABLE BALANCE
               </span>
-              <span className="text-2xl sm:text-3xl font-black text-white font-mono">
+              <span className="text-2xl sm:text-3xl font-bold text-[#171329] font-mono">
                 ₦{walletBalance.toLocaleString()}
               </span>
             </div>
             <div className="text-right">
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-500/30 inline-block">
+              <span className="text-[10px] font-bold text-[#047857] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 inline-block">
                 Server 2 Online
               </span>
             </div>
           </div>
 
-          {/* THE TWO ACTION CARDS MATCHING SCREENSHOT LAYOUT & STYLING */}
-          <div className="space-y-5 pt-1 max-w-md sm:max-w-lg mx-auto">
+          {/* THE TWO ACTION CARDS WITH CLEAN WHITE + PURPLE AESTHETIC */}
+          <div className="space-y-4 pt-1 max-w-md sm:max-w-lg mx-auto">
             
-            {/* Card 1: BUY NUMBERS (Red Squircle with Solid White Phone Icon) */}
+            {/* Card 1: BUY NUMBERS */}
             <button
               type="button"
               onClick={() => setCurrentPage('buy-numbers')}
-              className="w-full bg-[#12082b] hover:bg-[#180b38] border border-[#281452] hover:border-red-500/50 rounded-[30px] sm:rounded-[34px] py-10 sm:py-12 px-6 sm:px-8 flex flex-col items-center justify-center text-center shadow-xl shadow-[#080216]/60 transition-all duration-300 transform active:scale-[0.98] cursor-pointer group"
+              className="w-full bg-white hover:bg-[#F8F7FF] border border-[#E9E2FA] hover:border-[#7C3AED]/50 rounded-3xl py-8 sm:py-10 px-6 sm:px-8 flex flex-col items-center justify-center text-center shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
             >
-              {/* Red squircle icon container with solid white phone */}
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[26px] sm:rounded-[28px] bg-gradient-to-b from-[#c91823] to-[#991018] flex items-center justify-center shadow-lg shadow-red-900/40 group-hover:scale-105 transition-transform duration-300">
-                <Phone className="w-11 h-11 sm:w-13 sm:h-13 text-white fill-white stroke-none" />
+              {/* Squircle icon container */}
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-[#EDE9FE] flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Phone className="w-9 h-9 sm:w-11 sm:h-11 text-[#7C3AED]" />
               </div>
 
-              {/* Bold Clean Title matching screenshot */}
-              <h2 className="text-2xl sm:text-[28px] font-bold text-white mt-6 sm:mt-7 tracking-tight group-hover:text-red-200 transition-colors">
+              {/* Clean Title */}
+              <h2 className="text-xl sm:text-2xl font-bold text-[#171329] mt-5 sm:mt-6 tracking-tight group-hover:text-[#7C3AED] transition-colors">
                 Buy Numbers
               </h2>
+              <p className="text-xs text-[#716B82] mt-1">
+                Live carrier SMS verification across USA & 195+ countries
+              </p>
             </button>
 
-            {/* Card 2: BOOST ACCOUNTS (Purple Squircle with Solid White Rocket Icon) */}
+            {/* Card 2: BOOST ACCOUNTS */}
             <button
               type="button"
               onClick={() => setCurrentPage('boost-accounts')}
-              className="w-full bg-[#12082b] hover:bg-[#180b38] border border-[#281452] hover:border-purple-500/50 rounded-[30px] sm:rounded-[34px] py-10 sm:py-12 px-6 sm:px-8 flex flex-col items-center justify-center text-center shadow-xl shadow-[#080216]/60 transition-all duration-300 transform active:scale-[0.98] cursor-pointer group"
+              className="w-full bg-white hover:bg-[#F8F7FF] border border-[#E9E2FA] hover:border-[#7C3AED]/50 rounded-3xl py-8 sm:py-10 px-6 sm:px-8 flex flex-col items-center justify-center text-center shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
             >
-              {/* Purple squircle icon container with solid white rocket */}
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[26px] sm:rounded-[28px] bg-gradient-to-b from-[#8545f5] to-[#6725dc] flex items-center justify-center shadow-lg shadow-purple-900/40 group-hover:scale-105 transition-transform duration-300">
-                <Rocket className="w-11 h-11 sm:w-13 sm:h-13 text-white fill-white stroke-none" />
+              {/* Squircle icon container */}
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-[#EDE9FE] flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Rocket className="w-9 h-9 sm:w-11 sm:h-11 text-[#7C3AED]" />
               </div>
 
-              {/* Bold Clean Title matching screenshot */}
-              <h2 className="text-2xl sm:text-[28px] font-bold text-white mt-6 sm:mt-7 tracking-tight group-hover:text-purple-200 transition-colors">
+              {/* Clean Title */}
+              <h2 className="text-xl sm:text-2xl font-bold text-[#171329] mt-5 sm:mt-6 tracking-tight group-hover:text-[#7C3AED] transition-colors">
                 Boost Accounts
               </h2>
+              <p className="text-xs text-[#716B82] mt-1">
+                Instant followers, likes, views & organic growth tools
+              </p>
             </button>
 
           </div>
@@ -902,39 +933,52 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
 
       {/* ========================================================================= */}
-      {/* 2. INSIDE PAGE 1: BUY NUMBERS (SCREENSHOT 2: IMG_2714.png)                */}
+      {/* 2. INSIDE PAGE 1: BUY NUMBERS                                             */}
       {/* ========================================================================= */}
       {currentPage === 'buy-numbers' && (
         <div className="space-y-4 animate-in fade-in">
           
-          {/* Top Header: Avatar + Username + Fund Wallet */}
+          {/* Top Header: Back Button + Avatar + Username + Fund Wallet */}
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center space-x-3">
-              {/* Red Circular Initial Avatar with back action */}
+              {/* Back to Marketplace Button */}
               <button
                 type="button"
                 onClick={() => {
-                  if (initialPage === 'buy-numbers') {
-                    onBackToMarketplace();
+                  if (initialPage === 'buy-numbers' || hideSwitcherTabs) {
+                    handleBackToMarket();
                   } else {
                     setCurrentPage('front');
                   }
                 }}
-                className="relative w-11 h-11 rounded-full bg-gradient-to-b from-red-600 to-red-800 border border-red-400/40 text-white font-black text-base flex items-center justify-center shadow-md shadow-red-600/30 cursor-pointer hover:scale-105 transition"
-                title={initialPage === 'buy-numbers' ? "Back to Homepage" : "Back to Server 2 Front Page"}
+                className="w-10 h-10 rounded-2xl bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] border border-[#E9E2FA] flex items-center justify-center shadow-sm cursor-pointer transition active:scale-95 shrink-0"
+                title={initialPage === 'buy-numbers' || hideSwitcherTabs ? "Back to Marketplace" : "Back to Server Tool"}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+
+              {/* Circular Initial Avatar with back action */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (initialPage === 'buy-numbers' || hideSwitcherTabs) {
+                    handleBackToMarket();
+                  } else {
+                    setCurrentPage('front');
+                  }
+                }}
+                className="relative w-11 h-11 rounded-full bg-[#EDE9FE] border border-[#E9E2FA] text-[#7C3AED] font-bold text-base flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 transition shrink-0"
+                title={initialPage === 'buy-numbers' || hideSwitcherTabs ? "Back to Marketplace" : "Back to Server Tool"}
               >
                 <span>{userProfile?.username ? userProfile.username.charAt(0).toUpperCase() : 'M'}</span>
-                <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#180c38] rounded-full border border-purple-800 flex items-center justify-center text-[10px] text-purple-300">
-                  <ArrowLeft className="w-3 h-3" />
-                </span>
               </button>
 
               <div>
-                <span className="text-sm font-black text-white block leading-tight">
+                <span className="text-sm font-bold text-[#171329] block leading-tight">
                   {userProfile?.username || 'muzente001'}
                 </span>
-                <span className="text-[10px] text-purple-300/60 font-semibold">
-                  Server 2 Verified
+                <span className="text-[10px] text-[#716B82] font-medium">
+                  {initialPage === 'buy-numbers' ? 'Service Number 2 (Provider 2)' : 'Server 2 Verified'}
                 </span>
               </div>
             </div>
@@ -942,7 +986,7 @@ export const Server2View: React.FC<Server2ViewProps> = ({
             <button
               type="button"
               onClick={onOpenWallet}
-              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-black rounded-full shadow-md shadow-red-600/30 transition cursor-pointer flex items-center space-x-1"
+              className="px-4 py-2 bg-[#7C3AED] hover:bg-[#5B21B6] text-white text-xs font-bold rounded-full shadow-sm transition cursor-pointer flex items-center space-x-1"
             >
               <span>+ Fund Wallet</span>
             </button>
@@ -950,18 +994,18 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
           {/* Available Balance Display */}
           <div className="pt-2 pb-1">
-            <span className="text-[10px] font-black uppercase tracking-widest text-purple-300/60 block mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#716B82] block mb-1">
               AVAILABLE BALANCE
             </span>
             <div className="flex items-baseline space-x-1">
-              <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
+              <span className="text-3xl sm:text-4xl font-bold text-[#171329] font-mono tracking-tight">
                 ₦{walletBalance.toLocaleString()}
               </span>
             </div>
           </div>
 
-          {/* Country Type Segmented Control (Large Pill from IMG_2714.png) */}
-          <div className="bg-[#12082b] border border-[#27134d] p-1.5 rounded-2xl flex items-center shadow-inner">
+          {/* Country Type Segmented Control */}
+          <div className="bg-white border border-[#E9E2FA] p-1.5 rounded-2xl flex items-center shadow-sm">
             <button
               type="button"
               onClick={() => {
@@ -969,11 +1013,16 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                 setSelectedServer('usa1');
                 const usa = countries.find(c => c.id === '187' || c.code === 'US' || (c.name && c.name.toLowerCase().includes('united states')));
                 setSelectedCountry(usa ? usa.id : '187');
+                setSelectedService('');
+                setIsServiceInStock(false);
+                setStockMessage('');
+                setCalculatedPrice(0);
+                setPriceOptions([]);
               }}
-              className={`flex-1 py-3 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-200 cursor-pointer flex items-center justify-center space-x-1.5 ${
+              className={`flex-1 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center space-x-1.5 ${
                 activeTab === 'usa'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                  : 'text-purple-300/70 hover:text-white'
+                  ? 'bg-[#7C3AED] text-white shadow-sm'
+                  : 'text-[#716B82] hover:text-[#171329]'
               }`}
             >
               <span>🇺🇸 USA Numbers</span>
@@ -984,11 +1033,16 @@ export const Server2View: React.FC<Server2ViewProps> = ({
               onClick={() => {
                 setActiveTab('all');
                 setSelectedServer('all1');
+                setSelectedService('');
+                setIsServiceInStock(false);
+                setStockMessage('');
+                setCalculatedPrice(0);
+                setPriceOptions([]);
               }}
-              className={`flex-1 py-3 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-200 cursor-pointer flex items-center justify-center space-x-1.5 ${
+              className={`flex-1 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center space-x-1.5 ${
                 activeTab === 'all'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                  : 'text-purple-300/70 hover:text-white'
+                  ? 'bg-[#7C3AED] text-white shadow-sm'
+                  : 'text-[#716B82] hover:text-[#171329]'
               }`}
             >
               <Globe className="w-4 h-4" />
@@ -996,62 +1050,62 @@ export const Server2View: React.FC<Server2ViewProps> = ({
             </button>
           </div>
 
-          {/* Server Switch Sub-Pills (Internal Server 2 Route Selection - Stays strictly on Server 2) */}
-          <div className="flex items-center space-x-2 pt-1 pb-1">
+          {/* Server Switch Sub-Pills (Extra Log Tools Route Selection: USA 1/2 or All Country 1/2) */}
+          <div className="grid grid-cols-2 gap-2 pt-1 pb-1">
             <button
               type="button"
-              onClick={() => setSelectedServer(activeTab === 'all' ? 'all1' : 'usa1')}
-              className={`flex-1 py-2.5 px-2.5 rounded-full text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1 ${
+              onClick={() => {
+                setSelectedServer(activeTab === 'all' ? 'all1' : 'usa1');
+                setSelectedService('');
+                setIsServiceInStock(false);
+                setStockMessage('');
+                setCalculatedPrice(0);
+                setPriceOptions([]);
+              }}
+              className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center space-x-1.5 ${
                 selectedServer === 'usa1' || selectedServer === 'all1' || selectedServer === 'server_1'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-600/30 border border-red-500'
-                  : 'bg-[#12082b] text-purple-300/80 hover:bg-[#1a0c3b] hover:text-white border border-[#27134d]'
+                  ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#7C3AED]/40 font-bold'
+                  : 'bg-white text-[#716B82] hover:text-[#171329] border border-[#E9E2FA]'
               }`}
-              title="Server 1 Direct Route"
+              title={activeTab === 'usa' ? 'USA 1' : 'All Country 1'}
             >
               <Globe className="w-3.5 h-3.5" />
-              <span>Server 1</span>
+              <span>{activeTab === 'usa' ? 'USA 1' : 'All Country 1'}</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setSelectedServer(activeTab === 'all' ? 'all2' : 'usa2')}
-              className={`flex-1 py-2.5 px-2.5 rounded-full text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1 ${
+              onClick={() => {
+                setSelectedServer(activeTab === 'all' ? 'all2' : 'usa2');
+                setSelectedService('');
+                setIsServiceInStock(false);
+                setStockMessage('');
+                setCalculatedPrice(0);
+                setPriceOptions([]);
+              }}
+              className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center space-x-1.5 ${
                 selectedServer === 'usa2' || selectedServer === 'all2' || selectedServer === 'server_2'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-600/30 border border-red-500'
-                  : 'bg-[#12082b] text-purple-300/80 hover:bg-[#1a0c3b] hover:text-white border border-[#27134d]'
+                  ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#7C3AED]/40 font-bold'
+                  : 'bg-white text-[#716B82] hover:text-[#171329] border border-[#E9E2FA]'
               }`}
-              title="Server 2 Express Route"
+              title={activeTab === 'usa' ? 'USA 2' : 'All Country 2'}
             >
               <Globe className="w-3.5 h-3.5" />
-              <span>Server 2</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedServer(activeTab === 'all' ? 'all3' : 'usa3')}
-              className={`flex-1 py-2.5 px-2.5 rounded-full text-xs font-black transition cursor-pointer flex items-center justify-center space-x-1 ${
-                selectedServer === 'usa3' || selectedServer === 'all3' || selectedServer === 'server_3'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-600/30 border border-red-500'
-                  : 'bg-[#12082b] text-purple-300/80 hover:bg-[#1a0c3b] hover:text-white border border-[#27134d]'
-              }`}
-              title="Server 3 High Resilience Route"
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>Server 3</span>
+              <span>{activeTab === 'usa' ? 'USA 2' : 'All Country 2'}</span>
             </button>
           </div>
 
-          {/* MAIN CARD WITH RED HEADER STRIP (EXACTLY AS SEEN IN IMG_2714.png) */}
-          <div className="bg-[#100726] border border-[#261352] rounded-3xl overflow-hidden shadow-2xl">
+          {/* MAIN CARD WITH CLEAN HEADER */}
+          <div className="bg-white border border-[#E9E2FA] rounded-3xl overflow-hidden shadow-sm">
             
-            {/* Red top header banner */}
-            <div className="bg-red-600 text-white px-5 py-3 flex items-center justify-between text-xs font-black">
+            {/* Top header banner */}
+            <div className="bg-[#7C3AED] text-white px-5 py-3 flex items-center justify-between text-xs font-semibold">
               <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-white rounded-full animate-ping" />
+                <span className="w-2 h-2 bg-white rounded-full shrink-0 shadow-sm" />
                 <span>
                   {activeTab === 'usa' 
-                    ? '🇺🇸 USA Numbers Server 2 — High Success'
-                    : '🌐 All Countries Server 2 — 195+ Countries'}
+                    ? `🇺🇸 USA Numbers (${selectedServer === 'usa2' ? 'USA 2' : 'USA 1'}) — Live Carrier Pool`
+                    : `🌐 All Countries (${selectedServer === 'all2' ? 'All Country 2' : 'All Country 1'}) — 195+ Countries`}
                 </span>
               </div>
               <button
@@ -1060,7 +1114,7 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                   fetchNumberOrders();
                   setIsNumberOrdersModalOpen(true);
                 }}
-                className="text-[11px] font-bold text-white/90 hover:text-white underline cursor-pointer"
+                className="text-[11px] font-bold text-white hover:underline cursor-pointer"
               >
                 Orders
               </button>
@@ -1072,57 +1126,81 @@ export const Server2View: React.FC<Server2ViewProps> = ({
               {/* Field 1: COUNTRY */}
               <div
                 onClick={() => {
-                  if (activeTab === 'all') {
+                  if (activeTab === 'all' && !countriesLoading) {
                     setIsCountryModalOpen(true);
                   }
                 }}
-                className={`bg-[#160b33] border border-[#2b1756] ${
-                  activeTab === 'all' ? 'hover:border-red-500/50 cursor-pointer' : 'cursor-default'
+                className={`bg-[#F8F7FF] border border-[#E9E2FA] ${
+                  activeTab === 'all' ? 'hover:border-[#7C3AED]/40 cursor-pointer' : 'cursor-default'
                 } p-3.5 rounded-2xl flex items-center justify-between transition group`}
               >
                 <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-600/20">
-                    <Globe className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shrink-0">
+                    <Globe className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-purple-300/60 uppercase tracking-widest block mb-0.5">
+                    <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block mb-0.5">
                       COUNTRY {activeTab === 'usa' ? '(FIXED USA)' : ''}
                     </span>
-                    <span className="text-sm font-black text-white">
-                      {selectedCountryObj ? `${getCountryFlagEmoji(selectedCountryObj.code || selectedCountryObj.name)} ${selectedCountryObj.name}` : '🇺🇸 United States'}
+                    <span className="text-sm font-bold text-[#171329] flex items-center space-x-2">
+                      {countriesLoading ? (
+                        <span className="text-[#7C3AED] text-xs flex items-center space-x-1.5">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1" />
+                          <span>Loading countries...</span>
+                        </span>
+                      ) : selectedCountryObj ? (
+                        <span>{getCountryFlagEmoji(selectedCountryObj.code || selectedCountryObj.name)} {selectedCountryObj.name}</span>
+                      ) : (
+                        <span className="text-[#716B82] text-xs">Select Country</span>
+                      )}
                     </span>
                   </div>
                 </div>
                 {activeTab === 'all' && (
-                  <ChevronRight className="w-5 h-5 text-purple-400 group-hover:text-white transition" />
+                  <ChevronRight className="w-5 h-5 text-[#716B82] group-hover:text-[#171329] transition" />
                 )}
               </div>
 
               {/* Field 2: SERVICE */}
               <div
-                onClick={() => setIsServiceModalOpen(true)}
-                className="bg-[#160b33] border border-[#2b1756] hover:border-red-500/50 p-3.5 rounded-2xl flex items-center justify-between cursor-pointer transition group"
+                onClick={() => {
+                  if (!servicesLoading && services.length > 0) {
+                    setIsServiceModalOpen(true);
+                  }
+                }}
+                className={`bg-[#F8F7FF] border border-[#E9E2FA] ${
+                  servicesLoading ? 'opacity-70 cursor-wait' : 'hover:border-[#7C3AED]/40 cursor-pointer'
+                } p-3.5 rounded-2xl flex items-center justify-between transition group`}
               >
                 <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-600/20">
-                    <Smartphone className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shrink-0">
+                    <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-purple-300/60 uppercase tracking-widest block mb-0.5">
+                    <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block mb-0.5">
                       SERVICE
                     </span>
-                    <span className="text-sm font-black text-white">
-                      {selectedServiceObj ? selectedServiceObj.name : 'Select Service'}
+                    <span className="text-sm font-bold text-[#171329] flex items-center space-x-2">
+                      {servicesLoading ? (
+                        <span className="text-[#7C3AED] text-xs flex items-center space-x-1.5">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1" />
+                          <span>Loading services...</span>
+                        </span>
+                      ) : selectedServiceObj ? (
+                        <span>{selectedServiceObj.name}</span>
+                      ) : (
+                        <span className="text-[#716B82] text-xs">Select Service</span>
+                      )}
                     </span>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-purple-400 group-hover:text-white transition" />
+                <ChevronRight className="w-5 h-5 text-[#716B82] group-hover:text-[#171329] transition" />
               </div>
 
               {/* Quality Tier (if multiple options available) */}
               {priceOptions.length > 1 && (
                 <div className="space-y-1.5 pt-1">
-                  <span className="text-[10px] font-black text-purple-300/60 uppercase tracking-widest block pl-1">
+                  <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block pl-1">
                     CARRIER ROUTE QUALITY
                   </span>
                   <div className="grid grid-cols-2 gap-2">
@@ -1138,12 +1216,12 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                           }}
                           className={`p-2.5 rounded-xl border text-left text-xs transition cursor-pointer ${
                             isSel
-                              ? 'bg-red-950/60 border-red-500 text-white'
-                              : 'bg-[#150a2e] border-[#291452] text-purple-300/70 hover:bg-[#1a0c3b]'
+                              ? 'bg-[#EDE9FE] border-[#7C3AED] text-[#7C3AED] font-bold'
+                              : 'bg-[#F8F7FF] border-[#E9E2FA] text-[#716B82] hover:bg-white'
                           }`}
                         >
-                          <span className="font-extrabold block truncate">{opt.carrierTier.split(' (')[0]}</span>
-                          <span className="text-[10px] font-mono font-bold text-red-300">₦{opt.customerPrice.toLocaleString()}</span>
+                          <span className="font-bold block truncate">{opt.carrierTier.split(' (')[0]}</span>
+                          <span className="text-[10px] font-mono font-bold text-[#7C3AED]">₦{opt.customerPrice.toLocaleString()}</span>
                         </button>
                       );
                     })}
@@ -1152,29 +1230,90 @@ export const Server2View: React.FC<Server2ViewProps> = ({
               )}
 
               {/* Price & Delivery Notice */}
-              <div className="pt-2 border-t border-[#231248] flex items-center justify-between text-xs">
-                <span className="text-purple-300/80 font-bold">Allocation Price:</span>
-                <span className="text-2xl font-black font-mono text-white">
-                  ₦{calculatedPrice.toLocaleString()}
-                </span>
+              <div className="pt-2 border-t border-[#E9E2FA] space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-[#716B82] font-semibold block">Live Carrier Rate:</span>
+                    {!selectedCountry && !selectedService ? (
+                      <span className="text-[11px] text-[#716B82]">Select country & service to check rate</span>
+                    ) : !selectedCountry ? (
+                      <span className="text-[11px] text-[#716B82]">Select a country to check rate</span>
+                    ) : !selectedService ? (
+                      <span className="text-[11px] text-[#716B82]">Select a service to check rate</span>
+                    ) : pricesLoading ? (
+                      <span className="text-[11px] text-[#7C3AED] animate-pulse flex items-center space-x-1">
+                        <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
+                        <span>Checking carrier rate...</span>
+                      </span>
+                    ) : stockMessage ? (
+                      <span className={`text-[11px] font-semibold ${isServiceInStock ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {stockMessage}
+                      </span>
+                    ) : isServiceInStock ? (
+                      <span className="text-[11px] text-emerald-700 font-semibold">Ready for instant allocation</span>
+                    ) : null}
+                  </div>
+                  <span className="text-2xl font-bold font-mono text-[#171329]">
+                    {!selectedCountry || !selectedService ? (
+                      <span className="text-sm font-bold text-[#716B82]">—</span>
+                    ) : pricesLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-[#7C3AED] inline" />
+                    ) : isServiceInStock && calculatedPrice > 0 ? (
+                      `₦${calculatedPrice.toLocaleString()}`
+                    ) : (
+                      <span className="text-sm font-bold text-amber-600">Unavailable</span>
+                    )}
+                  </span>
+                </div>
               </div>
 
-              {/* Action Button: GET NUMBER (Red Rounded Button from IMG_2714.png) */}
+              {/* Action Button: GET NUMBER */}
               <button
                 type="button"
                 onClick={handleBuyNumber}
-                disabled={buyingNumberLoading || !selectedService}
-                className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black text-sm sm:text-base rounded-2xl flex items-center justify-center space-x-2 shadow-xl shadow-red-600/30 transition duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={
+                  buyingNumberLoading ||
+                  !selectedCountry ||
+                  !selectedService ||
+                  pricesLoading ||
+                  !isServiceInStock
+                }
+                className="w-full py-4 bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-bold text-sm sm:text-base rounded-2xl flex items-center justify-center space-x-2 shadow-sm transition duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {buyingNumberLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Allocating Number...</span>
+                    <span>Allocating Carrier Number...</span>
+                  </>
+                ) : !selectedCountry && !selectedService ? (
+                  <>
+                    <AlertCircle className="w-5 h-5 text-white/80" />
+                    <span>Please select a country and service</span>
+                  </>
+                ) : !selectedCountry ? (
+                  <>
+                    <Globe className="w-5 h-5 text-white/80" />
+                    <span>Please select a country</span>
+                  </>
+                ) : !selectedService ? (
+                  <>
+                    <Smartphone className="w-5 h-5 text-white/80" />
+                    <span>Please select a service</span>
+                  </>
+                ) : pricesLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Checking Live Carrier Rate...</span>
+                  </>
+                ) : isServiceInStock && calculatedPrice > 0 ? (
+                  <>
+                    <CreditCard className="w-5 h-5" />
+                    <span>Get Number • ₦{calculatedPrice.toLocaleString()}</span>
                   </>
                 ) : (
                   <>
-                    <CreditCard className="w-5 h-5" />
-                    <span>Get Number</span>
+                    <AlertTriangle className="w-5 h-5 text-amber-200" />
+                    <span>{stockMessage || 'Service Unavailable on this Route'}</span>
                   </>
                 )}
               </button>
@@ -1185,29 +1324,29 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
           {/* ACTIVE ORDER / LIVE SMS SCREEN IF ACTIVE */}
           {activeNumberOrder && (
-            <div className="bg-[#12082b] border border-red-500/40 rounded-3xl p-5 shadow-2xl space-y-4 animate-in zoom-in-95">
-              <div className="flex items-center justify-between border-b border-[#231248] pb-3">
+            <div className="bg-white border border-[#E9E2FA] rounded-3xl p-5 shadow-sm space-y-4 animate-in zoom-in-95">
+              <div className="flex items-center justify-between border-b border-[#E9E2FA] pb-3">
                 <div className="flex items-center space-x-2">
-                  <Smartphone className="w-5 h-5 text-red-400" />
-                  <span className="text-sm font-black text-white">Your Server 2 Number</span>
+                  <Smartphone className="w-5 h-5 text-[#7C3AED]" />
+                  <span className="text-sm font-bold text-[#171329]">Your Assigned Number</span>
                 </div>
-                <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-full">
+                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full">
                   Waiting for SMS
                 </span>
               </div>
 
               {/* Phone Number Display */}
-              <div className="bg-[#180c38] border border-[#2e1762] rounded-2xl p-4 flex items-center justify-between">
+              <div className="bg-[#F8F7FF] border border-[#E9E2FA] rounded-2xl p-4 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] uppercase font-black text-purple-300/60 block">Assigned Number</span>
-                  <span className="text-xl sm:text-2xl font-mono font-black text-white">
+                  <span className="text-[10px] uppercase font-bold text-[#716B82] block">Assigned Number</span>
+                  <span className="text-xl sm:text-2xl font-mono font-bold text-[#171329]">
                     {activeNumberOrder.phoneNumber}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleCopy(activeNumberOrder.phoneNumber || '', 'number')}
-                  className="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl flex items-center space-x-1 cursor-pointer"
+                  className="px-3.5 py-2 bg-[#7C3AED] hover:bg-[#5B21B6] text-white text-xs font-bold rounded-xl flex items-center space-x-1 cursor-pointer shadow-sm"
                 >
                   {copiedText === 'number' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   <span>{copiedText === 'number' ? 'Copied' : 'Copy'}</span>
@@ -1216,33 +1355,33 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
               {/* SMS Polling & Code Display */}
               {pollingStatus === 'WAITING' ? (
-                <div className="p-4 bg-[#100726] rounded-2xl border border-[#261352] text-center space-y-2">
-                  <div className="flex items-center justify-center space-x-2 text-amber-300 text-xs font-bold">
-                    <Clock className="w-4 h-4 animate-spin" />
+                <div className="p-4 bg-[#F8F7FF] rounded-2xl border border-[#E9E2FA] text-center space-y-2">
+                  <div className="flex items-center justify-center space-x-2 text-[#716B82] text-xs font-semibold">
+                    <Clock className="w-4 h-4 animate-spin text-[#7C3AED]" />
                     <span>Waiting for SMS code... ({elapsedSeconds}s)</span>
                   </div>
-                  <div className="w-full bg-[#1b0d3d] h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-red-500 h-full w-2/3 animate-pulse" />
+                  <div className="w-full bg-[#EDE9FE] h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-[#7C3AED] h-full w-2/3 animate-pulse" />
                   </div>
                 </div>
               ) : pollingStatus === 'RECEIVED' ? (
-                <div className="p-4 bg-emerald-950/60 border border-emerald-500/40 rounded-2xl text-center space-y-3">
-                  <span className="text-xs font-bold text-emerald-400 block">Verification Code Received:</span>
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3">
+                  <span className="text-xs font-bold text-emerald-800 block">Verification Code Received:</span>
                   <div className="flex items-center justify-center space-x-3">
-                    <span className="text-3xl font-black font-mono text-emerald-300 tracking-widest">
+                    <span className="text-3xl font-bold font-mono text-emerald-700 tracking-widest">
                       {verificationCode}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleCopy(verificationCode, 'code')}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl flex items-center space-x-1 cursor-pointer"
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center space-x-1 cursor-pointer shadow-sm"
                     >
                       {copiedText === 'code' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                       <span>{copiedText === 'code' ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
                   {smsContent && (
-                    <p className="text-[11px] font-mono text-purple-200/80 bg-[#12082b] p-2.5 rounded-xl text-left border border-purple-900/40">
+                    <p className="text-[11px] font-mono text-emerald-900 bg-white p-2.5 rounded-xl text-left border border-emerald-200">
                       {smsContent}
                     </p>
                   )}
@@ -1255,7 +1394,7 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                   type="button"
                   onClick={handleCancelNumber}
                   disabled={cancellingNumberLoading}
-                  className="w-full py-2.5 bg-red-950/60 hover:bg-red-900/60 border border-red-500/40 text-red-200 text-xs font-black rounded-xl transition cursor-pointer"
+                  className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl transition cursor-pointer"
                 >
                   {cancellingNumberLoading ? 'Processing 100% Refund...' : 'Cancel & Instant Full Refund'}
                 </button>
@@ -1268,70 +1407,70 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
 
       {/* ========================================================================= */}
-      {/* 3. INSIDE PAGE 2: BOOST ACCOUNTS (SCREENSHOT 3: IMG_2715.png & IMG_2718.jpeg) */}
+      {/* 3. INSIDE PAGE 2: BOOST ACCOUNTS                                           */}
       {/* ========================================================================= */}
       {currentPage === 'boost-accounts' && (
         <div className="space-y-4 animate-in fade-in">
           
-          {/* Top Bar: Red Back Button + Boost History Dark Pill */}
+          {/* Top Bar: Back Button + Boost History Pill */}
           <div className="flex items-center justify-between pt-1">
             <button
               type="button"
               onClick={() => {
                 if (selectedBoostPlatformForOrder) {
                   setSelectedBoostPlatformForOrder(null);
-                } else if (initialPage === 'boost-accounts') {
-                  onBackToMarketplace();
+                } else if (initialPage === 'boost-accounts' || hideSwitcherTabs) {
+                  handleBackToMarket();
                 } else {
                   setCurrentPage('front');
                 }
               }}
-              className="w-10 h-10 rounded-2xl bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-md shadow-red-600/30 cursor-pointer transition"
+              className="w-10 h-10 rounded-2xl bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] border border-[#E9E2FA] flex items-center justify-center shadow-sm cursor-pointer transition active:scale-95"
               title={
                 selectedBoostPlatformForOrder
                   ? "Back to All Platforms"
-                  : initialPage === 'boost-accounts'
-                  ? "Back to Homepage"
-                  : "Back to Server 2 Front Page"
+                  : initialPage === 'boost-accounts' || hideSwitcherTabs
+                  ? "Back to Marketplace"
+                  : "Back to Server Tool Home"
               }
             >
-              <ArrowLeft className="w-5 h-5 text-white" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
 
-            {/* Dark Pill Bar: Boost History with Yellow RotateCw Icon */}
+            {/* Boost History Pill */}
             <button
               type="button"
               onClick={() => {
                 fetchBoostOrders();
                 setIsBoostHistoryOpen(true);
               }}
-              className="bg-[#180d38] hover:bg-[#23124f] border border-[#2b1656] text-white px-5 py-2.5 rounded-full flex items-center space-x-2 font-bold text-xs shadow-md transition cursor-pointer"
+              className="bg-white hover:bg-[#F8F7FF] border border-[#E9E2FA] text-[#171329] px-4 py-2 rounded-full flex items-center space-x-2 font-bold text-xs shadow-sm transition cursor-pointer"
             >
-              <RotateCw className="w-4 h-4 text-yellow-400" />
+              <RotateCw className="w-4 h-4 text-[#7C3AED]" />
               <span>Boost History</span>
             </button>
           </div>
 
           {/* Available Balance Header */}
-          <div className="bg-[#0e0622] border border-[#261352] p-3.5 rounded-2xl flex items-center justify-between shadow-inner">
+          <div className="bg-white border border-[#E9E2FA] p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-purple-300/60 block">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#716B82] block">
                 AVAILABLE BALANCE
               </span>
-              <span className="text-xl sm:text-2xl font-black text-white font-mono">
+              <span className="text-xl sm:text-2xl font-bold text-[#171329] font-mono">
                 ₦{walletBalance.toLocaleString()}
               </span>
             </div>
             <button
               type="button"
               onClick={onOpenWallet}
-              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-black rounded-full shadow-md shadow-red-600/30 transition cursor-pointer"
+              className="px-3.5 py-1.5 bg-[#7C3AED] hover:bg-[#5B21B6] text-white text-xs font-bold rounded-full shadow-sm transition cursor-pointer"
             >
               + Fund
             </button>
           </div>
 
-          {/* VIEW A: LIST OF ALL 12 SOCIAL MEDIA PLATFORMS (Shown initially, NO order form underneath) */}
+          {/* VIEW A: LIST OF ALL SOCIAL MEDIA PLATFORMS */}
           {!selectedBoostPlatformForOrder ? (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 pt-1 animate-in fade-in">
               {SMM_PLATFORMS.map((platform) => {
@@ -1344,10 +1483,10 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                       setSelectedPlatformId(platform.id);
                       setSelectedBoostPlatformForOrder(platform.id);
                     }}
-                    className="rounded-2xl p-5 flex flex-col items-center justify-center min-h-[110px] cursor-pointer transition-all duration-200 bg-[#12082b] border border-[#27134d] hover:border-red-500 hover:bg-[#1a0c38] active:scale-[0.98]"
+                    className="rounded-2xl p-5 flex flex-col items-center justify-center min-h-[110px] cursor-pointer transition-all duration-200 bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/50 hover:bg-[#F8F7FF] shadow-sm active:scale-[0.98]"
                   >
                     <IconComp className={`w-7 h-7 sm:w-8 sm:h-8 mb-2.5 ${platform.iconColor}`} />
-                    <span className="text-sm sm:text-base font-black text-white tracking-wide">
+                    <span className="text-sm sm:text-base font-bold text-[#171329] tracking-wide">
                       {platform.name}
                     </span>
                   </button>
@@ -1355,49 +1494,49 @@ export const Server2View: React.FC<Server2ViewProps> = ({
               })}
             </div>
           ) : (
-            /* VIEW B: ORDER FORM FOR SELECTED PLATFORM (Shown only after clicking a platform, Screenshot IMG_2718.jpeg) */
-            <div className="bg-[#100726] border border-[#261352] rounded-3xl p-5 sm:p-6 shadow-xl space-y-4 animate-in fade-in">
+            /* VIEW B: ORDER FORM FOR SELECTED PLATFORM */
+            <div className="bg-white border border-[#E9E2FA] rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 animate-in fade-in">
               
-              <div className="flex items-center justify-between border-b border-[#221045] pb-3">
+              <div className="flex items-center justify-between border-b border-[#E9E2FA] pb-3">
                 <div className="flex items-center space-x-2">
-                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                  <h3 className="text-sm sm:text-base font-black text-white">
+                  <span className="w-2.5 h-2.5 bg-[#7C3AED] rounded-full shrink-0 shadow-sm" />
+                  <h3 className="text-sm sm:text-base font-bold text-[#171329]">
                     Order {SMM_PLATFORMS.find(p => p.id === selectedPlatformId)?.name} Boost (Server 2)
                   </h3>
                 </div>
-                <span className="text-[10px] font-bold text-red-400 bg-red-950/50 px-2 py-0.5 rounded-full border border-red-500/30 uppercase">
+                <span className="text-[10px] font-bold text-[#7C3AED] bg-[#EDE9FE] px-2 py-0.5 rounded-full border border-[#E9E2FA] uppercase">
                   Instant Auto
                 </span>
               </div>
 
               {/* Category Selector */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-purple-300/60 block pl-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-[#716B82] block pl-1">
                   Category
                 </label>
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full bg-[#160b33] border border-[#2b1756] rounded-xl px-3.5 py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-red-500 cursor-pointer"
+                  className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl px-3.5 py-3 text-xs sm:text-sm text-[#171329] focus:outline-none focus:border-[#7C3AED] cursor-pointer"
                 >
                   {currentCategories.map(cat => (
-                    <option key={cat} value={cat} className="bg-[#12082b] text-white">{cat}</option>
+                    <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
               </div>
 
               {/* Service Selector */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-purple-300/60 block pl-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-[#716B82] block pl-1">
                   Service Package
                 </label>
                 <select
                   value={selectedSmmServiceId}
                   onChange={(e) => setSelectedSmmServiceId(e.target.value)}
-                  className="w-full bg-[#160b33] border border-[#2b1756] rounded-xl px-3.5 py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-red-500 cursor-pointer"
+                  className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl px-3.5 py-3 text-xs sm:text-sm text-[#171329] focus:outline-none focus:border-[#7C3AED] cursor-pointer"
                 >
                   {filteredCategoryServices.map(srv => (
-                    <option key={srv.id} value={srv.id} className="bg-[#12082b] text-white">
+                    <option key={srv.id} value={srv.id}>
                       {srv.name} (₦{(srv.pricePerThousandNgn || srv.rate || 1500).toLocaleString()}/1k)
                     </option>
                   ))}
@@ -1406,17 +1545,17 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
               {/* Link Input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-purple-300/60 block pl-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-[#716B82] block pl-1">
                   Target Link / Profile URL
                 </label>
                 <div className="relative">
-                  <Link2 className="w-4 h-4 text-purple-400 absolute left-3.5 top-3.5" />
+                  <Link2 className="w-4 h-4 text-[#716B82] absolute left-3.5 top-3.5" />
                   <input
                     type="text"
                     placeholder="https://..."
                     value={targetLink}
                     onChange={(e) => setTargetLink(e.target.value)}
-                    className="w-full bg-[#160b33] border border-[#2b1756] rounded-xl pl-10 pr-3.5 py-3 text-xs sm:text-sm text-white placeholder-purple-400/40 focus:outline-none focus:border-red-500"
+                    className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl pl-10 pr-3.5 py-3 text-xs sm:text-sm text-[#171329] placeholder-[#716B82]/50 focus:outline-none focus:border-[#7C3AED]"
                   />
                 </div>
               </div>
@@ -1424,17 +1563,17 @@ export const Server2View: React.FC<Server2ViewProps> = ({
               {/* Quantity Input */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between pl-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-purple-300/60">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-[#716B82]">
                     Quantity
                   </label>
                   {activeSmmService && (
-                    <span className="text-[10px] text-purple-300/60 font-mono">
+                    <span className="text-[10px] text-[#716B82] font-mono">
                       Min: {(activeSmmService.min || 100).toLocaleString()} | Max: {(activeSmmService.max || 50000).toLocaleString()}
                     </span>
                   )}
                 </div>
                 <div className="relative">
-                  <Hash className="w-4 h-4 text-purple-400 absolute left-3.5 top-3.5" />
+                  <Hash className="w-4 h-4 text-[#716B82] absolute left-3.5 top-3.5" />
                   <input
                     type="number"
                     min={activeSmmService?.min || 100}
@@ -1442,15 +1581,15 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                     step={100}
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 0))}
-                    className="w-full bg-[#160b33] border border-[#2b1756] rounded-xl pl-10 pr-3.5 py-3 text-xs sm:text-sm font-mono text-white focus:outline-none focus:border-red-500"
+                    className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl pl-10 pr-3.5 py-3 text-xs sm:text-sm font-mono text-[#171329] focus:outline-none focus:border-[#7C3AED]"
                   />
                 </div>
               </div>
 
               {/* Total Charge & Place Order */}
-              <div className="pt-2 border-t border-[#231248] flex items-center justify-between text-xs">
-                <span className="text-purple-300/80 font-bold">Total Cost:</span>
-                <span className="text-2xl font-black font-mono text-white">
+              <div className="pt-2 border-t border-[#E9E2FA] flex items-center justify-between text-xs">
+                <span className="text-[#716B82] font-semibold">Total Cost:</span>
+                <span className="text-2xl font-bold font-mono text-[#171329]">
                   ₦{smmTotalNgn.toLocaleString()}
                 </span>
               </div>
@@ -1459,7 +1598,7 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                 type="button"
                 onClick={handlePlaceSmmOrder}
                 disabled={smmOrderingLoading || !targetLink.trim()}
-                className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black text-sm sm:text-base rounded-2xl flex items-center justify-center space-x-2 shadow-xl shadow-red-600/30 transition duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-bold text-sm sm:text-base rounded-2xl flex items-center justify-center space-x-2 shadow-sm transition duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {smmOrderingLoading ? (
                   <>
@@ -1484,49 +1623,65 @@ export const Server2View: React.FC<Server2ViewProps> = ({
       {/* MODAL: COUNTRY SELECTOR (SEARCHABLE MODAL)                                 */}
       {/* ========================================================================= */}
       {isCountryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#0e0721] border border-[#2b1756] rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-[#231248] flex items-center justify-between">
-              <h3 className="text-base font-black text-white">Select Country (Server 2)</h3>
-              <button onClick={() => setIsCountryModalOpen(false)} className="text-purple-300 hover:text-white cursor-pointer">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white border border-[#E9E2FA] rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-[#E9E2FA] flex items-center justify-between">
+              <h3 className="text-base font-bold text-[#171329]">Select Country (Server 2)</h3>
+              <button onClick={() => setIsCountryModalOpen(false)} className="text-[#716B82] hover:text-[#171329] cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-3 border-b border-[#231248]">
+            <div className="p-3 border-b border-[#E9E2FA]">
               <div className="relative">
-                <Search className="w-4 h-4 text-purple-400 absolute left-3 top-2.5" />
+                <Search className="w-4 h-4 text-[#716B82] absolute left-3 top-2.5" />
                 <input
                   type="text"
                   placeholder="Search countries..."
                   value={countrySearchQuery}
                   onChange={(e) => setCountrySearchQuery(e.target.value)}
-                  className="w-full bg-[#140b2b] border border-[#2b1756] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-purple-400/50 focus:outline-none focus:border-red-500"
+                  className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl pl-9 pr-3 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 focus:outline-none focus:border-[#7C3AED]"
                   autoFocus
                 />
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {filteredCountries.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setSelectedCountry(c.id);
-                    setIsCountryModalOpen(false);
-                    setCountrySearchQuery('');
-                  }}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-xs transition cursor-pointer ${
-                    selectedCountry === c.id ? 'bg-red-600 text-white font-black' : 'hover:bg-[#160b33] text-purple-200'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-lg">{getCountryFlagEmoji(c.code || c.name)}</span>
-                    <span className="font-extrabold">{c.name}</span>
-                  </div>
-                  {selectedCountry === c.id && <Check className="w-4 h-4" />}
-                </button>
-              ))}
+              {countriesLoading ? (
+                <div className="p-8 text-center text-[#716B82] text-xs flex flex-col items-center justify-center space-y-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#7C3AED]" />
+                  <span>Loading countries...</span>
+                </div>
+              ) : filteredCountries.length === 0 ? (
+                <div className="p-8 text-center text-[#716B82] text-xs">
+                  {countries.length === 0 ? 'No countries available on this server.' : 'No countries found matching your search.'}
+                </div>
+              ) : (
+                filteredCountries.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setSelectedCountry(c.id);
+                      setSelectedService('');
+                      setIsServiceInStock(false);
+                      setStockMessage('');
+                      setCalculatedPrice(0);
+                      setPriceOptions([]);
+                      setIsCountryModalOpen(false);
+                      setCountrySearchQuery('');
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-xs transition cursor-pointer ${
+                      selectedCountry === c.id ? 'bg-[#7C3AED] text-white font-bold' : 'hover:bg-[#F8F7FF] text-[#171329]'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-lg">{getCountryFlagEmoji(c.code || c.name)}</span>
+                      <span className="font-bold">{c.name}</span>
+                    </div>
+                    {selectedCountry === c.id && <Check className="w-4 h-4" />}
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1536,49 +1691,60 @@ export const Server2View: React.FC<Server2ViewProps> = ({
       {/* MODAL: SERVICE SELECTOR (SEARCHABLE MODAL)                                 */}
       {/* ========================================================================= */}
       {isServiceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#0e0721] border border-[#2b1756] rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-[#231248] flex items-center justify-between">
-              <h3 className="text-base font-black text-white">Select Service (Server 2)</h3>
-              <button onClick={() => setIsServiceModalOpen(false)} className="text-purple-300 hover:text-white cursor-pointer">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white border border-[#E9E2FA] rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-[#E9E2FA] flex items-center justify-between">
+              <h3 className="text-base font-bold text-[#171329]">Select Service (Server 2)</h3>
+              <button onClick={() => setIsServiceModalOpen(false)} className="text-[#716B82] hover:text-[#171329] cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-3 border-b border-[#231248]">
+            <div className="p-3 border-b border-[#E9E2FA]">
               <div className="relative">
-                <Search className="w-4 h-4 text-purple-400 absolute left-3 top-2.5" />
+                <Search className="w-4 h-4 text-[#716B82] absolute left-3 top-2.5" />
                 <input
                   type="text"
                   placeholder="Search apps (WhatsApp, Telegram, etc.)..."
                   value={serviceSearchQuery}
                   onChange={(e) => setServiceSearchQuery(e.target.value)}
-                  className="w-full bg-[#140b2b] border border-[#2b1756] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-purple-400/50 focus:outline-none focus:border-red-500"
+                  className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl pl-9 pr-3 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 focus:outline-none focus:border-[#7C3AED]"
                   autoFocus
                 />
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {filteredServices.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    setSelectedService(s.id);
-                    setIsServiceModalOpen(false);
-                    setServiceSearchQuery('');
-                  }}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-xs transition cursor-pointer ${
-                    selectedService === s.id ? 'bg-red-600 text-white font-black' : 'hover:bg-[#160b33] text-purple-200'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <Smartphone className="w-4 h-4 text-purple-400" />
-                    <span className="font-extrabold">{s.name}</span>
-                  </div>
-                  {selectedService === s.id && <Check className="w-4 h-4" />}
-                </button>
-              ))}
+              {servicesLoading ? (
+                <div className="p-8 text-center text-[#716B82] text-xs flex flex-col items-center justify-center space-y-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#7C3AED]" />
+                  <span>Loading services...</span>
+                </div>
+              ) : filteredServices.length === 0 ? (
+                <div className="p-8 text-center text-[#716B82] text-xs">
+                  {services.length === 0 ? 'No services available for this country.' : 'No services found matching your search.'}
+                </div>
+              ) : (
+                filteredServices.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setSelectedService(s.id);
+                      setIsServiceModalOpen(false);
+                      setServiceSearchQuery('');
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-xs transition cursor-pointer ${
+                      selectedService === s.id ? 'bg-[#7C3AED] text-white font-bold' : 'hover:bg-[#F8F7FF] text-[#171329]'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <Smartphone className="w-4 h-4 text-[#7C3AED]" />
+                      <span className="font-bold">{s.name}</span>
+                    </div>
+                    {selectedService === s.id && <Check className="w-4 h-4" />}
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1588,41 +1754,41 @@ export const Server2View: React.FC<Server2ViewProps> = ({
       {/* MODAL: NUMBER ORDERS HISTORY                                              */}
       {/* ========================================================================= */}
       {isNumberOrdersModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#0e0721] border border-[#2b1756] rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-[#231248] flex items-center justify-between">
-              <h3 className="text-base font-black text-white">Server 2 Number Orders</h3>
-              <button onClick={() => setIsNumberOrdersModalOpen(false)} className="text-purple-300 hover:text-white cursor-pointer">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white border border-[#E9E2FA] rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-[#E9E2FA] flex items-center justify-between">
+              <h3 className="text-base font-bold text-[#171329]">Server 2 Number Orders</h3>
+              <button onClick={() => setIsNumberOrdersModalOpen(false)} className="text-[#716B82] hover:text-[#171329] cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
               {numberOrders.length === 0 ? (
-                <div className="text-center py-10 text-purple-300/60 text-xs">
+                <div className="text-center py-10 text-[#716B82] text-xs">
                   No orders recorded for Server 2 yet.
                 </div>
               ) : (
                 numberOrders.map((ord) => (
-                  <div key={ord.orderId || ord.id} className="p-3 rounded-2xl bg-[#140b2b] border border-[#27134f] text-xs space-y-2">
+                  <div key={ord.orderId || ord.id} className="p-3.5 rounded-2xl bg-[#F8F7FF] border border-[#E9E2FA] text-xs space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-black text-white">{ord.service || 'Service'}</span>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                        ord.status === 'SMS_RECEIVED' || ord.code ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                      <span className="font-bold text-[#171329]">{ord.service || 'Service'}</span>
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                        ord.status === 'SMS_RECEIVED' || ord.code ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}>
                         {ord.status || 'Active'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-purple-300/80 font-mono">
+                    <div className="flex items-center justify-between text-[#716B82] font-mono">
                       <span>{ord.phoneNumber || ord.orderId}</span>
-                      {ord.amount && <span className="font-bold text-white">₦{ord.amount.toLocaleString()}</span>}
+                      {ord.amount && <span className="font-bold text-[#171329]">₦{ord.amount.toLocaleString()}</span>}
                     </div>
                     {ord.code && (
-                      <div className="bg-[#1a0f38] p-2 rounded-xl border border-emerald-500/30 flex items-center justify-between">
-                        <span className="font-mono font-black text-emerald-300">Code: {ord.code}</span>
+                      <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex items-center justify-between">
+                        <span className="font-mono font-bold text-emerald-800">Code: {ord.code}</span>
                         <button
                           onClick={() => handleCopy(ord.code || '', `code_${ord.orderId}`)}
-                          className="text-[10px] text-emerald-400 hover:text-white font-bold px-2 py-1 bg-emerald-500/20 rounded cursor-pointer"
+                          className="text-[10px] text-emerald-800 hover:text-emerald-900 font-bold px-2.5 py-1 bg-white border border-emerald-200 rounded-lg cursor-pointer"
                         >
                           {copiedText === `code_${ord.orderId}` ? 'Copied' : 'Copy'}
                         </button>
@@ -1637,112 +1803,44 @@ export const Server2View: React.FC<Server2ViewProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: BOOST HISTORY (CLICKED FROM DARK PILL IN SCREENSHOT 3)              */}
+      {/* MODAL: BOOST HISTORY                                                      */}
       {/* ========================================================================= */}
       {isBoostHistoryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#0e0721] border border-[#2b1756] rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-[#231248] flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white border border-[#E9E2FA] rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-[#E9E2FA] flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <RotateCw className="w-4 h-4 text-yellow-400" />
-                <h3 className="text-base font-black text-white">Boost Orders History (Server 2)</h3>
+                <RotateCw className="w-4 h-4 text-[#7C3AED]" />
+                <h3 className="text-base font-bold text-[#171329]">Boost Orders History (Server 2)</h3>
               </div>
-              <button onClick={() => setIsBoostHistoryOpen(false)} className="text-purple-300 hover:text-white cursor-pointer">
+              <button onClick={() => setIsBoostHistoryOpen(false)} className="text-[#716B82] hover:text-[#171329] cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
               {boostOrders.length === 0 ? (
-                <div className="text-center py-10 text-purple-300/60 text-xs">
+                <div className="text-center py-10 text-[#716B82] text-xs">
                   No boost orders placed on Server 2 yet.
                 </div>
               ) : (
-                boostOrders.map((ord) => {
-                  const currentOrderId = ord.orderId || ord.id || '';
-                  const isRefreshing = refreshingBoostOrderId === currentOrderId;
-                  const isRefilling = refillingBoostOrderId === currentOrderId;
-                  const isCancelling = cancellingBoostOrderId === currentOrderId;
-                  const statusStr = (ord.status || 'Processing').toLowerCase();
-                  const isCancelled = statusStr === 'cancelled' || statusStr === 'canceled';
-                  const isCompleted = statusStr === 'completed';
-
-                  return (
-                    <div key={currentOrderId} className="p-4 rounded-2xl bg-[#140b2b] border border-[#27134f] text-xs space-y-3 shadow-lg">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <span className="font-black text-white text-sm block truncate max-w-[220px]">
-                            {ord.serviceName || `Service #${ord.serviceId || ord.service}`}
-                          </span>
-                          <span className="text-[10px] text-purple-400/70 font-mono">
-                            ID: {currentOrderId}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider border ${
-                            isCompleted
-                              ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
-                              : isCancelled
-                              ? 'bg-red-950/60 border-red-500/40 text-red-300'
-                              : 'bg-indigo-950/60 border-indigo-500/40 text-indigo-300'
-                          }`}>
-                            {ord.status || 'Processing'}
-                          </span>
-                          <button
-                            onClick={() => handleRefreshBoostStatus(currentOrderId)}
-                            disabled={isRefreshing}
-                            className="p-1.5 bg-[#1e0f3d] hover:bg-[#2c1559] text-purple-300 hover:text-white rounded-lg border border-[#3b1c73] transition cursor-pointer"
-                            title="Check Live Status"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="bg-[#0f0724] p-2.5 rounded-xl border border-[#221045] space-y-1">
-                        <div className="text-purple-300/70 truncate text-[11px] flex items-center gap-1.5">
-                          <Link2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                          <span className="truncate">{ord.targetUrl || ord.link || ord.target}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-purple-300/80 font-mono text-[11px] pt-1 border-t border-[#1c0c38]">
-                          <span>Qty: {Number(ord.quantity || 0).toLocaleString()}</span>
-                          <span className="font-bold text-emerald-400">₦{Number(ord.totalChargeNgn || ord.charge || 0).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      {/* Feedback Alert for this order */}
-                      {boostActionFeedback && boostActionFeedback.orderId === currentOrderId && (
-                        <div className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
-                          boostActionFeedback.isError ? 'bg-red-950/60 text-red-300 border border-red-500/30' : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
-                        }`}>
-                          {boostActionFeedback.text}
-                        </div>
-                      )}
-
-                      {/* Action buttons: Refill & Cancel where supported */}
-                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#231248]">
-                        {!isCancelled && !isCompleted && (
-                          <button
-                            onClick={() => handleCancelBoostOrder(currentOrderId)}
-                            disabled={isCancelling}
-                            className="px-3 py-1 text-[11px] font-bold text-red-300 hover:text-white bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 rounded-lg transition cursor-pointer disabled:opacity-50"
-                          >
-                            {isCancelling ? 'Cancelling...' : 'Cancel & Refund'}
-                          </button>
-                        )}
-                        {(ord.refill || isCompleted) && !isCancelled && (
-                          <button
-                            onClick={() => handleRefillBoostOrder(currentOrderId)}
-                            disabled={isRefilling || ord.refillStatus === 'requested'}
-                            className="px-3 py-1 text-[11px] font-bold text-cyan-300 hover:text-white bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 rounded-lg transition cursor-pointer disabled:opacity-50"
-                          >
-                            {isRefilling ? 'Refilling...' : ord.refillStatus === 'requested' ? 'Refill Pending' : 'Request Refill'}
-                          </button>
-                        )}
-                      </div>
+                boostOrders.map((ord) => (
+                  <div key={ord.id || ord.orderId} className="p-3.5 rounded-2xl bg-[#F8F7FF] border border-[#E9E2FA] text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#171329] truncate max-w-[200px]">{ord.serviceName || 'Boost Service'}</span>
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA]">
+                        {ord.status || 'Processing'}
+                      </span>
                     </div>
-                  );
-                })
+                    <div className="text-[#716B82] truncate text-[11px]">
+                      {ord.targetUrl || ord.link}
+                    </div>
+                    <div className="flex items-center justify-between text-[#716B82] font-mono text-[11px]">
+                      <span>Qty: {ord.quantity.toLocaleString()}</span>
+                      <span className="font-bold text-[#171329]">₦{ord.totalChargeNgn.toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>

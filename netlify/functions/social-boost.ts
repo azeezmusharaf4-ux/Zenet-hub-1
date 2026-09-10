@@ -7,8 +7,14 @@ const getSmmApiKey = (): string => {
     process.env.ONEGRIDHUB_SMM_API_KEY,
     process.env.ONEGRIDHUB_API_KEY,
     process.env.ONEGRID_API_KEY,
+    process.env.VITE_ONEGRID_API_KEY,
+    process.env.VITE_ONEGRIDHUB_API_KEY,
+    process.env.VITE_ONEGRIDHUB_SMM_API_KEY,
     process.env.ONEGRIDHUB_KEY,
+    process.env.ONEGRIDHUB_SMM_KEY,
+    process.env.ONE_GRID_HUB_API_KEY,
     process.env.SMM_API_KEY,
+    process.env.VITE_SMM_API_KEY,
     process.env.OGH_API_KEY,
     process.env.ONEGRIDHUB_TOKEN
   ];
@@ -556,7 +562,11 @@ export const handler = async (event: any) => {
 
     // 4. POST /order - Place an SMM Order
     if (action === 'order') {
-      const { userId, serviceId, link, quantity, customComments } = body;
+      const userId = (body.userId || queryParams.userId || '').toString().trim();
+      const serviceId = (body.serviceId || body.service || '').toString().trim();
+      const link = (body.link || body.target || body.targetUrl || '').toString().trim();
+      const quantity = body.quantity;
+      const customComments = body.customComments || body.comments;
 
       if (!userId || !serviceId || !link || !quantity) {
         return {

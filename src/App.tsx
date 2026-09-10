@@ -53,8 +53,9 @@ import { ZenetUpdateAdminModal } from './components/ZenetUpdateAdminModal';
 import { SocialBoostView } from './components/SocialBoostView';
 import { VirtualNumbers2View } from './components/VirtualNumbers2View';
 import { SocialBoost2View } from './components/SocialBoost2View';
+import { Server2View } from './components/Server2View';
 import { PWAInstallBanner } from './components/PWAInstallPrompt';
-import { Phone, UserCheck, PhoneCall, Flame } from 'lucide-react';
+import { Phone, UserCheck, PhoneCall, Flame, Cpu } from 'lucide-react';
 
 import { 
   ShieldCheck, 
@@ -206,9 +207,15 @@ export default function App() {
   });
   const [authLoading, setAuthLoading] = useState<boolean>(true);
 
-  // Helper to update and cache user profile
+  // Helper to update and cache user profile stably
   const setAndCacheUserProfile = (profile: UserProfile | null) => {
-    setUserProfile(profile);
+    setUserProfile((prev) => {
+      if (!prev && !profile) return null;
+      if (prev && profile && prev.uid === profile.uid && prev.walletBalance === profile.walletBalance && prev.role === profile.role && prev.email === profile.email) {
+        return prev;
+      }
+      return profile;
+    });
     try {
       if (profile) {
         localStorage.setItem('zenet_cached_user_profile', JSON.stringify(profile));
@@ -363,17 +370,19 @@ export default function App() {
     };
   }, [user?.uid]);
 
-  // Sync walletBalance with userProfile
+  // Sync walletBalance with userProfile stably without triggering re-render loops
   useEffect(() => {
     if (userProfile) {
-      const balance = typeof userProfile.walletBalance === 'number' 
-        ? userProfile.walletBalance 
-        : (userProfile.walletBalance ? Number(userProfile.walletBalance) : 0);
-      setWalletBalance(isNaN(balance) ? 0 : balance);
+      const raw = userProfile.walletBalance;
+      const balance = typeof raw === 'number' 
+        ? raw 
+        : (raw ? Number(raw) : 0);
+      const safeBalance = isNaN(balance) ? 0 : balance;
+      setWalletBalance((prev) => (prev !== safeBalance ? safeBalance : prev));
     } else if (!user) {
-      setWalletBalance(0);
+      setWalletBalance((prev) => (prev !== 0 ? 0 : prev));
     }
-  }, [userProfile, user]);
+  }, [userProfile?.walletBalance, user?.uid]);
 
   // Smoothly close Authentication Modal only after both user AND userProfile (including role/wallet) are fully loaded and synchronized
   useEffect(() => {
@@ -381,7 +390,7 @@ export default function App() {
       setAuthMode(null);
       setSessionExpiredNotice('');
     }
-  }, [user, userProfile, authMode]);
+  }, [user?.uid, Boolean(userProfile), authMode]);
 
   const handleAddWalletFunds = async (amount: number, gateway: string, reference?: string) => {
     // Verification is executed by server Paystack verify/webhook endpoints.
@@ -414,6 +423,7 @@ export default function App() {
       'social-boost-2',
       'virtual-numbers',
       'virtual-numbers-2',
+      'server-tool',
       'log-accounts',
       'categories',
       'support',
@@ -496,12 +506,29 @@ export default function App() {
     }
   };
 
+  // Dedicated helper to return to homepage and reset scroll to top
+  const handleBackToMarketplace = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    navigateRoute({ view: 'marketplace', product: null, seller: null, walletModal: false, dashboardTab: null });
+  };
+
+  // Scroll to top whenever activeView transitions to 'marketplace'
+  useEffect(() => {
+    if (activeView === 'marketplace') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [activeView]);
+
   // Select Drawer View action
   const handleSelectView = (view: ActiveAppView) => {
     setIsDrawerOpen(false);
 
+    if (view === 'marketplace') {
+      handleBackToMarketplace();
+      return;
+    }
+
     if (
-      view === 'marketplace' ||
       view === 'categories' ||
       view === 'support' ||
       view === 'admin_wallets' ||
@@ -509,8 +536,10 @@ export default function App() {
       view === 'social-boost-2' ||
       view === 'virtual-numbers' ||
       view === 'virtual-numbers-2' ||
+      view === 'server-tool' ||
       view === 'log-accounts'
     ) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
       navigateRoute({ view, dashboardTab: null, walletModal: false, product: null, seller: null });
       return;
     }
@@ -571,7 +600,12 @@ export default function App() {
     });
   }, [navigateRoute]);
 
-  // Listen for Browser Back / Forward buttons (popstate event)
+  const listingsRef = useRef(listings);
+  useEffect(() => {
+    listingsRef.current = listings;
+  }, [listings]);
+
+  // Listen for Browser Back / Forward buttons (popstate event) stably without re-attaching
   useEffect(() => {
     const handlePopState = () => {
       const url = new URL(window.location.href);
@@ -584,6 +618,7 @@ export default function App() {
         'social-boost-2',
         'virtual-numbers',
         'virtual-numbers-2',
+        'server-tool',
         'log-accounts',
         'categories',
         'support',
@@ -605,8 +640,9 @@ export default function App() {
       }));
 
       const prodId = url.searchParams.get('product') || url.searchParams.get('p');
-      if (prodId && listings.length > 0) {
-        const match = listings.find((l) => l.id === prodId);
+      const currentListings = listingsRef.current;
+      if (prodId && currentListings.length > 0) {
+        const match = currentListings.find((l) => l.id === prodId);
         setSelectedListing(match || null);
       } else {
         setSelectedListing(null);
@@ -631,7 +667,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [listings]);
+  }, []);
 
   // Sync state with URL params when listings/user load for initial direct links
   useEffect(() => {
@@ -1750,15 +1786,13 @@ export default function App() {
   // Auth Loading Splash Screen
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#070311] text-purple-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F8F7FF] text-[#171329] flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500 p-0.5 animate-pulse shadow-lg shadow-purple-600/30">
-            <div className="w-full h-full bg-[#0d061f] rounded-[14px] flex items-center justify-center text-white font-black text-2xl">
-              Z
-            </div>
+          <div className="w-14 h-14 rounded-2xl bg-[#7C3AED] shadow-sm flex items-center justify-center text-white font-black text-2xl">
+            Z
           </div>
-          <div className="flex items-center space-x-2 text-xs font-bold text-purple-300/80 tracking-wide uppercase">
-            <span className="w-4 h-4 border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin"></span>
+          <div className="flex items-center space-x-2 text-xs font-bold text-[#716B82] tracking-wide uppercase">
+            <span className="w-4 h-4 border-2 border-[#E9E2FA] border-t-[#7C3AED] rounded-full animate-spin"></span>
             <span>Connecting to ZENET HUB...</span>
           </div>
         </div>
@@ -1769,7 +1803,7 @@ export default function App() {
   // Enforce authentication: if no user is signed in, display a full-screen landing / authentication screen
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#070311] text-purple-100 font-sans antialiased flex flex-col items-center justify-center p-4 w-full">
+      <div className="min-h-screen bg-[#F8F7FF] text-[#171329] font-sans antialiased flex flex-col items-center justify-center p-4 w-full">
         <AuthModal
           mode={authMode === 'signup' ? 'signup' : 'login'}
           sessionExpiredNotice={sessionExpiredNotice}
@@ -1789,15 +1823,13 @@ export default function App() {
   // Prevent flash of un-synchronized profile data upon initial successful login
   if (!userProfile) {
     return (
-      <div className="min-h-screen bg-[#070311] text-purple-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F8F7FF] text-[#171329] flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500 p-0.5 animate-pulse shadow-lg shadow-purple-600/30">
-            <div className="w-full h-full bg-[#0d061f] rounded-[14px] flex items-center justify-center text-white font-black text-2xl">
-              Z
-            </div>
+          <div className="w-14 h-14 rounded-2xl bg-[#7C3AED] shadow-sm flex items-center justify-center text-white font-black text-2xl">
+            Z
           </div>
-          <div className="flex items-center space-x-2 text-xs font-bold text-purple-300/80 tracking-wide uppercase">
-            <span className="w-4 h-4 border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin"></span>
+          <div className="flex items-center space-x-2 text-xs font-bold text-[#716B82] tracking-wide uppercase">
+            <span className="w-4 h-4 border-2 border-[#E9E2FA] border-t-[#7C3AED] rounded-full animate-spin"></span>
             <span>Synchronizing user session...</span>
           </div>
         </div>
@@ -1806,7 +1838,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070311] text-purple-100 font-sans antialiased flex flex-row selection:bg-purple-600 selection:text-white w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen bg-[#F8F7FF] text-[#171329] font-sans antialiased flex flex-row selection:bg-[#7C3AED] selection:text-white w-full max-w-full overflow-x-hidden">
       
       {/* Desktop Sidebar Navigation */}
       <Sidebar
@@ -1870,6 +1902,7 @@ export default function App() {
           onOpenZenetUpdate={() => setIsZenetUpdateModalOpen(true)}
           onOpenSocialBoost={() => handleSelectView('social-boost')}
           activeView={activeView}
+          onGoHome={handleBackToMarketplace}
         />
 
         {/* Left Slide-out Navigation Drawer (☰) */}
@@ -1905,9 +1938,9 @@ export default function App() {
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-8 sm:pb-12 overflow-x-hidden">
 
           {/* VIEW: VIRTUAL NUMBERS MARKETPLACE */}
-          {activeView === 'virtual-numbers' && userProfile && (
+          {activeView === 'virtual-numbers' && (
             <VirtualNumbersView
-              userProfile={userProfile}
+              userProfile={userProfile || ({ uid: user?.uid || '', email: user?.email || '', username: user?.displayName || 'User', role: 'customer', walletBalance } as any)}
               walletBalance={walletBalance}
               onRefreshProfile={async () => {
                 if (!user) return;
@@ -1917,15 +1950,15 @@ export default function App() {
                   setUserProfile(uSnap.data() as UserProfile);
                 }
               }}
-              onBackToMarketplace={() => setActiveView('marketplace')}
+              onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
             />
           )}
 
           {/* VIEW: LOG ACCOUNTS MARKETPLACE */}
-          {activeView === 'log-accounts' && userProfile && (
+          {activeView === 'log-accounts' && (
             <LogAccountsView
-              userProfile={userProfile}
+              userProfile={userProfile || ({ uid: user?.uid || '', email: user?.email || '', username: user?.displayName || 'Guest', role: 'customer', walletBalance } as any)}
               walletBalance={walletBalance}
               listings={listings}
               listingsLoading={listingsLoading}
@@ -1942,7 +1975,7 @@ export default function App() {
                   setUserProfile(uSnap.data() as UserProfile);
                 }
               }}
-              onBackToMarketplace={() => setActiveView('marketplace')}
+              onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
               onSelectListing={handleSelectListing}
               onContactSeller={handleContactSeller}
@@ -1957,6 +1990,7 @@ export default function App() {
           {activeView === 'categories' && (
             <CategoriesView
               listings={listings}
+              onBackToMarketplace={handleBackToMarketplace}
               onSelectCategory={(cat) => {
                 setFilters((prev) => ({ ...prev, category: cat }));
                 setActiveView('log-accounts');
@@ -1972,6 +2006,7 @@ export default function App() {
               isOwner={isOwner}
               isAdmin={isAdmin}
               onOpenAuth={(mode) => setAuthMode(mode)}
+              onBackToMarketplace={handleBackToMarketplace}
             />
           )}
 
@@ -1980,7 +2015,7 @@ export default function App() {
             <AdminWalletsView
               user={user}
               userProfile={userProfile}
-              onBackToMarketplace={() => handleSelectView('marketplace')}
+              onBackToMarketplace={handleBackToMarketplace}
               onOpenAuth={(mode) => setAuthMode(mode)}
             />
           )}
@@ -1990,13 +2025,13 @@ export default function App() {
             <SocialBoostView
               userProfile={userProfile}
               walletBalance={walletBalance}
-              onBackToMarketplace={() => setActiveView('marketplace')}
+              onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
             />
           )}
 
           {/* VIEW: SERVICE NUMBER 2 / VIRTUAL NUMBER 2 (NEW PROVIDER 2) */}
-          {activeView === 'virtual-numbers-2' && userProfile && (
+          {activeView === 'virtual-numbers-2' && (
             <VirtualNumbers2View
               userProfile={userProfile}
               walletBalance={walletBalance}
@@ -2008,7 +2043,7 @@ export default function App() {
                   setUserProfile(uSnap.data() as UserProfile);
                 }
               }}
-              onBackToMarketplace={() => setActiveView('marketplace')}
+              onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
             />
           )}
@@ -2026,7 +2061,27 @@ export default function App() {
                   setUserProfile(uSnap.data() as UserProfile);
                 }
               }}
-              onBackToMarketplace={() => setActiveView('marketplace')}
+              onBackToMarketplace={handleBackToMarketplace}
+              onOpenWallet={() => handleSelectView('wallet')}
+              onSwitchToServer1={() => handleSelectView('social-boost')}
+            />
+          )}
+
+          {/* VIEW: SERVER TOOL (EXTRA LOG TOOLS UNIFIED VIRTUAL NUMBERS & SOCIAL BOOST) */}
+          {activeView === 'server-tool' && (
+            <Server2View
+              userProfile={userProfile}
+              walletBalance={walletBalance}
+              initialPage="front"
+              onRefreshProfile={async () => {
+                if (!user) return;
+                const userRef = doc(db, 'users', user.uid);
+                const uSnap = await getDoc(userRef);
+                if (uSnap.exists()) {
+                  setUserProfile(uSnap.data() as UserProfile);
+                }
+              }}
+              onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
               onSwitchToServer1={() => handleSelectView('social-boost')}
             />
@@ -2038,33 +2093,30 @@ export default function App() {
               {/* Main Services UI Grid */}
               <div className="mb-8">
                 <div className="space-y-1 mb-4">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#9e67fa] block">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#7C3AED] block">
                     OUR VERIFIED SOLUTIONS
                   </span>
-                  <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center space-x-1.5">
+                  <h3 className="text-2xl sm:text-3xl font-black text-[#171329] tracking-tight flex items-center space-x-1.5">
                     <span>Main Services</span>
-                    <span className="text-[#a16eff] font-black">•</span>
+                    <span className="text-[#7C3AED] font-black">•</span>
                   </h3>
                 </div>
 
                 {/* Unified Balance and Funding Widget */}
-                <div className="relative overflow-hidden flex items-center justify-between space-x-4 text-xs sm:text-sm font-black text-white mb-6 bg-gradient-to-r from-[#170830] via-[#24114f] to-[#170830] border border-[#7d4cf7]/40 px-5 py-3.5 rounded-2xl shadow-[0_0_20px_rgba(125,76,247,0.15)]">
-                  {/* Subtle shining light sweep reflection */}
-                  <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-40 animate-pulse" />
-                  
+                <div className="flex items-center justify-between space-x-4 text-xs sm:text-sm font-bold text-[#171329] mb-6 bg-white border border-[#E9E2FA] px-5 py-3.5 rounded-2xl shadow-sm">
                   <div className="flex items-center space-x-2">
-                    <span className="text-[#c1a0ff] tracking-widest uppercase text-[10px] sm:text-xs">Balance</span>
-                    <span className="font-black text-white text-sm sm:text-base font-mono bg-black/40 px-3 py-1.5 rounded-lg border border-purple-900/30">
+                    <span className="text-[#716B82] tracking-widest uppercase text-[10px] sm:text-xs">Balance</span>
+                    <span className="font-black text-[#171329] text-sm sm:text-base font-mono bg-[#F8F7FF] px-3.5 py-1.5 rounded-xl border border-[#E9E2FA]">
                       ₦{walletBalance.toLocaleString()}
                     </span>
                   </div>
 
                   <button
                     onClick={() => setIsWalletModalOpen(true)}
-                    className="relative overflow-hidden px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#8a4ff7] to-[#b37eff] hover:from-[#965eff] hover:to-[#be8eff] text-white font-black text-xs sm:text-sm transition-all duration-300 cursor-pointer shadow-[0_0_15px_rgba(138,79,247,0.4)] hover:shadow-[0_0_22px_rgba(138,79,247,0.6)] active:scale-95 flex items-center space-x-2 border border-purple-300/30 uppercase tracking-wider"
+                    className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-sm flex items-center space-x-2 uppercase tracking-wider"
                   >
                     <span>Fund Account</span>
-                    <span className="w-2 h-2 rounded-full bg-white animate-ping shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-white shrink-0 shadow-sm" />
                   </button>
                 </div>
                 
@@ -2073,14 +2125,14 @@ export default function App() {
                   <button
                     id="main-service-log-accounts"
                     onClick={() => setActiveView('log-accounts')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#4d24a3] hover:bg-[#12082b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px]"
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px]"
                   >
-                    <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-[#bd93f9] border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center">
-                      <UserCheck className="w-6.5 h-6.5" />
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                      <UserCheck className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-white text-sm sm:text-base">Log Accounts</h4>
-                      <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
+                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Log Accounts</h4>
+                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Purchase verified digital logs
                       </p>
                     </div>
@@ -2089,15 +2141,15 @@ export default function App() {
                   {/* 2. Service Number */}
                   <button
                     id="main-service-virtual-numbers"
-                    onClick={() => user ? setActiveView('virtual-numbers') : setAuthMode('login')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#4d24a3] hover:bg-[#12082b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px]"
+                    onClick={() => handleSelectView('virtual-numbers')}
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px]"
                   >
-                    <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-[#bd93f9] border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center">
-                      <Phone className="w-6.5 h-6.5" />
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                      <Phone className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-white text-sm sm:text-base">Service Number</h4>
-                      <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
+                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Service Number</h4>
+                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Buy active virtual phone numbers
                       </p>
                     </div>
@@ -2107,14 +2159,14 @@ export default function App() {
                   <button
                     id="main-service-social-boost"
                     onClick={() => handleSelectView('social-boost')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#4d24a3] hover:bg-[#12082b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px]"
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px]"
                   >
-                    <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-indigo-400 border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center animate-pulse">
-                      <TrendingUp className="w-6.5 h-6.5" />
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-white text-sm sm:text-base">Social Boost</h4>
-                      <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
+                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Social Boost</h4>
+                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Automated growth panels & social boosting services
                       </p>
                     </div>
@@ -2124,14 +2176,14 @@ export default function App() {
                   <button
                     id="main-service-zenet-update"
                     onClick={() => setIsZenetUpdateModalOpen(true)}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#4d24a3] hover:bg-[#12082b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px]"
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px]"
                   >
-                    <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-[#bd93f9] border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center">
-                      <Sparkles className="w-6.5 h-6.5" />
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                      <Sparkles className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-white text-sm sm:text-base">Zenet Update</h4>
-                      <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
+                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Zenet Update</h4>
+                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Get the latest verified system updates and digital releases
                       </p>
                     </div>
@@ -2140,18 +2192,18 @@ export default function App() {
                   {/* 5. Service Number 2 */}
                   <button
                     id="main-service-virtual-numbers-2"
-                    onClick={() => user ? handleSelectView('virtual-numbers-2') : setAuthMode('login')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#8a4ff7] hover:bg-[#13072b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px] relative overflow-hidden"
+                    onClick={() => handleSelectView('virtual-numbers-2')}
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px] relative overflow-hidden"
                   >
-                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-purple-600/30 text-purple-300 border border-purple-500/40 text-[9px] font-black uppercase tracking-wider">
+                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-[#EDE9FE] text-[#5B21B6] border border-[#C4B5FD] text-[9px] font-black uppercase tracking-wider">
                       Provider 2
                     </div>
-                    <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-purple-400 border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center">
-                      <PhoneCall className="w-6.5 h-6.5" />
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                      <PhoneCall className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-white text-sm sm:text-base">Service Number 2</h4>
-                      <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
+                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Service Number 2</h4>
+                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Buy Provider 2 virtual numbers & instant SMS
                       </p>
                     </div>
@@ -2161,17 +2213,17 @@ export default function App() {
                   <button
                     id="main-service-social-boost-2"
                     onClick={() => handleSelectView('social-boost-2')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-8 rounded-[24px] bg-[#0c051f] border border-[#1b0d38] hover:border-[#8a4ff7] hover:bg-[#13072b] transition duration-300 cursor-pointer group shadow-lg min-h-[180px] relative overflow-hidden"
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px] relative overflow-hidden"
                   >
-                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-[9px] font-black uppercase tracking-wider">
+                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-[#EDE9FE] text-[#5B21B6] border border-[#C4B5FD] text-[9px] font-black uppercase tracking-wider">
                       Provider 2
                     </div>
-                    <div className="p-5 rounded-[22px] bg-[#1a0d3b] text-indigo-400 border border-[#2b165c] group-hover:scale-105 transition duration-300 shrink-0 mb-4 flex items-center justify-center">
-                      <Flame className="w-6.5 h-6.5" />
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                      <Flame className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-white text-sm sm:text-base">Social Boost 2</h4>
-                      <p className="text-[10px] sm:text-xs text-purple-300/40 font-semibold leading-tight max-w-[140px] mx-auto">
+                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Social Boost 2</h4>
+                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Provider 2 high-speed social boost & growth panel
                       </p>
                     </div>
