@@ -50,17 +50,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         )}
       </button>
 
-      {/* 3. Orders */}
+      {/* 3. History */}
       <button
         onClick={() => onSelectView('orders')}
         className={`relative flex flex-col items-center justify-center min-h-[44px] py-1 px-3 rounded-2xl transition cursor-pointer ${
-          activeView === 'orders'
+          activeView === 'orders' || activeView === 'history'
             ? 'text-[#7C3AED] font-bold'
             : 'text-[#716B82] hover:text-[#171329]'
         }`}
       >
-        <ShoppingBag className={`w-5 h-5 ${activeView === 'orders' ? 'text-[#7C3AED]' : 'text-[#716B82]'}`} />
-        <span className="text-[10px] mt-0.5">Orders</span>
+        <ShoppingBag className={`w-5 h-5 ${activeView === 'orders' || activeView === 'history' ? 'text-[#7C3AED]' : 'text-[#716B82]'}`} />
+        <span className="text-[10px] mt-0.5">History</span>
         {ordersCount > 0 && (
           <span className="absolute top-1 right-2 bg-[#7C3AED] text-white font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
             {ordersCount}

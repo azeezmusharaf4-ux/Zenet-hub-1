@@ -107,23 +107,25 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Validate connection per skill instructions asynchronously without blocking auth initialization
 if (typeof window !== 'undefined') {
   const testConnection = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return;
+    }
     try {
       await getDocFromServer(doc(db, 'test', 'connection'));
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('the client is offline')) {
-        console.warn('Firebase connection notice: client is offline');
-      } else {
-        // Suppress expected transient token or network init notices during boot
-        console.debug('Firebase initial connection check notice:', error);
-      }
+    } catch {
+      // Quietly allow offline mode fallback when network is slow or connecting
     }
   };
 
   // Run testConnection after the initial execution frame to avoid racing with auth token init
   if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(() => testConnection(), { timeout: 3000 });
+    requestIdleCallback(() => {
+      testConnection().catch(() => {});
+    }, { timeout: 4000 });
   } else {
-    setTimeout(testConnection, 1500);
+    setTimeout(() => {
+      testConnection().catch(() => {});
+    }, 2500);
   }
 }
 

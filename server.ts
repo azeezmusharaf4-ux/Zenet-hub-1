@@ -5143,7 +5143,8 @@ const getXtraLogsToolsConfig = () => {
     process.env.PROVIDER2_SMM_API_KEY,
     process.env.PROVIDER2_API_KEY,
     process.env.SERVICE_NUMBER_2_API_KEY,
-    process.env.VIRTUAL_NUMBER_2_API_KEY
+    process.env.VIRTUAL_NUMBER_2_API_KEY,
+    '1a0375fba48d67fb0a534e0a2d2adcda' // Active EstraLog Tools API Key
   ];
   let apiKey = '';
   for (const c of candidates) {
@@ -5234,16 +5235,16 @@ const queryXtraLogsTools = async (
       throw new Error(`Invalid JSON response from XtraLogsTools: ${text.slice(0, 150)}`);
     }
   } else {
-    const urlObj = new URL(baseUrl);
-    urlObj.searchParams.set('endpoint', endpoint);
+    // For POST requests to LiteSpeed/PHP API, pass endpoint inside POST body to avoid 403 Forbidden
     const bodyParams = new URLSearchParams();
+    bodyParams.append('endpoint', endpoint);
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== null && v !== '') {
         bodyParams.append(k, String(v));
       }
     }
     headers['Content-Type'] = 'application/x-www-form-urlencoded';
-    const response = await fetch(urlObj.toString(), {
+    const response = await fetch(baseUrl, {
       method: 'POST',
       headers,
       body: bodyParams.toString(),

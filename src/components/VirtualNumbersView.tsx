@@ -55,6 +55,7 @@ interface VirtualNumbersViewProps {
   onRefreshProfile: () => void;
   onBackToMarketplace: () => void;
   onOpenWallet: () => void;
+  initialServer?: string;
 }
 
 export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
@@ -62,7 +63,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   walletBalance,
   onRefreshProfile,
   onBackToMarketplace,
-  onOpenWallet
+  onOpenWallet,
+  initialServer
 }) => {
   const isOwner = userProfile?.role === 'owner' || userProfile?.email?.toLowerCase().trim() === 'azeezmusharaf4@gmail.com' || auth?.currentUser?.email?.toLowerCase().trim() === 'azeezmusharaf4@gmail.com';
 
@@ -86,7 +88,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   const [orders, setOrders] = useState<any[]>([]);
 
   // Selected values & Live Pricing Breakdown
-  const [selectedServer, setSelectedServer] = useState<string>('server_1');
+  const [selectedServer, setSelectedServer] = useState<string>(initialServer || 'all1');
   const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [selectedService, setSelectedService] = useState<string>('');
 
@@ -887,62 +889,14 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   // Dynamic Card & Theme Settings based on active tab and selected server
   const isUsaMode = activeTab === 'usa';
 
-  // Server styling configurations matching the reference screenshots
-  const getServerConfig = () => {
-    if (isUsaMode) {
-      // USA Mode Theme (Screenshot IMG_2194 - magenta/pink accent header, dark selected pills)
-      const serverNum = selectedServer.includes('2') ? '2' : selectedServer.includes('3') ? '3' : '1';
-      return {
-        headerBg: 'bg-[#9d174d] bg-gradient-to-r from-[#be185d] to-[#9d174d]',
-        dotColor: 'bg-[#f472b6]',
-        headerTitle: `🇺🇸 USA Server ${serverNum} — USA Numbers`,
-        iconBg: 'bg-[#be185d]',
-        buttonBg: 'bg-gradient-to-r from-[#be185d] to-[#9d174d] hover:from-[#db2777] hover:to-[#be185d] text-white shadow-[0_4px_20px_rgba(190,24,93,0.35)]',
-        buttonText: 'Buy Number',
-        buttonIcon: <CreditCard className="w-4 h-4 mr-2 inline" />,
-        badgeText: `USA SV${serverNum}`
-      };
-    } else {
-      // All Countries Theme (Screenshot IMG_2193 - warm orange/amber header for SV1, blue for SV2, teal for SV3)
-      if (selectedServer === 'all2' || selectedServer === 'server_2') {
-        return {
-          headerBg: 'bg-gradient-to-r from-blue-600 to-sky-600',
-          dotColor: 'bg-sky-300',
-          headerTitle: '🌐 All Countries Server 2 (Pro Gateway)',
-          iconBg: 'bg-blue-600',
-          buttonBg: 'bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white shadow-[0_4px_20px_rgba(37,99,235,0.35)]',
-          buttonText: 'Rent Number',
-          buttonIcon: <FileText className="w-4 h-4 mr-2 inline" />,
-          badgeText: 'ALL SV2'
-        };
-      } else if (selectedServer === 'all3' || selectedServer === 'server_3') {
-        return {
-          headerBg: 'bg-gradient-to-r from-emerald-600 to-teal-600',
-          dotColor: 'bg-emerald-300',
-          headerTitle: '🌐 All Countries Server 3 (Direct / Special)',
-          iconBg: 'bg-emerald-600',
-          buttonBg: 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-[0_4px_20px_rgba(5,150,105,0.35)]',
-          buttonText: 'Rent Number',
-          buttonIcon: <FileText className="w-4 h-4 mr-2 inline" />,
-          badgeText: 'ALL SV3'
-        };
-      } else {
-        // Default Server 1 (All Countries) - Warm Orange
-        return {
-          headerBg: 'bg-[#c2410c] bg-gradient-to-r from-[#ea580c] to-[#c2410c]',
-          dotColor: 'bg-[#fb923c]',
-          headerTitle: '🌐 All Countries Server 1',
-          iconBg: 'bg-[#ea580c]',
-          buttonBg: 'bg-gradient-to-r from-[#ea580c] to-[#c2410c] hover:from-[#f97316] hover:to-[#ea580c] text-white shadow-[0_4px_20px_rgba(234,88,12,0.35)]',
-          buttonText: 'Rent Number',
-          buttonIcon: <FileText className="w-4 h-4 mr-2 inline" />,
-          badgeText: 'ALL SV1'
-        };
-      }
-    }
+  const getServerIndex = (serverId: string) => {
+    if (serverId.includes('1') || serverId.endsWith('1')) return '1';
+    if (serverId.includes('2') || serverId.endsWith('2')) return '2';
+    if (serverId.includes('3') || serverId.endsWith('3')) return '3';
+    return '1';
   };
 
-  const serverConfig = getServerConfig();
+  const selectedServerNumber = getServerIndex(selectedServer);
 
   const displayedServers = isUsaMode
     ? (servers.filter(s => s.id?.startsWith('usa') || (s as any).region === 'USA').length > 0
@@ -953,51 +907,52 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         : [{ id: 'all1', name: 'Server 1 (All Countries)', region: 'Global' }, { id: 'all2', name: 'Server 2 (Pro Gateway)', region: 'Global' }, { id: 'all3', name: 'Server 3 (Special / Direct)', region: 'Global' }]);
 
   return (
-    <div className="w-full max-w-xl mx-auto px-2 sm:px-0">
+    <div className="w-full max-w-md mx-auto px-3 sm:px-0 space-y-4">
       
-      {/* 1. TOP HEADER (Matching Screenshots) */}
-      <div className="flex items-center justify-between bg-white text-[#171329] px-4 py-3.5 rounded-2xl mb-6 shadow-sm border border-[#E9E2FA]">
-        <button
-          type="button"
-          onClick={activeStep === 'activation' ? () => setActiveStep('selection') : onBackToMarketplace}
-          className="p-2 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#171329] rounded-xl transition cursor-pointer border border-[#E9E2FA] flex items-center justify-center"
-          title="Back to Marketplace"
-        >
-          <ArrowLeft className="w-5 h-5 text-[#171329]" />
-        </button>
+      {/* 1. TOP HEADER (Matching Reference Image) */}
+      <div className="flex items-center justify-between bg-white text-[#171329] px-4 py-3 rounded-2xl shadow-xs border border-[#E9E2FA]">
+        <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={activeStep === 'activation' ? () => setActiveStep('selection') : onBackToMarketplace}
+            className="w-9 h-9 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#171329] rounded-xl transition cursor-pointer border border-[#E9E2FA] flex items-center justify-center shrink-0 active:scale-95"
+            title="Back to Marketplace"
+          >
+            <ArrowLeft className="w-5 h-5 text-[#171329]" />
+          </button>
 
-        <h1 className="text-base sm:text-lg font-bold tracking-tight text-[#171329] flex items-center space-x-1.5">
-          <span>Global Virtual Numbers</span>
-        </h1>
+          <h1 className="text-base sm:text-lg font-black tracking-tight text-[#171329]">
+            Global Virtual Numbers
+          </h1>
+        </div>
 
         <div className="flex items-center space-x-2">
           {isOwner && (
             <button
               onClick={() => setIsOwnerSettingsOpen(true)}
-              className="flex items-center space-x-1 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:text-amber-900 rounded-lg text-[11px] font-bold transition cursor-pointer"
+              className="w-9 h-9 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] rounded-xl border border-[#E9E2FA] flex items-center justify-center transition cursor-pointer shrink-0"
               title="Configure Pricing Engine"
             >
-              <Settings className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Settings</span>
+              <Settings className="w-4.5 h-4.5" />
             </button>
           )}
 
-          <div className="relative p-2 bg-[#F8F7FF] text-[#716B82] rounded-xl border border-[#E9E2FA] flex items-center justify-center">
-            <Bell className="w-5 h-5 text-[#716B82]" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full shrink-0 shadow-sm" />
+          <div className="relative w-9 h-9 bg-[#F8F7FF] text-[#716B82] rounded-xl border border-[#E9E2FA] flex items-center justify-center shrink-0">
+            <Bell className="w-4.5 h-4.5 text-[#716B82]" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
           </div>
         </div>
       </div>
 
       {infoMessage && (
-        <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-xs">
           <span>{infoMessage}</span>
           <button onClick={() => setInfoMessage('')} className="text-emerald-700 hover:text-emerald-900 font-extrabold cursor-pointer">×</button>
         </div>
       )}
 
       {errorMessage && (
-        <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold p-3.5 rounded-2xl flex items-center justify-between shadow-xs">
           <span>{errorMessage}</span>
           <button onClick={() => setErrorMessage('')} className="text-rose-700 hover:text-rose-900 font-extrabold cursor-pointer">×</button>
         </div>
@@ -1005,10 +960,10 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
       {/* STEP 1: SELECTION FLOW */}
       {activeStep === 'selection' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           
-          {/* 2. COUNTRY TYPE SWITCH (Large Segmented Control) */}
-          <div className="bg-white p-1.5 rounded-[28px] border border-[#E9E2FA] shadow-sm flex items-center">
+          {/* 2. REGION SWITCHER (USA Numbers vs All Countries) */}
+          <div className="flex items-center space-x-2.5">
             <button
               type="button"
               onClick={() => {
@@ -1018,13 +973,17 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 setSelectedCountry('187');
                 setSelectedService('');
               }}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-[22px] text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
+              className={`flex-1 py-2.5 px-4 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center justify-between shadow-xs ${
                 isUsaMode
-                  ? 'bg-[#7C3AED] text-white shadow-sm'
-                  : 'text-[#716B82] hover:text-[#171329] hover:bg-[#F8F7FF]'
+                  ? 'bg-[#6D28D9] text-white shadow-purple-600/20'
+                  : 'bg-white text-[#171329] border border-[#E9E2FA] hover:border-[#6D28D9]/40 hover:bg-[#FAF8FE]'
               }`}
             >
-              <span>🇺🇸 USA Numbers</span>
+              <span className="flex items-center space-x-1.5 truncate">
+                <span>🇺🇸</span>
+                <span>USA Numbers</span>
+              </span>
+              <ChevronDown className={`w-4 h-4 ml-1.5 shrink-0 transition-transform ${isUsaMode ? 'text-white' : 'text-[#716B82]'}`} />
             </button>
             
             <button
@@ -1036,43 +995,37 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 setSelectedCountry('');
                 setSelectedService('');
               }}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-[22px] text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer ${
+              className={`py-2.5 px-5 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center space-x-1.5 shadow-xs shrink-0 ${
                 !isUsaMode
-                  ? 'bg-[#7C3AED] text-white shadow-sm'
-                  : 'text-[#716B82] hover:text-[#171329] hover:bg-[#F8F7FF]'
+                  ? 'bg-[#6D28D9] text-white shadow-purple-600/20'
+                  : 'bg-white text-[#171329] border border-[#E9E2FA] hover:border-[#6D28D9]/40 hover:bg-[#FAF8FE]'
               }`}
             >
-              <Globe className="w-4 h-4" />
-              <span>🌐 All Countries</span>
+              <Globe className="w-4 h-4 shrink-0" />
+              <span>All Countries</span>
             </button>
           </div>
 
           {/* 3. SMS SERVER SELECTION */}
-          <div className="space-y-2.5">
-            <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block pl-1">
+          <div className="space-y-2">
+            <span className="text-[11px] font-black text-[#64748B] uppercase tracking-wider block pl-1">
               CHOOSE SMS SERVER
             </span>
 
             <div className="grid grid-cols-3 gap-2.5">
               {serversLoading ? (
-                <div className="col-span-3 text-xs text-[#7C3AED] flex items-center justify-center space-x-2 py-3">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#7C3AED]" />
+                <div className="col-span-3 text-xs text-[#6D28D9] font-bold flex items-center justify-center space-x-2 py-3 bg-white border border-[#E9E2FA] rounded-2xl shadow-xs">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#6D28D9]" />
                   <span>Loading servers...</span>
                 </div>
               ) : displayedServers.length === 0 ? (
-                <div className="col-span-3 text-xs text-[#716B82] text-center py-2">
+                <div className="col-span-3 text-xs text-[#716B82] text-center py-3 bg-white border border-[#E9E2FA] rounded-2xl shadow-xs">
                   No servers available.
                 </div>
               ) : (
                 displayedServers.slice(0, 3).map((s, idx) => {
                   const isSelected = selectedServer === s.id;
                   
-                  const buttonStyle = isSelected
-                    ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm'
-                    : 'bg-white text-[#716B82] border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] hover:text-[#171329]';
-
-                  const iconPrefix = isUsaMode ? '🇺🇸' : <Globe className="w-3.5 h-3.5 inline mr-1" />;
-
                   return (
                     <button
                       key={s.id}
@@ -1081,12 +1034,14 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                         setSelectedServer(s.id);
                         setSelectedService('');
                       }}
-                      className={`flex items-center justify-center py-3 px-3 rounded-full text-xs font-bold transition-all border cursor-pointer ${buttonStyle}`}
+                      className={`flex items-center justify-center py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-bold transition-all border cursor-pointer shadow-xs space-x-1.5 ${
+                        isSelected
+                          ? 'bg-[#6D28D9] text-white border-[#6D28D9] shadow-purple-600/20'
+                          : 'bg-white text-[#475569] border-[#E9E2FA] hover:border-[#6D28D9]/40 hover:bg-[#FAF8FE] hover:text-[#171329]'
+                      }`}
                     >
-                      <span className="truncate flex items-center justify-center">
-                        <span className="mr-1.5">{typeof iconPrefix === 'string' ? iconPrefix : iconPrefix}</span>
-                        <span>Server {idx + 1}</span>
-                      </span>
+                      <Server className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-[#475569]'}`} />
+                      <span>Server {idx + 1}</span>
                     </button>
                   );
                 })
@@ -1095,94 +1050,109 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
           </div>
 
           {/* 4. SERVER CONTENT CARD */}
-          <div className="bg-white border border-[#E9E2FA] rounded-[30px] shadow-sm relative z-10 overflow-hidden">
+          <div className="bg-white border border-[#E9E2FA] rounded-3xl shadow-sm relative z-10 overflow-hidden">
             
             {/* Header Banner */}
-            <div className={`${serverConfig.headerBg} px-5 py-3.5 flex items-center justify-between text-white`}>
-              <div className="flex items-center space-x-2.5">
-                <span className={`w-2.5 h-2.5 ${serverConfig.dotColor} rounded-full shrink-0 shadow-sm`} />
-                <span className="text-xs sm:text-sm font-bold tracking-wide uppercase">
-                  {serverConfig.headerTitle}
+            <div className="bg-[#6D28D9] px-4 py-3 flex items-center justify-between text-white">
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 rounded-full bg-white shrink-0 shadow-xs" />
+                <Server className="w-3.5 h-3.5 text-white shrink-0" />
+                <span className="text-xs sm:text-sm font-black tracking-wider uppercase">
+                  {isUsaMode ? 'USA' : 'ALL COUNTRIES'} SERVER {selectedServerNumber}
                 </span>
               </div>
+              <span className="text-[10px] font-bold bg-white/15 text-white px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                Online
+              </span>
             </div>
 
             {/* Card Content & Fields */}
-            <div className="p-5 sm:p-6 space-y-4">
+            <div className="p-4 sm:p-5 space-y-3">
               
               {/* Field 1: COUNTRY */}
-              <div className={`relative ${isCountryModalOpen ? 'z-50' : 'z-20'}`}>
+              <div className="relative">
                 <button
                   type="button"
                   onClick={() => {
+                    if (isUsaMode) return;
                     setIsCountryModalOpen(!isCountryModalOpen);
                     setIsServiceModalOpen(false);
                     setCountrySearchQuery('');
                   }}
-                  className="w-full flex items-center justify-between space-x-4 bg-[#F8F7FF] border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-white p-4 rounded-2xl transition cursor-pointer text-left focus:outline-none group shadow-sm"
+                  className={`w-full flex items-center justify-between space-x-3 bg-[#F8F7FF] hover:bg-[#F3F0FA] border border-[#E9E2FA] hover:border-[#6D28D9]/40 p-3.5 rounded-2xl transition text-left focus:outline-none group shadow-2xs ${
+                    isUsaMode ? 'cursor-default' : 'cursor-pointer'
+                  }`}
                 >
-                  <div className="flex items-center space-x-3.5 flex-1 min-w-0">
-                    <div className={`w-11 h-11 rounded-xl ${serverConfig.iconBg} text-white shrink-0 flex items-center justify-center shadow-sm`}>
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#6D28D9] text-white shrink-0 flex items-center justify-center shadow-xs">
                       <Globe className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block mb-0.5">
-                        COUNTRY
+                      <span className="text-[9px] font-black text-[#94A3B8] uppercase tracking-widest block mb-0.5">
+                        COUNTRY {isUsaMode ? '(USA)' : ''}
                       </span>
                       {countriesLoading ? (
-                        <div className="text-xs text-[#7C3AED] font-medium flex items-center space-x-2">
+                        <div className="text-xs text-[#6D28D9] font-bold flex items-center space-x-2">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           <span>Loading countries...</span>
                         </div>
                       ) : selectedCountry && currentCountryObj ? (
-                        <span className="text-sm font-bold text-[#171329] truncate block">
+                        <span className="text-sm font-black text-[#171329] truncate block">
                           {`${getCountryFlagEmoji(currentCountryObj.id || currentCountryObj.code || currentCountryObj.name)} ${currentCountryObj.name || currentCountryObj.id}${getCountryDialCode(currentCountryObj.id, currentCountryObj.name, currentCountryObj.code) ? ` (${getCountryDialCode(currentCountryObj.id, currentCountryObj.name, currentCountryObj.code)})` : ''}`}
                         </span>
                       ) : selectedCountry ? (
-                        <span className="text-sm font-bold text-[#171329] truncate block">
+                        <span className="text-sm font-black text-[#171329] truncate block">
                           {getCountryDisplayName(selectedCountry)}
                         </span>
                       ) : (
-                        <span className="text-sm font-medium text-[#716B82]/70 truncate block">
+                        <span className="text-sm font-bold text-[#64748B] truncate block">
                           Select Country
                         </span>
                       )}
                     </div>
                   </div>
-                  <ChevronRight className={`w-5 h-5 text-[#716B82] shrink-0 transition-transform ${isCountryModalOpen ? 'rotate-90' : ''}`} />
+                  {!isUsaMode && (
+                    <ChevronRight className={`w-5 h-5 text-[#94A3B8] group-hover:text-[#6D28D9] shrink-0 transition-transform ${isCountryModalOpen ? 'rotate-90 text-[#6D28D9]' : ''}`} />
+                  )}
                 </button>
 
-                {/* Country Dropdown / Modal */}
-                {isCountryModalOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-white border border-[#E9E2FA] rounded-2xl shadow-xl p-3.5">
-                    <div className="relative mb-3">
-                      <Search className="w-4 h-4 text-[#716B82] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                {/* Compact Country Selection Panel */}
+                {isCountryModalOpen && !isUsaMode && (
+                  <div className="mt-2 bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl p-2.5 sm:p-3 shadow-xs space-y-2 animate-in fade-in duration-150">
+                    {/* Search Field clearly visible immediately at top */}
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-[#716B82] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         type="text"
                         value={countrySearchQuery}
                         onChange={(e) => setCountrySearchQuery(e.target.value)}
-                        placeholder="Search country (e.g. United, UK, Nigeria, Ghana)..."
+                        placeholder="Search country..."
                         autoFocus
-                        className="w-full bg-[#F8F7FF] border border-[#E9E2FA] focus:border-[#7C3AED] rounded-xl pl-9.5 pr-8 py-2.5 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-sm"
+                        className="w-full bg-white border border-[#E9E2FA] focus:border-[#6D28D9] rounded-xl pl-9 pr-8 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-2xs"
                       />
                       {countrySearchQuery && (
                         <button
                           type="button"
                           onClick={() => setCountrySearchQuery('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] cursor-pointer p-1"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] cursor-pointer p-1"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
 
-                    {/* Scrollable list */}
+                    {/* Contained, compact scrollable list showing approximately 1-6 countries */}
                     <div 
-                      className="max-h-[250px] overflow-y-auto overflow-x-hidden space-y-1.5 pr-1.5 custom-scrollbar touch-pan-y overscroll-contain"
+                      className="max-h-[210px] overflow-y-auto overflow-x-hidden space-y-1 pr-1 overscroll-contain"
                       style={{ WebkitOverflowScrolling: 'touch' }}
                     >
-                      {filteredCountries.length === 0 ? (
-                        <div className="py-8 text-center text-xs text-[#716B82] font-bold">
+                      {countriesLoading ? (
+                        <div className="py-6 text-center text-xs text-[#6D28D9] font-bold flex items-center justify-center space-x-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#6D28D9]" />
+                          <span>Loading countries...</span>
+                        </div>
+                      ) : filteredCountries.length === 0 ? (
+                        <div className="py-6 text-center text-xs text-[#716B82] font-semibold">
                           No matching country found
                         </div>
                       ) : (
@@ -1200,21 +1170,21 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                                 setIsCountryModalOpen(false);
                                 setCountrySearchQuery('');
                               }}
-                              className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left cursor-pointer touch-manipulation select-none ${
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer select-none ${
                                 isSelected
-                                  ? 'bg-[#7C3AED] text-white shadow-sm'
-                                  : 'text-[#171329] hover:bg-[#F8F7FF] active:bg-[#EDE9FE]'
+                                  ? 'bg-[#6D28D9] text-white shadow-xs'
+                                  : 'bg-white hover:bg-[#EDE9FE]/50 text-[#171329] border border-[#E9E2FA]'
                               }`}
                             >
-                              <div className="flex items-center space-x-3 truncate">
-                                <span className="text-lg shrink-0 select-none">{flag}</span>
-                                <span className="truncate font-semibold">{c.name || c.id}</span>
+                              <div className="flex items-center space-x-2.5 truncate">
+                                <span className="text-base shrink-0 select-none">{flag}</span>
+                                <span className="truncate font-bold">{c.name || c.id}</span>
                               </div>
                               {dialCode && (
-                                <span className={`text-[11px] font-mono font-bold shrink-0 ml-2 px-2 py-0.5 rounded-md ${
+                                <span className={`text-[10px] font-mono font-bold shrink-0 ml-2 px-1.5 py-0.5 rounded ${
                                   isSelected
                                     ? 'bg-white/20 text-white'
-                                    : 'bg-[#F8F7FF] text-[#7C3AED] border border-[#E9E2FA]'
+                                    : 'bg-[#FAF8FE] text-[#6D28D9] border border-[#E9E2FA]'
                                 }`}>
                                   {dialCode}
                                 </span>
@@ -1237,41 +1207,41 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     setIsCountryModalOpen(false);
                     setServiceSearchQuery('');
                   }}
-                  className="w-full flex items-center justify-between space-x-4 bg-[#F8F7FF] border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-white p-4 rounded-2xl transition cursor-pointer text-left focus:outline-none group shadow-sm"
+                  className="w-full flex items-center justify-between space-x-3 bg-[#F8F7FF] hover:bg-[#F3F0FA] border border-[#E9E2FA] hover:border-[#6D28D9]/40 p-3.5 rounded-2xl transition cursor-pointer text-left focus:outline-none group shadow-2xs"
                 >
-                  <div className="flex items-center space-x-3.5 flex-1 min-w-0">
-                    <div className={`w-11 h-11 rounded-xl ${serverConfig.iconBg} text-white shrink-0 flex items-center justify-center shadow-sm`}>
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#6D28D9] text-white shrink-0 flex items-center justify-center shadow-xs">
                       <Smartphone className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block mb-0.5">
+                      <span className="text-[9px] font-black text-[#94A3B8] uppercase tracking-widest block mb-0.5">
                         SERVICE
                       </span>
                       {!selectedCountry ? (
-                        <span className="text-sm font-medium text-[#716B82]/70 truncate block">
+                        <span className="text-sm font-medium text-[#94A3B8] truncate block">
                           Select Country First
                         </span>
                       ) : servicesLoading ? (
-                        <div className="text-xs text-[#7C3AED] font-medium flex items-center space-x-2">
+                        <div className="text-xs text-[#6D28D9] font-bold flex items-center space-x-2">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           <span>Loading services...</span>
                         </div>
                       ) : currentServiceObj ? (
-                        <span className="text-sm font-bold text-[#171329] truncate block">
+                        <span className="text-sm font-black text-[#171329] truncate block">
                           {getServiceDisplayName(currentServiceObj.id, currentServiceObj.name)}
                         </span>
                       ) : selectedService ? (
-                        <span className="text-sm font-bold text-[#171329] truncate block">
+                        <span className="text-sm font-black text-[#171329] truncate block">
                           {getServiceDisplayName(selectedService)}
                         </span>
                       ) : (
-                        <span className="text-sm font-medium text-[#716B82]/70 truncate block">
+                        <span className="text-sm font-bold text-[#64748B] truncate block">
                           Select Service
                         </span>
                       )}
                     </div>
                   </div>
-                  <ChevronRight className={`w-5 h-5 text-[#716B82] shrink-0 transition-transform ${isServiceModalOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`w-5 h-5 text-[#94A3B8] group-hover:text-[#6D28D9] shrink-0 transition-transform ${isServiceModalOpen ? 'rotate-90 text-[#6D28D9]' : ''}`} />
                 </button>
 
                 {/* Service Dropdown / Modal */}
@@ -1291,7 +1261,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                             onChange={(e) => setServiceSearchQuery(e.target.value)}
                             placeholder="Search service (e.g. WhatsApp, Telegram, Google, TikTok)..."
                             autoFocus
-                            className="w-full bg-[#F8F7FF] border border-[#E9E2FA] focus:border-[#7C3AED] rounded-xl pl-9.5 pr-8 py-2.5 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-sm"
+                            className="w-full bg-[#F8F7FF] border border-[#E9E2FA] focus:border-[#6D28D9] rounded-xl pl-9.5 pr-8 py-2.5 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-sm"
                           />
                           {serviceSearchQuery && (
                             <button
@@ -1327,7 +1297,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                                   }}
                                   className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left cursor-pointer touch-manipulation select-none ${
                                     isSelected
-                                      ? 'bg-[#7C3AED] text-white shadow-sm'
+                                      ? 'bg-[#6D28D9] text-white shadow-sm'
                                       : 'text-[#171329] hover:bg-[#F8F7FF] active:bg-[#EDE9FE]'
                                   }`}
                                 >
@@ -1354,9 +1324,9 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
               {/* Price Options Preview when Country & Service are Selected */}
               {selectedCountry && selectedService && (
-                <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-4 rounded-2xl space-y-3">
+                <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-3.5 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-[#716B82] uppercase tracking-widest">
                       {priceOptions.length > 1 ? 'Select Line Quality / Tier' : 'Line Price'}
                     </span>
                     {isPriceAvailable && (
@@ -1410,8 +1380,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   )}
 
                   {priceLoading ? (
-                    <div className="flex items-center space-x-2 py-2 text-xs text-[#7C3AED]">
-                      <Loader2 className="w-4 h-4 animate-spin text-[#7C3AED]" />
+                    <div className="flex items-center space-x-2 py-2 text-xs text-[#6D28D9] font-bold">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#6D28D9]" />
                       <span>Checking real-time carrier rates...</span>
                     </div>
                   ) : isPriceAvailable && priceOptions.length > 1 ? (
@@ -1424,14 +1394,14 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                             onClick={() => handleSelectOption(opt)}
                             className={`p-2.5 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
                               isSelected
-                                ? 'bg-[#EDE9FE] border-[#7C3AED] shadow-sm ring-1 ring-[#7C3AED]'
-                                : 'bg-white border-[#E9E2FA] hover:border-[#7C3AED]/40'
+                                ? 'bg-[#EDE9FE] border-[#6D28D9] shadow-xs ring-1 ring-[#6D28D9]'
+                                : 'bg-white border-[#E9E2FA] hover:border-[#6D28D9]/40'
                             }`}
                           >
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] font-bold text-[#171329]">{opt.tierName}</span>
                               {opt.badge && (
-                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-[#EDE9FE] text-[#7C3AED]">
+                                <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-[#EDE9FE] text-[#6D28D9]">
                                   {opt.badge}
                                 </span>
                               )}
@@ -1462,46 +1432,46 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 </div>
               )}
 
-              {/* Action Button: Rent Number vs Buy Number */}
+              {/* Rent Number Button (Matching Reference Image IMG_3238.png) */}
               {!selectedCountry || !selectedService ? (
                 <button
                   type="button"
                   disabled
-                  className={`w-full py-4 px-6 rounded-[22px] font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center shadow-md ${serverConfig.buttonBg} opacity-50 cursor-not-allowed`}
+                  className="w-full py-3.5 px-6 rounded-2xl font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center shadow-xs bg-[#A78BFA] text-white cursor-not-allowed opacity-90"
                 >
-                  {serverConfig.buttonIcon}
-                  <span>{serverConfig.buttonText}</span>
+                  <FileText className="w-4.5 h-4.5 mr-2 shrink-0" />
+                  <span>RENT NUMBER</span>
                 </button>
               ) : walletBalance < calculatedPrice && isPriceAvailable && calculatedPrice > 0 ? (
                 <button
                   type="button"
                   onClick={onOpenWallet}
-                  className="w-full py-4 px-6 rounded-[22px] font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md bg-amber-600 hover:bg-amber-500 text-white"
+                  className="w-full py-3.5 px-6 rounded-2xl font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md shadow-purple-600/20 bg-[#6D28D9] hover:bg-[#5B21B6] text-white active:scale-[0.99]"
                 >
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  <span>FUND ACCOUNT (₦{(calculatedPrice - walletBalance).toLocaleString()} Needed)</span>
+                  <CreditCard className="w-4.5 h-4.5 mr-2 shrink-0" />
+                  <span>FUND WALLET (₦{(calculatedPrice - walletBalance).toLocaleString()} Needed)</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleBuyNumber}
                   disabled={buyingLoading || priceLoading || !isPriceAvailable || calculatedPrice <= 0}
-                  className={`w-full py-4 px-6 rounded-[22px] font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center shadow-md active:scale-95 cursor-pointer ${serverConfig.buttonBg} disabled:opacity-50 disabled:pointer-events-none`}
+                  className="w-full py-3.5 px-6 rounded-2xl font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center shadow-md shadow-purple-600/25 active:scale-[0.99] cursor-pointer bg-[#6D28D9] hover:bg-[#5B21B6] text-white disabled:bg-[#A78BFA] disabled:opacity-90 disabled:cursor-not-allowed disabled:pointer-events-none"
                 >
                   {buyingLoading ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      <Loader2 className="w-4.5 h-4.5 animate-spin mr-2 shrink-0" />
                       <span>Provisioning Number...</span>
                     </>
                   ) : !isPriceAvailable ? (
                     <>
-                      <XCircle className="w-4 h-4 mr-2" />
+                      <XCircle className="w-4.5 h-4.5 mr-2 shrink-0" />
                       <span>Unavailable for Selection</span>
                     </>
                   ) : (
                     <>
-                      {serverConfig.buttonIcon}
-                      <span>{serverConfig.buttonText}</span>
+                      <FileText className="w-4.5 h-4.5 mr-2 shrink-0" />
+                      <span>RENT NUMBER</span>
                     </>
                   )}
                 </button>
@@ -1510,31 +1480,34 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
             </div>
           </div>
 
-          {/* 5. MY ORDERS SECTION (Matching Screenshots) */}
-          <div className="space-y-4 pt-4">
+          {/* 5. MY ORDERS SECTION (Matching Reference Image) */}
+          <div className="space-y-3 pt-2">
             
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-[#171329] text-base tracking-tight flex items-center space-x-2">
-                <Clock className="w-4.5 h-4.5 text-[#7C3AED]" />
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-black text-[#171329] text-base tracking-tight flex items-center space-x-2">
+                <Clock className="w-4.5 h-4.5 text-[#6D28D9]" />
                 <span>My Orders</span>
               </h3>
-              <span className="text-xs font-bold bg-[#EDE9FE] text-[#7C3AED] px-3 py-1 rounded-full">
-                {orders.length} {orders.length === 1 ? 'orders' : 'orders'}
+              <span className="text-xs font-bold bg-[#FAF8FE] border border-[#E9E2FA] text-[#6D28D9] px-3 py-0.5 rounded-full">
+                {orders.length} {orders.length === 1 ? 'order' : 'orders'}
               </span>
             </div>
 
             {ordersLoading ? (
-              <div className="flex flex-col items-center justify-center py-8 text-[#716B82] text-xs">
-                <Loader2 className="w-6 h-6 animate-spin text-[#7C3AED] mb-2" />
-                Loading your orders...
+              <div className="flex flex-col items-center justify-center py-8 text-[#64748B] text-xs">
+                <Loader2 className="w-5 h-5 animate-spin text-[#6D28D9] mb-2" />
+                <span>Loading your orders...</span>
               </div>
             ) : orders.length === 0 ? (
-              <div className="text-center py-10 bg-white border border-dashed border-[#E9E2FA] rounded-[28px] shadow-sm">
-                <Phone className="w-8 h-8 text-[#716B82]/30 mx-auto mb-2" />
-                <p className="text-xs font-bold text-[#716B82]">No virtual numbers purchased yet</p>
+              <div className="text-center py-12 px-4 bg-white border border-dashed border-[#E9E2FA] rounded-3xl shadow-xs">
+                <div className="w-12 h-12 rounded-full bg-[#FAF8FE] border border-[#E9E2FA] flex items-center justify-center mx-auto mb-3 text-[#6D28D9]">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <p className="text-sm font-black text-[#171329]">No orders yet</p>
+                <p className="text-xs text-[#64748B] mt-1 font-medium">Your purchased numbers will appear here</p>
               </div>
             ) : (
-              <div className="space-y-3.5">
+              <div className="space-y-3">
                 {orders.map((o) => {
                   const isCompleted = o.status === 'SMS_RECEIVED' || o.code;
                   const isWaiting = o.status === 'WAITING';
@@ -1543,37 +1516,36 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   // Tag determination
                   const isUsaOrder = (o.country === 'US' || o.country === '187' || (o.server || '').includes('usa'));
                   const serverPill = isUsaOrder ? 'USA SV3' : (o.server === 'server_2' ? 'ALL SV2' : o.server === 'server_3' ? 'ALL SV3' : 'ALL SV1');
-                  const serverPillBg = isUsaOrder ? 'bg-[#be185d]' : (o.server === 'server_2' ? 'bg-blue-600' : o.server === 'server_3' ? 'bg-emerald-600' : 'bg-[#ea580c]');
 
                   return (
                     <div 
                       key={o.orderId}
-                      className="bg-white border border-[#E9E2FA] rounded-[26px] overflow-hidden shadow-sm p-4 space-y-3"
+                      className="bg-white border border-[#E9E2FA] rounded-2xl shadow-xs p-3.5 space-y-2.5"
                     >
                       {/* Top Row */}
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center space-x-2">
-                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full text-white ${serverPillBg} uppercase`}>
+                          <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full text-white bg-[#6D28D9] uppercase tracking-wider">
                             {serverPill}
                           </span>
                           <span className="font-bold text-[#171329] truncate max-w-[180px]">
                             {getServiceDisplayName(o.service, o.serviceName || o.service)}
                           </span>
                         </div>
-                        <span className="text-[11px] text-[#716B82] font-semibold">
+                        <span className="text-[11px] text-[#64748B] font-medium">
                           {formatDateSimple(o.createdAt)}
                         </span>
                       </div>
 
                       {/* Number & Copy Row */}
-                      <div className="flex items-center space-x-3">
-                        <span className="text-base sm:text-lg font-bold text-[#7C3AED] tracking-wider underline cursor-pointer">
+                      <div className="flex items-center justify-between bg-[#FAF8FE] border border-[#E9E2FA] p-2.5 rounded-xl">
+                        <span className="text-base sm:text-lg font-black text-[#6D28D9] tracking-wider">
                           {o.phoneNumber}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleCopy(o.phoneNumber, o.orderId)}
-                          className="flex items-center space-x-1 px-2.5 py-1 bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#171329] rounded-lg text-xs font-bold transition cursor-pointer"
+                          className="flex items-center space-x-1 px-2.5 py-1 bg-white hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#171329] rounded-lg text-xs font-bold transition cursor-pointer shadow-2xs"
                         >
                           {copiedText === o.orderId ? (
                             <>
@@ -1582,7 +1554,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                             </>
                           ) : (
                             <>
-                              <Copy className="w-3.5 h-3.5" />
+                              <Copy className="w-3.5 h-3.5 text-[#6D28D9]" />
                               <span>Copy</span>
                             </>
                           )}
@@ -1592,26 +1564,26 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                       {/* Info & Status Badges Row */}
                       <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-[#E9E2FA] text-xs">
                         <div className="flex items-center space-x-2">
-                          <span className="text-[#716B82] font-bold flex items-center space-x-1">
-                            <Globe className="w-3.5 h-3.5 mr-1 inline" />
+                          <span className="text-[#64748B] font-semibold flex items-center space-x-1">
+                            <Globe className="w-3.5 h-3.5 mr-1 inline text-[#6D28D9]" />
                             <span>{getCountryDisplayName(o.country)}</span>
                           </span>
-                          <span className="bg-emerald-50 border border-emerald-200 text-[#047857] font-bold px-2 py-0.5 rounded-lg">
+                          <span className="bg-emerald-50 border border-emerald-200 text-[#047857] font-bold px-2 py-0.5 rounded-md">
                             ₦{(Number(o.customerPrice || o.price || 0)).toLocaleString()}
                           </span>
                         </div>
 
                         <div>
                           {isCompleted ? (
-                            <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
+                            <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                               COMPLETED
                             </span>
                           ) : isWaiting ? (
-                            <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase animate-pulse">
+                            <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
                               AWAITING SMS
                             </span>
                           ) : (
-                            <span className="bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
+                            <span className="bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                               {o.status || 'EXPIRED'}
                             </span>
                           )}
@@ -1623,7 +1595,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center space-y-1">
                           <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">OTP RECEIVED</span>
                           <div className="flex items-center justify-center space-x-2">
-                            <span className="text-xl font-bold text-emerald-900 tracking-widest">{o.code}</span>
+                            <span className="text-xl font-black text-emerald-900 tracking-widest">{o.code}</span>
                             <button
                               type="button"
                               onClick={() => handleCopy(o.code, `${o.orderId}-code`)}
@@ -1640,7 +1612,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleBuyAgain(o)}
-                        className="w-full py-2 bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#171329] hover:text-[#7C3AED] text-xs font-bold rounded-xl transition flex items-center justify-center cursor-pointer"
+                        className="w-full py-2 bg-[#FAF8FE] hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#6D28D9] hover:text-[#5B21B6] text-xs font-black rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs"
                       >
                         + Buy Again
                       </button>

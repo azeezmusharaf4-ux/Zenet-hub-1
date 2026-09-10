@@ -36,7 +36,8 @@ import {
   Cpu,
   PhoneCall,
   Flame,
-  Wrench
+  Wrench,
+  FileText
 } from 'lucide-react';
 import { UserProfile, SocialBoostService, SocialBoostOrder, SocialBoostPricingSettings } from '../types';
 import { auth, getSafeIdToken } from '../lib/firebase';
@@ -128,6 +129,20 @@ const getCountryFlagEmoji = (codeOrName: string = ''): string => {
     'NETHERLANDS': '🇳🇱'
   };
   return nameMap[code] || '🌐';
+};
+
+const formatDateSimple = (dateStr: string | number) => {
+  try {
+    const d = new Date(dateStr);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()];
+    const day = d.getDate();
+    const hours = d.getHours().toString().padStart(2, '0');
+    const mins = d.getMinutes().toString().padStart(2, '0');
+    return `${day} ${month} • ${hours}:${mins}`;
+  } catch {
+    return 'Today';
+  }
 };
 
 // 12 SMM Platforms exactly from Screenshot 3 (IMG_2715.png)
@@ -933,15 +948,14 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
 
       {/* ========================================================================= */}
-      {/* 2. INSIDE PAGE 1: BUY NUMBERS                                             */}
+      {/* 2. INSIDE PAGE 1: BUY NUMBERS (Identical Design to VirtualNumbersView)     */}
       {/* ========================================================================= */}
       {currentPage === 'buy-numbers' && (
         <div className="space-y-4 animate-in fade-in">
           
-          {/* Top Header: Back Button + Avatar + Username + Fund Wallet */}
-          <div className="flex items-center justify-between pt-1">
+          {/* 1. TOP HEADER (Matching Reference Image) */}
+          <div className="flex items-center justify-between bg-white text-[#171329] px-4 py-3 rounded-2xl shadow-xs border border-[#E9E2FA]">
             <div className="flex items-center space-x-3">
-              {/* Back to Marketplace Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -951,61 +965,39 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                     setCurrentPage('front');
                   }
                 }}
-                className="w-10 h-10 rounded-2xl bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] border border-[#E9E2FA] flex items-center justify-center shadow-sm cursor-pointer transition active:scale-95 shrink-0"
+                className="w-9 h-9 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] rounded-xl transition cursor-pointer border border-[#E9E2FA] flex items-center justify-center shrink-0 active:scale-95"
                 title={initialPage === 'buy-numbers' || hideSwitcherTabs ? "Back to Marketplace" : "Back to Server Tool"}
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-5 h-5 text-[#171329]" />
               </button>
 
-              {/* Circular Initial Avatar with back action */}
+              <h1 className="text-base sm:text-lg font-black tracking-tight text-[#171329]">
+                Global Virtual Numbers
+              </h1>
+            </div>
+
+            <div className="flex items-center space-x-2">
               <button
                 type="button"
-                onClick={() => {
-                  if (initialPage === 'buy-numbers' || hideSwitcherTabs) {
-                    handleBackToMarket();
-                  } else {
-                    setCurrentPage('front');
-                  }
-                }}
-                className="relative w-11 h-11 rounded-full bg-[#EDE9FE] border border-[#E9E2FA] text-[#7C3AED] font-bold text-base flex items-center justify-center shadow-sm cursor-pointer hover:scale-105 transition shrink-0"
-                title={initialPage === 'buy-numbers' || hideSwitcherTabs ? "Back to Marketplace" : "Back to Server Tool"}
+                onClick={onOpenWallet}
+                className="px-3.5 py-1.5 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#6D28D9] border border-[#E9E2FA] rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs cursor-pointer"
               >
-                <span>{userProfile?.username ? userProfile.username.charAt(0).toUpperCase() : 'M'}</span>
+                <CreditCard className="w-3.5 h-3.5 text-[#6D28D9]" />
+                <span>+ Fund</span>
               </button>
-
-              <div>
-                <span className="text-sm font-bold text-[#171329] block leading-tight">
-                  {userProfile?.username || 'muzente001'}
-                </span>
-                <span className="text-[10px] text-[#716B82] font-medium">
-                  {initialPage === 'buy-numbers' ? 'Service Number 2 (Provider 2)' : 'Server 2 Verified'}
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onOpenWallet}
-              className="px-4 py-2 bg-[#7C3AED] hover:bg-[#5B21B6] text-white text-xs font-bold rounded-full shadow-sm transition cursor-pointer flex items-center space-x-1"
-            >
-              <span>+ Fund Wallet</span>
-            </button>
-          </div>
-
-          {/* Available Balance Display */}
-          <div className="pt-2 pb-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#716B82] block mb-1">
-              AVAILABLE BALANCE
-            </span>
-            <div className="flex items-baseline space-x-1">
-              <span className="text-3xl sm:text-4xl font-bold text-[#171329] font-mono tracking-tight">
-                ₦{walletBalance.toLocaleString()}
-              </span>
             </div>
           </div>
 
-          {/* Country Type Segmented Control */}
-          <div className="bg-white border border-[#E9E2FA] p-1.5 rounded-2xl flex items-center shadow-sm">
+          {/* INFORMATION ALERT BANNER (Matching Reference Image) */}
+          <div className="bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl p-3 flex items-start space-x-2.5 shadow-2xs">
+            <AlertCircle className="w-4 h-4 text-[#6D28D9] shrink-0 mt-0.5" />
+            <p className="text-xs text-[#64748B] font-medium leading-relaxed">
+              Virtual numbers can receive SMS codes from services worldwide. Select a country and service to get started.
+            </p>
+          </div>
+
+          {/* 2. REGION TOGGLE (USA Numbers vs All Countries) */}
+          <div className="bg-white border border-[#E9E2FA] p-1 rounded-2xl flex items-center shadow-xs">
             <button
               type="button"
               onClick={() => {
@@ -1019,10 +1011,10 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                 setCalculatedPrice(0);
                 setPriceOptions([]);
               }}
-              className={`flex-1 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center space-x-1.5 ${
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer flex items-center justify-center space-x-1.5 ${
                 activeTab === 'usa'
-                  ? 'bg-[#7C3AED] text-white shadow-sm'
-                  : 'text-[#716B82] hover:text-[#171329]'
+                  ? 'bg-[#6D28D9] text-white shadow-xs'
+                  : 'text-[#64748B] hover:text-[#171329]'
               }`}
             >
               <span>🇺🇸 USA Numbers</span>
@@ -1039,342 +1031,361 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                 setCalculatedPrice(0);
                 setPriceOptions([]);
               }}
-              className={`flex-1 py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center space-x-1.5 ${
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all duration-200 cursor-pointer flex items-center justify-center space-x-1.5 ${
                 activeTab === 'all'
-                  ? 'bg-[#7C3AED] text-white shadow-sm'
-                  : 'text-[#716B82] hover:text-[#171329]'
+                  ? 'bg-[#6D28D9] text-white shadow-xs'
+                  : 'text-[#64748B] hover:text-[#171329]'
               }`}
             >
-              <Globe className="w-4 h-4" />
+              <Globe className="w-3.5 h-3.5" />
               <span>All Countries</span>
             </button>
           </div>
 
-          {/* Server Switch Sub-Pills (Extra Log Tools Route Selection: USA 1/2 or All Country 1/2) */}
-          <div className="grid grid-cols-2 gap-2 pt-1 pb-1">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedServer(activeTab === 'all' ? 'all1' : 'usa1');
-                setSelectedService('');
-                setIsServiceInStock(false);
-                setStockMessage('');
-                setCalculatedPrice(0);
-                setPriceOptions([]);
-              }}
-              className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center space-x-1.5 ${
-                selectedServer === 'usa1' || selectedServer === 'all1' || selectedServer === 'server_1'
-                  ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#7C3AED]/40 font-bold'
-                  : 'bg-white text-[#716B82] hover:text-[#171329] border border-[#E9E2FA]'
-              }`}
-              title={activeTab === 'usa' ? 'USA 1' : 'All Country 1'}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>{activeTab === 'usa' ? 'USA 1' : 'All Country 1'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedServer(activeTab === 'all' ? 'all2' : 'usa2');
-                setSelectedService('');
-                setIsServiceInStock(false);
-                setStockMessage('');
-                setCalculatedPrice(0);
-                setPriceOptions([]);
-              }}
-              className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center justify-center space-x-1.5 ${
-                selectedServer === 'usa2' || selectedServer === 'all2' || selectedServer === 'server_2'
-                  ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#7C3AED]/40 font-bold'
-                  : 'bg-white text-[#716B82] hover:text-[#171329] border border-[#E9E2FA]'
-              }`}
-              title={activeTab === 'usa' ? 'USA 2' : 'All Country 2'}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>{activeTab === 'usa' ? 'USA 2' : 'All Country 2'}</span>
-            </button>
+          {/* 3. SERVER SELECTOR (Server 1, Server 2, Server 3) */}
+          <div className="flex items-center space-x-1.5">
+            {['1', '2', '3'].map((srvNum) => {
+              const serverKey = activeTab === 'all' ? `all${srvNum}` : `usa${srvNum}`;
+              const isSelected = selectedServer === serverKey || (srvNum === '1' && (selectedServer === 'server_1' || selectedServer === 'usa1' || selectedServer === 'all1')) || (srvNum === '2' && (selectedServer === 'server_2' || selectedServer === 'usa2' || selectedServer === 'all2'));
+              return (
+                <button
+                  key={srvNum}
+                  type="button"
+                  onClick={() => {
+                    setSelectedServer(serverKey);
+                    setSelectedService('');
+                    setIsServiceInStock(false);
+                    setStockMessage('');
+                    setCalculatedPrice(0);
+                    setPriceOptions([]);
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer flex items-center justify-center space-x-1 ${
+                    isSelected
+                      ? 'bg-[#6D28D9] text-white shadow-xs'
+                      : 'bg-white text-[#64748B] hover:text-[#171329] border border-[#E9E2FA]'
+                  }`}
+                >
+                  <span>Server {srvNum}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* MAIN CARD WITH CLEAN HEADER */}
-          <div className="bg-white border border-[#E9E2FA] rounded-3xl overflow-hidden shadow-sm">
+          {/* 4. MAIN CONTENT CARD (Matching Reference Image) */}
+          <div className="bg-white border border-[#E9E2FA] rounded-3xl p-4 sm:p-5 shadow-xs space-y-3.5">
             
-            {/* Top header banner */}
-            <div className="bg-[#7C3AED] text-white px-5 py-3 flex items-center justify-between text-xs font-semibold">
+            {/* Server Badge header */}
+            <div className="bg-[#FAF8FE] border border-[#E9E2FA] text-[#6D28D9] px-3.5 py-1.5 rounded-full text-xs font-black flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-white rounded-full shrink-0 shadow-sm" />
+                <span className="w-2 h-2 rounded-full bg-[#6D28D9] animate-pulse" />
                 <span>
-                  {activeTab === 'usa' 
-                    ? `🇺🇸 USA Numbers (${selectedServer === 'usa2' ? 'USA 2' : 'USA 1'}) — Live Carrier Pool`
-                    : `🌐 All Countries (${selectedServer === 'all2' ? 'All Country 2' : 'All Country 1'}) — 195+ Countries`}
+                  {activeTab === 'usa' ? '🇺🇸 USA Numbers' : '🌐 All Countries'}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  fetchNumberOrders();
-                  setIsNumberOrdersModalOpen(true);
-                }}
-                className="text-[11px] font-bold text-white hover:underline cursor-pointer"
-              >
-                Orders
-              </button>
+              <span className="text-[11px] font-bold text-[#64748B]">
+                {selectedServer.includes('2') ? 'Server 2' : selectedServer.includes('3') ? 'Server 3' : 'Server 1'}
+              </span>
             </div>
 
-            {/* Card Body */}
-            <div className="p-5 sm:p-6 space-y-4">
-              
-              {/* Field 1: COUNTRY */}
+            {/* Field 1: COUNTRY */}
+            <div className="relative">
               <div
                 onClick={() => {
                   if (activeTab === 'all' && !countriesLoading) {
-                    setIsCountryModalOpen(true);
+                    setIsCountryModalOpen(!isCountryModalOpen);
+                    setIsServiceModalOpen(false);
+                    setCountrySearchQuery('');
                   }
                 }}
-                className={`bg-[#F8F7FF] border border-[#E9E2FA] ${
-                  activeTab === 'all' ? 'hover:border-[#7C3AED]/40 cursor-pointer' : 'cursor-default'
-                } p-3.5 rounded-2xl flex items-center justify-between transition group`}
+                className={`bg-[#FAF8FE] border border-[#E9E2FA] ${
+                  activeTab === 'all' ? 'hover:border-[#6D28D9]/40 cursor-pointer' : 'cursor-default'
+                } p-3 rounded-2xl flex items-center justify-between transition group shadow-2xs`}
               >
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shrink-0">
-                    <Globe className="w-5 h-5" />
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-white border border-[#E9E2FA] text-[#6D28D9] flex items-center justify-center shrink-0">
+                    <Globe className="w-4.5 h-4.5" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block mb-0.5">
-                      COUNTRY {activeTab === 'usa' ? '(FIXED USA)' : ''}
+                    <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
+                      COUNTRY {activeTab === 'usa' ? '(USA)' : ''}
                     </span>
-                    <span className="text-sm font-bold text-[#171329] flex items-center space-x-2">
+                    <div className="text-sm font-black text-[#171329] flex items-center space-x-1.5">
                       {countriesLoading ? (
-                        <span className="text-[#7C3AED] text-xs flex items-center space-x-1.5">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1" />
-                          <span>Loading countries...</span>
+                        <span className="text-[#6D28D9] text-xs flex items-center space-x-1">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin inline" />
+                          <span>Loading...</span>
                         </span>
                       ) : selectedCountryObj ? (
-                        <span>{getCountryFlagEmoji(selectedCountryObj.code || selectedCountryObj.name)} {selectedCountryObj.name}</span>
+                        <span className="truncate max-w-[200px]">
+                          {getCountryFlagEmoji(selectedCountryObj.code || selectedCountryObj.name)} {selectedCountryObj.name}
+                        </span>
                       ) : (
-                        <span className="text-[#716B82] text-xs">Select Country</span>
+                        <span className="text-[#64748B] text-xs font-normal">Select Country</span>
                       )}
-                    </span>
+                    </div>
                   </div>
                 </div>
                 {activeTab === 'all' && (
-                  <ChevronRight className="w-5 h-5 text-[#716B82] group-hover:text-[#171329] transition" />
+                  <ChevronRight className={`w-4.5 h-4.5 text-[#64748B] group-hover:text-[#171329] transition transform ${isCountryModalOpen ? 'rotate-90 text-[#6D28D9]' : ''}`} />
                 )}
               </div>
 
-              {/* Field 2: SERVICE */}
-              <div
-                onClick={() => {
-                  if (!servicesLoading && services.length > 0) {
-                    setIsServiceModalOpen(true);
-                  }
-                }}
-                className={`bg-[#F8F7FF] border border-[#E9E2FA] ${
-                  servicesLoading ? 'opacity-70 cursor-wait' : 'hover:border-[#7C3AED]/40 cursor-pointer'
-                } p-3.5 rounded-2xl flex items-center justify-between transition group`}
-              >
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shrink-0">
-                    <Smartphone className="w-5 h-5" />
+              {/* Compact Country Selection Panel */}
+              {isCountryModalOpen && activeTab === 'all' && (
+                <div className="mt-2 bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl p-2.5 sm:p-3 shadow-xs space-y-2 animate-in fade-in duration-150">
+                  {/* Search Field clearly visible immediately at top */}
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-[#716B82] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search country..."
+                      value={countrySearchQuery}
+                      onChange={(e) => setCountrySearchQuery(e.target.value)}
+                      autoFocus
+                      className="w-full bg-white border border-[#E9E2FA] focus:border-[#6D28D9] rounded-xl pl-9 pr-8 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-2xs"
+                    />
+                    {countrySearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setCountrySearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] cursor-pointer p-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block mb-0.5">
-                      SERVICE
-                    </span>
-                    <span className="text-sm font-bold text-[#171329] flex items-center space-x-2">
-                      {servicesLoading ? (
-                        <span className="text-[#7C3AED] text-xs flex items-center space-x-1.5">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1" />
-                          <span>Loading services...</span>
-                        </span>
-                      ) : selectedServiceObj ? (
-                        <span>{selectedServiceObj.name}</span>
-                      ) : (
-                        <span className="text-[#716B82] text-xs">Select Service</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-[#716B82] group-hover:text-[#171329] transition" />
-              </div>
 
-              {/* Quality Tier (if multiple options available) */}
-              {priceOptions.length > 1 && (
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block pl-1">
-                    CARRIER ROUTE QUALITY
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {priceOptions.map((opt) => {
-                      const isSel = selectedOptionId === opt.optionId;
-                      return (
-                        <button
-                          key={opt.optionId}
-                          type="button"
-                          onClick={() => {
-                            setSelectedOptionId(opt.optionId);
-                            setCalculatedPrice(opt.customerPrice);
-                          }}
-                          className={`p-2.5 rounded-xl border text-left text-xs transition cursor-pointer ${
-                            isSel
-                              ? 'bg-[#EDE9FE] border-[#7C3AED] text-[#7C3AED] font-bold'
-                              : 'bg-[#F8F7FF] border-[#E9E2FA] text-[#716B82] hover:bg-white'
-                          }`}
-                        >
-                          <span className="font-bold block truncate">{opt.carrierTier.split(' (')[0]}</span>
-                          <span className="text-[10px] font-mono font-bold text-[#7C3AED]">₦{opt.customerPrice.toLocaleString()}</span>
-                        </button>
-                      );
-                    })}
+                  {/* Contained, compact scrollable list showing approximately 1-6 countries */}
+                  <div 
+                    className="max-h-[210px] overflow-y-auto overflow-x-hidden space-y-1 pr-1 overscroll-contain"
+                    style={{ WebkitOverflowScrolling: 'touch' }}
+                  >
+                    {countriesLoading ? (
+                      <div className="py-6 text-center text-xs text-[#6D28D9] font-bold flex items-center justify-center space-y-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#6D28D9]" />
+                        <span>Loading countries...</span>
+                      </div>
+                    ) : filteredCountries.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-[#716B82] font-semibold">
+                        {countries.length === 0 ? 'No countries available on this server.' : 'No countries found matching your search.'}
+                      </div>
+                    ) : (
+                      filteredCountries.map((c) => {
+                        const isSelected = selectedCountry === c.id;
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCountry(c.id);
+                              setSelectedService('');
+                              setIsServiceInStock(false);
+                              setStockMessage('');
+                              setCalculatedPrice(0);
+                              setPriceOptions([]);
+                              setIsCountryModalOpen(false);
+                              setCountrySearchQuery('');
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer select-none ${
+                              isSelected
+                                ? 'bg-[#6D28D9] text-white shadow-xs'
+                                : 'bg-white hover:bg-[#EDE9FE]/50 text-[#171329] border border-[#E9E2FA]'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2.5 truncate">
+                              <span className="text-base shrink-0">{getCountryFlagEmoji(c.code || c.name)}</span>
+                              <span className="truncate font-bold">{c.name}</span>
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-white shrink-0" />}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}
+            </div>
 
-              {/* Price & Delivery Notice */}
-              <div className="pt-2 border-t border-[#E9E2FA] space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <div>
-                    <span className="text-[#716B82] font-semibold block">Live Carrier Rate:</span>
-                    {!selectedCountry && !selectedService ? (
-                      <span className="text-[11px] text-[#716B82]">Select country & service to check rate</span>
-                    ) : !selectedCountry ? (
-                      <span className="text-[11px] text-[#716B82]">Select a country to check rate</span>
-                    ) : !selectedService ? (
-                      <span className="text-[11px] text-[#716B82]">Select a service to check rate</span>
-                    ) : pricesLoading ? (
-                      <span className="text-[11px] text-[#7C3AED] animate-pulse flex items-center space-x-1">
-                        <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
-                        <span>Checking carrier rate...</span>
-                      </span>
-                    ) : stockMessage ? (
-                      <span className={`text-[11px] font-semibold ${isServiceInStock ? 'text-emerald-700' : 'text-amber-700'}`}>
-                        {stockMessage}
-                      </span>
-                    ) : isServiceInStock ? (
-                      <span className="text-[11px] text-emerald-700 font-semibold">Ready for instant allocation</span>
-                    ) : null}
-                  </div>
-                  <span className="text-2xl font-bold font-mono text-[#171329]">
-                    {!selectedCountry || !selectedService ? (
-                      <span className="text-sm font-bold text-[#716B82]">—</span>
-                    ) : pricesLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-[#7C3AED] inline" />
-                    ) : isServiceInStock && calculatedPrice > 0 ? (
-                      `₦${calculatedPrice.toLocaleString()}`
-                    ) : (
-                      <span className="text-sm font-bold text-amber-600">Unavailable</span>
-                    )}
+            {/* Field 2: SERVICE */}
+            <div
+              onClick={() => {
+                if (!servicesLoading && services.length > 0) {
+                  setIsServiceModalOpen(true);
+                }
+              }}
+              className={`bg-[#FAF8FE] border border-[#E9E2FA] ${
+                servicesLoading ? 'opacity-70 cursor-wait' : 'hover:border-[#6D28D9]/40 cursor-pointer'
+              } p-3 rounded-2xl flex items-center justify-between transition group shadow-2xs`}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-white border border-[#E9E2FA] text-[#6D28D9] flex items-center justify-center shrink-0">
+                  <Smartphone className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
+                    SERVICE
                   </span>
+                  <div className="text-sm font-black text-[#171329] flex items-center space-x-1.5">
+                    {servicesLoading ? (
+                      <span className="text-[#6D28D9] text-xs flex items-center space-x-1">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin inline" />
+                        <span>Loading...</span>
+                      </span>
+                    ) : selectedServiceObj ? (
+                      <span className="truncate max-w-[200px]">{selectedServiceObj.name}</span>
+                    ) : (
+                      <span className="text-[#64748B] text-xs font-normal">Select Service</span>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              {/* Action Button: GET NUMBER */}
-              <button
-                type="button"
-                onClick={handleBuyNumber}
-                disabled={
-                  buyingNumberLoading ||
-                  !selectedCountry ||
-                  !selectedService ||
-                  pricesLoading ||
-                  !isServiceInStock
-                }
-                className="w-full py-4 bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-bold text-sm sm:text-base rounded-2xl flex items-center justify-center space-x-2 shadow-sm transition duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {buyingNumberLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Allocating Carrier Number...</span>
-                  </>
-                ) : !selectedCountry && !selectedService ? (
-                  <>
-                    <AlertCircle className="w-5 h-5 text-white/80" />
-                    <span>Please select a country and service</span>
-                  </>
-                ) : !selectedCountry ? (
-                  <>
-                    <Globe className="w-5 h-5 text-white/80" />
-                    <span>Please select a country</span>
-                  </>
-                ) : !selectedService ? (
-                  <>
-                    <Smartphone className="w-5 h-5 text-white/80" />
-                    <span>Please select a service</span>
-                  </>
-                ) : pricesLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Checking Live Carrier Rate...</span>
-                  </>
-                ) : isServiceInStock && calculatedPrice > 0 ? (
-                  <>
-                    <CreditCard className="w-5 h-5" />
-                    <span>Get Number • ₦{calculatedPrice.toLocaleString()}</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="w-5 h-5 text-amber-200" />
-                    <span>{stockMessage || 'Service Unavailable on this Route'}</span>
-                  </>
-                )}
-              </button>
-
+              <ChevronRight className="w-4.5 h-4.5 text-[#64748B] group-hover:text-[#171329] transition" />
             </div>
+
+            {/* Quality Tier (if multiple options available) */}
+            {priceOptions.length > 1 && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block pl-1">
+                  CARRIER ROUTE QUALITY
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {priceOptions.map((opt) => {
+                    const isSel = selectedOptionId === opt.optionId;
+                    return (
+                      <button
+                        key={opt.optionId}
+                        type="button"
+                        onClick={() => {
+                          setSelectedOptionId(opt.optionId);
+                          setCalculatedPrice(opt.customerPrice);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left text-xs transition cursor-pointer ${
+                          isSel
+                            ? 'bg-[#EDE9FE] border-[#6D28D9] text-[#6D28D9] font-bold'
+                            : 'bg-[#FAF8FE] border-[#E9E2FA] text-[#64748B] hover:bg-white'
+                        }`}
+                      >
+                        <span className="font-bold block truncate">{opt.carrierTier.split(' (')[0]}</span>
+                        <span className="text-[10px] font-mono font-bold text-[#6D28D9]">₦{opt.customerPrice.toLocaleString()}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Price & Delivery Notice */}
+            <div className="pt-2 border-t border-[#E9E2FA] flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-[#64748B] block">Price:</span>
+                <span className="text-[11px] font-semibold text-[#64748B]">
+                  {!selectedCountry || !selectedService ? (
+                    'Select country & service'
+                  ) : pricesLoading ? (
+                    'Checking carrier rate...'
+                  ) : isServiceInStock ? (
+                    'Ready for instant allocation'
+                  ) : (
+                    stockMessage || 'Unavailable'
+                  )}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-xl sm:text-2xl font-black font-mono text-[#171329]">
+                  {!selectedCountry || !selectedService ? (
+                    '—'
+                  ) : pricesLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-[#6D28D9] inline" />
+                  ) : isServiceInStock && calculatedPrice > 0 ? (
+                    `₦${calculatedPrice.toLocaleString()}`
+                  ) : (
+                    <span className="text-sm font-bold text-amber-600">Unavailable</span>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* Action Button: RENT NUMBER (Matching Reference Image) */}
+            <button
+              type="button"
+              onClick={handleBuyNumber}
+              disabled={
+                buyingNumberLoading ||
+                !selectedCountry ||
+                !selectedService ||
+                pricesLoading ||
+                !isServiceInStock
+              }
+              className="w-full py-3.5 bg-[#6D28D9] hover:bg-[#5B21B6] text-white font-black text-sm rounded-2xl flex items-center justify-center space-x-2 shadow-xs transition duration-150 cursor-pointer active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {buyingNumberLoading ? (
+                <>
+                  <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                  <span>Allocating Carrier Number...</span>
+                </>
+              ) : (
+                <>
+                  <Phone className="w-4 h-4" />
+                  <span>Rent Number</span>
+                </>
+              )}
+            </button>
 
           </div>
 
           {/* ACTIVE ORDER / LIVE SMS SCREEN IF ACTIVE */}
           {activeNumberOrder && (
-            <div className="bg-white border border-[#E9E2FA] rounded-3xl p-5 shadow-sm space-y-4 animate-in zoom-in-95">
+            <div className="bg-white border border-[#E9E2FA] rounded-3xl p-5 shadow-xs space-y-4 animate-in zoom-in-95">
               <div className="flex items-center justify-between border-b border-[#E9E2FA] pb-3">
                 <div className="flex items-center space-x-2">
-                  <Smartphone className="w-5 h-5 text-[#7C3AED]" />
-                  <span className="text-sm font-bold text-[#171329]">Your Assigned Number</span>
+                  <Smartphone className="w-5 h-5 text-[#6D28D9]" />
+                  <span className="text-sm font-black text-[#171329]">Your Assigned Number</span>
                 </div>
-                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full">
+                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
                   Waiting for SMS
                 </span>
               </div>
 
               {/* Phone Number Display */}
-              <div className="bg-[#F8F7FF] border border-[#E9E2FA] rounded-2xl p-4 flex items-center justify-between">
+              <div className="bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl p-4 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-[#716B82] block">Assigned Number</span>
-                  <span className="text-xl sm:text-2xl font-mono font-bold text-[#171329]">
+                  <span className="text-[10px] uppercase font-bold text-[#64748B] block">Assigned Number</span>
+                  <span className="text-xl sm:text-2xl font-mono font-black text-[#171329]">
                     {activeNumberOrder.phoneNumber}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleCopy(activeNumberOrder.phoneNumber || '', 'number')}
-                  className="px-3.5 py-2 bg-[#7C3AED] hover:bg-[#5B21B6] text-white text-xs font-bold rounded-xl flex items-center space-x-1 cursor-pointer shadow-sm"
+                  className="px-3.5 py-2 bg-white hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#171329] text-xs font-bold rounded-xl flex items-center space-x-1 cursor-pointer shadow-2xs transition"
                 >
-                  {copiedText === 'number' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedText === 'number' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-[#6D28D9]" />}
                   <span>{copiedText === 'number' ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
 
               {/* SMS Polling & Code Display */}
               {pollingStatus === 'WAITING' ? (
-                <div className="p-4 bg-[#F8F7FF] rounded-2xl border border-[#E9E2FA] text-center space-y-2">
-                  <div className="flex items-center justify-center space-x-2 text-[#716B82] text-xs font-semibold">
-                    <Clock className="w-4 h-4 animate-spin text-[#7C3AED]" />
+                <div className="p-4 bg-[#FAF8FE] rounded-2xl border border-[#E9E2FA] text-center space-y-2">
+                  <div className="flex items-center justify-center space-x-2 text-[#64748B] text-xs font-semibold">
+                    <Clock className="w-4 h-4 animate-spin text-[#6D28D9]" />
                     <span>Waiting for SMS code... ({elapsedSeconds}s)</span>
                   </div>
                   <div className="w-full bg-[#EDE9FE] h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-[#7C3AED] h-full w-2/3 animate-pulse" />
+                    <div className="bg-[#6D28D9] h-full w-2/3 animate-pulse" />
                   </div>
                 </div>
               ) : pollingStatus === 'RECEIVED' ? (
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3">
-                  <span className="text-xs font-bold text-emerald-800 block">Verification Code Received:</span>
+                  <span className="text-xs font-black text-emerald-800 block uppercase tracking-wider">Verification Code Received:</span>
                   <div className="flex items-center justify-center space-x-3">
-                    <span className="text-3xl font-bold font-mono text-emerald-700 tracking-widest">
+                    <span className="text-3xl font-black font-mono text-emerald-700 tracking-widest">
                       {verificationCode}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleCopy(verificationCode, 'code')}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center space-x-1 cursor-pointer shadow-sm"
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center space-x-1 cursor-pointer shadow-xs"
                     >
                       {copiedText === 'code' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                       <span>{copiedText === 'code' ? 'Copied' : 'Copy'}</span>
@@ -1394,13 +1405,114 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                   type="button"
                   onClick={handleCancelNumber}
                   disabled={cancellingNumberLoading}
-                  className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl transition cursor-pointer"
+                  className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-black rounded-xl transition cursor-pointer uppercase tracking-wider"
                 >
                   {cancellingNumberLoading ? 'Processing 100% Refund...' : 'Cancel & Instant Full Refund'}
                 </button>
               )}
             </div>
           )}
+
+          {/* 5. MY ORDERS SECTION (Matching Reference Image) */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-black text-[#171329] text-base tracking-tight flex items-center space-x-2">
+                <Clock className="w-4.5 h-4.5 text-[#6D28D9]" />
+                <span>My Orders</span>
+              </h3>
+              <span className="text-xs font-bold bg-[#FAF8FE] border border-[#E9E2FA] text-[#6D28D9] px-3 py-0.5 rounded-full">
+                {numberOrders.length} {numberOrders.length === 1 ? 'order' : 'orders'}
+              </span>
+            </div>
+
+            {numberOrders.length === 0 ? (
+              <div className="text-center py-12 px-4 bg-white border border-dashed border-[#E9E2FA] rounded-3xl shadow-xs">
+                <div className="w-12 h-12 rounded-full bg-[#FAF8FE] border border-[#E9E2FA] flex items-center justify-center mx-auto mb-3 text-[#6D28D9]">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <p className="text-sm font-black text-[#171329]">No orders yet</p>
+                <p className="text-xs text-[#64748B] mt-1 font-medium">Your purchased numbers will appear here</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {numberOrders.map((ord) => {
+                  const isCompleted = ord.status === 'SMS_RECEIVED' || ord.code;
+                  return (
+                    <div 
+                      key={ord.orderId || ord.id}
+                      className="bg-white border border-[#E9E2FA] rounded-2xl shadow-xs p-3.5 space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full text-white bg-[#6D28D9] uppercase tracking-wider">
+                            SERVER 2
+                          </span>
+                          <span className="font-bold text-[#171329] truncate max-w-[180px]">
+                            {ord.service || 'Service'}
+                          </span>
+                        </div>
+                        {ord.createdAt && (
+                          <span className="text-[11px] text-[#64748B] font-medium">
+                            {formatDateSimple(ord.createdAt)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between bg-[#FAF8FE] border border-[#E9E2FA] p-2.5 rounded-xl">
+                        <span className="text-base sm:text-lg font-black text-[#6D28D9] tracking-wider">
+                          {ord.phoneNumber || ord.orderId}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(ord.phoneNumber || ord.orderId, ord.orderId || ord.id || '')}
+                          className="flex items-center space-x-1 px-2.5 py-1 bg-white hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#171329] rounded-lg text-xs font-bold transition cursor-pointer shadow-2xs"
+                        >
+                          {copiedText === (ord.orderId || ord.id) ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="text-emerald-700">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-[#6D28D9]" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-[#E9E2FA] text-xs">
+                        <span className="bg-emerald-50 border border-emerald-200 text-[#047857] font-bold px-2 py-0.5 rounded-md">
+                          ₦{(ord.amount || 0).toLocaleString()}
+                        </span>
+                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                          isCompleted ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-amber-50 border border-amber-200 text-amber-700'
+                        }`}>
+                          {ord.status || 'ACTIVE'}
+                        </span>
+                      </div>
+
+                      {ord.code && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center space-y-1">
+                          <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">OTP RECEIVED</span>
+                          <div className="flex items-center justify-center space-x-2">
+                            <span className="text-xl font-black text-emerald-900 tracking-widest">{ord.code}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(ord.code || '', `code_${ord.orderId}`)}
+                              className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition"
+                            >
+                              {copiedText === `code_${ord.orderId}` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
         </div>
       )}
@@ -1619,73 +1731,6 @@ export const Server2View: React.FC<Server2ViewProps> = ({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: COUNTRY SELECTOR (SEARCHABLE MODAL)                                 */}
-      {/* ========================================================================= */}
-      {isCountryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white border border-[#E9E2FA] rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-[#E9E2FA] flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#171329]">Select Country (Server 2)</h3>
-              <button onClick={() => setIsCountryModalOpen(false)} className="text-[#716B82] hover:text-[#171329] cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-3 border-b border-[#E9E2FA]">
-              <div className="relative">
-                <Search className="w-4 h-4 text-[#716B82] absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search countries..."
-                  value={countrySearchQuery}
-                  onChange={(e) => setCountrySearchQuery(e.target.value)}
-                  className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl pl-9 pr-3 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 focus:outline-none focus:border-[#7C3AED]"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {countriesLoading ? (
-                <div className="p-8 text-center text-[#716B82] text-xs flex flex-col items-center justify-center space-y-2">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#7C3AED]" />
-                  <span>Loading countries...</span>
-                </div>
-              ) : filteredCountries.length === 0 ? (
-                <div className="p-8 text-center text-[#716B82] text-xs">
-                  {countries.length === 0 ? 'No countries available on this server.' : 'No countries found matching your search.'}
-                </div>
-              ) : (
-                filteredCountries.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => {
-                      setSelectedCountry(c.id);
-                      setSelectedService('');
-                      setIsServiceInStock(false);
-                      setStockMessage('');
-                      setCalculatedPrice(0);
-                      setPriceOptions([]);
-                      setIsCountryModalOpen(false);
-                      setCountrySearchQuery('');
-                    }}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-xs transition cursor-pointer ${
-                      selectedCountry === c.id ? 'bg-[#7C3AED] text-white font-bold' : 'hover:bg-[#F8F7FF] text-[#171329]'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <span className="text-lg">{getCountryFlagEmoji(c.code || c.name)}</span>
-                      <span className="font-bold">{c.name}</span>
-                    </div>
-                    {selectedCountry === c.id && <Check className="w-4 h-4" />}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL: SERVICE SELECTOR (SEARCHABLE MODAL)                                 */}

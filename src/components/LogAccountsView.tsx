@@ -120,17 +120,17 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
     <div className="w-full max-w-full space-y-6">
       
       {/* Top Header Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E9E2FA]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#EDE9FE]">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToMarketplace}
-            className="flex items-center gap-2 text-[#171329] hover:text-[#7C3AED] font-bold text-xs transition bg-white hover:bg-[#F8F7FF] px-4 py-2.5 rounded-xl border border-[#E9E2FA] cursor-pointer shadow-sm"
+            className="flex items-center gap-2 text-[#0F172A] hover:text-[#7C3AED] font-black text-xs transition bg-white hover:bg-[#FAF8FE] px-4 py-2.5 rounded-xl border border-[#DDD6FE] hover:border-[#7C3AED] cursor-pointer shadow-xs"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Marketplace</span>
           </button>
           
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDE9FE] border border-[#E9E2FA] text-[11px] font-bold text-[#7C3AED]">
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EDE9FE] border border-[#DDD6FE] text-[11px] font-black text-[#7C3AED]">
             <Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" />
             <span>Alphabetically Sorted Inventory Sync</span>
           </div>
@@ -139,11 +139,11 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
 
       {/* Headline banner */}
       <div className="space-y-1.5">
-        <h3 className="font-bold text-[#171329] text-lg sm:text-xl flex items-center gap-2 tracking-tight">
+        <h3 className="font-black text-[#0F172A] text-lg sm:text-xl flex items-center gap-2 tracking-tight">
           <Database className="w-5 h-5 text-[#7C3AED]" />
           <span>Premium Log Accounts Store</span>
         </h3>
-        <p className="text-xs text-[#716B82] leading-relaxed max-w-2xl">
+        <p className="text-xs text-[#475569] font-medium leading-relaxed max-w-2xl">
           Instantly buy, preview, or bookmark verified aged logs, developer profiles, and social accounts matching your direct search specifications. Sorted alphabetically by category.
         </p>
       </div>
@@ -153,7 +153,7 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
         
         {/* Sleek Search Bar */}
         <div className="relative w-full">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#716B82]">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#7C3AED]">
             <Search className="w-4.5 h-4.5" />
           </div>
           <input
@@ -161,7 +161,7 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
             placeholder="Search account logs (e.g. 'Aged Facebook', '50K followers Instagram', '2FA Gmail')..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-white border border-[#E9E2FA] focus:border-[#7C3AED] text-[#171329] placeholder-[#716B82]/50 text-xs sm:text-sm pl-11 pr-4 py-3 rounded-2xl focus:outline-none transition-all duration-300 shadow-sm"
+            className="w-full bg-white border border-[#DDD6FE] focus:border-[#7C3AED] text-[#0F172A] placeholder-[#64748B] text-xs sm:text-sm pl-11 pr-4 py-3 rounded-2xl focus:outline-none transition-all duration-300 shadow-xs font-semibold"
           />
         </div>
 
@@ -180,13 +180,13 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
                 onClick={() => onCategoryFilterChange(cat.name)}
                 className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 border cursor-pointer ${
                   isSelected
-                    ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm'
-                    : 'bg-white hover:bg-[#F8F7FF] text-[#716B82] hover:text-[#171329] border-[#E9E2FA]'
+                    ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm shadow-purple-600/20 font-black'
+                    : 'bg-white hover:bg-[#FAF8FE] text-[#1E192E] hover:text-[#7C3AED] border-[#DDD6FE] shadow-xs'
                 }`}
               >
                 <span>{cat.label}</span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                  isSelected ? 'bg-white/20 text-white' : 'bg-[#F8F7FF] text-[#7C3AED] border border-[#E9E2FA]'
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                  isSelected ? 'bg-white/25 text-white' : 'bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE]'
                 }`}>
                   {count}
                 </span>
@@ -198,16 +198,16 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
 
       {/* Real Inventory Display Grid */}
       {listingsLoading ? (
-        <div className="h-64 bg-white border border-dashed border-[#E9E2FA] rounded-3xl flex flex-col items-center justify-center gap-3 text-sm text-[#7C3AED] font-bold shadow-sm">
+        <div className="h-64 bg-white border border-dashed border-[#DDD6FE] rounded-3xl flex flex-col items-center justify-center gap-3 text-sm text-[#7C3AED] font-black shadow-xs">
           <div className="w-8 h-8 rounded-full border-2 border-[#7C3AED] border-t-transparent animate-spin" />
           <span>Synchronizing existing accounts inventory...</span>
         </div>
       ) : filteredAndSortedListings.length === 0 ? (
-        <div className="bg-white border border-dashed border-[#E9E2FA] rounded-3xl p-12 text-center space-y-4 max-w-xl mx-auto my-6 shadow-sm">
-          <ShoppingCart className="w-12 h-12 text-[#7C3AED]/30 mx-auto" />
+        <div className="bg-white border border-dashed border-[#DDD6FE] rounded-3xl p-12 text-center space-y-4 max-w-xl mx-auto my-6 shadow-xs">
+          <ShoppingCart className="w-12 h-12 text-[#7C3AED]/40 mx-auto" />
           <div className="space-y-1">
-            <h4 className="font-bold text-[#171329] text-base">No Matching Logs Available</h4>
-            <p className="text-xs text-[#716B82] leading-relaxed">
+            <h4 className="font-black text-[#0F172A] text-base">No Matching Logs Available</h4>
+            <p className="text-xs text-[#475569] font-medium leading-relaxed">
               There are currently no active listings that match your filter or search query. Try choosing a different category or clearing your search term.
             </p>
           </div>
@@ -216,7 +216,7 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
               onCategoryFilterChange('All');
               onSearchChange('');
             }}
-            className="px-4 py-2 bg-[#EDE9FE] hover:bg-[#DDD6FE] text-[#7C3AED] border border-[#E9E2FA] text-xs font-bold rounded-xl transition cursor-pointer"
+            className="px-4 py-2 bg-[#EDE9FE] hover:bg-[#DDD6FE] text-[#7C3AED] border border-[#DDD6FE] text-xs font-black rounded-xl transition cursor-pointer shadow-xs"
           >
             Clear Filters
           </button>

@@ -75,19 +75,19 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = React.memo(({
       
       {/* 1. Compact, Clean Search Bar */}
       <div className="relative w-full">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 pointer-events-none" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7C3AED] pointer-events-none" />
         <input
           type="text"
           placeholder="Search products, category or seller..."
           value={searchValue}
           onChange={handleSearchInputChange}
-          className="w-full bg-[#120826] text-white placeholder-purple-300/40 text-xs sm:text-sm pl-11 pr-24 py-3.5 rounded-xl border border-[#271448] focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 transition shadow-inner font-medium"
+          className="w-full bg-white text-[#0F172A] placeholder-[#64748B] text-xs sm:text-sm pl-11 pr-24 py-3.5 rounded-xl border border-[#DDD6FE] focus:outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/20 transition shadow-xs font-semibold"
         />
         {searchValue && (
           <button
             type="button"
             onClick={handleClearSearch}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-purple-300 hover:text-white bg-[#281549] hover:bg-[#341b5f] px-2.5 py-1 rounded-lg border border-purple-800/60 transition flex items-center gap-1 cursor-pointer"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-[#475569] hover:text-[#7C3AED] bg-[#FAF8FE] hover:bg-[#EDE9FE] px-2.5 py-1 rounded-lg border border-[#DDD6FE] transition flex items-center gap-1 cursor-pointer shadow-xs"
           >
             <X className="w-3 h-3" />
             <span>Clear</span>
@@ -109,8 +109,8 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = React.memo(({
                 onClick={() => onFilterChange({ category: cat.name })}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
                   isSelected
-                    ? `bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-950/60 font-extrabold`
-                    : 'bg-[#140b29] hover:bg-[#1e103b] border-[#29164a] text-purple-300/80 hover:text-white'
+                    ? `bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm shadow-purple-600/20 font-black`
+                    : 'bg-white hover:bg-[#FAF8FE] border-[#EDE9FE] hover:border-[#DDD6FE] text-[#1E192E] hover:text-[#7C3AED] shadow-xs'
                 }`}
               >
                 {platformConfig ? (
@@ -118,13 +118,13 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = React.memo(({
                     {platformConfig.iconSvg}
                   </div>
                 ) : (
-                  <Globe className="w-4 h-4 text-purple-300 shrink-0" />
+                  <Globe className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-[#7C3AED]'}`} />
                 )}
                 <span>{cat.label}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
                   isSelected 
-                    ? 'bg-purple-950 text-purple-200 border border-purple-400/40' 
-                    : 'bg-[#20113f] text-purple-300/70'
+                    ? 'bg-white/25 text-white' 
+                    : 'bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE]'
                 }`}>
                   {count}
                 </span>

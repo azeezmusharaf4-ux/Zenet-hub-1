@@ -43,6 +43,8 @@ import {
 import { db, sanitizeFirestorePayload } from '../lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { AdminWalletsView } from './AdminWalletsView';
+import { HistoryView } from './HistoryView';
+import { ActiveAppView } from '../types';
 
 export type DashboardTab = 'profile' | 'purchases' | 'saved' | 'recent' | 'inquiries' | 'listings' | 'referrals' | 'settings' | 'wallets';
 
@@ -66,6 +68,7 @@ interface UserDashboardModalProps {
   onUpdateProfile?: (profileData: Partial<UserProfile>) => Promise<void>;
   onSignOut?: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
+  onSelectView?: (view: ActiveAppView) => void;
 }
 
 export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
@@ -87,7 +90,8 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
   onContactSeller,
   onUpdateProfile,
   onSignOut,
-  onOpenAuth
+  onOpenAuth,
+  onSelectView
 }) => {
   const isOwner = user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.role === 'owner';
   const isAdmin = isOwner || userProfile?.role === 'admin';
@@ -523,367 +527,25 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
           )}
 
           {/* ========================================================= */}
-          {/* TAB 2: MY ORDERS & ESCROW HISTORY */}
+          {/* TAB 2: HISTORY (NUMBER, LOG, BOOST, UPDATE) */}
           {/* ========================================================= */}
           {activeTab === 'purchases' && (
-            <div className="space-y-4 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-white text-base flex items-center gap-2">
-                    <ShoppingBag className="w-5 h-5 text-emerald-400" />
-                    My Escrow Orders & Purchases
-                  </h3>
-                  <p className="text-xs text-purple-300/70">
-                    Accounts purchased with 7-Day Escrow Money-Back Guarantee
-                  </p>
-                </div>
-                <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold px-3 py-1 rounded-full">
-                  {purchases.length} Total Orders
-                </span>
-              </div>
-
-              {purchases.length === 0 ? (
-                <div className="text-center py-14 bg-[#150a2b] border border-dashed border-[#2d1952] rounded-3xl p-6 space-y-3">
-                  <div className="w-14 h-14 bg-purple-900/30 text-purple-400 rounded-full flex items-center justify-center mx-auto border border-purple-500/30">
-                    <ShoppingBag className="w-7 h-7" />
-                  </div>
-                  <h4 className="text-white font-extrabold text-sm">No Purchases Yet</h4>
-                  <p className="text-purple-300/70 text-xs max-w-sm mx-auto">
-                    When you purchase Facebook, TikTok, Instagram, or Gmail accounts, your orders and escrow security tokens will appear here.
-                  </p>
-                  <button
-                    onClick={onClose}
-                    className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-lg transition cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <span>Browse Accounts Marketplace</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                purchases.map((ord) => (
-                  <div key={ord.id} className="bg-[#170c30] border border-[#2d1952] p-4 sm:p-5 rounded-3xl space-y-3 shadow-lg hover:border-purple-500/40 transition">
-                    
-                    {/* Top Status Bar */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#281548] pb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                          {ord.status === 'completed' ? 'Escrow Released' : 'Held in Safe Escrow'}
-                        </span>
-
-                        <span className="bg-purple-950/90 text-purple-300 border border-purple-800/80 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase">
-                          {ord.paymentGateway || 'Paystack'} Gateway
-                        </span>
-                      </div>
-
-                      <span className="text-xs text-purple-300/60 font-mono">
-                        {new Date(ord.purchasedAt).toLocaleDateString()} {new Date(ord.purchasedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-
-                    {/* Order Details */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
-                          {ord.type === 'virtual_number' 
-                            ? 'Virtual Number OTP Slot' 
-                            : ord.type === 'log_account' 
-                              ? 'Automated Log Account' 
-                              : `${ord.category || 'Platform'} Account`}
-                        </span>
-                        <h4 className="font-extrabold text-white text-base leading-snug">{ord.listingTitle}</h4>
-                        <p className="text-xs text-purple-300/80">
-                          {ord.type === 'virtual_number' ? (
-                            <>
-                              Provider: <strong className="text-purple-300 font-semibold">OneGridHub Carrier</strong>
-                            </>
-                          ) : ord.type === 'log_account' ? (
-                            <>
-                              Provider: <strong className="text-purple-300 font-semibold">OneGridHub Log Store</strong>
-                            </>
-                          ) : (
-                            <>
-                              Seller: <strong className="text-white font-semibold">{ord.sellerName || 'Zenet Agent'}</strong> {ord.sellerEmail && `(${ord.sellerEmail})`}
-                            </>
-                          )}
-                        </p>
-                      </div>
-
-                      <div className="text-left sm:text-right shrink-0">
-                        <span className="text-[10px] text-purple-300/60 font-bold uppercase block">Paid Amount</span>
-                        <span className="text-xl font-black text-white font-mono">
-                          {ord.currency || 'USD'} {Number(ord.paidAmount || ord.price).toLocaleString()}
-                        </span>
-                        {ord.price && (
-                          <span className="text-[10px] text-purple-300/60 block">
-                            (₦{ord.price.toLocaleString()} NGN)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Ref */}
-                    {ord.transactionId && (
-                      <div className="text-[11px] text-purple-300/60 font-mono">
-                        Transaction Ref: <span className="text-purple-200">{ord.transactionId}</span>
-                      </div>
-                    )}
-
-                    {/* Revealed Digital Credentials Section */}
-                    <div className="bg-[#120826] border border-[#3b1d73] p-4 rounded-2xl space-y-3 mt-3">
-                      <div className="flex items-center justify-between border-b border-[#2d1952] pb-2.5">
-                        <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-xs">
-                          {ord.type === 'virtual_number' ? (
-                            <>
-                              <Phone className="w-4 h-4 text-purple-400" />
-                              <span>Active Virtual Number OTP Info</span>
-                            </>
-                          ) : (
-                            <>
-                              <Key className="w-4 h-4 text-amber-300" />
-                              <span>🔑 Digital Product Credentials (Purchased & Revealed)</span>
-                            </>
-                          )}
-                        </div>
-                        <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded-md font-bold uppercase">
-                          {ord.type === 'virtual_number' ? 'Activation Slot' : 'Buyer Access Only'}
-                        </span>
-                      </div>
-
-                      {ord.type === 'virtual_number' ? (
-                        <div className="space-y-2.5 text-xs">
-                          <div className="flex items-center justify-between bg-[#0a0418] p-2.5 rounded-xl border border-[#231245]">
-                            <div>
-                              <span className="text-[10px] text-purple-300/60 font-bold block uppercase">Assigned Phone Number</span>
-                              <span className="text-white font-mono font-bold">{ord.phoneNumber || 'Provisioning...'}</span>
-                            </div>
-                            {ord.phoneNumber && (
-                              <button
-                                onClick={() => handleCopyCredential(ord.phoneNumber, `${ord.id}_phone`)}
-                                className={`p-1.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                  copiedItemKey === `${ord.id}_phone`
-                                    ? 'bg-emerald-600 text-white border-emerald-400'
-                                    : 'bg-[#211242] hover:bg-[#311961] text-purple-200 border-[#3c1d75]'
-                                }`}
-                              >
-                                {copiedItemKey === `${ord.id}_phone` ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3 text-purple-300" />}
-                                <span>{copiedItemKey === `${ord.id}_phone` ? 'Copied' : 'Copy'}</span>
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="bg-[#0a0418] p-3 rounded-xl border border-[#231245] space-y-2">
-                            <span className="text-[10px] text-purple-300/60 font-bold block uppercase">Verification Code (OTP) Status</span>
-                            
-                            {ord.smsCode ? (
-                              <div className="flex items-center justify-between bg-emerald-950/20 border border-emerald-500/25 p-2 rounded-lg">
-                                <span className="text-emerald-400 font-black font-mono text-base tracking-widest">{ord.smsCode}</span>
-                                <button
-                                  onClick={() => handleCopyCredential(ord.smsCode, `${ord.id}_otp`)}
-                                  className={`p-1 rounded text-[10px] font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                    copiedItemKey === `${ord.id}_otp`
-                                      ? 'bg-emerald-600 text-white border-emerald-400'
-                                      : 'bg-[#211242] hover:bg-[#311961] text-purple-200 border-[#3c1d75]'
-                                  }`}
-                                >
-                                  {copiedItemKey === `${ord.id}_otp` ? 'Copied' : 'Copy OTP'}
-                                </button>
-                              </div>
-                            ) : (
-                              <p className="text-[11px] text-purple-300/50 animate-pulse font-medium">
-                                Waiting for incoming SMS... {ord.orderStatus === 'CANCELLED' ? '(Session Expired or Cancelled)' : ''}
-                              </p>
-                            )}
-
-                            {ord.smsText && (
-                              <div className="bg-[#120826] p-2 rounded border border-purple-900/30 font-mono text-[11px] text-slate-300">
-                                {ord.smsText}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : ord.digitalProductDetails && (ord.digitalProductDetails.accountEmail || ord.digitalProductDetails.accountPassword || ord.digitalProductDetails.recoveryInfo || ord.digitalProductDetails.backupCodes || ord.digitalProductDetails.additionalInstructions) ? (
-                        <div className="space-y-2.5 text-xs">
-                          {ord.digitalProductDetails.accountEmail && (
-                            <div className="flex items-center justify-between bg-[#0a0418] p-2.5 rounded-xl border border-[#231245]">
-                              <div>
-                                <span className="text-[10px] text-purple-300/60 font-bold block uppercase">Account Email / Login</span>
-                                <span className="text-white font-mono font-bold">{ord.digitalProductDetails.accountEmail}</span>
-                              </div>
-                              <button
-                                onClick={() => handleCopyCredential(ord.digitalProductDetails?.accountEmail || '', `${ord.id}_email`)}
-                                className={`p-1.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                  copiedItemKey === `${ord.id}_email`
-                                    ? 'bg-emerald-600 text-white border-emerald-400'
-                                    : 'bg-[#211242] hover:bg-[#311961] text-purple-200 border-[#3c1d75]'
-                                }`}
-                              >
-                                {copiedItemKey === `${ord.id}_email` ? (
-                                  <>
-                                    <Check className="w-3 h-3 text-white" /> Copied!
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-3 h-3 text-purple-300" /> Copy
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
-
-                          {ord.digitalProductDetails.accountPassword && (
-                            <div className="flex items-center justify-between bg-[#0a0418] p-2.5 rounded-xl border border-[#231245]">
-                              <div>
-                                <span className="text-[10px] text-purple-300/60 font-bold block uppercase">Account Password</span>
-                                <span className="text-amber-300 font-mono font-bold">{ord.digitalProductDetails.accountPassword}</span>
-                              </div>
-                              <button
-                                onClick={() => handleCopyCredential(ord.digitalProductDetails?.accountPassword || '', `${ord.id}_pass`)}
-                                className={`p-1.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                  copiedItemKey === `${ord.id}_pass`
-                                    ? 'bg-emerald-600 text-white border-emerald-400'
-                                    : 'bg-[#211242] hover:bg-[#311961] text-purple-200 border-[#3c1d75]'
-                                }`}
-                              >
-                                {copiedItemKey === `${ord.id}_pass` ? (
-                                  <>
-                                    <Check className="w-3 h-3 text-white" /> Copied!
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-3 h-3 text-purple-300" /> Copy
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
-
-                          {ord.digitalProductDetails.recoveryInfo && (
-                            <div className="flex items-center justify-between bg-[#0a0418] p-2.5 rounded-xl border border-[#231245]">
-                              <div>
-                                <span className="text-[10px] text-purple-300/60 font-bold block uppercase">Recovery Info</span>
-                                <span className="text-purple-100 font-mono">{ord.digitalProductDetails.recoveryInfo}</span>
-                              </div>
-                              <button
-                                onClick={() => handleCopyCredential(ord.digitalProductDetails?.recoveryInfo || '', `${ord.id}_rec`)}
-                                className={`p-1.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                  copiedItemKey === `${ord.id}_rec`
-                                    ? 'bg-emerald-600 text-white border-emerald-400'
-                                    : 'bg-[#211242] hover:bg-[#311961] text-purple-200 border-[#3c1d75]'
-                                }`}
-                              >
-                                {copiedItemKey === `${ord.id}_rec` ? (
-                                  <>
-                                    <Check className="w-3 h-3 text-white" /> Copied!
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-3 h-3 text-purple-300" /> Copy
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
-
-                          {ord.digitalProductDetails.twoFactorSecretKey && (
-                            <div className="bg-[#0a0418] p-2.5 rounded-xl border border-amber-500/30">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] text-amber-300/80 font-bold uppercase">2FA Authenticator Secret Key</span>
-                                <button
-                                  onClick={() => handleCopyCredential(ord.digitalProductDetails?.twoFactorSecretKey || '', `${ord.id}_2fa_sec`)}
-                                  className={`p-1.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                    copiedItemKey === `${ord.id}_2fa_sec`
-                                      ? 'bg-emerald-600 text-white border-emerald-400'
-                                      : 'bg-[#251342] hover:bg-[#371b63] text-amber-200 border-[#4a237d]'
-                                  }`}
-                                >
-                                  {copiedItemKey === `${ord.id}_2fa_sec` ? (
-                                    <>
-                                      <Check className="w-3 h-3 text-white" /> Copied!
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-3 h-3 text-amber-300" /> Copy Secret Key
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                              <code className="text-amber-200 font-mono text-xs select-all block break-all">{ord.digitalProductDetails.twoFactorSecretKey}</code>
-                            </div>
-                          )}
-
-                          {(ord.digitalProductDetails.twoFactorBackupCodes || ord.digitalProductDetails.backupCodes) && (
-                            <div className="bg-[#0a0418] p-2.5 rounded-xl border border-[#231245]">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] text-purple-300/60 font-bold uppercase">2FA Backup Codes</span>
-                                <button
-                                  onClick={() => handleCopyCredential(ord.digitalProductDetails?.twoFactorBackupCodes || ord.digitalProductDetails?.backupCodes || '', `${ord.id}_2fa`)}
-                                  className={`p-1.5 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                    copiedItemKey === `${ord.id}_2fa`
-                                      ? 'bg-emerald-600 text-white border-emerald-400'
-                                      : 'bg-[#211242] hover:bg-[#311961] text-purple-200 border-[#3c1d75]'
-                                  }`}
-                                >
-                                  {copiedItemKey === `${ord.id}_2fa` ? (
-                                    <>
-                                      <Check className="w-3 h-3 text-white" /> Copied!
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-3 h-3 text-purple-300" /> Copy Codes
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                              <p className="text-amber-200 font-mono text-[11px] whitespace-pre-wrap break-all">{ord.digitalProductDetails.twoFactorBackupCodes || ord.digitalProductDetails.backupCodes}</p>
-                            </div>
-                          )}
-
-                          {ord.digitalProductDetails.additionalInstructions && (
-                            <div className="bg-[#0a0418] p-2.5 rounded-xl border border-[#231245]">
-                              <span className="text-[10px] text-purple-300/60 font-bold block uppercase mb-1">Transfer & Takeover Instructions</span>
-                              <p className="text-purple-200 text-xs leading-relaxed">{ord.digitalProductDetails.additionalInstructions}</p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-purple-300/70 italic">
-                          Credentials will be provided by seller upon takeover request. Contact seller directly using contact info.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Escrow Release Token Box */}
-                    {ord.transferCode && (
-                      <div className="bg-[#1f103d] border border-[#381c6e] p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
-                        <div className="flex items-center gap-2.5">
-                          <Key className="w-4 h-4 text-amber-300 shrink-0" />
-                          <div>
-                            <span className="text-purple-300/70 text-[10px] uppercase font-bold block">
-                              Escrow Verification Release Token
-                            </span>
-                            <code className="text-amber-300 font-mono font-black text-xs sm:text-sm tracking-wider">
-                              {ord.transferCode}
-                            </code>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(ord.transferCode || '');
-                            alert('Escrow Token copied to clipboard!');
-                          }}
-                          className="bg-[#2a1354] hover:bg-[#381b70] text-purple-200 text-xs font-bold px-3 py-1.5 rounded-xl border border-[#48228d] transition cursor-pointer flex items-center gap-1.5"
-                        >
-                          <Copy className="w-3.5 h-3.5 text-purple-300" />
-                          <span>Copy Token</span>
-                        </button>
-                      </div>
-                    )}
-
-                  </div>
-                ))
-              )}
+            <div className="bg-[#FAF8FE] text-[#171329] p-2 sm:p-4 rounded-3xl animate-in fade-in duration-150">
+              <HistoryView
+                user={user}
+                userProfile={userProfile}
+                purchases={purchases || []}
+                onBack={() => setActiveTab('profile')}
+                onSelectView={(v) => {
+                  onClose();
+                  onSelectView?.(v);
+                }}
+                onOpenAuth={onOpenAuth || (() => {})}
+                onOpenWallet={() => {
+                  onClose();
+                  onSelectView?.('wallet');
+                }}
+              />
             </div>
           )}
 

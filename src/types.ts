@@ -386,6 +386,7 @@ export type ActiveAppView =
   | 'dashboard' 
   | 'categories' 
   | 'orders' 
+  | 'history'
   | 'wallet' 
   | 'deposit-history'
   | 'seller'

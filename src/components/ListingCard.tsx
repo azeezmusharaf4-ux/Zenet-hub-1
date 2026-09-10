@@ -68,7 +68,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
   );
 
   return (
-    <div className="w-full h-full group bg-white hover:bg-[#F8F7FF] border border-[#E9E2FA] hover:border-[#7C3AED]/40 rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200 shadow-sm hover:shadow-md relative overflow-hidden gap-3.5">
+    <div className="w-full h-full group bg-white hover:bg-[#FAF8FE] border border-[#DDD6FE] hover:border-[#7C3AED] rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200 shadow-xs hover:shadow-md relative overflow-hidden gap-3.5">
       
       {/* Top Header Section: Platform Icon Avatar, Title & Seller */}
       <div className="z-10 space-y-2.5">
@@ -97,7 +97,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
           <div className="flex-1 min-w-0">
             <h3 
               onClick={() => onSelect(listing)}
-              className="text-[#171329] font-extrabold text-sm sm:text-base leading-snug hover:text-[#7C3AED] transition cursor-pointer line-clamp-1 tracking-tight"
+              className="text-[#0F172A] font-black text-sm sm:text-base leading-snug hover:text-[#7C3AED] transition cursor-pointer line-clamp-1 tracking-tight"
               title={listing.title}
             >
               {listing.title}
@@ -112,15 +112,15 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
                     onViewSellerProfile(listing.sellerId, listing.sellerName);
                   }
                 }}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[#716B82] hover:text-[#7C3AED] transition cursor-pointer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-[#475569] hover:text-[#7C3AED] transition cursor-pointer"
               >
                 <span className="truncate max-w-[110px]">{sellerHandle}</span>
-                <span title="Verified Seller" className="bg-amber-100 text-amber-700 p-0.5 rounded-full border border-amber-300 shrink-0">
+                <span title="Verified Seller" className="bg-amber-100 text-amber-800 p-0.5 rounded-full border border-amber-300 shrink-0">
                   <Check className="w-2.5 h-2.5 stroke-[3]" />
                 </span>
               </button>
 
-              <div className="flex items-center gap-0.5 text-amber-500 font-bold text-[11px] shrink-0">
+              <div className="flex items-center gap-0.5 text-amber-500 font-black text-[11px] shrink-0">
                 <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                 <span>{listing.sellerRating || 4.9}</span>
               </div>
@@ -137,7 +137,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
               className={`p-1.5 rounded-xl border transition cursor-pointer ${
                 isSaved
                   ? 'bg-[#EDE9FE] text-[#7C3AED] border-[#C4B5FD]'
-                  : 'bg-[#F8F7FF] text-[#716B82] hover:text-[#171329] border-[#E9E2FA]'
+                  : 'bg-[#FAF8FE] text-[#64748B] hover:text-[#7C3AED] border-[#DDD6FE]'
               }`}
               title={isSaved ? 'Remove Bookmark' : 'Bookmark Item'}
             >
@@ -163,7 +163,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
         {/* Short Product Description (Max 2 lines) */}
         <p 
           onClick={() => onSelect(listing)}
-          className="text-xs text-[#716B82] leading-relaxed cursor-pointer hover:text-[#171329] transition line-clamp-2 min-h-[36px]"
+          className="text-xs text-[#475569] font-medium leading-relaxed cursor-pointer hover:text-[#0F172A] transition line-clamp-2 min-h-[36px]"
         >
           {listing.description || 'Verified PVA account with instant 2FA transfer and original email access included.'}
         </p>
@@ -171,7 +171,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
       </div>
 
       {/* Middle/Bottom Row: Stock Status & Price */}
-      <div className="z-10 pt-2 border-t border-[#E9E2FA] space-y-2.5">
+      <div className="z-10 pt-2 border-t border-[#EDE9FE] space-y-2.5">
         
         {/* Stock & Price Line */}
         <div className="flex items-center justify-between gap-2">
@@ -179,12 +179,12 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
           {/* Stock Counter */}
           <div className="flex items-center gap-1.5">
             {isSoldOut ? (
-              <span className="flex items-center gap-1.5 text-xs font-bold text-rose-600">
+              <span className="flex items-center gap-1.5 text-xs font-black text-rose-600">
                 <span className="w-2 h-2 rounded-full bg-rose-500" />
                 <span>0 stock</span>
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+              <span className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                 <span>{stockCount} in stock</span>
               </span>
@@ -193,7 +193,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
 
           {/* Price */}
           <div className="text-right">
-            <span className="text-lg sm:text-xl font-black text-[#171329] font-mono tracking-tight">
+            <span className="text-lg sm:text-xl font-black text-[#0F172A] font-mono tracking-tight">
               ₦{Number(listing.price).toLocaleString()}
             </span>
           </div>
@@ -205,7 +205,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
           <button
             type="button"
             onClick={() => onSelect(listing)}
-            className="w-full min-h-[40px] flex items-center justify-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-900 font-extrabold text-xs py-2.5 px-2.5 rounded-xl border border-slate-200 transition cursor-pointer shadow-sm active:scale-[0.98] whitespace-nowrap"
+            className="w-full min-h-[40px] flex items-center justify-center gap-1.5 bg-white hover:bg-[#FAF8FE] text-[#0F172A] font-black text-xs py-2.5 px-2.5 rounded-xl border border-[#DDD6FE] hover:border-[#7C3AED] transition cursor-pointer shadow-xs active:scale-[0.98] whitespace-nowrap"
           >
             <Eye className="w-3.5 h-3.5 text-[#7C3AED] shrink-0" />
             <span>Preview</span>
@@ -223,10 +223,10 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
               }
             }}
             disabled={isSoldOut}
-            className={`w-full min-h-[40px] flex items-center justify-center gap-1.5 font-extrabold text-xs py-2.5 px-2.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
+            className={`w-full min-h-[40px] flex items-center justify-center gap-1.5 font-black text-xs py-2.5 px-2.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
               isSoldOut
                 ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                : 'bg-[#7C3AED] hover:bg-[#5B21B6] text-white shadow-sm active:scale-[0.98]'
+                : 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-sm shadow-purple-600/20 active:scale-[0.98]'
             }`}
           >
             <Lock className="w-3.5 h-3.5 text-white/90 shrink-0" />

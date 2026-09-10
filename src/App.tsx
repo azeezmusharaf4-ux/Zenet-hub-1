@@ -54,8 +54,9 @@ import { SocialBoostView } from './components/SocialBoostView';
 import { VirtualNumbers2View } from './components/VirtualNumbers2View';
 import { SocialBoost2View } from './components/SocialBoost2View';
 import { Server2View } from './components/Server2View';
+import { HistoryView } from './components/HistoryView';
 import { PWAInstallBanner } from './components/PWAInstallPrompt';
-import { Phone, UserCheck, PhoneCall, Flame, Cpu } from 'lucide-react';
+import { Phone, UserCheck } from 'lucide-react';
 
 import { 
   ShieldCheck, 
@@ -537,16 +538,20 @@ export default function App() {
       view === 'virtual-numbers' ||
       view === 'virtual-numbers-2' ||
       view === 'server-tool' ||
-      view === 'log-accounts'
+      view === 'log-accounts' ||
+      view === 'orders' ||
+      view === 'history'
     ) {
       window.scrollTo({ top: 0, behavior: 'instant' });
-      navigateRoute({ view, dashboardTab: null, walletModal: false, product: null, seller: null });
+      const targetView: ActiveAppView = view === 'history' ? 'orders' : view;
+      setActiveView(targetView);
+      navigateRoute({ view: targetView, dashboardTab: null, walletModal: false, product: null, seller: null });
       return;
     }
 
     // Modal-backed views require login
     if (!user) {
-      if (view === 'dashboard' || view === 'profile' || view === 'settings' || view === 'orders' || view === 'saved' || view === 'messages' || view === 'referrals') {
+      if (view === 'dashboard' || view === 'profile' || view === 'settings' || view === 'saved' || view === 'messages' || view === 'referrals') {
         navigateRoute({ dashboardTab: 'profile' });
         return;
       }
@@ -558,8 +563,6 @@ export default function App() {
       navigateRoute({ dashboardTab: 'profile' });
     } else if (view === 'settings') {
       navigateRoute({ dashboardTab: 'settings' });
-    } else if (view === 'orders') {
-      navigateRoute({ dashboardTab: 'purchases' });
     } else if (view === 'saved') {
       navigateRoute({ dashboardTab: 'saved' });
     } else if (view === 'messages') {
@@ -622,12 +625,15 @@ export default function App() {
         'log-accounts',
         'categories',
         'support',
-        'admin_wallets'
+        'admin_wallets',
+        'orders',
+        'history'
       ];
+      const normalizedViewParam: ActiveAppView | undefined = vParam === 'history' ? 'orders' : vParam;
       const validView: ActiveAppView = (isWalletsUrl || vParam === 'admin_wallets') 
         ? 'admin_wallets' 
-        : (vParam && validViews.includes(vParam))
-        ? vParam 
+        : (normalizedViewParam && validViews.includes(normalizedViewParam))
+        ? normalizedViewParam 
         : 'marketplace';
       setActiveView(validView);
 
@@ -1077,7 +1083,7 @@ export default function App() {
 
         setCompletedOrder(null);
         setBuyingListing(null);
-        navigateRoute({ dashboardTab: 'purchases' });
+        handleSelectView('orders');
         return;
       } catch (err: any) {
         console.error('Secure wallet purchase error:', err);
@@ -1384,7 +1390,7 @@ export default function App() {
     // Close checkout and open Orders & History cleanly
     setBuyingListing(null);
     setCompletedOrder(null);
-    navigateRoute({ dashboardTab: 'purchases' });
+    handleSelectView('orders');
   };
 
   // Handler: Secure and Streamlined Wallet Buy Now Flow
@@ -2087,6 +2093,19 @@ export default function App() {
             />
           )}
 
+          {/* VIEW: ORDER & SERVICE HISTORY (NUMBER, LOG, BOOST, UPDATE) */}
+          {(activeView === 'orders' || activeView === 'history') && (
+            <HistoryView
+              user={user}
+              userProfile={userProfile}
+              purchases={purchases}
+              onBack={handleBackToMarketplace}
+              onSelectView={handleSelectView}
+              onOpenAuth={(mode) => setAuthMode(mode)}
+              onOpenWallet={() => handleSelectView('wallet')}
+            />
+          )}
+
           {/* VIEW 3: MARKETPLACE HOME */}
           {activeView === 'marketplace' && (
             <>
@@ -2096,43 +2115,43 @@ export default function App() {
                   <span className="text-[10px] font-black uppercase tracking-widest text-[#7C3AED] block">
                     OUR VERIFIED SOLUTIONS
                   </span>
-                  <h3 className="text-2xl sm:text-3xl font-black text-[#171329] tracking-tight flex items-center space-x-1.5">
+                  <h3 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight flex items-center space-x-1.5">
                     <span>Main Services</span>
                     <span className="text-[#7C3AED] font-black">•</span>
                   </h3>
                 </div>
 
                 {/* Unified Balance and Funding Widget */}
-                <div className="flex items-center justify-between space-x-4 text-xs sm:text-sm font-bold text-[#171329] mb-6 bg-white border border-[#E9E2FA] px-5 py-3.5 rounded-2xl shadow-sm">
+                <div className="flex items-center justify-between space-x-4 text-xs sm:text-sm font-bold text-[#0F172A] mb-6 bg-white border border-[#DDD6FE] px-5 py-3.5 rounded-2xl shadow-xs">
                   <div className="flex items-center space-x-2">
-                    <span className="text-[#716B82] tracking-widest uppercase text-[10px] sm:text-xs">Balance</span>
-                    <span className="font-black text-[#171329] text-sm sm:text-base font-mono bg-[#F8F7FF] px-3.5 py-1.5 rounded-xl border border-[#E9E2FA]">
+                    <span className="text-[#7C3AED] font-black tracking-widest uppercase text-[10px] sm:text-xs">Balance</span>
+                    <span className="font-black text-[#0F172A] text-sm sm:text-base font-mono bg-[#FAF8FE] px-3.5 py-1.5 rounded-xl border border-[#EDE9FE]">
                       ₦{walletBalance.toLocaleString()}
                     </span>
                   </div>
 
                   <button
                     onClick={() => setIsWalletModalOpen(true)}
-                    className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-sm flex items-center space-x-2 uppercase tracking-wider"
+                    className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-black text-xs sm:text-sm transition cursor-pointer shadow-sm shadow-purple-600/20 flex items-center space-x-2 uppercase tracking-wider"
                   >
                     <span>Fund Account</span>
                     <span className="w-2 h-2 rounded-full bg-white shrink-0 shadow-sm" />
                   </button>
                 </div>
                 
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {/* 1. Log Accounts */}
                   <button
                     id="main-service-log-accounts"
                     onClick={() => setActiveView('log-accounts')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px]"
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#DDD6FE] hover:border-[#7C3AED] hover:bg-[#FAF8FE] transition duration-200 cursor-pointer group shadow-xs hover:shadow-md min-h-[180px]"
                   >
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
                       <UserCheck className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Log Accounts</h4>
-                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
+                      <h4 className="font-black text-[#0F172A] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Log Accounts</h4>
+                      <p className="text-[11px] sm:text-xs text-[#475569] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Purchase verified digital logs
                       </p>
                     </div>
@@ -2142,14 +2161,14 @@ export default function App() {
                   <button
                     id="main-service-virtual-numbers"
                     onClick={() => handleSelectView('virtual-numbers')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px]"
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#DDD6FE] hover:border-[#7C3AED] hover:bg-[#FAF8FE] transition duration-200 cursor-pointer group shadow-xs hover:shadow-md min-h-[180px]"
                   >
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
                       <Phone className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Service Number</h4>
-                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
+                      <h4 className="font-black text-[#0F172A] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Service Number</h4>
+                      <p className="text-[11px] sm:text-xs text-[#475569] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Buy active virtual phone numbers
                       </p>
                     </div>
@@ -2159,14 +2178,14 @@ export default function App() {
                   <button
                     id="main-service-social-boost"
                     onClick={() => handleSelectView('social-boost')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px]"
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#DDD6FE] hover:border-[#7C3AED] hover:bg-[#FAF8FE] transition duration-200 cursor-pointer group shadow-xs hover:shadow-md min-h-[180px]"
                   >
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
                       <TrendingUp className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Social Boost</h4>
-                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
+                      <h4 className="font-black text-[#0F172A] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Social Boost</h4>
+                      <p className="text-[11px] sm:text-xs text-[#475569] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Automated growth panels & social boosting services
                       </p>
                     </div>
@@ -2176,55 +2195,15 @@ export default function App() {
                   <button
                     id="main-service-zenet-update"
                     onClick={() => setIsZenetUpdateModalOpen(true)}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px]"
+                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#DDD6FE] hover:border-[#7C3AED] hover:bg-[#FAF8FE] transition duration-200 cursor-pointer group shadow-xs hover:shadow-md min-h-[180px]"
                   >
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
                       <Sparkles className="w-6 h-6" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Zenet Update</h4>
-                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
+                      <h4 className="font-black text-[#0F172A] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Zenet Update</h4>
+                      <p className="text-[11px] sm:text-xs text-[#475569] font-medium leading-relaxed max-w-[150px] mx-auto">
                         Get the latest verified system updates and digital releases
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 5. Service Number 2 */}
-                  <button
-                    id="main-service-virtual-numbers-2"
-                    onClick={() => handleSelectView('virtual-numbers-2')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px] relative overflow-hidden"
-                  >
-                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-[#EDE9FE] text-[#5B21B6] border border-[#C4B5FD] text-[9px] font-black uppercase tracking-wider">
-                      Provider 2
-                    </div>
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
-                      <PhoneCall className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Service Number 2</h4>
-                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
-                        Buy Provider 2 virtual numbers & instant SMS
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 6. Social Boost 2 */}
-                  <button
-                    id="main-service-social-boost-2"
-                    onClick={() => handleSelectView('social-boost-2')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#7C3AED]/40 hover:bg-[#F8F7FF] transition duration-200 cursor-pointer group shadow-sm hover:shadow-md min-h-[180px] relative overflow-hidden"
-                  >
-                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-[#EDE9FE] text-[#5B21B6] border border-[#C4B5FD] text-[9px] font-black uppercase tracking-wider">
-                      Provider 2
-                    </div>
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
-                      <Flame className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-extrabold text-[#171329] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Social Boost 2</h4>
-                      <p className="text-[11px] sm:text-xs text-[#716B82] font-medium leading-relaxed max-w-[150px] mx-auto">
-                        Provider 2 high-speed social boost & growth panel
                       </p>
                     </div>
                   </button>
@@ -2350,6 +2329,7 @@ export default function App() {
           }}
           onSignOut={handleLogout}
           onOpenAuth={(mode) => setAuthMode(mode)}
+          onSelectView={(view) => handleSelectView(view)}
         />
       )}
 
@@ -2472,7 +2452,7 @@ export default function App() {
           onClose={() => setCompletedOrder(null)}
           onOpenOrderHistory={() => {
             setCompletedOrder(null);
-            setDashboardTab('purchases');
+            handleSelectView('orders');
           }}
           onContactSeller={(listing) => setContactListing(listing)}
         />
