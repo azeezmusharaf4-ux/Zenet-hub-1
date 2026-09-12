@@ -5,7 +5,6 @@ import {
   X, 
   Store, 
   MessageSquare, 
-  ShoppingBag, 
   Trash2, 
   CheckCircle2, 
   User as UserIcon, 
@@ -19,31 +18,20 @@ import {
   Send, 
   Search, 
   Image, 
-  Phone, 
-  Globe, 
-  Save, 
-  Sparkles, 
-  AlertCircle,
-  Clock,
-  ExternalLink,
-  Lock,
-  Eye,
-  Star,
-  Layers,
-  Award
+  Sparkles
 } from 'lucide-react';
-import { db, sanitizeFirestorePayload } from '../lib/firebase';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { EditListingModal } from './EditListingModal';
 
-export type SellerDashboardTab = 'overview' | 'listings' | 'inquiries' | 'sales' | 'profile';
+export type SellerDashboardTab = 'overview' | 'listings' | 'inquiries';
 
 interface SellerDashboardModalProps {
   user: User | null;
   userProfile: UserProfile | null;
   myListings: AccountListing[];
   inquiries: Inquiry[];
-  purchases: PurchaseRecord[];
+  purchases?: PurchaseRecord[];
   onClose: () => void;
   onSelectListing: (listing: AccountListing) => void;
   onOpenCreateListing: () => void;
@@ -58,7 +46,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   userProfile,
   myListings,
   inquiries,
-  purchases,
+  purchases = [],
   onClose,
   onSelectListing,
   onOpenCreateListing,
@@ -77,19 +65,8 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   // Editing listing modal state
   const [editingListing, setEditingListing] = useState<AccountListing | null>(null);
 
-  // Profile Edit Form state
-  const [displayName, setDisplayName] = useState(
-    userProfile?.displayName || user?.displayName || user?.email?.split('@')[0] || ''
-  );
-  const [whatsapp, setWhatsapp] = useState(userProfile?.whatsapp || '');
-  const [telegram, setTelegram] = useState(userProfile?.telegram || '');
-  const [bio, setBio] = useState(userProfile?.bio || '');
-  const [preferredCurrency, setPreferredCurrency] = useState<string>(
-    userProfile?.preferredCurrency || 'USD'
-  );
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
-  const [profileError, setProfileError] = useState('');
+  // Store display name for header
+  const displayName = userProfile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Zenet Store';
 
   // Inquiry reply state
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
@@ -128,41 +105,6 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
     }
     return true;
   });
-
-  // Handle Profile Update in Firestore
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingProfile(true);
-    setProfileSuccessMsg('');
-    setProfileError('');
-
-    try {
-      const updatedData = sanitizeFirestorePayload({
-        displayName: displayName.trim(),
-        whatsapp: whatsapp.trim(),
-        telegram: telegram.trim(),
-        bio: bio.trim(),
-        preferredCurrency
-      });
-
-      // 1. Update Firestore user doc
-      const userDocRef = doc(db, 'users', user.uid);
-      await updateDoc(userDocRef, updatedData);
-
-      // 2. Call parent callback if provided
-      if (onUpdateProfile) {
-        await onUpdateProfile(updatedData);
-      }
-
-      setProfileSuccessMsg('Seller Store Profile updated successfully in real time!');
-      setTimeout(() => setProfileSuccessMsg(''), 3000);
-    } catch (err: any) {
-      console.error('Profile update error:', err);
-      setProfileError(err.message || 'Failed to update profile.');
-    } finally {
-      setIsSavingProfile(false);
-    }
-  };
 
   // Handle Inquiry Reply submission in Firestore
   const handleSendReply = async (inquiry: Inquiry) => {
@@ -240,10 +182,10 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
         </div>
 
         {/* Navigation Tabs Bar */}
-        <div className="bg-[#0e061e] px-4 sm:px-6 py-2 border-b border-[#241344] flex gap-1.5 overflow-x-auto text-xs font-semibold shrink-0 scrollbar-none">
+        <div className="bg-[#0e061e] px-4 sm:px-6 py-2.5 border-b border-[#241344] flex items-center gap-2 overflow-x-auto text-xs font-semibold shrink-0 scrollbar-none">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'bg-purple-600/30 text-purple-200 border border-purple-500/50 shadow-md font-bold'
                 : 'text-purple-300/70 hover:text-white hover:bg-[#1b0d38]'
@@ -255,7 +197,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
 
           <button
             onClick={() => setActiveTab('listings')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
               activeTab === 'listings'
                 ? 'bg-purple-600/30 text-purple-200 border border-purple-500/50 shadow-md font-bold'
                 : 'text-purple-300/70 hover:text-white hover:bg-[#1b0d38]'
@@ -267,7 +209,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
 
           <button
             onClick={() => setActiveTab('inquiries')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap ${
               activeTab === 'inquiries'
                 ? 'bg-purple-600/30 text-purple-200 border border-purple-500/50 shadow-md font-bold'
                 : 'text-purple-300/70 hover:text-white hover:bg-[#1b0d38]'
@@ -275,30 +217,6 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
           >
             <MessageSquare className="w-4 h-4 text-indigo-400" />
             <span>Buyer Inquiries ({sellerInquiries.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('sales')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
-              activeTab === 'sales'
-                ? 'bg-purple-600/30 text-purple-200 border border-purple-500/50 shadow-md font-bold'
-                : 'text-purple-300/70 hover:text-white hover:bg-[#1b0d38]'
-            }`}
-          >
-            <ShoppingBag className="w-4 h-4 text-amber-400" />
-            <span>Escrow Sales Orders</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
-              activeTab === 'profile'
-                ? 'bg-purple-600/30 text-purple-200 border border-purple-500/50 shadow-md font-bold'
-                : 'text-purple-300/70 hover:text-white hover:bg-[#1b0d38]'
-            }`}
-          >
-            <UserIcon className="w-4 h-4 text-cyan-400" />
-            <span>Seller Store Profile</span>
           </button>
         </div>
 
@@ -722,199 +640,6 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                   ))}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* ========================================================= */}
-          {/* TAB 4: ESCROW SALES ORDERS */}
-          {/* ========================================================= */}
-          {activeTab === 'sales' && (
-            <div className="space-y-4 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-white text-base flex items-center gap-2">
-                    <ShoppingBag className="w-5 h-5 text-amber-400" />
-                    Escrow Sales & Payment Orders
-                  </h3>
-                  <p className="text-xs text-purple-300/70">
-                    Track account sales paid by buyers through Paystack & Escrow
-                  </p>
-                </div>
-              </div>
-
-              {purchases.length === 0 ? (
-                <div className="text-center py-16 bg-[#150a2b] border border-dashed border-[#2d1952] rounded-3xl p-6 space-y-3">
-                  <ShoppingBag className="w-12 h-12 text-amber-400 mx-auto opacity-40" />
-                  <h4 className="text-white font-extrabold text-sm">No Sales Records Yet</h4>
-                  <p className="text-purple-300/70 text-xs max-w-sm mx-auto">
-                    When buyers complete payment for your listed accounts, order details and escrow release statuses will display here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {purchases.map((ord) => (
-                    <div key={ord.id} className="bg-[#170c30] border border-[#2d1952] p-5 rounded-3xl space-y-3 shadow-lg">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#281548] pb-3">
-                        <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1 uppercase">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                          {ord.status === 'completed' ? 'Escrow Released to Seller' : 'Funds Secured in Escrow'}
-                        </span>
-                        <span className="text-xs text-purple-300/60 font-mono">
-                          {new Date(ord.purchasedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-bold text-purple-400 uppercase">{ord.category} Account</span>
-                          <h4 className="font-extrabold text-white text-base">{ord.listingTitle}</h4>
-                          <p className="text-xs text-purple-300/80">
-                            Buyer: <strong className="text-white">{ord.buyerName || 'Verified Buyer'}</strong> ({ord.buyerEmail})
-                          </p>
-                        </div>
-
-                        <div className="text-left sm:text-right">
-                          <span className="text-[10px] text-purple-300/60 font-bold uppercase block">Escrow Amount</span>
-                          <span className="text-xl font-black text-white font-mono">
-                            ₦{Number(ord.paidAmount || ord.price).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ========================================================= */}
-          {/* TAB 5: SELLER STORE PROFILE MANAGEMENT */}
-          {/* ========================================================= */}
-          {activeTab === 'profile' && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-white text-base flex items-center gap-2">
-                    <UserIcon className="w-5 h-5 text-cyan-400" />
-                    Seller Store Profile & Branding
-                  </h3>
-                  <p className="text-xs text-purple-300/70">
-                    Customize your public merchant presence, direct contact links, and store credentials
-                  </p>
-                </div>
-              </div>
-
-              {profileSuccessMsg && (
-                <div className="p-3 bg-emerald-950/80 border border-emerald-800/80 rounded-2xl text-emerald-200 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>{profileSuccessMsg}</span>
-                </div>
-              )}
-
-              {profileError && (
-                <div className="p-3 bg-rose-950/80 border border-rose-800/80 rounded-2xl text-rose-200 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                  <span>{profileError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSaveProfile} className="bg-[#170c30] border border-[#2d1952] p-5 rounded-3xl space-y-5 shadow-lg">
-                
-                {/* Store Name */}
-                <div>
-                  <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
-                    Store / Display Name
-                  </label>
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Zenet Verified Accounts Store"
-                    className="w-full bg-[#0a0416] text-white p-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
-                    required
-                  />
-                </div>
-
-                {/* Direct Contact Handles */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
-                      WhatsApp Number (with Country Code)
-                    </label>
-                    <div className="relative">
-                      <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
-                      <input
-                        type="text"
-                        value={whatsapp}
-                        onChange={(e) => setWhatsapp(e.target.value)}
-                        placeholder="+2348012345678"
-                        className="w-full bg-[#0a0416] text-white pl-10 pr-3 py-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
-                      Telegram Username
-                    </label>
-                    <div className="relative">
-                      <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400" />
-                      <input
-                        type="text"
-                        value={telegram}
-                        onChange={(e) => setTelegram(e.target.value)}
-                        placeholder="@zenet_seller"
-                        className="w-full bg-[#0a0416] text-white pl-10 pr-3 py-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bio / Store Guarantee */}
-                <div>
-                  <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
-                    Store Description & Delivery Guarantee
-                  </label>
-                  <textarea
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    rows={3}
-                    placeholder="Provide details about your experience as an account provider, fast response rate, 24/7 support..."
-                    className="w-full bg-[#0a0416] text-white p-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
-                  />
-                </div>
-
-                {/* Seller Badges preview */}
-                <div className="bg-[#0b0419] p-4 rounded-2xl border border-[#281349] space-y-2">
-                  <span className="text-xs font-extrabold text-purple-300 uppercase block">Active Seller Badges</span>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-800 px-3 py-1 rounded-full font-bold flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      Verified Merchant
-                    </span>
-                    <span className="bg-indigo-950/90 text-indigo-300 border border-indigo-800 px-3 py-1 rounded-full font-bold flex items-center gap-1">
-                      <Award className="w-3.5 h-3.5 text-indigo-400" />
-                      100% Escrow Rating
-                    </span>
-                    <span className="bg-purple-950/90 text-purple-300 border border-purple-800 px-3 py-1 rounded-full font-bold flex items-center gap-1">
-                      <Star className="w-3.5 h-3.5 text-amber-400" />
-                      Instant Delivery Seller
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    disabled={isSavingProfile}
-                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold px-6 py-3 rounded-2xl shadow-lg transition cursor-pointer flex items-center gap-2 disabled:opacity-50 text-xs"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{isSavingProfile ? 'Saving Store Profile...' : 'Save Seller Profile'}</span>
-                  </button>
-                </div>
-
-              </form>
             </div>
           )}
 

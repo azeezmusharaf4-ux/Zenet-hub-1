@@ -329,93 +329,93 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
 
   return (
     <>
-      <div id="zenet-update-modal" className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-start sm:items-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div id="zenet-update-modal" className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-start sm:items-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
         <div 
-          className="relative w-full max-w-3xl my-auto bg-[#0c051f] border border-[#2b165c] rounded-2xl sm:rounded-[28px] shadow-[0_0_60px_rgba(125,76,247,0.3)] flex flex-col overflow-visible sm:overflow-hidden text-slate-200"
+          className="relative w-full max-w-3xl my-auto bg-white border border-[#E9E2FA] rounded-2xl sm:rounded-[28px] shadow-2xl flex flex-col overflow-visible sm:overflow-hidden text-[#171329]"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header with Glowing Badge */}
-          <div className="relative p-5 sm:p-6 bg-gradient-to-b from-[#1c0d3d] to-[#0c051f] border-b border-[#2b165c] flex flex-col sm:flex-row items-center sm:justify-between text-center sm:text-left gap-4">
-            {/* Close Button in top right corner on mobile, static on desktop */}
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 sm:static p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer border border-white/10 z-10"
-              aria-label="Close modal"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex flex-col sm:flex-row items-center gap-3.5">
-              <div className="p-3 rounded-2xl bg-[#2a1359] border border-[#7d4cf7]/40 text-[#bd93f9] shadow-lg flex items-center justify-center shrink-0">
-                <Sparkles className="w-5.5 h-5.5 text-[#bd93f9]" />
+          {/* Header */}
+          <div className="bg-white px-4 sm:px-6 py-4 border-b border-[#E9E2FA] flex items-center justify-between shrink-0 gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#EDE9FE] border border-[#DDD6FE] flex items-center justify-center text-[#7C3AED] shrink-0 shadow-xs">
+                <Sparkles className="w-5 h-5" />
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-                  <h3 className="text-xl font-black text-white tracking-tight">ZENET HUB Update</h3>
-                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] uppercase font-black px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-extrabold text-[#171329] text-base sm:text-lg">ZENET HUB Update</h3>
+                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span>LIVE</span>
                   </span>
                 </div>
-                <p className="text-xs text-purple-300/60 font-medium max-w-md">
+                <p className="text-xs text-[#716B82]">
                   Exclusive digital tools, premium methods, and official updates verified by ZENET HUB.
                 </p>
               </div>
             </div>
+
+            <button
+              onClick={onClose}
+              className="p-2 text-[#716B82] hover:text-[#171329] bg-[#F8F7FF] hover:bg-[#EDE9FE] border border-[#E9E2FA] rounded-full transition cursor-pointer shrink-0"
+              title="Close modal"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Navigation Sub-Tabs & Live Wallet Bar */}
-          <div className="bg-[#14082e] border-b border-[#24114f] px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="grid grid-cols-3 sm:flex sm:items-center gap-1.5 w-full sm:w-auto">
+          <div className="bg-[#F8F7FF] border-b border-[#E9E2FA] px-4 sm:px-6 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
               <button
                 onClick={() => setActiveTab('marketplace')}
-                className={`px-1 sm:px-3.5 py-2 rounded-xl text-[10px] sm:text-xs font-black transition cursor-pointer flex items-center justify-center gap-1 ${
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === 'marketplace'
-                    ? 'bg-[#7d4cf7] text-white shadow-[0_0_12px_rgba(125,76,247,0.4)] border border-[#7d4cf7]'
-                    : 'bg-[#1e0e3a] text-purple-300 hover:text-white border border-[#30166a]'
+                    ? 'bg-[#7C3AED] text-white shadow-xs'
+                    : 'bg-white text-[#58516D] hover:text-[#171329] hover:bg-[#EDE9FE]/50 border border-[#E9E2FA]'
                 }`}
               >
-                <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                 <span>Products ({products.length})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('purchases')}
-                className={`px-1 sm:px-3.5 py-2 rounded-xl text-[10px] sm:text-xs font-black transition cursor-pointer flex items-center justify-center gap-1 ${
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === 'purchases'
-                    ? 'bg-[#7d4cf7] text-white shadow-[0_0_12px_rgba(125,76,247,0.4)] border border-[#7d4cf7]'
-                    : 'bg-[#1e0e3a] text-purple-300 hover:text-white border border-[#30166a]'
+                    ? 'bg-[#7C3AED] text-white shadow-xs'
+                    : 'bg-white text-[#58516D] hover:text-[#171329] hover:bg-[#EDE9FE]/50 border border-[#E9E2FA]'
                 }`}
               >
-                <Unlock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" />
-                <span className="truncate">My Purchased Updates ({purchasedOrders.length})</span>
+                <Unlock className="w-3.5 h-3.5 shrink-0" />
+                <span>My Purchased Updates ({purchasedOrders.length})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('system_updates')}
-                className={`px-1 sm:px-3.5 py-2 rounded-xl text-[10px] sm:text-xs font-black transition cursor-pointer flex items-center justify-center gap-1 ${
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === 'system_updates'
-                    ? 'bg-[#7d4cf7] text-white shadow-[0_0_12px_rgba(125,76,247,0.4)] border border-[#7d4cf7]'
-                    : 'bg-[#1e0e3a] text-purple-300 hover:text-white border border-[#30166a]'
+                    ? 'bg-[#7C3AED] text-white shadow-xs'
+                    : 'bg-white text-[#58516D] hover:text-[#171329] hover:bg-[#EDE9FE]/50 border border-[#E9E2FA]'
                 }`}
               >
-                <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <Sparkles className="w-3.5 h-3.5 shrink-0" />
                 <span>System News</span>
               </button>
             </div>
 
-            {/* Wallet Balance Display & Fund CTA - Full Width on Mobile */}
-            <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-3 text-xs bg-purple-950/20 sm:bg-transparent border border-purple-900/30 sm:border-none p-2.5 sm:p-0 rounded-xl sm:rounded-none">
-              <div className="flex items-center gap-2">
-                <span className="text-purple-300/60 font-black uppercase text-[10px]">Wallet Balance</span>
-                <span className="font-mono font-extrabold text-white text-sm bg-black/40 px-2.5 py-1 rounded-lg border border-purple-900/40 shadow-sm">
+            {/* Wallet Balance Display & Fund CTA */}
+            <div className="flex items-center justify-between sm:justify-end gap-2 text-xs">
+              <div className="flex items-center gap-2 bg-white border border-[#E9E2FA] px-3 py-1.5 rounded-xl shadow-xs">
+                <span className="text-[#716B82] font-bold uppercase text-[10px] tracking-wider">Wallet Balance</span>
+                <span className="font-mono font-extrabold text-[#171329] text-xs sm:text-sm">
                   ₦{walletBalance.toLocaleString()}
                 </span>
               </div>
               {onOpenWallet && (
                 <button
                   onClick={() => { onClose(); onOpenWallet(); }}
-                  className="px-3.5 py-1.5 rounded-lg bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white font-black text-xs transition cursor-pointer shadow active:scale-95 flex items-center gap-1 uppercase tracking-wider"
+                  className="px-3.5 py-1.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] active:bg-[#5B21B6] text-white font-bold text-xs transition cursor-pointer shadow-xs flex items-center gap-1 uppercase tracking-wider"
                 >
                   <span>+ Fund</span>
                 </button>
@@ -425,16 +425,16 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
 
           {/* Owner-Only Quick Link to Product Generator */}
           {isOwner && onOpenAdminGenerator && (
-            <div className="bg-[#1a0c3b] border-b border-[#34186d] px-6 py-2 flex items-center justify-between text-xs">
-              <div className="flex items-center space-x-2 text-amber-300 font-bold">
-                <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <div className="bg-amber-50/90 border-b border-amber-200/80 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center space-x-2 text-amber-900 font-bold">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>Authorized Owner Mode (Azeezmusharaf4@gmail.com)</span>
               </div>
               <button
                 onClick={() => { onClose(); onOpenAdminGenerator(); }}
-                className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-[11px] uppercase tracking-wider flex items-center space-x-1 shadow cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] uppercase tracking-wider flex items-center space-x-1 shadow-xs cursor-pointer transition"
               >
-                <Plus className="w-3 h-3 text-black" />
+                <Plus className="w-3.5 h-3.5 text-white" />
                 <span>Add Product to Generate Update</span>
               </button>
             </div>
@@ -442,38 +442,38 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
 
           {/* Error Notice */}
           {errorNotice && (
-            <div className="bg-rose-500/15 border-b border-rose-500/30 px-6 py-3 text-xs text-rose-300 font-semibold flex items-center justify-between">
+            <div className="bg-rose-50 border-b border-rose-200 px-4 sm:px-6 py-2.5 text-xs text-rose-700 font-semibold flex items-center justify-between gap-2">
               <div className="flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
                 <span>{errorNotice}</span>
               </div>
-              <button onClick={() => setErrorNotice(null)} className="text-rose-400 hover:text-white">
+              <button onClick={() => setErrorNotice(null)} className="text-rose-400 hover:text-rose-700 p-1 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
           )}
 
-          {/* Main Body - Natural Scrolling on Mobile, Contained on Desktop */}
-          <div className="flex-1 overflow-visible sm:overflow-y-auto p-4 sm:p-6 space-y-6 max-h-none sm:max-h-[calc(92vh-170px)]">
-            {/* TAB 1: PRODUCT MARKETPLACE (LARGE VISUAL PRODUCT CARDS) */}
+          {/* Main Body */}
+          <div className="flex-1 overflow-visible sm:overflow-y-auto p-4 sm:p-6 space-y-6 max-h-none sm:max-h-[calc(92vh-180px)] bg-[#FAF9FF]">
+            {/* TAB 1: PRODUCT MARKETPLACE */}
             {activeTab === 'marketplace' && (
               <div className="space-y-4">
                 {loading ? (
-                  <div className="py-16 flex flex-col items-center justify-center space-y-2 text-purple-300/50">
-                    <Loader2 className="w-8 h-8 animate-spin text-[#bd93f9]" />
-                    <p className="text-xs font-bold">Loading updates marketplace...</p>
+                  <div className="py-16 flex flex-col items-center justify-center space-y-2 text-[#7C3AED]">
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                    <p className="text-xs font-bold text-[#716B82]">Loading updates marketplace...</p>
                   </div>
                 ) : products.length === 0 ? (
-                  <div className="py-16 text-center bg-[#12082b] border border-[#210f45] rounded-3xl p-8 space-y-3">
-                    <ShoppingBag className="w-12 h-12 text-purple-400/40 mx-auto" />
-                    <h4 className="text-base font-bold text-white">No Update Products Available Yet</h4>
-                    <p className="text-xs text-purple-300/60 max-w-md mx-auto">
+                  <div className="py-16 text-center bg-white border border-dashed border-[#DDD6FE] rounded-3xl p-8 space-y-3 shadow-xs">
+                    <ShoppingBag className="w-12 h-12 text-[#7C3AED]/40 mx-auto" />
+                    <h4 className="text-base font-bold text-[#171329]">No Update Products Available Yet</h4>
+                    <p className="text-xs text-[#716B82] max-w-md mx-auto">
                       Authorized administrators can generate and publish products with cover images and private delivery links directly from the menu.
                     </p>
                     {(isOwner || isAdmin) && onOpenAdminGenerator && (
                       <button
                         onClick={() => { onClose(); onOpenAdminGenerator(); }}
-                        className="mt-2 px-5 py-2.5 rounded-xl bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white text-xs font-black transition cursor-pointer shadow-md inline-flex items-center space-x-2"
+                        className="mt-2 px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold transition cursor-pointer shadow-xs inline-flex items-center space-x-2"
                       >
                         <Plus className="w-4 h-4" />
                         <span>Add Product to Generate Update</span>
@@ -481,7 +481,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {products.map((product) => {
                       const isPurchasingThis = purchasingProductId === product.id;
                       const hasPurchased = purchasedOrders.some((o) => o.productId === product.id);
@@ -489,12 +489,10 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
                       return (
                         <div
                           key={product.id}
-                          className="bg-[#0f0624] border border-[#2b165c] hover:border-[#5c30b5] rounded-[24px] overflow-hidden flex flex-col shadow-xl transition-all duration-300 group"
+                          className="bg-white border border-[#E9E2FA] hover:border-[#C4B5FD] rounded-2xl sm:rounded-[24px] overflow-hidden flex flex-col shadow-xs hover:shadow-md transition-all duration-200 group"
                         >
-                          {/* =================================================== */}
-                          {/* LARGE PRODUCT COVER IMAGE (REQUESTED CARD LAYOUT) */}
-                          {/* =================================================== */}
-                          <div className="relative aspect-[16/10] w-full bg-[#070214] overflow-hidden border-b border-[#210f45]">
+                          {/* PRODUCT COVER IMAGE */}
+                          <div className="relative aspect-[16/10] w-full bg-[#F3F0FF] overflow-hidden border-b border-[#E9E2FA]">
                             {product.imageUrl ? (
                               <img
                                 src={product.imageUrl}
@@ -503,48 +501,46 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
                                 referrerPolicy="no-referrer"
                               />
                             ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center text-purple-400/30 space-y-1">
+                              <div className="w-full h-full flex flex-col items-center justify-center text-[#7C3AED]/30 space-y-1">
                                 <ImageIcon className="w-10 h-10" />
-                                <span className="text-[11px] font-bold">ZENET UPDATE</span>
+                                <span className="text-[11px] font-bold text-[#7C3AED]/60">ZENET UPDATE</span>
                               </div>
                             )}
 
-                            {/* Verified Badge */}
-                            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md border border-purple-500/30 text-[#bd93f9] text-[10px] font-black uppercase px-2.5 py-1 rounded-lg flex items-center space-x-1 shadow">
-                              <Sparkles className="w-3 h-3 text-[#bd93f9]" />
+                            {/* Official Update Badge */}
+                            <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md border border-[#DDD6FE] text-[#7C3AED] text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-lg flex items-center space-x-1.5 shadow-xs">
+                              <Sparkles className="w-3 h-3 text-[#7C3AED]" />
                               <span>OFFICIAL UPDATE</span>
                             </div>
 
-                            {/* Status or Owned Badge */}
+                            {/* Unlocked Badge */}
                             {hasPurchased && (
-                              <div className="absolute top-3 right-3 bg-emerald-500 text-black text-[10px] font-black uppercase px-2.5 py-1 rounded-lg flex items-center space-x-1 shadow">
-                                <CheckCircle2 className="w-3 h-3 text-black" />
+                              <div className="absolute top-3 right-3 bg-emerald-600 text-white text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-lg flex items-center space-x-1 shadow-xs">
+                                <CheckCircle2 className="w-3 h-3 text-white" />
                                 <span>UNLOCKED</span>
                               </div>
                             )}
                           </div>
 
-                          {/* =================================================== */}
-                          {/* PRODUCT DETAILS (NAME, DESCRIPTION, PRICE, BUY) */}
-                          {/* =================================================== */}
-                          <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                            <div className="space-y-2">
-                              <h4 className="text-base sm:text-lg font-black text-white tracking-tight leading-snug">
+                          {/* PRODUCT DETAILS */}
+                          <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4 bg-white">
+                            <div className="space-y-1.5">
+                              <h4 className="text-base sm:text-lg font-black text-[#171329] tracking-tight leading-snug">
                                 {product.name}
                               </h4>
-                              <p className="text-xs text-purple-200/70 leading-relaxed line-clamp-3">
+                              <p className="text-xs text-[#58516D] leading-relaxed line-clamp-3">
                                 {product.description}
                               </p>
                             </div>
 
-                            <div className="pt-2 border-t border-[#1d0d3b] space-y-3">
+                            <div className="pt-3 border-t border-[#F1ECFD] space-y-3">
                               {/* Price Display */}
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-purple-300/50">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[#716B82]">
                                   Price
                                 </span>
-                                <div className="text-lg sm:text-xl font-black text-white font-mono flex items-center space-x-1">
-                                  <span className="text-[#a16eff]">₦</span>
+                                <div className="text-lg sm:text-xl font-black text-[#171329] font-mono flex items-center space-x-0.5">
+                                  <span className="text-[#7C3AED]">₦</span>
                                   <span>{product.price.toLocaleString()}</span>
                                 </div>
                               </div>
@@ -556,7 +552,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
                                     const matching = purchasedOrders.find((o) => o.productId === product.id);
                                     if (matching) setUnlockedOrder(matching);
                                   }}
-                                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center justify-center space-x-2 cursor-pointer"
+                                  className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-xs flex items-center justify-center space-x-2 cursor-pointer"
                                 >
                                   <Unlock className="w-4 h-4" />
                                   <span>VIEW UNLOCKED PRODUCT</span>
@@ -565,7 +561,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
                                 <button
                                   onClick={() => handleBuyProduct(product)}
                                   disabled={isPurchasingThis}
-                                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#7d4cf7] via-[#8e5ff9] to-[#a16eff] hover:from-[#8e5ff9] hover:to-[#b37eff] text-white font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-[0_0_18px_rgba(125,76,247,0.35)] hover:shadow-[0_0_25px_rgba(125,76,247,0.5)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.98]"
+                                  className="w-full py-3 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] active:bg-[#5B21B6] text-white font-extrabold text-xs uppercase tracking-wider transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 active:scale-[0.99]"
                                 >
                                   {isPurchasingThis ? (
                                     <>
@@ -594,63 +590,63 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
             {activeTab === 'purchases' && (
               <div className="space-y-4">
                 {!user ? (
-                  <div className="py-16 text-center bg-[#12082b] border border-[#210f45] rounded-3xl p-8 space-y-3">
-                    <Lock className="w-10 h-10 text-purple-400/40 mx-auto" />
-                    <h4 className="text-base font-bold text-white">Sign In to View Your Purchases</h4>
-                    <p className="text-xs text-purple-300/60 max-w-sm mx-auto">
+                  <div className="py-16 text-center bg-white border border-dashed border-[#DDD6FE] rounded-3xl p-8 space-y-3 shadow-xs">
+                    <Lock className="w-10 h-10 text-[#7C3AED]/40 mx-auto" />
+                    <h4 className="text-base font-bold text-[#171329]">Sign In to View Your Purchases</h4>
+                    <p className="text-xs text-[#716B82] max-w-sm mx-auto">
                       Log in to access your unlocked private delivery links and purchased update products.
                     </p>
                     {onOpenAuth && (
                       <button
                         onClick={() => { onClose(); onOpenAuth('login'); }}
-                        className="px-5 py-2.5 rounded-xl bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white text-xs font-bold transition cursor-pointer"
+                        className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold transition cursor-pointer shadow-xs"
                       >
                         Sign In Now
                       </button>
                     )}
                   </div>
                 ) : purchasedOrders.length === 0 ? (
-                  <div className="py-16 text-center bg-[#12082b] border border-[#210f45] rounded-3xl p-8 space-y-3">
-                    <ShoppingBag className="w-10 h-10 text-purple-400/40 mx-auto" />
-                    <h4 className="text-base font-bold text-white">No Purchased Updates Yet</h4>
-                    <p className="text-xs text-purple-300/60 max-w-sm mx-auto">
+                  <div className="py-16 text-center bg-white border border-dashed border-[#DDD6FE] rounded-3xl p-8 space-y-3 shadow-xs">
+                    <ShoppingBag className="w-10 h-10 text-[#7C3AED]/40 mx-auto" />
+                    <h4 className="text-base font-bold text-[#171329]">No Purchased Updates Yet</h4>
+                    <p className="text-xs text-[#716B82] max-w-sm mx-auto">
                       When you purchase products from ZENET HUB Update, your private delivery links unlock instantly here.
                     </p>
                     <button
                       onClick={() => setActiveTab('marketplace')}
-                      className="px-5 py-2.5 rounded-xl bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white text-xs font-black transition cursor-pointer"
+                      className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold transition cursor-pointer shadow-xs"
                     >
                       Browse Products
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-3.5">
+                  <div className="space-y-3">
                     {purchasedOrders.map((order) => (
                       <div
                         key={order.id}
-                        className="p-4 rounded-2xl bg-[#12082b] border border-[#261352] hover:border-[#5c30b5] transition duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                        className="p-4 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#C4B5FD] transition duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs"
                       >
                         <div className="flex items-center space-x-3.5">
                           {order.productImage ? (
                             <img
                               src={order.productImage}
                               alt={order.productName}
-                              className="w-14 h-14 rounded-xl object-cover border border-purple-500/30 shrink-0"
+                              className="w-14 h-14 rounded-xl object-cover border border-[#E9E2FA] shrink-0"
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <div className="w-14 h-14 rounded-xl bg-[#1d0e42] border border-[#30166a] flex items-center justify-center shrink-0 text-[#bd93f9]">
+                            <div className="w-14 h-14 rounded-xl bg-[#EDE9FE] border border-[#DDD6FE] flex items-center justify-center shrink-0 text-[#7C3AED]">
                               <Unlock className="w-6 h-6" />
                             </div>
                           )}
                           <div className="space-y-1">
                             <div className="flex items-center space-x-2 flex-wrap">
-                              <h4 className="font-extrabold text-white text-sm">{order.productName}</h4>
-                              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] uppercase font-black px-2 py-0.5 rounded">
+                              <h4 className="font-extrabold text-[#171329] text-sm">{order.productName}</h4>
+                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] uppercase font-bold px-2 py-0.5 rounded">
                                 ACTIVE ACCESS
                               </span>
                             </div>
-                            <div className="flex items-center space-x-3 text-[11px] text-purple-300/60 font-mono">
+                            <div className="flex items-center space-x-3 text-[11px] text-[#716B82] font-mono">
                               <span>Paid: ₦{order.price.toLocaleString()}</span>
                               <span>•</span>
                               <span>{new Date(order.purchasedAt).toLocaleDateString()}</span>
@@ -661,7 +657,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => openDeliveryLink(order.secretDeliveryInfo)}
-                            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#7d4cf7] to-[#a16eff] hover:from-[#8e5ff9] hover:to-[#b37eff] text-white font-black text-xs uppercase tracking-wider flex items-center space-x-1.5 transition cursor-pointer shadow"
+                            className="px-4 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-extrabold text-xs uppercase tracking-wider flex items-center space-x-1.5 transition cursor-pointer shadow-xs"
                           >
                             <span>🔓 OPEN PRODUCT</span>
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -677,7 +673,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
             {/* TAB 3: SYSTEM NEWS & CORE SERVICE UPDATES */}
             {activeTab === 'system_updates' && (
               <div className="space-y-3.5">
-                <div className="text-[11px] font-black uppercase tracking-widest text-[#9e67fa]">
+                <div className="text-[11px] font-black uppercase tracking-widest text-[#7C3AED]">
                   Platform Infrastructure Upgrades
                 </div>
 
@@ -687,24 +683,24 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
                     return (
                       <div 
                         key={item.id}
-                        className="p-4 rounded-2xl bg-[#12082b] border border-[#210f45] hover:border-[#4d24a3] transition duration-200 space-y-2 group"
+                        className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E9E2FA] hover:border-[#C4B5FD] transition duration-200 space-y-2 group shadow-xs"
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="p-2.5 rounded-xl bg-[#1d0e42] text-[#c1a0ff] border border-[#30166a] shrink-0">
+                          <div className="p-2.5 rounded-xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] shrink-0">
                             <IconComp className="w-4 h-4" />
                           </div>
                           <div>
-                            <div className="flex items-center space-x-2">
-                              <h4 className="font-bold text-white text-sm">{item.title}</h4>
-                              <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase ${item.tagColor}`}>
+                            <div className="flex items-center space-x-2 flex-wrap">
+                              <h4 className="font-bold text-[#171329] text-sm">{item.title}</h4>
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded border uppercase bg-[#EDE9FE] text-[#6D28D9] border-[#DDD6FE]">
                                 {item.tag}
                               </span>
                             </div>
-                            <span className="text-[10px] text-purple-300/40 font-mono">{item.date}</span>
+                            <span className="text-[10px] text-[#716B82] font-mono">{item.date}</span>
                           </div>
                         </div>
 
-                        <p className="text-xs text-purple-200/70 leading-relaxed pl-1">
+                        <p className="text-xs text-[#58516D] leading-relaxed pl-1">
                           {item.description}
                         </p>
 
@@ -715,7 +711,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
                                 onClose();
                                 onNavigateService(item.actionKey);
                               }}
-                              className="inline-flex items-center space-x-1.5 text-xs font-bold text-[#b37eff] hover:text-white transition cursor-pointer"
+                              className="inline-flex items-center space-x-1.5 text-xs font-bold text-[#7C3AED] hover:text-[#5B21B6] transition cursor-pointer"
                             >
                               <span>{item.actionText}</span>
                               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -731,13 +727,13 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="p-4 bg-[#12082b] border-t border-[#24114f] flex items-center justify-between text-xs">
-            <span className="text-purple-300/40 font-medium">
+          <div className="p-4 bg-[#F8F7FF] border-t border-[#E9E2FA] flex items-center justify-between text-xs">
+            <span className="text-[#716B82] font-medium">
               Real-time escrow-backed digital deliveries.
             </span>
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white font-bold transition cursor-pointer shadow-md"
+              className="px-5 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold transition cursor-pointer shadow-xs"
             >
               Close
             </button>
@@ -749,37 +745,37 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
       {/* SUCCESS UNLOCK MODAL (PURCHASE SUCCESSFUL) */}
       {/* =================================================== */}
       {unlockedOrder && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-lg animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
           <div 
-            className="relative w-full max-w-md bg-[#0c051f] border-2 border-emerald-500/70 rounded-[28px] shadow-[0_0_60px_rgba(16,185,129,0.35)] p-6 text-center text-slate-200 space-y-5 overflow-hidden"
+            className="relative w-full max-w-md bg-white border border-[#E9E2FA] rounded-[28px] shadow-2xl p-6 text-center text-[#171329] space-y-5 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center mx-auto text-emerald-400 shadow-lg animate-bounce">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600 shadow-sm animate-bounce">
               <CheckCircle2 className="w-9 h-9" />
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
                 PURCHASE SUCCESSFUL
               </span>
-              <h3 className="text-xl font-black text-white tracking-tight mt-2">
+              <h3 className="text-xl font-black text-[#171329] tracking-tight mt-2">
                 Your product is ready.
               </h3>
-              <p className="text-xs text-purple-200/70">
-                You have successfully acquired <strong className="text-white">"{unlockedOrder.productName}"</strong>. Your private delivery link has been unlocked below.
+              <p className="text-xs text-[#58516D]">
+                You have successfully acquired <strong className="text-[#171329]">"{unlockedOrder.productName}"</strong>. Your private delivery link has been unlocked below.
               </p>
             </div>
 
             {/* Unlocked Link Box */}
-            <div className="p-4 rounded-2xl bg-[#14082e] border border-emerald-500/40 text-left space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-black uppercase text-emerald-300">
+            <div className="p-4 rounded-2xl bg-[#F8F7FF] border border-[#E9E2FA] text-left space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-black uppercase text-emerald-700">
                 <span className="flex items-center space-x-1.5">
-                  <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+                  <Unlock className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Private Delivery Access</span>
                 </span>
-                <span className="text-[10px] text-emerald-400/70 font-mono">UNLOCKED</span>
+                <span className="text-[10px] text-emerald-600 font-mono">UNLOCKED</span>
               </div>
-              <p className="text-xs text-purple-200 font-mono break-all select-all bg-[#080214] p-2.5 rounded-xl border border-purple-900/40">
+              <p className="text-xs text-[#171329] font-mono break-all select-all bg-white p-2.5 rounded-xl border border-[#E9E2FA]">
                 {unlockedOrder.secretDeliveryInfo}
               </p>
             </div>
@@ -788,7 +784,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
             <div className="space-y-2 pt-1">
               <button
                 onClick={() => openDeliveryLink(unlockedOrder.secretDeliveryInfo)}
-                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-sm uppercase tracking-wider transition-all shadow-[0_0_25px_rgba(16,185,129,0.4)] flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
+                className="w-full py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-sm uppercase tracking-wider transition-all shadow-sm flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
               >
                 <span>🔓 OPEN PRODUCT</span>
                 <ExternalLink className="w-4 h-4" />
@@ -796,7 +792,7 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
 
               <button
                 onClick={() => setUnlockedOrder(null)}
-                className="w-full py-2.5 text-xs text-purple-300 hover:text-white font-bold transition cursor-pointer"
+                className="w-full py-2.5 text-xs text-[#716B82] hover:text-[#171329] font-bold transition cursor-pointer"
               >
                 Keep Browsing ZENET HUB Update
               </button>

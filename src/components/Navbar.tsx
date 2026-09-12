@@ -2,10 +2,7 @@ import React from 'react';
 import { User } from 'firebase/auth';
 import { 
   Store, 
-  Menu,
-  PlusCircle,
-  Sparkles,
-  TrendingUp
+  PlusCircle 
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { DashboardTab } from './UserDashboardModal';
@@ -52,22 +49,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#EDE9FE] w-full max-w-full overflow-x-hidden select-none safe-top-header">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between space-x-2 sm:space-x-4">
         
-        {/* Left Side: Three-line Drawer Trigger (☰) + Brand Logo */}
+        {/* Left Side: Brand Logo */}
         <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-          
-          {/* Main Three-line Menu Toggle Button (Mobile/Tablet only) with guaranteed 44x44px touch area */}
-          <button
-            onClick={onToggleDrawer}
-            className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] text-[#0F172A] hover:text-[#7C3AED] bg-[#FAF8FE] hover:bg-[#EDE9FE] rounded-2xl border border-[#DDD6FE] hover:border-[#7C3AED] transition cursor-pointer flex items-center justify-center relative z-20 group shrink-0 active:scale-95 shadow-xs"
-            title="Open Menu (☰)"
-            aria-label="Open Navigation Drawer"
-          >
-            <Menu className="w-5 h-5 text-[#0F172A] group-hover:text-[#7C3AED] transition" />
-            {(unreadInquiriesCount > 0 || savedCount > 0) && (
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#7C3AED] rounded-full ring-2 ring-white" />
-            )}
-          </button>
- 
           {/* Brand Logo with reset to homepage */}
           <button 
             type="button"

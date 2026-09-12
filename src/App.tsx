@@ -55,6 +55,12 @@ import { VirtualNumbers2View } from './components/VirtualNumbers2View';
 import { SocialBoost2View } from './components/SocialBoost2View';
 import { Server2View } from './components/Server2View';
 import { HistoryView } from './components/HistoryView';
+import { HomeDashboardView } from './components/HomeDashboardView';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { ProfileView } from './components/ProfileView';
+import { EditProfileView } from './components/EditProfileView';
+import { ReferralsView, generateUserReferralCode } from './components/ReferralsView';
+import { ChangePasswordView } from './components/ChangePasswordView';
 import { PWAInstallBanner } from './components/PWAInstallPrompt';
 import { Phone, UserCheck } from 'lucide-react';
 
@@ -428,7 +434,13 @@ export default function App() {
       'log-accounts',
       'categories',
       'support',
-      'admin_wallets'
+      'admin_wallets',
+      'profile',
+      'edit-profile',
+      'change-password',
+      'referrals',
+      'orders',
+      'history'
     ];
 
     const targetView = opts.view 
@@ -540,7 +552,11 @@ export default function App() {
       view === 'server-tool' ||
       view === 'log-accounts' ||
       view === 'orders' ||
-      view === 'history'
+      view === 'history' ||
+      view === 'profile' ||
+      view === 'edit-profile' ||
+      view === 'change-password' ||
+      view === 'referrals'
     ) {
       window.scrollTo({ top: 0, behavior: 'instant' });
       const targetView: ActiveAppView = view === 'history' ? 'orders' : view;
@@ -551,7 +567,7 @@ export default function App() {
 
     // Modal-backed views require login
     if (!user) {
-      if (view === 'dashboard' || view === 'profile' || view === 'settings' || view === 'saved' || view === 'messages' || view === 'referrals') {
+      if (view === 'dashboard' || view === 'settings' || view === 'saved' || view === 'messages') {
         navigateRoute({ dashboardTab: 'profile' });
         return;
       }
@@ -559,7 +575,7 @@ export default function App() {
       return;
     }
 
-    if (view === 'dashboard' || view === 'profile') {
+    if (view === 'dashboard') {
       navigateRoute({ dashboardTab: 'profile' });
     } else if (view === 'settings') {
       navigateRoute({ dashboardTab: 'settings' });
@@ -567,8 +583,6 @@ export default function App() {
       navigateRoute({ dashboardTab: 'saved' });
     } else if (view === 'messages') {
       navigateRoute({ dashboardTab: 'inquiries' });
-    } else if (view === 'referrals') {
-      navigateRoute({ dashboardTab: 'referrals' });
     } else if (view === 'wallet' || view === 'deposit-history') {
       navigateRoute({ walletModal: true });
     } else if (view === 'seller') {
@@ -800,7 +814,10 @@ export default function App() {
             assignedRole = 'owner';
           }
 
-          const myReferralCode = existingData.referralCode || `ZN-${currentUser.uid.substring(0, 6).toUpperCase()}`;
+          let myReferralCode = existingData.referralCode;
+          if (!myReferralCode || !myReferralCode.startsWith('REF')) {
+            myReferralCode = generateUserReferralCode(currentUser.uid);
+          }
           let referredBy = existingData.referredBy || null;
 
           // Check if brand new user or unlinked referral
@@ -1941,7 +1958,7 @@ export default function App() {
         />
 
         {/* Main Container */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-8 sm:pb-12 overflow-x-hidden">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-12 overflow-x-hidden">
 
           {/* VIEW: VIRTUAL NUMBERS MARKETPLACE */}
           {activeView === 'virtual-numbers' && (
@@ -2099,117 +2116,94 @@ export default function App() {
               user={user}
               userProfile={userProfile}
               purchases={purchases}
-              onBack={handleBackToMarketplace}
+              onBack={() => handleSelectView('profile')}
               onSelectView={handleSelectView}
               onOpenAuth={(mode) => setAuthMode(mode)}
               onOpenWallet={() => handleSelectView('wallet')}
             />
           )}
 
-          {/* VIEW 3: MARKETPLACE HOME */}
+          {/* VIEW: PROFILE PAGE HOSTING ALL MENU OPTIONS */}
+          {activeView === 'profile' && (
+            <ProfileView
+              user={user}
+              userProfile={userProfile}
+              walletBalance={walletBalance}
+              ordersCount={purchases.length}
+              savedCount={savedListingIds.length}
+              unreadMessagesCount={inquiries.length}
+              onSelectView={handleSelectView}
+              onOpenDashboard={(tab) => setDashboardTab(tab || 'profile')}
+              onOpenWallet={() => {
+                if (!user) {
+                  setAuthMode('login');
+                } else {
+                  setIsWalletModalOpen(true);
+                }
+              }}
+              onOpenAdmin={isOwner ? () => setAdminOpen(true) : undefined}
+              onOpenSellerDashboard={isAdmin ? () => setIsSellerDashboardOpen(true) : undefined}
+              onOpenZenetUpdateGenerator={isOwner ? () => setIsZenetUpdateAdminModalOpen(true) : undefined}
+              onLogout={handleLogout}
+              onOpenAuth={(mode) => setAuthMode(mode)}
+            />
+          )}
+
+          {/* VIEW: EDIT PROFILE MATCHING USER REFERENCE DESIGN */}
+          {activeView === 'edit-profile' && (
+            <EditProfileView
+              user={user}
+              userProfile={userProfile}
+              onBack={() => handleSelectView('profile')}
+              onProfileUpdated={(updated) => {
+                setUserProfile((prev) => prev ? ({ ...prev, ...updated }) : null);
+              }}
+              onOpenAuth={(mode) => setAuthMode(mode)}
+            />
+          )}
+
+          {/* VIEW: REFERRALS MATCHING USER REFERENCE DESIGN */}
+          {activeView === 'referrals' && (
+            <ReferralsView
+              user={user}
+              userProfile={userProfile}
+              onBack={() => handleSelectView('profile')}
+              onProfileUpdated={(updated) => {
+                setUserProfile((prev) => prev ? ({ ...prev, ...updated }) : null);
+              }}
+              onOpenAuth={(mode) => setAuthMode(mode)}
+            />
+          )}
+
+          {/* VIEW: CHANGE PASSWORD MATCHING USER REFERENCE DESIGN */}
+          {activeView === 'change-password' && (
+            <ChangePasswordView
+              user={user}
+              onBack={() => handleSelectView('profile')}
+              onOpenAuth={(mode) => setAuthMode(mode)}
+            />
+          )}
+
+          {/* VIEW 3: MARKETPLACE HOME & DASHBOARD PRESENTATION */}
           {activeView === 'marketplace' && (
-            <>
-              {/* Main Services UI Grid */}
-              <div className="mb-8">
-                <div className="space-y-1 mb-4">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#7C3AED] block">
-                    OUR VERIFIED SOLUTIONS
-                  </span>
-                  <h3 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight flex items-center space-x-1.5">
-                    <span>Main Services</span>
-                    <span className="text-[#7C3AED] font-black">•</span>
-                  </h3>
-                </div>
-
-                {/* Unified Balance and Funding Widget */}
-                <div className="flex items-center justify-between space-x-4 text-xs sm:text-sm font-bold text-[#0F172A] mb-6 bg-white border border-[#DDD6FE] px-5 py-3.5 rounded-2xl shadow-xs">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-[#7C3AED] font-black tracking-widest uppercase text-[10px] sm:text-xs">Balance</span>
-                    <span className="font-black text-[#0F172A] text-sm sm:text-base font-mono bg-[#FAF8FE] px-3.5 py-1.5 rounded-xl border border-[#EDE9FE]">
-                      ₦{walletBalance.toLocaleString()}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={() => setIsWalletModalOpen(true)}
-                    className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-black text-xs sm:text-sm transition cursor-pointer shadow-sm shadow-purple-600/20 flex items-center space-x-2 uppercase tracking-wider"
-                  >
-                    <span>Fund Account</span>
-                    <span className="w-2 h-2 rounded-full bg-white shrink-0 shadow-sm" />
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {/* 1. Log Accounts */}
-                  <button
-                    id="main-service-log-accounts"
-                    onClick={() => setActiveView('log-accounts')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#DDD6FE] hover:border-[#7C3AED] hover:bg-[#FAF8FE] transition duration-200 cursor-pointer group shadow-xs hover:shadow-md min-h-[180px]"
-                  >
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
-                      <UserCheck className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-black text-[#0F172A] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Log Accounts</h4>
-                      <p className="text-[11px] sm:text-xs text-[#475569] font-medium leading-relaxed max-w-[150px] mx-auto">
-                        Purchase verified digital logs
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 2. Service Number */}
-                  <button
-                    id="main-service-virtual-numbers"
-                    onClick={() => handleSelectView('virtual-numbers')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#DDD6FE] hover:border-[#7C3AED] hover:bg-[#FAF8FE] transition duration-200 cursor-pointer group shadow-xs hover:shadow-md min-h-[180px]"
-                  >
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
-                      <Phone className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-black text-[#0F172A] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Service Number</h4>
-                      <p className="text-[11px] sm:text-xs text-[#475569] font-medium leading-relaxed max-w-[150px] mx-auto">
-                        Buy active virtual phone numbers
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 3. Social Boost */}
-                  <button
-                    id="main-service-social-boost"
-                    onClick={() => handleSelectView('social-boost')}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#DDD6FE] hover:border-[#7C3AED] hover:bg-[#FAF8FE] transition duration-200 cursor-pointer group shadow-xs hover:shadow-md min-h-[180px]"
-                  >
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
-                      <TrendingUp className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-black text-[#0F172A] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Social Boost</h4>
-                      <p className="text-[11px] sm:text-xs text-[#475569] font-medium leading-relaxed max-w-[150px] mx-auto">
-                        Automated growth panels & social boosting services
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* 4. Zenet Update */}
-                  <button
-                    id="main-service-zenet-update"
-                    onClick={() => setIsZenetUpdateModalOpen(true)}
-                    className="flex flex-col items-center justify-center text-center p-6 sm:p-7 rounded-2xl bg-white border border-[#DDD6FE] hover:border-[#7C3AED] hover:bg-[#FAF8FE] transition duration-200 cursor-pointer group shadow-xs hover:shadow-md min-h-[180px]"
-                  >
-                    <div className="p-4 sm:p-5 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE] group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200 shrink-0 mb-3.5 flex items-center justify-center">
-                      <Sparkles className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-black text-[#0F172A] group-hover:text-[#7C3AED] transition text-sm sm:text-base">Zenet Update</h4>
-                      <p className="text-[11px] sm:text-xs text-[#475569] font-medium leading-relaxed max-w-[150px] mx-auto">
-                        Get the latest verified system updates and digital releases
-                      </p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </>
+            <HomeDashboardView
+              user={user}
+              userProfile={userProfile}
+              walletBalance={walletBalance}
+              purchases={purchases}
+              onOpenWallet={() => {
+                if (!user) {
+                  setAuthMode('login');
+                } else {
+                  setIsWalletModalOpen(true);
+                }
+              }}
+              onSelectView={handleSelectView}
+              onOpenZenetUpdate={() => setIsZenetUpdateModalOpen(true)}
+              onSelectPurchase={(purchase) => setSelectedPurchaseDetails(purchase)}
+              onOpenAuth={(mode) => setAuthMode(mode)}
+              onOpenDashboard={(tab) => setDashboardTab(tab || 'profile')}
+            />
           )}
 
       </main>
@@ -2546,6 +2540,20 @@ export default function App() {
 
       {/* 13. Progressive Web App (PWA) Install Prompt Banner */}
       <PWAInstallBanner />
+
+      {/* 14. Mobile Bottom Navigation Bar (Home, Wallet, Profile) */}
+      <MobileBottomNav
+        activeView={activeView}
+        onSelectView={handleSelectView}
+        isWalletOpen={isWalletModalOpen}
+        onOpenWallet={() => {
+          if (!user) {
+            setAuthMode('login');
+          } else {
+            setIsWalletModalOpen(true);
+          }
+        }}
+      />
 
     </div>
   );

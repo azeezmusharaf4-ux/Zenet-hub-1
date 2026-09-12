@@ -394,6 +394,8 @@ export type ActiveAppView =
   | 'messages' 
   | 'saved' 
   | 'profile' 
+  | 'edit-profile'
+  | 'change-password'
   | 'settings' 
   | 'support'
   | 'admin_wallets';

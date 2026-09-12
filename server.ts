@@ -3870,7 +3870,7 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
     const baseUrl = getOneGridHubConfig().oneGridBaseUrl;
 
     try {
-      console.log('[SocialBoost] Fetching Page 1 of SMM services from OneGridHub API...');
+      console.log('[SocialBoost] Checking SMM services catalogue...');
       const q1 = new URLSearchParams({
         endpoint: 'smm_services',
         page: '1',
@@ -3878,19 +3878,27 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
         api_key: apiKey
       }).toString();
 
-      const res1 = await fetch(`${baseUrl}?${q1}`, {
-        headers: { 'Accept': 'application/json', 'User-Agent': 'ZENET-Hub/1.0' },
-        signal: AbortSignal.timeout(10000)
-      });
-
-      if (!res1.ok) {
-        console.warn(`[SocialBoost] Page 1 fetch returned status ${res1.status}`);
-        return cachedLiveProviderServices.length > 0 ? cachedLiveProviderServices : [];
+      let res1: Response | null = null;
+      try {
+        res1 = await fetch(`${baseUrl}?${q1}`, {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'ZENET-Hub/1.0' },
+          signal: AbortSignal.timeout(8000)
+        });
+      } catch {
+        res1 = null;
       }
 
-      const data1: any = await res1.json();
+      if (!res1 || !res1.ok) {
+        if (cachedLiveProviderServices.length > 0) {
+          console.log(`[SocialBoost] Upstream provider unreachable; continuing with ${cachedLiveProviderServices.length} cached services.`);
+          return cachedLiveProviderServices;
+        }
+        return [];
+      }
+
+      const data1: any = await res1.json().catch(() => null);
       if (!data1 || (data1.status !== 'success' && !Array.isArray(data1.services) && !Array.isArray(data1))) {
-        console.warn('[SocialBoost] Unexpected response structure from SMM services API:', data1);
+        console.warn('[SocialBoost] Unexpected response structure from SMM services API');
         return cachedLiveProviderServices.length > 0 ? cachedLiveProviderServices : [];
       }
 
@@ -3913,7 +3921,7 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
         for (let i = 0; i < pageNumbers.length; i += batchSize) {
           const batch = pageNumbers.slice(i, i + batchSize);
           const batchPromises = batch.map(async (pageNum) => {
-            const maxAttempts = 4;
+            const maxAttempts = 3;
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
               try {
                 const q = new URLSearchParams({
@@ -3925,25 +3933,25 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
 
                 const r = await fetch(`${baseUrl}?${q}`, {
                   headers: { 'Accept': 'application/json', 'User-Agent': 'ZENET-Hub/1.0' },
-                  signal: AbortSignal.timeout(25000)
-                });
+                  signal: AbortSignal.timeout(15000)
+                }).catch(() => null);
 
-                if (r.ok) {
+                if (r && r.ok) {
                   const d: any = await r.json().catch(() => null);
                   if (!d) return [];
                   const items = Array.isArray(d) ? d : (d.services || d.data || []);
                   if (Array.isArray(items)) {
                     return items;
                   }
-                } else if (r.status === 404 || r.status === 400) {
+                } else if (r && (r.status === 404 || r.status === 400)) {
                   // Page index beyond available count, stop retrying
                   return [];
                 }
-              } catch (pageErr: any) {
+              } catch {
                 if (attempt === maxAttempts) {
-                  console.log(`[SocialBoost] Note: SMM page ${pageNum} omitted (${pageErr?.message || 'fetch failed'})`);
+                  console.log(`[SocialBoost] Note: SMM page ${pageNum} omitted (upstream unreachable)`);
                 } else {
-                  const backoffMs = (attempt * 1200) + Math.floor(Math.random() * 400);
+                  const backoffMs = (attempt * 1000) + Math.floor(Math.random() * 300);
                   await new Promise(resolve => setTimeout(resolve, backoffMs));
                 }
               }
@@ -3991,7 +3999,8 @@ const fetchAllOneGridHubSmmServices = async (): Promise<any[]> => {
       }
       return cachedLiveProviderServices.length > 0 ? cachedLiveProviderServices : [];
     } catch (err: any) {
-      console.log('[SocialBoost] SMM services sync note:', err?.message || err);
+      const safeMsg = err?.message?.includes('fetch failed') ? 'upstream provider currently unreachable' : (err?.message || 'sync notice');
+      console.log('[SocialBoost] SMM services sync note:', safeMsg);
       return cachedLiveProviderServices.length > 0 ? cachedLiveProviderServices : [];
     } finally {
       activeSmmFetchPromise = null;
@@ -4071,7 +4080,8 @@ const queryOneGridHubSmm = async (action: string, params: Record<string, any> = 
         }
       }
     } catch (e: any) {
-      console.warn('[SocialBoost SMM Order] Upstream dispatch warning:', e.message);
+      const msg = e?.message?.includes('fetch failed') ? 'upstream unreachable' : (e?.message || 'notice');
+      console.warn('[SocialBoost SMM Order] Upstream dispatch note:', msg);
     }
     return null;
   }
@@ -4095,7 +4105,8 @@ const queryOneGridHubSmm = async (action: string, params: Record<string, any> = 
         return parsed;
       }
     } catch (e: any) {
-      console.warn('[SocialBoost SMM Status] Status query warning:', e.message);
+      const msg = e?.message?.includes('fetch failed') ? 'upstream unreachable' : (e?.message || 'notice');
+      console.warn('[SocialBoost SMM Status] Status query note:', msg);
     }
     return null;
   }
@@ -4261,12 +4272,9 @@ setTimeout(async () => {
   try {
     await loadSocialBoostCatalogueFromDb();
     
-    // Check if we already have a robust, fresh cache (< 12 hours old and >= 500 services)
-    const isCacheRecent = lastCatalogueSyncTime && 
-      (Date.now() - new Date(lastCatalogueSyncTime).getTime() < 12 * 60 * 60 * 1000);
-    
-    if (cachedLiveProviderServices.length >= 500 && isCacheRecent) {
-      console.log(`[SocialBoost] Warm cache active with ${cachedLiveProviderServices.length} services (last synced: ${lastCatalogueSyncTime}).`);
+    // Check if we already have a robust cache (>= 500 services)
+    if (cachedLiveProviderServices.length >= 500) {
+      console.log(`[SocialBoost] Warm cache active with ${cachedLiveProviderServices.length} services (last synced: ${lastCatalogueSyncTime || 'local cache'}).`);
       return;
     }
 
@@ -4275,7 +4283,8 @@ setTimeout(async () => {
       console.log(`[SocialBoost] Auto-synced & cached ${live.length} dynamic live services from OneGridHub.`);
     }
   } catch (e: any) {
-    console.log('[SocialBoost] Background sync note:', e?.message || e);
+    const msg = e?.message?.includes('fetch failed') ? 'upstream offline' : (e?.message || 'sync pending');
+    console.log('[SocialBoost] Background sync note:', msg);
   }
 }, 1000);
 

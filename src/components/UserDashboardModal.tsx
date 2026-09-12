@@ -43,6 +43,7 @@ import {
 import { db, sanitizeFirestorePayload } from '../lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { AdminWalletsView } from './AdminWalletsView';
+import { generateUserReferralCode } from './ReferralsView';
 import { HistoryView } from './HistoryView';
 import { ActiveAppView } from '../types';
 
@@ -122,7 +123,9 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
   // Referral State & Firestore Subscription
   const [referralsList, setReferralsList] = useState<ReferralRecord[]>([]);
 
-  const userReferralCode = userProfile?.referralCode || (user ? `ZN-${user.uid.substring(0, 6).toUpperCase()}` : 'ZN-HUB');
+  const userReferralCode = (userProfile?.referralCode && userProfile.referralCode.startsWith('REF'))
+    ? userProfile.referralCode 
+    : generateUserReferralCode(user?.uid);
   const userReferralLink = typeof window !== 'undefined' ? `${window.location.origin}?ref=${userReferralCode}` : `https://zenethub.com/?ref=${userReferralCode}`;
 
   useEffect(() => {
@@ -343,7 +346,14 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                   </div>
 
                   <button
-                    onClick={() => setActiveTab('settings')}
+                    onClick={() => {
+                      if (onSelectView) {
+                        onClose();
+                        onSelectView('edit-profile');
+                      } else {
+                        setActiveTab('settings');
+                      }
+                    }}
                     className="bg-[#2a1354] hover:bg-[#381a70] text-purple-200 border border-[#48228d] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto"
                   >
                     <Settings className="w-4 h-4 text-purple-300" />

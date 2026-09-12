@@ -1,81 +1,89 @@
 import React from 'react';
-import { Store, Grid, Bookmark, ShoppingBag, Menu } from 'lucide-react';
+import { Home, Wallet, User } from 'lucide-react';
 import { ActiveAppView } from '../types';
 
 interface MobileBottomNavProps {
   activeView: ActiveAppView;
   onSelectView: (view: ActiveAppView) => void;
-  onToggleDrawer: () => void;
-  savedCount: number;
-  ordersCount: number;
+  onOpenWallet: () => void;
+  isWalletOpen?: boolean;
+  onToggleDrawer?: () => void;
+  savedCount?: number;
+  ordersCount?: number;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeView,
   onSelectView,
-  onToggleDrawer,
-  savedCount,
-  ordersCount
+  onOpenWallet,
+  isWalletOpen = false
 }) => {
+  const isWallet = isWalletOpen || activeView === 'wallet' || activeView === 'deposit-history';
+  const isProfile = !isWallet && (activeView === 'profile' || activeView === 'edit-profile' || activeView === 'referrals' || activeView === 'change-password');
+  const isHome = !isWallet && !isProfile && (activeView === 'marketplace' || activeView === 'landing');
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E9E2FA] px-1 py-1 flex items-center justify-around shadow-lg w-full max-w-full overflow-x-hidden safe-bottom">
-      {/* 1. Marketplace Home */}
+    <nav 
+      id="zenet-mobile-bottom-nav"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#EAE6F8] px-4 sm:px-6 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.625rem)] flex items-center justify-around shadow-[0_-4px_20px_rgba(15,23,42,0.06)] w-full max-w-full overflow-x-hidden"
+    >
+      {/* 1. Home Tab */}
       <button
+        id="mobile-nav-home"
         onClick={() => onSelectView('marketplace')}
-        className={`flex flex-col items-center justify-center min-h-[44px] py-1 px-3 rounded-2xl transition cursor-pointer ${
-          activeView === 'marketplace'
-            ? 'text-[#7C3AED] font-bold'
-            : 'text-[#716B82] hover:text-[#171329]'
+        className={`flex items-center justify-center min-h-[44px] transition-all cursor-pointer active:scale-95 ${
+          isHome
+            ? 'bg-[#5B4DF5] text-white px-5 sm:px-6 py-2 rounded-full font-extrabold text-xs shadow-md shadow-indigo-600/25 space-x-2'
+            : 'flex-col items-center justify-center text-[#0F172A] hover:text-[#5B4DF5] px-4 py-1'
         }`}
+        aria-label="Home"
       >
-        <Store className={`w-5 h-5 ${activeView === 'marketplace' ? 'text-[#7C3AED]' : 'text-[#716B82]'}`} />
-        <span className="text-[10px] mt-0.5">Market</span>
-      </button>
-
-      {/* 2. Saved Items */}
-      <button
-        onClick={() => onSelectView('saved')}
-        className={`relative flex flex-col items-center justify-center min-h-[44px] py-1 px-3 rounded-2xl transition cursor-pointer ${
-          activeView === 'saved'
-            ? 'text-[#7C3AED] font-bold'
-            : 'text-[#716B82] hover:text-[#171329]'
-        }`}
-      >
-        <Bookmark className={`w-5 h-5 ${activeView === 'saved' ? 'text-[#7C3AED] fill-[#7C3AED]/20' : 'text-[#716B82]'}`} />
-        <span className="text-[10px] mt-0.5">Saved</span>
-        {savedCount > 0 && (
-          <span className="absolute top-1 right-2 bg-[#7C3AED] text-white font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
-            {savedCount}
-          </span>
+        <Home className={`${isHome ? 'w-4 h-4 text-white stroke-[2.5]' : 'w-5 h-5 text-[#0F172A] stroke-[2.2]'}`} />
+        {isHome ? (
+          <span className="text-xs font-bold text-white whitespace-nowrap">Home</span>
+        ) : (
+          <span className="text-[11px] font-bold mt-0.5 whitespace-nowrap text-[#0F172A]">Home</span>
         )}
       </button>
 
-      {/* 3. History */}
+      {/* 2. Wallet Tab */}
       <button
-        onClick={() => onSelectView('orders')}
-        className={`relative flex flex-col items-center justify-center min-h-[44px] py-1 px-3 rounded-2xl transition cursor-pointer ${
-          activeView === 'orders' || activeView === 'history'
-            ? 'text-[#7C3AED] font-bold'
-            : 'text-[#716B82] hover:text-[#171329]'
+        id="mobile-nav-wallet"
+        onClick={onOpenWallet}
+        className={`flex items-center justify-center min-h-[44px] transition-all cursor-pointer active:scale-95 ${
+          isWallet
+            ? 'bg-[#5B4DF5] text-white px-5 sm:px-6 py-2 rounded-full font-extrabold text-xs shadow-md shadow-indigo-600/25 space-x-2'
+            : 'flex-col items-center justify-center text-[#0F172A] hover:text-[#5B4DF5] px-4 py-1'
         }`}
+        aria-label="Wallet"
       >
-        <ShoppingBag className={`w-5 h-5 ${activeView === 'orders' || activeView === 'history' ? 'text-[#7C3AED]' : 'text-[#716B82]'}`} />
-        <span className="text-[10px] mt-0.5">History</span>
-        {ordersCount > 0 && (
-          <span className="absolute top-1 right-2 bg-[#7C3AED] text-white font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
-            {ordersCount}
-          </span>
+        <Wallet className={`${isWallet ? 'w-4 h-4 text-white stroke-[2.5]' : 'w-5 h-5 text-[#0F172A] stroke-[2.2]'}`} />
+        {isWallet ? (
+          <span className="text-xs font-bold text-white whitespace-nowrap">Wallet</span>
+        ) : (
+          <span className="text-[11px] font-bold mt-0.5 whitespace-nowrap text-[#0F172A]">Wallet</span>
         )}
       </button>
 
-      {/* 4. Menu Drawer Toggle */}
+      {/* 3. Profile Tab */}
       <button
-        onClick={onToggleDrawer}
-        className="flex flex-col items-center justify-center min-h-[44px] py-1 px-3 text-[#716B82] hover:text-[#171329] transition cursor-pointer"
+        id="mobile-nav-profile"
+        onClick={() => onSelectView('profile')}
+        className={`flex items-center justify-center min-h-[44px] transition-all cursor-pointer active:scale-95 ${
+          isProfile
+            ? 'bg-[#5B4DF5] text-white px-5 sm:px-6 py-2 rounded-full font-extrabold text-xs shadow-md shadow-indigo-600/25 space-x-2'
+            : 'flex-col items-center justify-center text-[#0F172A] hover:text-[#5B4DF5] px-4 py-1'
+        }`}
+        aria-label="Profile"
       >
-        <Menu className="w-5 h-5 text-[#716B82]" />
-        <span className="text-[10px] mt-0.5">Menu</span>
+        <User className={`${isProfile ? 'w-4 h-4 text-white stroke-[2.5]' : 'w-5 h-5 text-[#0F172A] stroke-[2.2]'}`} />
+        {isProfile ? (
+          <span className="text-xs font-bold text-white whitespace-nowrap">Profile</span>
+        ) : (
+          <span className="text-[11px] font-bold mt-0.5 whitespace-nowrap text-[#0F172A]">Profile</span>
+        )}
       </button>
     </nav>
   );
 };
+

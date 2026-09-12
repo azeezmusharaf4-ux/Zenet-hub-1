@@ -1083,43 +1083,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-[#716B82] font-medium mt-0.5">
-                  Purchased logs, accounts and credentials
+                  Purchased accounts and credentials
                 </p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-[#94A3B8] group-hover:text-[#7C3AED] group-hover:translate-x-0.5 transition shrink-0 ml-2" />
           </button>
 
-          {/* CARD 3: BOOST HISTORY */}
-          <button
-            onClick={() => setSelectedCategory('boost')}
-            className="w-full bg-white border border-[#E9E2FA] rounded-3xl p-4 sm:p-5 flex items-center justify-between shadow-2xs hover:border-[#7C3AED]/50 hover:shadow-md transition-all cursor-pointer group text-left active:scale-[0.99]"
-          >
-            <div className="flex items-center">
-              {/* Light Purple Rounded Icon Box */}
-              <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shrink-0 mr-4 shadow-2xs group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-black text-[#171329] group-hover:text-[#7C3AED] transition tracking-tight">
-                    Boost History
-                  </h3>
-                  {counts.boost > 0 && (
-                    <span className="bg-[#EDE9FE] text-[#7C3AED] text-[10px] font-black px-2 py-0.5 rounded-full">
-                      {counts.boost}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-[#716B82] font-medium mt-0.5">
-                  Followers, likes, views and boosting orders
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-[#94A3B8] group-hover:text-[#7C3AED] group-hover:translate-x-0.5 transition shrink-0 ml-2" />
-          </button>
-
-          {/* CARD 4: UPDATE HISTORY */}
+          {/* CARD 3: ZENET UPDATE HISTORY */}
           <button
             onClick={() => setSelectedCategory('update')}
             className="w-full bg-white border border-[#E9E2FA] rounded-3xl p-4 sm:p-5 flex items-center justify-between shadow-2xs hover:border-[#7C3AED]/50 hover:shadow-md transition-all cursor-pointer group text-left active:scale-[0.99]"
@@ -1132,7 +1103,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-black text-[#171329] group-hover:text-[#7C3AED] transition tracking-tight">
-                    Update History
+                    Zenet Update History
                   </h3>
                   {counts.update > 0 && (
                     <span className="bg-[#EDE9FE] text-[#7C3AED] text-[10px] font-black px-2 py-0.5 rounded-full">
@@ -1141,7 +1112,36 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                   )}
                 </div>
                 <p className="text-xs text-[#716B82] font-medium mt-0.5">
-                  System updates, releases and digital packages
+                  Updates and feature logs
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#94A3B8] group-hover:text-[#7C3AED] group-hover:translate-x-0.5 transition shrink-0 ml-2" />
+          </button>
+
+          {/* CARD 4: BOOSTING HISTORY */}
+          <button
+            onClick={() => setSelectedCategory('boost')}
+            className="w-full bg-white border border-[#E9E2FA] rounded-3xl p-4 sm:p-5 flex items-center justify-between shadow-2xs hover:border-[#7C3AED]/50 hover:shadow-md transition-all cursor-pointer group text-left active:scale-[0.99]"
+          >
+            <div className="flex items-center">
+              {/* Light Purple Rounded Icon Box */}
+              <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#7C3AED] flex items-center justify-center shrink-0 mr-4 shadow-2xs group-hover:scale-105 group-hover:bg-[#7C3AED] group-hover:text-white transition duration-200">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-[#171329] group-hover:text-[#7C3AED] transition tracking-tight">
+                    Boosting History
+                  </h3>
+                  {counts.boost > 0 && (
+                    <span className="bg-[#EDE9FE] text-[#7C3AED] text-[10px] font-black px-2 py-0.5 rounded-full">
+                      {counts.boost}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[#716B82] font-medium mt-0.5">
+                  Social media views, followers and likes
                 </p>
               </div>
             </div>
