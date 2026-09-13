@@ -31,7 +31,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   onAddFunds,
   transactions
 }) => {
-  const [activeTab, setActiveTab] = useState<'fund' | 'overview' | 'history'>('fund');
+  const [activeTab, setActiveTab] = useState<'fund' | 'history'>('fund');
   
   // Wallet Funding State
   const [amount, setAmount] = useState<number>(5000);
@@ -269,16 +269,6 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             Fund Wallet
           </button>
           <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-xl transition cursor-pointer ${
-              activeTab === 'overview'
-                ? 'bg-[#7C3AED] text-white font-bold shadow-sm'
-                : 'text-[#716B82] hover:text-[#171329]'
-            }`}
-          >
-            Balance & Escrow
-          </button>
-          <button
             onClick={() => setActiveTab('history')}
             className={`px-4 py-2 rounded-xl transition cursor-pointer ${
               activeTab === 'history'
@@ -400,55 +390,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             </form>
           )}
 
-          {/* TAB 2: BALANCE OVERVIEW */}
-          {activeTab === 'overview' && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              
-              {/* Balance Card */}
-              <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-6 rounded-3xl relative overflow-hidden shadow-sm space-y-3">
-                <div className="flex items-center justify-between relative z-10">
-                  <span className="text-xs uppercase tracking-widest text-[#716B82] font-bold">Total Wallet Balance</span>
-                  <span className="bg-[#EDE9FE] text-[#5B21B6] border border-[#C4B5FD] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-[#7C3AED]" />
-                    Escrow Vault Active
-                  </span>
-                </div>
-
-                <div className="relative z-10">
-                  <h2 className="text-3xl sm:text-4xl font-black text-[#171329] font-mono tracking-tight">
-                    ₦{walletBalance.toLocaleString()} <span className="text-base text-[#716B82] font-sans font-bold">NGN</span>
-                  </h2>
-                  <p className="text-xs text-[#716B82] pt-1">
-                    Instant Marketplace Checkout • Auto-Deduction on Buy
-                  </p>
-                </div>
-
-                <div className="pt-2 relative z-10">
-                  <button
-                    onClick={() => setActiveTab('fund')}
-                    className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-extrabold py-3 px-4 rounded-xl shadow-sm flex items-center justify-center gap-2 transition cursor-pointer text-xs sm:text-sm"
-                  >
-                    <Wallet className="w-4 h-4" />
-                    <span>Fund Wallet via Paystack</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Escrow Guarantee Callout */}
-              <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-4 rounded-2xl flex items-start gap-3">
-                <Lock className="w-5 h-5 text-[#7C3AED] shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <h4 className="font-extrabold text-[#171329] text-xs">Wallet Purchase & Escrow Protection</h4>
-                  <p className="text-xs text-[#716B82] leading-relaxed">
-                    When you purchase a product on ZENET HUB, funds are safely held in escrow. Digital product credentials are unlocked instantly upon purchase!
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* TAB 3: HISTORY */}
+          {/* TAB 2: HISTORY */}
           {activeTab === 'history' && (
             <div className="space-y-3 animate-in fade-in duration-150">
               <h4 className="font-extrabold text-[#171329] text-sm">Wallet Ledger & Deposits</h4>

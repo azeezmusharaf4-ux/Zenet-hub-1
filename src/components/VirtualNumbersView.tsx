@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { auth, getSafeIdToken } from '../lib/firebase';
 import { UserProfile } from '../types';
-import { sanitizeApiErrorMessage } from '../utils/api';
+import { sanitizeApiErrorMessage, isValidOtpCode, isInvalidOtpCode, resolveCountryInfo } from '../utils/api';
 
 export interface PriceOption {
   optionId: string;
@@ -280,13 +280,11 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     { id: 'SG', name: 'Singapore', code: '+65' }
   ];
 
-  // Helper to format country names + flags + dials
-  const getCountryDisplayName = (countryId: string, fallbackName?: string, dialCode?: string) => {
-    if (!countryId) return 'Select Country';
-    const countryObj = countries.find(c => c.id === countryId);
-    const resolvedName = fallbackName || countryObj?.name || countryId;
-    const flag = getCountryFlagEmoji(countryObj?.code || resolvedName || countryId);
-    return `${flag} ${resolvedName}${dialCode ? ` (${dialCode})` : ''}`;
+  // Helper to format country names + flags + dials using reliable prefix matcher
+  const getCountryDisplayName = (countryId: string, fallbackName?: string, dialCode?: string, phoneNumber?: string) => {
+    if (!countryId && !phoneNumber) return 'Select Country';
+    const resolved = resolveCountryInfo(countryId || fallbackName, phoneNumber, dialCode);
+    return resolved.displayName;
   };
 
   // Clean service name mapping
@@ -748,22 +746,29 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         });
 
         if (ok && data) {
-          if (data.status === 'SMS_RECEIVED' || data.code) {
+          const rawCode = data.code || data.smsCode || data.otp;
+          const hasValidOtp = isValidOtpCode(rawCode);
+
+          if (hasValidOtp) {
             setPollingStatus('RECEIVED');
-            setVerificationCode(data.code);
-            setSmsContent(data.smsText || `Your verification code is: ${data.code}`);
+            setVerificationCode(rawCode);
+            setSmsContent(data.smsText || `Your verification code is: ${rawCode}`);
             
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             
             onRefreshProfile();
             fetchOrders();
-          } else if (data.status === 'CANCELLED' || data.status === 'EXPIRED') {
+          } else if (data.status === 'CANCELLED' || data.status === 'cancelled' || data.status === 'EXPIRED' || data.status === 'expired') {
             setPollingStatus('CANCELLED');
             setErrorMessage('This session expired or was cancelled by the provider.');
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             fetchOrders();
+          } else {
+            // Still waiting for real carrier OTP
+            setPollingStatus('WAITING');
+            setVerificationCode('');
           }
         }
       } catch (err) {
@@ -1509,12 +1514,14 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
             ) : (
               <div className="space-y-3">
                 {orders.map((o) => {
-                  const isCompleted = o.status === 'SMS_RECEIVED' || o.code;
-                  const isWaiting = o.status === 'WAITING';
-                  const isCancelled = o.status === 'CANCELLED' || o.status === 'EXPIRED';
+                  const hasValidCode = isValidOtpCode(o.code);
+                  const isCompleted = hasValidCode;
+                  const isCancelled = o.status === 'CANCELLED' || o.status === 'cancelled' || o.status === 'EXPIRED' || o.status === 'expired';
+                  const isWaiting = !hasValidCode && !isCancelled;
 
                   // Tag determination
-                  const isUsaOrder = (o.country === 'US' || o.country === '187' || (o.server || '').includes('usa'));
+                  const resolvedCountry = resolveCountryInfo(o.country || o.countryName, o.phoneNumber, o.countryCode);
+                  const isUsaOrder = resolvedCountry.id === 'US' || (o.server || '').includes('usa');
                   const serverPill = isUsaOrder ? 'USA SV3' : (o.server === 'server_2' ? 'ALL SV2' : o.server === 'server_3' ? 'ALL SV3' : 'ALL SV1');
 
                   return (
@@ -1566,7 +1573,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                         <div className="flex items-center space-x-2">
                           <span className="text-[#64748B] font-semibold flex items-center space-x-1">
                             <Globe className="w-3.5 h-3.5 mr-1 inline text-[#6D28D9]" />
-                            <span>{getCountryDisplayName(o.country)}</span>
+                            <span>{resolvedCountry.flag} {resolvedCountry.displayName}</span>
                           </span>
                           <span className="bg-emerald-50 border border-emerald-200 text-[#047857] font-bold px-2 py-0.5 rounded-md">
                             ₦{(Number(o.customerPrice || o.price || 0)).toLocaleString()}
@@ -1574,13 +1581,13 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                         </div>
 
                         <div>
-                          {isCompleted ? (
+                          {hasValidCode ? (
                             <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
                               COMPLETED
                             </span>
                           ) : isWaiting ? (
                             <span className="bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse">
-                              AWAITING SMS
+                              WAITING FOR OTP
                             </span>
                           ) : (
                             <span className="bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
@@ -1590,8 +1597,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Received OTP Box */}
-                      {isCompleted && o.code && (
+                      {/* Received OTP Box or Waiting Box */}
+                      {hasValidCode ? (
                         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center space-y-1">
                           <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">OTP RECEIVED</span>
                           <div className="flex items-center justify-center space-x-2">
@@ -1599,14 +1606,22 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                             <button
                               type="button"
                               onClick={() => handleCopy(o.code, `${o.orderId}-code`)}
-                              className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition"
+                              className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition cursor-pointer"
                               title="Copy OTP"
                             >
                               {copiedText === `${o.orderId}-code` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
                           </div>
                         </div>
-                      )}
+                      ) : isWaiting ? (
+                        <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 text-center space-y-1">
+                          <div className="flex items-center justify-center space-x-1.5 text-amber-800">
+                            <Clock className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">WAITING FOR OTP</span>
+                          </div>
+                          <p className="text-xs text-amber-700 font-medium">Waiting for the verification code...</p>
+                        </div>
+                      ) : null}
 
                       {/* Buy Again Button */}
                       <button
@@ -1632,11 +1647,17 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
       {activeStep === 'activation' && activeOrder && (
         <div className="bg-white border border-[#E9E2FA] rounded-[30px] overflow-hidden shadow-sm space-y-5 p-6">
           
-          <div className="text-center space-y-1">
+          <div className="text-center space-y-1.5">
             <h3 className="font-bold text-lg text-[#171329] tracking-tight uppercase">Active SMS Verification</h3>
-            <p className="text-xs text-[#716B82] font-semibold">
-              Order ID: <span className="font-mono text-[11px] bg-[#F8F7FF] border border-[#E9E2FA] px-2 py-0.5 rounded text-[#171329]">{activeOrder.orderId}</span>
-            </p>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-[#6D28D9] bg-[#F5F3FF] border border-[#DDD6FE] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <span>{resolveCountryInfo(activeOrder.country, activeOrder.phoneNumber).flag}</span>
+                <span>{resolveCountryInfo(activeOrder.country, activeOrder.phoneNumber).displayName}</span>
+              </span>
+              <p className="text-xs text-[#716B82] font-semibold">
+                Order ID: <span className="font-mono text-[11px] bg-[#F8F7FF] border border-[#E9E2FA] px-2 py-0.5 rounded text-[#171329]">{activeOrder.orderId}</span>
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col items-center justify-center p-6 bg-[#F8F7FF] rounded-2xl border border-[#E9E2FA] text-center space-y-3">
@@ -1648,12 +1669,12 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     {formatTime(elapsedSeconds)}
                   </span>
                 </div>
-                <h4 className="text-sm font-bold text-[#171329] uppercase tracking-wider animate-pulse">Awaiting SMS Code...</h4>
+                <h4 className="text-sm font-bold text-[#171329] uppercase tracking-wider animate-pulse">WAITING FOR OTP</h4>
                 <p className="text-[11px] text-[#716B82] leading-relaxed max-w-sm">
-                  Please use the virtual phone number below to request your verification code. This screen will automatically update as soon as the SMS is received.
+                  Waiting for the verification code... Please use the phone number below to request your OTP. This screen will automatically update as soon as the carrier delivers the code.
                 </p>
               </>
-            ) : pollingStatus === 'RECEIVED' ? (
+            ) : pollingStatus === 'RECEIVED' && isValidOtpCode(verificationCode) ? (
               <>
                 <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-200">
                   <Check className="w-6 h-6 animate-bounce" />
@@ -1690,7 +1711,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
           </div>
 
           {/* OTP Code Box */}
-          {pollingStatus === 'RECEIVED' && verificationCode && (
+          {pollingStatus === 'RECEIVED' && isValidOtpCode(verificationCode) && (
             <div className="space-y-4 pt-2">
               <span className="text-[10px] font-bold text-[#716B82] uppercase tracking-widest block">Delivered Verification Code</span>
               
@@ -1702,6 +1723,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 </span>
 
                 <button
+                  type="button"
                   onClick={() => handleCopy(verificationCode, 'code')}
                   className="mx-auto flex items-center space-x-2 px-5 py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-bold rounded-xl border border-emerald-300 transition cursor-pointer"
                 >
@@ -1709,7 +1731,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   <span>{copiedText === 'code' ? 'Copied OTP' : 'Copy OTP'}</span>
                 </button>
 
-                <span className="text-[10px] text-[#716B82] block">Message: "{smsContent}"</span>
+                <span className="text-[10px] text-[#716B82] block">Message: &quot;{smsContent}&quot;</span>
               </div>
             </div>
           )}

@@ -371,18 +371,18 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
 
   if (!isOwner) {
     return (
-      <div id="zenet-update-admin-modal" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md">
-        <div className="relative w-full max-w-md bg-[#0c051f] border border-rose-500/50 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
-          <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/40">
+      <div id="zenet-update-admin-modal" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="relative w-full max-w-md bg-white border border-pink-200 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center mx-auto border border-pink-200">
             <AlertCircle className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-black text-white">Owner Authorization Required</h3>
-          <p className="text-xs text-purple-300/80 leading-relaxed">
+          <h3 className="text-lg font-black text-slate-900">Owner Authorization Required</h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
             ZENET Update management controls are strictly restricted to the primary website Owner (Azeezmusharaf4@gmail.com). Normal administrators do not have access.
           </p>
           <button
             onClick={onClose}
-            className="w-full px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black transition cursor-pointer"
+            className="w-full px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition cursor-pointer"
           >
             Close Window
           </button>
@@ -392,28 +392,28 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
   }
 
   return (
-    <div id="zenet-update-admin-modal" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+    <div id="zenet-update-admin-modal" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="relative w-full max-w-3xl max-h-[92vh] bg-[#0c051f] border border-[#3b1c78] rounded-[28px] shadow-[0_0_60px_rgba(125,76,247,0.35)] flex flex-col overflow-hidden text-slate-200"
+        className="relative w-full max-w-3xl max-h-[92vh] bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header with Glowing Badge */}
-        <div className="relative p-5 sm:p-6 bg-gradient-to-b from-[#1d0c42] to-[#0c051f] border-b border-[#2b165c] flex items-center justify-between">
+        {/* Header */}
+        <div className="relative p-5 sm:p-6 bg-white border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center space-x-3.5">
-            <div className="p-3 rounded-2xl bg-[#2a1359] border border-[#7d4cf7]/50 text-[#c1a0ff] shadow-lg flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-[#bd93f9]" />
+            <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 shadow-xs flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-blue-600" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
                   Add Product to Generate Update
                 </h3>
-                <span className="bg-gradient-to-r from-amber-500 to-amber-600 text-black font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                  <ShieldCheck className="w-3 h-3 text-black" />
+                <span className="bg-pink-50 text-pink-700 border border-pink-200 font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                  <ShieldCheck className="w-3 h-3 text-pink-600" />
                   OWNER ONLY
                 </span>
               </div>
-              <p className="text-xs text-purple-300/60 font-medium mt-0.5">
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
                 Create & manage products that appear inside the live ZENET HUB Update marketplace.
               </p>
             </div>
@@ -421,7 +421,7 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
 
           <button
             onClick={() => { resetForm(); onClose(); }}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer border border-white/10"
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition cursor-pointer border border-slate-200"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -429,14 +429,14 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
         </div>
 
         {/* Tab Toggle: Add / Edit vs Manage Existing */}
-        <div className="bg-[#14082e] border-b border-[#24114f] px-5 sm:px-6 py-2.5 flex items-center justify-between">
+        <div className="bg-slate-50 border-b border-slate-200 px-5 sm:px-6 py-2.5 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <button
               onClick={() => { setActiveTab('add'); }}
               className={`px-4 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center space-x-1.5 ${
                 activeTab === 'add'
-                  ? 'bg-[#7d4cf7] text-white shadow-[0_0_12px_rgba(125,76,247,0.4)]'
-                  : 'bg-[#1e0e3a] text-purple-300 hover:text-white border border-[#30166a]'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:text-blue-600 border border-slate-200'
               }`}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -446,8 +446,8 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
               onClick={() => { setActiveTab('manage'); setStatusMessage(null); }}
               className={`px-4 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center space-x-1.5 ${
                 activeTab === 'manage'
-                  ? 'bg-[#7d4cf7] text-white shadow-[0_0_12px_rgba(125,76,247,0.4)]'
-                  : 'bg-[#1e0e3a] text-purple-300 hover:text-white border border-[#30166a]'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:text-blue-600 border border-slate-200'
               }`}
             >
               <Package className="w-3.5 h-3.5" />
@@ -458,7 +458,7 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
           {editingProduct && (
             <button
               onClick={resetForm}
-              className="text-xs text-purple-300 hover:text-white underline cursor-pointer"
+              className="text-xs text-pink-600 hover:text-pink-700 underline cursor-pointer"
             >
               Cancel Edit
             </button>
@@ -469,26 +469,26 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
         {statusMessage && (
           <div className={`px-6 py-3 border-b text-xs font-bold flex items-center space-x-2 ${
             statusMessage.type === 'success' 
-              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' 
-              : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+              ? 'bg-blue-50 border-blue-200 text-blue-700' 
+              : 'bg-pink-50 border-pink-200 text-pink-700'
           }`}>
             {statusMessage.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-blue-600" />
             ) : (
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              <AlertCircle className="w-4 h-4 shrink-0 text-pink-600" />
             )}
             <span>{statusMessage.text}</span>
           </div>
         )}
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 bg-white">
           {activeTab === 'add' ? (
             <form onSubmit={handleSubmit} onPaste={handlePaste} className="space-y-5">
               {/* Field 1: Product Name */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-black uppercase tracking-wider text-purple-300/80">
-                  Product Name <span className="text-rose-400">*</span>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                  Product Name <span className="text-pink-600">*</span>
                 </label>
                 <input
                   type="text"
@@ -496,17 +496,17 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
                   placeholder="e.g. Verified Telegram PVA Method + Tool"
-                  className="w-full bg-[#12082b] border border-[#261352] focus:border-[#7d4cf7] rounded-xl px-4 py-3 text-sm text-white placeholder-purple-300/30 outline-none transition"
+                  className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition"
                 />
               </div>
 
               {/* Field 2: Product Image (Upload Image / Cover) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-black uppercase tracking-wider text-purple-300/80">
-                    Product Image (Cover Photo) <span className="text-rose-400">*</span>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                    Product Image (Cover Photo) <span className="text-pink-600">*</span>
                   </label>
-                  <span className="text-[11px] text-purple-400/80 font-medium flex items-center gap-1">
+                  <span className="text-[11px] text-blue-600 font-medium flex items-center gap-1">
                     <ClipboardPaste className="w-3 h-3" /> Supports Drag, Drop & Ctrl+V Paste
                   </span>
                 </div>
@@ -530,34 +530,34 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                       onDrop={handleDrop}
                       className={`w-full flex flex-col items-center justify-center p-5 border-2 border-dashed rounded-2xl cursor-pointer transition text-center group ${
                         isDragging
-                          ? 'border-[#7d4cf7] bg-[#230f4e] scale-[1.01]'
-                          : 'border-[#3a1d75] hover:border-[#7d4cf7] bg-[#12082b] hover:bg-[#190b3b]'
+                          ? 'border-blue-500 bg-blue-50 scale-[1.01]'
+                          : 'border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/50'
                       }`}
                     >
-                      <Upload className="w-6 h-6 text-[#bd93f9] group-hover:scale-110 transition duration-200 mb-2" />
-                      <span className="text-xs font-bold text-white">Click or Drag & Drop Image Here</span>
-                      <span className="text-[10px] text-purple-300/60 mt-0.5">Instant auto-compression (PNG, JPG, WEBP)</span>
+                      <Upload className="w-6 h-6 text-blue-600 group-hover:scale-110 transition duration-200 mb-2" />
+                      <span className="text-xs font-bold text-slate-900">Click or Drag & Drop Image Here</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">Instant auto-compression (PNG, JPG, WEBP)</span>
                     </label>
 
                     {/* Or URL Input */}
                     <div className="flex items-center space-x-2">
-                      <span className="text-[10px] text-purple-300/40 uppercase font-black">or URL:</span>
+                      <span className="text-[10px] text-slate-500 uppercase font-black">or URL:</span>
                       <input
                         type="url"
                         value={productImage.startsWith('data:') ? '' : productImage}
                         onChange={(e) => setProductImage(e.target.value)}
                         placeholder="https://..."
-                        className="flex-1 bg-[#12082b] border border-[#261352] focus:border-[#7d4cf7] rounded-lg px-3 py-1.5 text-xs text-white placeholder-purple-300/30 outline-none"
+                        className="flex-1 bg-white border border-slate-200 focus:border-blue-500 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none"
                       />
                     </div>
                   </div>
 
-                  {/* Image Preview Box (Instant and always visible) */}
+                  {/* Image Preview Box */}
                   <div 
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    className="relative aspect-video rounded-2xl overflow-hidden bg-[#090317] border border-[#2b165c] flex items-center justify-center group"
+                    className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center group"
                   >
                     {productImage ? (
                       <>
@@ -568,25 +568,25 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                           referrerPolicy="no-referrer"
                         />
                         {uploadingImage && (
-                          <div className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-md border border-purple-500/40 text-[10px] text-purple-300 flex items-center gap-1.5 font-bold shadow-lg">
-                            <Loader2 className="w-3 h-3 text-purple-400 animate-spin" />
+                          <div className="absolute top-2 left-2 px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-md border border-blue-400 text-[10px] text-white flex items-center gap-1.5 font-bold shadow-lg">
+                            <Loader2 className="w-3 h-3 text-blue-400 animate-spin" />
                             <span>Optimizing...</span>
                           </div>
                         )}
                         <button
                           type="button"
                           onClick={() => { setProductImage(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/70 hover:bg-rose-900/80 text-white transition cursor-pointer"
+                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/70 hover:bg-pink-600 text-white transition cursor-pointer"
                           title="Remove image"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </>
                     ) : (
-                      <div className="flex flex-col items-center text-purple-300/40 space-y-1.5 p-4 text-center">
-                        <ImageIcon className="w-8 h-8 text-purple-400/50" />
-                        <span className="text-xs font-semibold text-purple-200/70">Instant Image Preview</span>
-                        <span className="text-[10px] text-purple-300/40">Upload or paste an image to see preview</span>
+                      <div className="flex flex-col items-center text-slate-400 space-y-1.5 p-4 text-center">
+                        <ImageIcon className="w-8 h-8 text-slate-300" />
+                        <span className="text-xs font-semibold text-slate-600">Instant Image Preview</span>
+                        <span className="text-[10px] text-slate-400">Upload or paste an image to see preview</span>
                       </div>
                     )}
                   </div>
@@ -595,8 +595,8 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
 
               {/* Field 3: Description */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-black uppercase tracking-wider text-purple-300/80">
-                  Description <span className="text-rose-400">*</span>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                  Description <span className="text-pink-600">*</span>
                 </label>
                 <textarea
                   required
@@ -604,17 +604,17 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Detailed breakdown of what is included, features, instructions, or account specifications..."
-                  className="w-full bg-[#12082b] border border-[#261352] focus:border-[#7d4cf7] rounded-xl px-4 py-3 text-sm text-white placeholder-purple-300/30 outline-none transition resize-none"
+                  className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition resize-none"
                 />
               </div>
 
               {/* Field 4: Price */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-black uppercase tracking-wider text-purple-300/80">
-                  Price (₦ NGN) <span className="text-rose-400">*</span>
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                  Price (₦ NGN) <span className="text-pink-600">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-purple-300 font-bold">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 font-bold">
                     ₦
                   </div>
                   <input
@@ -625,29 +625,29 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     placeholder="e.g. 5000"
-                    className="w-full bg-[#12082b] border border-[#261352] focus:border-[#7d4cf7] rounded-xl pl-9 pr-4 py-3 text-sm text-white placeholder-purple-300/30 outline-none transition font-mono font-bold"
+                    className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl pl-9 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition font-mono font-bold"
                   />
                 </div>
               </div>
 
               {/* Field 5: Private Delivery Link */}
-              <div className="space-y-1.5 p-4 rounded-2xl bg-[#14082e] border border-[#30166a]">
+              <div className="space-y-1.5 p-4 rounded-2xl bg-blue-50/50 border border-blue-100">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center space-x-1.5">
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Private Delivery Link <span className="text-rose-400">*</span></span>
+                  <label className="text-xs font-black uppercase tracking-wider text-blue-900 flex items-center space-x-1.5">
+                    <Lock className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Private Delivery Link <span className="text-pink-600">*</span></span>
                   </label>
-                  <span className="text-[10px] text-amber-400/70 font-semibold bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                  <span className="text-[10px] text-blue-700 font-semibold bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
                     HIDDEN UNTIL PURCHASE
                   </span>
                 </div>
 
-                <p className="text-[11px] text-purple-300/60 leading-relaxed mb-2">
+                <p className="text-[11px] text-slate-600 leading-relaxed mb-2">
                   Paste the secret link (Google Drive, Mega, Telegram channel, download URL, or credentials access) delivered immediately to the buyer post-purchase.
                 </p>
 
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-purple-400">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <LinkIcon className="w-4 h-4" />
                   </div>
                   <input
@@ -656,12 +656,12 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                     value={privateDeliveryLink}
                     onChange={(e) => setPrivateDeliveryLink(e.target.value)}
                     placeholder="https://example.com/secret-product-access"
-                    className="w-full bg-[#0c051f] border border-[#3b1c78] focus:border-amber-400 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-purple-300/30 outline-none font-mono"
+                    className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none font-mono"
                   />
                   <button
                     type="button"
                     onClick={() => setShowSecretLink(!showSecretLink)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-purple-400 hover:text-white cursor-pointer"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-700 cursor-pointer"
                   >
                     {showSecretLink ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -673,7 +673,7 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#7d4cf7] to-[#a16eff] hover:from-[#8e5ff9] hover:to-[#b37eff] text-white font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(125,76,247,0.4)] hover:shadow-[0_0_30px_rgba(125,76,247,0.6)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm uppercase tracking-wider transition-all duration-200 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {submitting ? (
                     <>
@@ -693,20 +693,20 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
             /* Manage Existing Products List */
             <div className="space-y-4">
               {loading ? (
-                <div className="py-12 flex flex-col items-center justify-center text-purple-300/50 space-y-2">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#bd93f9]" />
+                <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                   <p className="text-xs font-bold">Loading generated update products...</p>
                 </div>
               ) : products.length === 0 ? (
-                <div className="py-12 text-center bg-[#12082b] border border-[#24114f] rounded-2xl p-6 space-y-3">
-                  <Package className="w-10 h-10 text-purple-400/40 mx-auto" />
-                  <h4 className="text-sm font-bold text-white">No Update Products Added Yet</h4>
-                  <p className="text-xs text-purple-300/50 max-w-sm mx-auto">
+                <div className="py-12 text-center bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-3">
+                  <Package className="w-10 h-10 text-slate-400 mx-auto" />
+                  <h4 className="text-sm font-bold text-slate-900">No Update Products Added Yet</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
                     Use the "Add New Product" tab above to create your first product for ZENED U Update.
                   </p>
                   <button
                     onClick={() => setActiveTab('add')}
-                    className="px-4 py-2 bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white rounded-xl text-xs font-black transition cursor-pointer"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition cursor-pointer"
                   >
                     Add First Product
                   </button>
@@ -716,10 +716,10 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                   {products.map((item) => (
                     <div 
                       key={item.id}
-                      className="bg-[#12082b] border border-[#210f45] hover:border-[#4d24a3] rounded-2xl overflow-hidden flex flex-col transition duration-200 group"
+                      className="bg-white border border-slate-200 hover:border-blue-300 rounded-2xl overflow-hidden flex flex-col transition duration-200 group shadow-xs"
                     >
                       {/* Product Image Cover */}
-                      <div className="relative aspect-video w-full bg-black/40 overflow-hidden">
+                      <div className="relative aspect-video w-full bg-slate-100 overflow-hidden border-b border-slate-100">
                         {item.imageUrl ? (
                           <img 
                             src={item.imageUrl} 
@@ -728,11 +728,11 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                             referrerPolicy="no-referrer"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-purple-400/30">
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
                             <ImageIcon className="w-8 h-8" />
                           </div>
                         )}
-                        <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-purple-500/30 text-white font-mono font-bold text-xs">
+                        <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm px-2.5 py-1 rounded-lg text-white font-mono font-bold text-xs shadow-xs">
                           ₦{item.price.toLocaleString()}
                         </div>
                       </div>
@@ -740,16 +740,16 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                       {/* Details */}
                       <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                         <div className="space-y-1">
-                          <h4 className="font-extrabold text-white text-sm line-clamp-1">{item.name}</h4>
-                          <p className="text-xs text-purple-200/70 line-clamp-2 leading-relaxed">
+                          <h4 className="font-extrabold text-slate-900 text-sm line-clamp-1">{item.name}</h4>
+                          <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
                             {item.description}
                           </p>
                         </div>
 
                         {/* Secret Link Preview for Admin */}
-                        <div className="p-2 rounded-xl bg-[#090317] border border-[#24114f] text-[11px] font-mono flex items-center justify-between space-x-2">
-                          <div className="flex items-center space-x-1.5 text-amber-300/80 truncate">
-                            <Lock className="w-3 h-3 shrink-0 text-amber-400" />
+                        <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono flex items-center justify-between space-x-2">
+                          <div className="flex items-center space-x-1.5 text-slate-700 truncate">
+                            <Lock className="w-3 h-3 shrink-0 text-blue-600" />
                             <span className="truncate">{item.privateDeliveryLink || item.secretDeliveryInfo}</span>
                           </div>
                           {item.privateDeliveryLink && (
@@ -757,7 +757,7 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                               href={item.privateDeliveryLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[#bd93f9] hover:text-white shrink-0 p-1"
+                              className="text-blue-600 hover:text-blue-800 shrink-0 p-1"
                               title="Test link"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -766,10 +766,10 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center space-x-2 pt-1 border-t border-[#210f45]">
+                        <div className="flex items-center space-x-2 pt-1 border-t border-slate-100">
                           <button
                             onClick={() => handleStartEdit(item)}
-                            className="flex-1 py-1.5 px-3 rounded-xl bg-[#1e0e3a] hover:bg-[#2e155b] text-[#bd93f9] hover:text-white border border-[#30166a] text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                            className="flex-1 py-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-blue-600 border border-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -779,13 +779,13 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                             <div className="flex items-center space-x-1">
                               <button
                                 onClick={() => handleDeleteProduct(item.id, item.name)}
-                                className="py-1.5 px-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition cursor-pointer"
+                                className="py-1.5 px-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold transition cursor-pointer"
                               >
                                 Confirm
                               </button>
                               <button
                                 onClick={() => setDeleteConfirmId(null)}
-                                className="py-1.5 px-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold cursor-pointer"
+                                className="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold cursor-pointer hover:bg-slate-200"
                               >
                                 Cancel
                               </button>
@@ -793,7 +793,7 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                           ) : (
                             <button
                               onClick={() => setDeleteConfirmId(item.id)}
-                              className="p-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 transition cursor-pointer"
+                              className="p-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-600 border border-pink-200 transition cursor-pointer"
                               title="Delete Product"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -810,13 +810,13 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-[#12082b] border-t border-[#24114f] flex items-center justify-between text-xs">
-          <span className="text-purple-300/40 font-medium">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+          <span className="text-slate-500 font-medium">
             Products automatically appear in the live ZENED U Update catalog.
           </span>
           <button
             onClick={() => { resetForm(); onClose(); }}
-            className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold transition cursor-pointer"
+            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition cursor-pointer"
           >
             Done
           </button>

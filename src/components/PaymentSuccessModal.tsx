@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AccountListing, PurchaseRecord } from '../types';
+import AccountCredentialsCard from './AccountCredentialsCard';
 import { 
   CheckCircle2, 
   ShieldCheck, 
@@ -172,95 +173,13 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
 
             {/* Delivered Account Credentials & 2FA Information */}
             {credentials && (credentials.accountEmail || credentials.accountPassword || credentials.twoFactorSecretKey || credentials.twoFactorBackupCodes || credentials.backupCodes) && (
-              <div className="bg-[#120624] border border-emerald-500/40 p-4 rounded-2xl space-y-3 shadow-md">
-                <div className="flex items-center gap-2 pb-2 border-b border-purple-500/20">
-                  <div className="w-6 h-6 rounded-lg bg-emerald-950 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                    <Key className="w-3.5 h-3.5" />
-                  </div>
-                  <h4 className="font-extrabold text-white text-xs flex items-center gap-1.5">
-                    Delivered Account Credentials
-                    <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[9px] px-1.5 py-0.2 rounded font-bold">
-                      Instant Access
-                    </span>
-                  </h4>
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  {credentials.accountEmail && (
-                    <div className="bg-[#0c0418] p-2.5 rounded-xl border border-[#2a134e] flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="text-[9px] uppercase font-bold text-purple-300/60 block">Login Username / Email</span>
-                        <code className="font-mono font-bold text-white text-xs truncate block">{credentials.accountEmail}</code>
-                      </div>
-                      <button
-                        onClick={handleCopyEmail}
-                        className="p-1 text-purple-300 hover:text-white bg-[#1a0c33] rounded-lg border border-[#30165c] transition cursor-pointer shrink-0"
-                        title="Copy Username"
-                      >
-                        {copiedEmail ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  )}
-
-                  {credentials.accountPassword && (
-                    <div className="bg-[#0c0418] p-2.5 rounded-xl border border-[#2a134e] flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="text-[9px] uppercase font-bold text-purple-300/60 block">Account Password</span>
-                        <code className="font-mono font-bold text-white text-xs truncate block">
-                          {showPassword ? credentials.accountPassword : '••••••••••••'}
-                        </code>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="p-1 text-purple-300 hover:text-white bg-[#1a0c33] rounded-lg border border-[#30165c] transition cursor-pointer"
-                          title={showPassword ? 'Hide' : 'Show'}
-                        >
-                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                        <button
-                          onClick={handleCopyPassword}
-                          className="p-1 text-purple-300 hover:text-white bg-[#1a0c33] rounded-lg border border-[#30165c] transition cursor-pointer"
-                          title="Copy Password"
-                        >
-                          {copiedPassword ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {credentials.twoFactorSecretKey && (
-                    <div className="bg-[#0c0418] p-2.5 rounded-xl border border-amber-500/30 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="text-[9px] uppercase font-bold text-amber-300/90 block">2FA Authenticator Secret Key</span>
-                        <code className="font-mono font-bold text-amber-200 text-xs truncate block">{credentials.twoFactorSecretKey}</code>
-                      </div>
-                      <button
-                        onClick={handleCopySecretKey}
-                        className="p-1 text-amber-300 hover:text-white bg-[#251342] rounded-lg border border-[#442173] transition cursor-pointer shrink-0"
-                        title="Copy 2FA Secret Key"
-                      >
-                        {copiedSecretKey ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  )}
-
-                  {(credentials.twoFactorBackupCodes || credentials.backupCodes) && (
-                    <div className="bg-[#0c0418] p-2.5 rounded-xl border border-purple-500/30 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] uppercase font-bold text-purple-300/60 block">2FA Backup Codes</span>
-                        <button
-                          onClick={handleCopyBackupCodes}
-                          className="p-1 text-purple-300 hover:text-white bg-[#1a0c33] rounded-lg border border-[#30165c] transition cursor-pointer shrink-0"
-                          title="Copy 2FA Backup Codes"
-                        >
-                          {copiedBackupCodes ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                      <p className="font-mono text-purple-200 text-[11px] break-all">{credentials.twoFactorBackupCodes || credentials.backupCodes}</p>
-                    </div>
-                  )}
-                </div>
+              <div className="pt-2">
+                <AccountCredentialsCard
+                  email={credentials.accountEmail || ''}
+                  password={credentials.accountPassword || ''}
+                  recoveryInfo={credentials.twoFactorSecretKey || credentials.twoFactorBackupCodes || credentials.backupCodes || credentials.recoveryInfo || ''}
+                  instructions={credentials.additionalInstructions || ''}
+                />
               </div>
             )}
 

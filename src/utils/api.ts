@@ -210,5 +210,162 @@ export const safeApiFetch = async (path: string, options: RequestInit = {}): Pro
   }
 };
 
+/**
+ * Known invalid strings that must never be treated as OTP codes
+ */
+const INVALID_OTP_PATTERNS = [
+  'unauthorized',
+  'forbidden',
+  'invalid',
+  'error',
+  'failed',
+  'status',
+  'pending',
+  'waiting',
+  'wait',
+  'expired',
+  'cancelled',
+  'canceled',
+  'null',
+  'undefined',
+  'unknown',
+  'no_activation',
+  'bad_key',
+  'bad_action',
+  'no_numbers',
+  'access_denied',
+  'true',
+  'false',
+  'ok',
+  'success',
+  'none'
+];
+
+export const isInvalidOtpCode = (val: any): boolean => {
+  if (!val) return true;
+  const str = String(val).trim().toLowerCase();
+  if (!str) return true;
+  if (INVALID_OTP_PATTERNS.includes(str)) return true;
+  if (str.length < 3 || str.length > 12) return true;
+  if (/^[a-z_\s\-]+$/i.test(str)) return true;
+  return false;
+};
+
+export const isValidOtpCode = (val: any): boolean => {
+  if (!val) return false;
+  if (isInvalidOtpCode(val)) return false;
+  const str = String(val).trim();
+  // Valid OTP must contain at least 3 digits
+  const digitCount = (str.match(/\d/g) || []).length;
+  return digitCount >= 3;
+};
+
+export interface ResolvedCountryInfo {
+  id: string;
+  name: string;
+  code: string;
+  flag: string;
+  displayName: string;
+}
+
+export const resolveCountryInfo = (
+  countryIdentifier?: string | null,
+  phoneNumber?: string | null,
+  dialCodeFallback?: string | null
+): ResolvedCountryInfo => {
+  const cleanPhone = (phoneNumber || '').replace(/[^\d+]/g, '');
+
+  if (cleanPhone.startsWith('+1') || (cleanPhone.startsWith('1') && cleanPhone.length === 11)) {
+    return { id: 'US', name: 'United States', code: '+1', flag: '🇺🇸', displayName: '🇺🇸 United States (+1)' };
+  }
+  if (cleanPhone.startsWith('+44') || cleanPhone.startsWith('44')) {
+    return { id: 'GB', name: 'United Kingdom', code: '+44', flag: '🇬🇧', displayName: '🇬🇧 United Kingdom (+44)' };
+  }
+  if (cleanPhone.startsWith('+234') || cleanPhone.startsWith('234')) {
+    return { id: 'NG', name: 'Nigeria', code: '+234', flag: '🇳🇬', displayName: '🇳🇬 Nigeria (+234)' };
+  }
+  if (cleanPhone.startsWith('+7') || cleanPhone.startsWith('7')) {
+    return { id: 'RU', name: 'Russia', code: '+7', flag: '🇷🇺', displayName: '🇷🇺 Russia (+7)' };
+  }
+  if (cleanPhone.startsWith('+91') || cleanPhone.startsWith('91')) {
+    return { id: 'IN', name: 'India', code: '+91', flag: '🇮🇳', displayName: '🇮🇳 India (+91)' };
+  }
+  if (cleanPhone.startsWith('+55') || cleanPhone.startsWith('55')) {
+    return { id: 'BR', name: 'Brazil', code: '+55', flag: '🇧🇷', displayName: '🇧🇷 Brazil (+55)' };
+  }
+  if (cleanPhone.startsWith('+62') || cleanPhone.startsWith('62')) {
+    return { id: 'ID', name: 'Indonesia', code: '+62', flag: '🇮🇩', displayName: '🇮🇩 Indonesia (+62)' };
+  }
+  if (cleanPhone.startsWith('+63') || cleanPhone.startsWith('63')) {
+    return { id: 'PH', name: 'Philippines', code: '+63', flag: '🇵🇭', displayName: '🇵🇭 Philippines (+63)' };
+  }
+  if (cleanPhone.startsWith('+254') || cleanPhone.startsWith('254')) {
+    return { id: 'KE', name: 'Kenya', code: '+254', flag: '🇰🇪', displayName: '🇰🇪 Kenya (+254)' };
+  }
+  if (cleanPhone.startsWith('+27') || cleanPhone.startsWith('27')) {
+    return { id: 'ZA', name: 'South Africa', code: '+27', flag: '🇿🇦', displayName: '🇿🇦 South Africa (+27)' };
+  }
+  if (cleanPhone.startsWith('+49') || cleanPhone.startsWith('49')) {
+    return { id: 'DE', name: 'Germany', code: '+49', flag: '🇩🇪', displayName: '🇩🇪 Germany (+49)' };
+  }
+  if (cleanPhone.startsWith('+33') || cleanPhone.startsWith('33')) {
+    return { id: 'FR', name: 'France', code: '+33', flag: '🇫🇷', displayName: '🇫🇷 France (+33)' };
+  }
+  if (cleanPhone.startsWith('+380') || cleanPhone.startsWith('380')) {
+    return { id: 'UA', name: 'Ukraine', code: '+380', flag: '🇺🇦', displayName: '🇺🇦 Ukraine (+380)' };
+  }
+  if (cleanPhone.startsWith('+84') || cleanPhone.startsWith('84')) {
+    return { id: 'VN', name: 'Vietnam', code: '+84', flag: '🇻🇳', displayName: '🇻🇳 Vietnam (+84)' };
+  }
+  if (cleanPhone.startsWith('+60') || cleanPhone.startsWith('60')) {
+    return { id: 'MY', name: 'Malaysia', code: '+60', flag: '🇲🇾', displayName: '🇲🇾 Malaysia (+60)' };
+  }
+  if (cleanPhone.startsWith('+65') || cleanPhone.startsWith('65')) {
+    return { id: 'SG', name: 'Singapore', code: '+65', flag: '🇸🇬', displayName: '🇸🇬 Singapore (+65)' };
+  }
+
+  const raw = String(countryIdentifier || '').trim().toLowerCase();
+  if (raw === 'us' || raw === 'usa' || raw === 'united states' || raw === '187' || raw === '1') {
+    return { id: 'US', name: 'United States', code: '+1', flag: '🇺🇸', displayName: '🇺🇸 United States (+1)' };
+  }
+  if (raw === 'gb' || raw === 'uk' || raw === 'england' || raw === 'united kingdom' || raw === '16' || raw === '44') {
+    return { id: 'GB', name: 'United Kingdom', code: '+44', flag: '🇬🇧', displayName: '🇬🇧 United Kingdom (+44)' };
+  }
+  if (raw === 'ng' || raw === 'nigeria' || raw === '19' || raw === '234') {
+    return { id: 'NG', name: 'Nigeria', code: '+234', flag: '🇳🇬', displayName: '🇳🇬 Nigeria (+234)' };
+  }
+  if (raw === 'ru' || raw === 'russia' || raw === '0' || raw === '7') {
+    return { id: 'RU', name: 'Russia', code: '+7', flag: '🇷🇺', displayName: '🇷🇺 Russia (+7)' };
+  }
+  if (raw === 'in' || raw === 'india' || raw === '22' || raw === '91') {
+    return { id: 'IN', name: 'India', code: '+91', flag: '🇮🇳', displayName: '🇮🇳 India (+91)' };
+  }
+  if (raw === 'br' || raw === 'brazil' || raw === '73' || raw === '55') {
+    return { id: 'BR', name: 'Brazil', code: '+55', flag: '🇧🇷', displayName: '🇧🇷 Brazil (+55)' };
+  }
+  if (raw === 'id' || raw === 'indonesia' || raw === '6' || raw === '62') {
+    return { id: 'ID', name: 'Indonesia', code: '+62', flag: '🇮🇩', displayName: '🇮🇩 Indonesia (+62)' };
+  }
+  if (raw === 'ke' || raw === 'kenya' || raw === '8' || raw === '254') {
+    return { id: 'KE', name: 'Kenya', code: '+254', flag: '🇰🇪', displayName: '🇰🇪 Kenya (+254)' };
+  }
+  if (raw === 'za' || raw === 'south africa' || raw === '31' || raw === '27') {
+    return { id: 'ZA', name: 'South Africa', code: '+27', flag: '🇿🇦', displayName: '🇿🇦 South Africa (+27)' };
+  }
+  if (raw === 'ph' || raw === 'philippines' || raw === '4' || raw === '63') {
+    return { id: 'PH', name: 'Philippines', code: '+63', flag: '🇵🇭', displayName: '🇵🇭 Philippines (+63)' };
+  }
+
+  const fallbackName = countryIdentifier || 'International';
+  const dial = dialCodeFallback || '';
+  return {
+    id: countryIdentifier || 'INT',
+    name: fallbackName,
+    code: dial,
+    flag: '🌐',
+    displayName: dial ? `🌐 ${fallbackName} (${dial})` : `🌐 ${fallbackName}`
+  };
+};
+
 
 

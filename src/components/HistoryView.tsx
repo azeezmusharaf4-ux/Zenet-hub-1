@@ -26,6 +26,8 @@ import {
 import { PurchaseRecord, UserProfile, ActiveAppView } from '../types';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { isValidOtpCode, resolveCountryInfo } from '../utils/api';
+import AccountCredentialsCard from './AccountCredentialsCard';
 
 export type HistoryCategory = 'number' | 'log' | 'boost' | 'update';
 
@@ -374,9 +376,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           ) : (
             <div className="space-y-3">
               {filtered.map((item) => {
-                const isWaiting = item.status === 'WAITING' || item.status === 'waiting_for_sms' || (!item.smsCode && item.status !== 'CANCELLED');
-                const isCancelled = item.status === 'CANCELLED' || item.status === 'cancelled' || item.status === 'expired';
-                const hasCode = Boolean(item.smsCode);
+                const isCancelled = item.status === 'CANCELLED' || item.status === 'cancelled' || item.status === 'expired' || item.status === 'EXPIRED';
+                const hasCode = isValidOtpCode(item.smsCode);
+                const isWaiting = !hasCode && !isCancelled;
+                const resolvedCountry = resolveCountryInfo(item.country, item.phoneNumber);
 
                 return (
                   <div
@@ -392,11 +395,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-black text-sm text-[#171329]">{item.service}</h4>
-                            {item.country && (
-                              <span className="text-[10px] font-bold text-[#716B82] bg-[#F1EDF9] px-2 py-0.5 rounded-md">
-                                {item.country}
-                              </span>
-                            )}
+                            <span className="text-[10px] font-bold text-[#6D28D9] bg-[#F5F3FF] border border-[#DDD6FE] px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <span>{resolvedCountry.flag}</span>
+                              <span>{resolvedCountry.displayName}</span>
+                            </span>
                           </div>
                           <span className="text-[11px] text-[#716B82]">
                             {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -408,14 +410,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                         <span className="font-black text-sm text-[#171329] block">
                           ₦{Number(item.price || 0).toLocaleString()}
                         </span>
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase ${
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                           hasCode
                             ? 'bg-emerald-100 text-emerald-800'
                             : isCancelled
                             ? 'bg-rose-100 text-rose-800'
                             : 'bg-amber-100 text-amber-800 animate-pulse'
                         }`}>
-                          {hasCode ? 'Code Received' : isCancelled ? 'Cancelled' : 'Waiting for SMS'}
+                          {hasCode ? 'COMPLETED' : isCancelled ? 'Cancelled' : 'WAITING FOR OTP'}
                         </span>
                       </div>
                     </div>
@@ -452,15 +454,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                       </span>
                       {hasCode ? (
                         <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl">
-                          <span className="font-mono font-black text-lg sm:text-xl text-emerald-700 tracking-widest">
-                            {item.smsCode}
-                          </span>
+                          <div>
+                            <span className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider block mb-0.5">OTP RECEIVED</span>
+                            <span className="font-mono font-black text-lg sm:text-xl text-emerald-700 tracking-widest">
+                              {item.smsCode}
+                            </span>
+                          </div>
                           <button
                             onClick={() => handleCopy(item.smsCode, `${item.id}_code`)}
-                            className={`px-3 py-1 rounded-lg text-xs font-black transition flex items-center gap-1 cursor-pointer ${
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1 cursor-pointer ${
                               copiedKey === `${item.id}_code`
                                 ? 'bg-emerald-600 text-white'
-                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
                             }`}
                           >
                             {copiedKey === `${item.id}_code` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -468,13 +473,21 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                           </button>
                         </div>
                       ) : (
-                        <p className="text-xs text-[#716B82] italic flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" />
-                          <span>Waiting for SMS code... {isCancelled ? '(Cancelled)' : ''}</span>
-                        </p>
+                        <div className="py-1">
+                          <p className="text-xs text-amber-800 font-semibold flex items-center gap-1.5">
+                            {isCancelled ? (
+                              <span className="text-rose-700">Verification session cancelled or expired.</span>
+                            ) : (
+                              <>
+                                <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                                <span>Waiting for the verification code...</span>
+                              </>
+                            )}
+                          </p>
+                        </div>
                       )}
 
-                      {item.smsText && (
+                      {hasCode && item.smsText && (
                         <div className="text-[11px] text-[#475569] bg-white p-2 rounded-xl border border-[#E9E2FA] font-mono mt-1">
                           {item.smsText}
                         </div>
@@ -549,7 +562,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             <div className="space-y-3.5">
               {filtered.map((item) => {
                 const creds = item.digitalProductDetails;
-                const isPwVisible = Boolean(showPasswordMap[item.id]);
 
                 return (
                   <div
@@ -581,98 +593,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
                     {/* Credentials Box */}
                     {creds && (creds.accountEmail || creds.accountPassword || creds.backupCodes || creds.additionalInstructions) ? (
-                      <div className="bg-[#FAF8FE] border border-[#DDD6FE] p-4 rounded-2xl space-y-3">
-                        <div className="flex items-center justify-between border-b border-[#EDE9FE] pb-2">
-                          <span className="text-xs font-black text-[#171329] flex items-center gap-1.5">
-                            <Key className="w-4 h-4 text-[#7C3AED]" />
-                            <span>Revealed Credentials</span>
-                          </span>
-                          <span className="text-[10px] font-extrabold text-[#7C3AED] uppercase">
-                            Instant Delivery
-                          </span>
-                        </div>
-
-                        {/* Email */}
-                        {creds.accountEmail && (
-                          <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-[#E9E2FA]">
-                            <div className="min-w-0 pr-2">
-                              <span className="text-[10px] font-bold text-[#716B82] uppercase block">Login / Email</span>
-                              <span className="font-mono font-bold text-xs sm:text-sm text-[#171329] truncate block">
-                                {creds.accountEmail}
-                              </span>
-                            </div>
-                            <button
-                              onClick={() => handleCopy(creds.accountEmail || '', `${item.id}_email`)}
-                              className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0 ${
-                                copiedKey === `${item.id}_email`
-                                  ? 'bg-emerald-600 text-white'
-                                  : 'bg-[#EDE9FE] hover:bg-[#DDD6FE] text-[#7C3AED]'
-                              }`}
-                            >
-                              {copiedKey === `${item.id}_email` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedKey === `${item.id}_email` ? 'Copied' : 'Copy'}</span>
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Password */}
-                        {creds.accountPassword && (
-                          <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-[#E9E2FA]">
-                            <div className="min-w-0 pr-2">
-                              <span className="text-[10px] font-bold text-[#716B82] uppercase block">Password</span>
-                              <span className="font-mono font-bold text-xs sm:text-sm text-[#171329] truncate block">
-                                {isPwVisible ? creds.accountPassword : '••••••••••••'}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                onClick={() => togglePasswordVisibility(item.id)}
-                                className="p-1.5 text-[#716B82] hover:text-[#171329] bg-white border border-[#E9E2FA] rounded-lg transition cursor-pointer"
-                                title={isPwVisible ? 'Hide Password' : 'Show Password'}
-                              >
-                                {isPwVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </button>
-                              <button
-                                onClick={() => handleCopy(creds.accountPassword || '', `${item.id}_pw`)}
-                                className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
-                                  copiedKey === `${item.id}_pw`
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'bg-[#EDE9FE] hover:bg-[#DDD6FE] text-[#7C3AED]'
-                                }`}
-                              >
-                                {copiedKey === `${item.id}_pw` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedKey === `${item.id}_pw` ? 'Copied' : 'Copy'}</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Backup codes or 2FA */}
-                        {creds.backupCodes && (
-                          <div className="bg-white p-2.5 rounded-xl border border-[#E9E2FA] space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-[#716B82] uppercase block">Backup Codes / 2FA Secret</span>
-                              <button
-                                onClick={() => handleCopy(creds.backupCodes || '', `${item.id}_codes`)}
-                                className="text-[10px] font-bold text-[#7C3AED] hover:underline flex items-center gap-1 cursor-pointer"
-                              >
-                                {copiedKey === `${item.id}_codes` ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedKey === `${item.id}_codes` ? 'Copied' : 'Copy Codes'}</span>
-                              </button>
-                            </div>
-                            <p className="font-mono text-xs text-[#171329] bg-[#FAF8FE] p-2 rounded-lg break-all">
-                              {creds.backupCodes}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Additional Instructions */}
-                        {creds.additionalInstructions && (
-                          <div className="text-xs text-[#475569] bg-white p-2.5 rounded-xl border border-[#E9E2FA]">
-                            <span className="text-[10px] font-bold text-[#716B82] uppercase block mb-1">Seller Transfer Notes</span>
-                            <p className="whitespace-pre-line text-[11px] leading-relaxed">{creds.additionalInstructions}</p>
-                          </div>
-                        )}
+                      <div className="pt-1">
+                        <AccountCredentialsCard
+                          email={creds.accountEmail || ''}
+                          password={creds.accountPassword || ''}
+                          recoveryInfo={creds.twoFactorSecretKey || creds.twoFactorBackupCodes || creds.backupCodes || creds.recoveryInfo || ''}
+                          instructions={creds.additionalInstructions || ''}
+                        />
                       </div>
                     ) : (
                       <div className="bg-[#FAF8FE] p-3 rounded-2xl text-xs text-[#716B82] flex items-center gap-2">

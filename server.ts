@@ -1809,6 +1809,178 @@ function normalizeCountryEntry(rawId: string, rawName?: string, rawCode?: string
   };
 }
 
+// Validates whether a candidate code is an error message or non-OTP string
+function isInvalidOtpCode(val?: string | null): boolean {
+  if (!val) return true;
+  const s = String(val).trim().toLowerCase();
+  if (s.length === 0) return true;
+
+  const invalidTokens = [
+    'unauthorized',
+    'error',
+    'failed',
+    'failure',
+    'cancelled',
+    'canceled',
+    'expired',
+    'not_found',
+    'not found',
+    'waiting',
+    'pending',
+    'waiting_for_sms',
+    'status_wait_code',
+    'status_cancel',
+    'access_denied',
+    'bad_request',
+    'timeout',
+    'unknown',
+    'invalid',
+    'invalid_key',
+    'forbidden',
+    '401',
+    '403',
+    '500',
+    '502',
+    '503',
+    '504',
+    'null',
+    'undefined',
+    'none',
+    'true',
+    'false',
+    'ok',
+    'success'
+  ];
+
+  if (invalidTokens.includes(s)) return true;
+  if (s.includes('unauthorized') || s.includes('auth') || s.includes('forbidden')) return true;
+  if (s.startsWith('status_') || s.startsWith('error_')) return true;
+  return false;
+}
+
+// Validates whether a code is a genuine carrier verification code
+function isValidOtpCode(val?: string | null): boolean {
+  if (!val) return false;
+  if (isInvalidOtpCode(val)) return false;
+  const clean = String(val).trim();
+  return clean.length >= 3 && clean.length <= 12;
+}
+
+// Resolves accurate country metadata using phone number prefix as gold standard
+function resolveCountryDetails(countryIdOrName?: string, phoneNumber?: string): { id: string; name: string; code: string; flag: string } {
+  if (phoneNumber) {
+    const clean = String(phoneNumber).replace(/[^\d+]/g, '');
+    const digits = clean.startsWith('+') ? clean.slice(1) : clean;
+
+    if (digits.startsWith('1') && digits.length >= 11) {
+      return { id: 'US', name: 'United States', code: '+1', flag: '🇺🇸' };
+    }
+    if (digits.startsWith('44')) {
+      return { id: 'GB', name: 'United Kingdom', code: '+44', flag: '🇬🇧' };
+    }
+    if (digits.startsWith('234')) {
+      return { id: 'NG', name: 'Nigeria', code: '+234', flag: '🇳🇬' };
+    }
+    if (digits.startsWith('233')) {
+      return { id: 'GH', name: 'Ghana', code: '+233', flag: '🇬🇭' };
+    }
+    if (digits.startsWith('254')) {
+      return { id: 'KE', name: 'Kenya', code: '+254', flag: '🇰🇪' };
+    }
+    if (digits.startsWith('27')) {
+      return { id: 'ZA', name: 'South Africa', code: '+27', flag: '🇿🇦' };
+    }
+    if (digits.startsWith('49')) {
+      return { id: 'DE', name: 'Germany', code: '+49', flag: '🇩🇪' };
+    }
+    if (digits.startsWith('33')) {
+      return { id: 'FR', name: 'France', code: '+33', flag: '🇫🇷' };
+    }
+    if (digits.startsWith('91')) {
+      return { id: 'IN', name: 'India', code: '+91', flag: '🇮🇳' };
+    }
+    if (digits.startsWith('55')) {
+      return { id: 'BR', name: 'Brazil', code: '+55', flag: '🇧🇷' };
+    }
+    if (digits.startsWith('61')) {
+      return { id: 'AU', name: 'Australia', code: '+61', flag: '🇦🇺' };
+    }
+    if (digits.startsWith('31')) {
+      return { id: 'NL', name: 'Netherlands', code: '+31', flag: '🇳🇱' };
+    }
+    if (digits.startsWith('380')) {
+      return { id: 'UA', name: 'Ukraine', code: '+380', flag: '🇺🇦' };
+    }
+    if (digits.startsWith('48')) {
+      return { id: 'PL', name: 'Poland', code: '+48', flag: '🇵🇱' };
+    }
+    if (digits.startsWith('62')) {
+      return { id: 'ID', name: 'Indonesia', code: '+62', flag: '🇮🇩' };
+    }
+    if (digits.startsWith('63')) {
+      return { id: 'PH', name: 'Philippines', code: '+63', flag: '🇵🇭' };
+    }
+    if (digits.startsWith('84')) {
+      return { id: 'VN', name: 'Vietnam', code: '+84', flag: '🇻🇳' };
+    }
+    if (digits.startsWith('60')) {
+      return { id: 'MY', name: 'Malaysia', code: '+60', flag: '🇲🇾' };
+    }
+    if (digits.startsWith('7')) {
+      return { id: 'RU', name: 'Russia', code: '+7', flag: '🇷🇺' };
+    }
+  }
+
+  const c = String(countryIdOrName || '').toLowerCase().trim();
+  if (c === '187' || c === 'us' || c === 'usa' || c === '1' || c.includes('united states') || c === 'america') {
+    return { id: 'US', name: 'United States', code: '+1', flag: '🇺🇸' };
+  }
+  if (c === 'gb' || c === 'uk' || c === 'england' || c.includes('united kingdom') || c.includes('england') || c === '2' || c === '16') {
+    return { id: 'GB', name: 'United Kingdom', code: '+44', flag: '🇬🇧' };
+  }
+  if (c === 'ng' || c.includes('nigeria') || c === '14') {
+    return { id: 'NG', name: 'Nigeria', code: '+234', flag: '🇳🇬' };
+  }
+  if (c === 'ca' || c.includes('canada') || c === '36') {
+    return { id: 'CA', name: 'Canada', code: '+1', flag: '🇨🇦' };
+  }
+  if (c === 'gh' || c.includes('ghana') || c === '42') {
+    return { id: 'GH', name: 'Ghana', code: '+233', flag: '🇬🇭' };
+  }
+  if (c === 'za' || c.includes('south africa') || c === '153') {
+    return { id: 'ZA', name: 'South Africa', code: '+27', flag: '🇿🇦' };
+  }
+  if (c === 'de' || c.includes('germany') || c === '43') {
+    return { id: 'DE', name: 'Germany', code: '+49', flag: '🇩🇪' };
+  }
+  if (c === 'fr' || c.includes('france') || c === '78') {
+    return { id: 'FR', name: 'France', code: '+33', flag: '🇫🇷' };
+  }
+  if (c === 'in' || c.includes('india') || c === '22') {
+    return { id: 'IN', name: 'India', code: '+91', flag: '🇮🇳' };
+  }
+  if (c === 'br' || c.includes('brazil') || c === '73') {
+    return { id: 'BR', name: 'Brazil', code: '+55', flag: '🇧🇷' };
+  }
+  if (c === 'au' || c.includes('australia')) {
+    return { id: 'AU', name: 'Australia', code: '+61', flag: '🇦🇺' };
+  }
+  if (c === 'ke' || c.includes('kenya') || c === '8') {
+    return { id: 'KE', name: 'Kenya', code: '+254', flag: '🇰🇪' };
+  }
+  if (c === 'nl' || c.includes('netherlands') || c === '48') {
+    return { id: 'NL', name: 'Netherlands', code: '+31', flag: '🇳🇱' };
+  }
+
+  const titleName = countryIdOrName ? countryIdOrName.charAt(0).toUpperCase() + countryIdOrName.slice(1) : 'International';
+  return {
+    id: countryIdOrName || 'INT',
+    name: titleName,
+    code: '',
+    flag: '🌐'
+  };
+}
+
 // Generate multiple buying price options from ONE provider cost
 function generateVirtualNumberPriceOptions(
   providerCost: number,
@@ -2096,16 +2268,43 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           });
         }
 
+        if (resp.status === 401 || resp.status === 403) {
+          console.warn(`[OneGridHub Query] Upstream returned HTTP ${resp.status} Unauthorized for "${endpoint}".`);
+          return {
+            status: 'error',
+            isApiError: true,
+            httpStatus: resp.status,
+            error: 'Provider API authentication failed (unauthorized). Please verify the provider API key.',
+            message: 'Provider API authentication failed (unauthorized).'
+          };
+        }
+
         const text = await resp.text();
         if (!text || text.trim() === '') return null;
 
         const trimmed = text.trim();
+        const lowerTrimmed = trimmed.toLowerCase();
+
+        // Catch raw unauthorized or error responses
+        if (lowerTrimmed === 'unauthorized' || lowerTrimmed.includes('unauthorized') || lowerTrimmed.includes('invalid_api_key')) {
+          return {
+            status: 'error',
+            isApiError: true,
+            httpStatus: 401,
+            error: 'Provider API authentication failed (unauthorized).',
+            message: 'Provider API authentication failed (unauthorized).'
+          };
+        }
+
         if (trimmed.startsWith('ACCESS_NUMBER:') || trimmed.startsWith('STATUS_') || trimmed.startsWith('ACCESS_BALANCE:')) {
           return { rawText: trimmed };
         }
 
         try {
           const parsed = JSON.parse(trimmed);
+          if (parsed && (parsed.status === 'error' || parsed.error || parsed.code === 'unauthorized' || String(parsed.message || '').toLowerCase().includes('unauthorized'))) {
+            parsed.isApiError = true;
+          }
           return parsed;
         } catch {
           return { rawText: trimmed };
@@ -2502,11 +2701,27 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           return res.status(403).json({ success: false, error: 'Forbidden: You do not have permission to access this order.' });
         }
 
-        // Return immediately if already finished or cancelled
-        if (orderData.status === 'sms_received' || orderData.status === 'SMS_RECEIVED' || orderData.status === 'completed') {
+        // Clean up any corrupt historical code (e.g. "unauthorized" mistakenly stored as OTP)
+        if (isInvalidOtpCode(orderData.code)) {
+          if (orderData.code) {
+            orderData.code = '';
+            if (orderData.status === 'sms_received' || orderData.status === 'SMS_RECEIVED') {
+              orderData.status = 'waiting_for_sms';
+            }
+            try {
+              await updateDoc(orderRef, { code: '', status: orderData.status, updatedAt: new Date().toISOString() });
+            } catch (cleanErr) {
+              console.warn('[OneGridHub Status] Error cleaning corrupt code on doc:', cleanErr);
+            }
+          }
+        }
+
+        // Return immediately if genuine OTP code has already been received
+        if (isValidOtpCode(orderData.code) && (orderData.status === 'sms_received' || orderData.status === 'SMS_RECEIVED' || orderData.status === 'completed')) {
           return res.json(orderData);
         }
 
+        // Return immediately if cancelled or expired
         if (orderData.status === 'cancelled' || orderData.status === 'CANCELLED' || orderData.status === 'expired' || orderData.status === 'EXPIRED') {
           return res.json(orderData);
         }
@@ -2581,44 +2796,63 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           });
 
           if (statusResp) {
-            // Check raw text response: e.g. STATUS_OK:123456 or STATUS_WAIT_CODE or STATUS_CANCEL
+            // 1. Upstream authentication or API error: Do NOT treat as OTP or complete
+            if (statusResp.isApiError || statusResp.status === 'error' || statusResp.code === 'unauthorized') {
+              const apiErrMsg = statusResp.error || statusResp.message || 'Provider API authorization failure';
+              console.warn(`[OneGridHub Status] Provider API error for order ${orderId}: ${apiErrMsg}`);
+              return res.json({
+                ...orderData,
+                status: orderData.status || 'waiting_for_sms',
+                code: '',
+                isApiError: true,
+                apiError: apiErrMsg
+              });
+            }
+
+            // 2. Check raw text response: e.g. STATUS_OK:123456 or STATUS_WAIT_CODE or STATUS_CANCEL
             if (statusResp.rawText) {
               const raw = statusResp.rawText.trim();
               if (raw.startsWith('STATUS_OK:')) {
-                const code = raw.substring('STATUS_OK:'.length).trim();
-                const updated = {
-                  status: 'sms_received',
-                  code,
-                  smsText: `Your verification code is ${code}`,
-                  updatedAt: new Date().toISOString()
-                };
-                await updateDoc(orderRef, updated);
-                console.log(`[OneGridHub Status] Received real SMS OTP for order ${orderId}: ${code}`);
-                return res.json({ ...orderData, ...updated });
+                const candidateCode = raw.substring('STATUS_OK:'.length).trim();
+                if (isValidOtpCode(candidateCode)) {
+                  const updated = {
+                    status: 'sms_received',
+                    code: candidateCode,
+                    smsText: `Your verification code is ${candidateCode}`,
+                    updatedAt: new Date().toISOString()
+                  };
+                  await updateDoc(orderRef, updated);
+                  console.log(`[OneGridHub Status] Received real SMS OTP for order ${orderId}: ${candidateCode}`);
+                  return res.json({ ...orderData, ...updated });
+                }
               } else if (raw === 'STATUS_CANCEL') {
                 const updated = { status: 'cancelled', updatedAt: new Date().toISOString() };
                 await updateDoc(orderRef, updated);
                 return res.json({ ...orderData, ...updated });
+              } else if (raw === 'STATUS_WAIT_CODE') {
+                return res.json({
+                  ...orderData,
+                  status: 'waiting_for_sms',
+                  code: ''
+                });
               }
             }
 
-            // Check JSON response: e.g. { status: 'success', code: '123456', sms: '...' }
+            // 3. Check JSON response: ONLY accept genuine, validated OTP codes
             const statusUpper = (statusResp.status || statusResp.state || '').toString().toUpperCase();
-            const code = (statusResp.code || statusResp.otp || statusResp.sms_code || '').toString();
-            const smsText = (statusResp.sms || statusResp.smsText || statusResp.text || statusResp.message || (code ? `Your verification code is ${code}` : '')).toString();
+            const candidateCode = (statusResp.otp || statusResp.sms_code || statusResp.smsCode || (!statusResp.isApiError && statusUpper !== 'ERROR' && statusResp.code !== 'unauthorized' ? statusResp.code : '') || '').toString().trim();
 
-            if (code || statusUpper === 'SMS_RECEIVED' || statusUpper === 'STATUS_OK' || statusUpper === 'SUCCESS' || statusUpper === 'COMPLETED') {
-              if (code) {
-                const updated = {
-                  status: 'sms_received',
-                  code,
-                  smsText: smsText || `Your verification code is ${code}`,
-                  updatedAt: new Date().toISOString()
-                };
-                await updateDoc(orderRef, updated);
-                console.log(`[OneGridHub Status] Real SMS delivered for order ${orderId}: ${code}`);
-                return res.json({ ...orderData, ...updated });
-              }
+            if (isValidOtpCode(candidateCode)) {
+              const smsText = (statusResp.sms || statusResp.smsText || statusResp.text || `Your verification code is ${candidateCode}`).toString();
+              const updated = {
+                status: 'sms_received',
+                code: candidateCode,
+                smsText,
+                updatedAt: new Date().toISOString()
+              };
+              await updateDoc(orderRef, updated);
+              console.log(`[OneGridHub Status] Real SMS delivered for order ${orderId}: ${candidateCode}`);
+              return res.json({ ...orderData, ...updated });
             } else if (statusUpper === 'CANCELLED' || statusResp.code === 'cancelled') {
               const updated = { status: 'cancelled', updatedAt: new Date().toISOString() };
               await updateDoc(orderRef, updated);
@@ -2631,8 +2865,12 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           }
         }
 
-        // Return current waiting state
-        return res.json(orderData);
+        // Return current waiting state with clean empty code if no real OTP has arrived
+        return res.json({
+          ...orderData,
+          status: orderData.status || 'waiting_for_sms',
+          code: isValidOtpCode(orderData.code) ? orderData.code : ''
+        });
       }
 
       // 2f. USER ORDERS HISTORY
@@ -2648,7 +2886,23 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
         const qSnap = await getDocs(q);
         const ordersList: any[] = [];
         qSnap.forEach(docSnap => {
-          const raw = docSnap.data();
+          const raw = { ...docSnap.data() };
+
+          // Sanitize candidate OTP code - never expose "unauthorized" or error text as code
+          if (isInvalidOtpCode(raw.code)) {
+            raw.code = '';
+            if (raw.status === 'sms_received' || raw.status === 'SMS_RECEIVED') {
+              raw.status = 'waiting_for_sms';
+            }
+          }
+
+          // Resolve accurate country based on actual phone number prefix
+          const resolved = resolveCountryDetails(raw.country, raw.phoneNumber);
+          raw.country = resolved.id;
+          raw.countryName = resolved.name;
+          raw.countryCode = resolved.code;
+          raw.countryFlag = resolved.flag;
+
           if (isOwner) {
             ordersList.push(raw);
           } else {
@@ -2829,16 +3083,22 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           }
 
           // 5. Save order to Firestore with all audit fields
+          const resolvedCountry = resolveCountryDetails(country, phoneNumber);
+          const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+
           const orderData = {
             orderId,
             providerActivationId: providerActivationId || orderId,
             userId: authUid,
             userEmail,
             server,
-            country,
+            country: resolvedCountry.id,
+            countryName: resolvedCountry.name,
+            countryCode: resolvedCountry.code,
+            countryFlag: resolvedCountry.flag,
             service,
             tierName: chosenTierName,
-            phoneNumber,
+            phoneNumber: formattedPhone,
             status: 'waiting_for_sms',
             price: customerPrice,
             customerPrice,

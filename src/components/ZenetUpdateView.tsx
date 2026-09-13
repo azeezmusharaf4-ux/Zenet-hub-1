@@ -530,34 +530,34 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
   };
 
   return (
-    <div id="zened-update-section" className="w-full max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 pb-16">
+    <div id="zened-update-section" className="w-full max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 pb-16 text-slate-800">
       
       {/* 1. Header Navigation Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#2b165c]/60">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToMarketplace}
-            className="flex items-center gap-2 text-purple-200 hover:text-white font-black text-xs transition bg-[#170c30] hover:bg-[#221047] px-4 py-2.5 rounded-xl border border-purple-900/40 cursor-pointer shadow-sm active:scale-95"
+            className="flex items-center gap-2 text-slate-700 hover:text-slate-900 font-bold text-xs transition bg-slate-100 hover:bg-slate-200 px-4 py-2.5 rounded-xl border border-slate-200 cursor-pointer shadow-xs active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Marketplace</span>
           </button>
 
-          <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-purple-950/40 border border-purple-500/20 text-[10px] font-black uppercase tracking-wider text-purple-300">
-            <Sparkles className="w-3 h-3 text-purple-400" />
+          <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-black uppercase tracking-wider text-blue-700">
+            <Sparkles className="w-3 h-3 text-blue-600" />
             <span>Official Digital Catalog</span>
           </div>
         </div>
 
         {/* User Balance & Fund Button */}
         <div className="flex items-center space-x-3 self-end sm:self-auto">
-          <div className="flex items-center space-x-2 bg-[#12082b] border border-[#2b165c] px-3.5 py-1.5 rounded-xl">
-            <span className="text-[10px] font-bold text-purple-300/60 uppercase">Wallet</span>
-            <span className="text-sm font-black text-white font-mono">₦{walletBalance.toLocaleString()}</span>
+          <div className="flex items-center space-x-2 bg-white border border-slate-200 px-3.5 py-1.5 rounded-xl shadow-xs">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">Wallet</span>
+            <span className="text-sm font-black text-slate-900 font-mono">₦{walletBalance.toLocaleString()}</span>
           </div>
           <button
             onClick={onOpenWallet}
-            className="px-3.5 py-1.5 rounded-xl bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white font-black text-xs transition cursor-pointer shadow-md active:scale-95 flex items-center space-x-1.5"
+            className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition cursor-pointer shadow-xs active:scale-95 flex items-center space-x-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Fund</span>
@@ -566,37 +566,36 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
       </div>
 
       {/* 2. Hero Presentation Banner */}
-      <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#1c0d3d] via-[#12082b] to-[#0c051f] border border-[#3b1c78] p-6 sm:p-8 shadow-[0_0_50px_rgba(125,76,247,0.15)]">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-200 p-6 sm:p-8 shadow-xs">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="flex items-center space-x-2">
-              <span className="px-2.5 py-0.5 rounded-md bg-[#7d4cf7]/20 border border-[#7d4cf7]/40 text-[#c8a6ff] text-[10px] font-black uppercase tracking-wider">
+              <span className="px-2.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase tracking-wider">
                 ZENED U UPDATE SYSTEM
               </span>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-black uppercase">
+              <span className="px-2 py-0.5 rounded-md bg-pink-50 border border-pink-200 text-pink-700 text-[10px] font-black uppercase">
                 Instant Auto-Delivery
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
               ZENED U Update Products & Digital Releases
             </h1>
-            <p className="text-xs sm:text-sm text-purple-200/70 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Explore verified software tools, exclusive scripts, private guides, and premium digital updates. Purchased items immediately deliver private credentials, links, and license data to your account.
             </p>
           </div>
 
           {/* Admin Add Button */}
           {isAdmin && (
-            <div className="shrink-0 flex flex-col items-start sm:items-end gap-2 bg-[#1b0d3d]/80 border border-[#4a2496] p-4 rounded-2xl">
-              <div className="flex items-center space-x-2 text-[11px] font-black text-[#c8a6ff]">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <div className="shrink-0 flex flex-col items-start sm:items-end gap-2 bg-slate-50 border border-slate-200 p-4 rounded-2xl">
+              <div className="flex items-center space-x-2 text-[11px] font-black text-blue-700">
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
                 <span>Admin Management Mode</span>
               </div>
               <button
                 id="admin-add-zened-product-btn"
                 onClick={handleOpenAddModal}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs uppercase tracking-wider transition-all duration-200 shadow-lg shadow-emerald-900/30 flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition-all duration-200 shadow-xs flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add New Product</span>
@@ -607,19 +606,19 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
       </div>
 
       {/* 3. Sub-Navigation Tabs: Products vs My Purchased Updates */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#210f3f] pb-3">
-        <div className="flex items-center space-x-2 bg-[#0c051f] p-1.5 rounded-2xl border border-[#210f3f]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="flex items-center space-x-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
           <button
             onClick={() => setActiveTab('marketplace')}
             className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center space-x-2 ${
               activeTab === 'marketplace'
-                ? 'bg-gradient-to-r from-[#7d4cf7] to-[#9e67fa] text-white shadow-md'
-                : 'text-purple-300/70 hover:text-white hover:bg-white/5'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
             <Boxes className="w-4 h-4" />
             <span>Product Catalog</span>
-            <span className="bg-black/30 px-1.5 py-0.5 rounded text-[10px]">{products.length}</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] ${activeTab === 'marketplace' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>{products.length}</span>
           </button>
 
           <button
@@ -632,14 +631,14 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
             }}
             className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center space-x-2 ${
               activeTab === 'my-orders'
-                ? 'bg-gradient-to-r from-[#7d4cf7] to-[#9e67fa] text-white shadow-md'
-                : 'text-purple-300/70 hover:text-white hover:bg-white/5'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
           >
             <ShoppingBag className="w-4 h-4" />
             <span>My Purchased Updates</span>
             {user && (
-              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded text-[10px]">
+              <span className={`px-1.5 py-0.5 rounded text-[10px] ${activeTab === 'my-orders' ? 'bg-white/20 text-white' : 'bg-pink-50 text-pink-700 border border-pink-200'}`}>
                 {myOrders.length}
               </span>
             )}
@@ -649,18 +648,18 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
         {/* Search Bar */}
         {activeTab === 'marketplace' && (
           <div className="relative flex-1 max-w-xs min-w-[220px]">
-            <Search className="w-4 h-4 text-purple-400/60 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search products, tools, guides..."
-              className="w-full bg-[#0c051f] border border-[#210f3f] focus:border-[#7d4cf7] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-purple-300/40 focus:outline-none transition"
+              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition shadow-xs"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-purple-400 hover:text-white text-xs"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -680,8 +679,8 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer border ${
                   isSelected
-                    ? 'bg-[#7d4cf7]/25 text-[#d8baff] border-[#7d4cf7] shadow-sm'
-                    : 'bg-[#0c051f] text-purple-300/60 border-[#210f3f] hover:border-purple-800/60 hover:text-purple-200'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'
                 }`}
               >
                 {cat}
@@ -699,25 +698,25 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
               {[1, 2, 3].map((n) => (
                 <div
                   key={n}
-                  className="h-96 rounded-[24px] bg-[#12082b]/80 border border-[#24114f] animate-pulse p-4 flex flex-col justify-between"
+                  className="h-96 rounded-2xl bg-white border border-slate-200 animate-pulse p-4 flex flex-col justify-between"
                 >
-                  <div className="w-full h-48 bg-[#1f0e42] rounded-2xl" />
+                  <div className="w-full h-48 bg-slate-100 rounded-xl" />
                   <div className="space-y-2">
-                    <div className="h-5 bg-[#1f0e42] rounded-lg w-3/4" />
-                    <div className="h-3 bg-[#1f0e42] rounded-lg w-full" />
+                    <div className="h-5 bg-slate-100 rounded-lg w-3/4" />
+                    <div className="h-3 bg-slate-100 rounded-lg w-full" />
                   </div>
-                  <div className="h-10 bg-[#281354] rounded-xl" />
+                  <div className="h-10 bg-slate-100 rounded-xl" />
                 </div>
               ))}
             </div>
           ) : filteredProducts.length === 0 ? (
-            <div className="p-12 text-center rounded-[28px] bg-[#0c051f] border border-[#210f3f] space-y-4 max-w-lg mx-auto my-6">
-              <div className="w-16 h-16 rounded-2xl bg-purple-950/40 border border-purple-500/20 flex items-center justify-center mx-auto text-purple-400">
+            <div className="p-12 text-center rounded-3xl bg-white border border-slate-200 space-y-4 max-w-lg mx-auto my-6 shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center mx-auto text-blue-600">
                 <Package className="w-8 h-8" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-lg font-black text-white">No Products Available Yet</h3>
-                <p className="text-xs text-purple-300/60">
+                <h3 className="text-lg font-black text-slate-900">No Products Available Yet</h3>
+                <p className="text-xs text-slate-500">
                   {searchQuery || selectedCategory !== 'All'
                     ? 'No products match your active search or category filters.'
                     : 'The ZENED U Update catalog is being refreshed. Check back shortly!'}
@@ -726,7 +725,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
               {isAdmin && (
                 <button
                   onClick={handleOpenAddModal}
-                  className="px-5 py-2.5 rounded-xl bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white font-black text-xs uppercase tracking-wider transition cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-xs"
                 >
                   + Add First Product
                 </button>
@@ -741,10 +740,10 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                 return (
                   <div
                     key={product.id}
-                    className="group relative flex flex-col justify-between rounded-[26px] bg-[#0f0724] border border-[#24114f] hover:border-[#6032bd] transition-all duration-300 overflow-hidden shadow-lg hover:shadow-[0_0_30px_rgba(125,76,247,0.2)]"
+                    className="group relative flex flex-col justify-between rounded-2xl bg-white border border-slate-200 hover:border-blue-300 transition-all duration-300 overflow-hidden shadow-xs hover:shadow-md"
                   >
                     {/* Top Image Container with Visual Backdrop */}
-                    <div className="relative w-full h-52 sm:h-56 bg-[#170b36] overflow-hidden flex items-center justify-center">
+                    <div className="relative w-full h-52 sm:h-56 bg-slate-100 overflow-hidden flex items-center justify-center">
                       {product.imageUrl ? (
                         <img
                           src={product.imageUrl}
@@ -757,9 +756,9 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                           }}
                         />
                       ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#1f0e42] to-[#0c051f] p-4 text-center">
-                          <Sparkles className="w-10 h-10 text-[#a578ff] mb-2" />
-                          <span className="text-xs font-black text-purple-200/80 uppercase tracking-widest">
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 p-4 text-center">
+                          <Sparkles className="w-10 h-10 text-blue-500 mb-2" />
+                          <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
                             {product.category || 'ZENED UPDATE'}
                           </span>
                         </div>
@@ -767,15 +766,15 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
 
                       {/* Top Badges */}
                       <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                        <span className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 text-white text-[10px] font-black uppercase tracking-wider shadow-md">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-wider shadow-xs">
                           {product.category || 'Update'}
                         </span>
                         {isOutOfStock ? (
-                          <span className="px-2 py-1 rounded-lg bg-red-500/80 backdrop-blur-md text-white text-[10px] font-black uppercase shadow-md">
+                          <span className="px-2 py-1 rounded-lg bg-pink-600 backdrop-blur-md text-white text-[10px] font-black uppercase shadow-xs">
                             Out of Stock
                           </span>
                         ) : (
-                          <span className="px-2 py-1 rounded-lg bg-emerald-500/80 backdrop-blur-md text-white text-[10px] font-black uppercase shadow-md flex items-center space-x-1">
+                          <span className="px-2 py-1 rounded-lg bg-blue-600 backdrop-blur-md text-white text-[10px] font-black uppercase shadow-xs flex items-center space-x-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                             <span>In Stock ({product.stock ?? 'Available'})</span>
                           </span>
@@ -784,13 +783,13 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
 
                       {/* Admin Quick Action Buttons */}
                       {isAdmin && (
-                        <div className="absolute top-3 right-3 flex items-center space-x-1.5 bg-black/70 backdrop-blur-md p-1 rounded-xl border border-white/10 shadow-lg">
+                        <div className="absolute top-3 right-3 flex items-center space-x-1.5 bg-white/90 backdrop-blur-md p-1 rounded-xl border border-slate-200 shadow-sm">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleOpenEditModal(product);
                             }}
-                            className="p-1.5 rounded-lg bg-purple-600/60 hover:bg-purple-600 text-white transition cursor-pointer"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 transition cursor-pointer"
                             title="Edit Product"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
@@ -800,7 +799,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                               e.stopPropagation();
                               handleDeleteProduct(product.id, product.name);
                             }}
-                            className="p-1.5 rounded-lg bg-red-600/60 hover:bg-red-600 text-white transition cursor-pointer"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-pink-50 text-slate-700 hover:text-pink-600 transition cursor-pointer"
                             title="Delete Product"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -808,34 +807,34 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                         </div>
                       )}
 
-                      {/* Bottom Image Gradient Overlay */}
-                      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0f0724] to-transparent pointer-events-none" />
+                      {/* Bottom Gradient Overlay */}
+                      <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/20 to-transparent pointer-events-none" />
                     </div>
 
                     {/* Card Body */}
                     <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                       <div className="space-y-2">
-                        <h3 className="text-base sm:text-lg font-black text-white leading-tight group-hover:text-[#c49aff] transition-colors">
+                        <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors">
                           {product.name}
                         </h3>
-                        <p className="text-xs text-purple-200/70 leading-relaxed line-clamp-3">
+                        <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
                           {product.description}
                         </p>
                       </div>
 
                       {/* Security & Instant Delivery Guarantee Pill */}
-                      <div className="flex items-center space-x-2 text-[10px] font-bold text-emerald-300/80 bg-emerald-950/30 border border-emerald-500/20 px-2.5 py-1.5 rounded-xl">
-                        <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <div className="flex items-center space-x-2 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1.5 rounded-xl">
+                        <Lock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                         <span className="truncate">Secret Delivery Info unlocked upon purchase</span>
                       </div>
 
                       {/* Price and Buy Button */}
-                      <div className="pt-3 border-t border-[#210f3f] flex items-center justify-between gap-3">
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
                         <div className="space-y-0.5">
-                          <span className="text-[10px] font-extrabold text-purple-400/60 uppercase tracking-wider block">
+                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
                             Price
                           </span>
-                          <span className="text-lg sm:text-xl font-black text-white font-mono tracking-tight">
+                          <span className="text-lg sm:text-xl font-black text-slate-900 font-mono tracking-tight">
                             ₦{product.price.toLocaleString()}
                           </span>
                         </div>
@@ -843,10 +842,10 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                         <button
                           disabled={isOutOfStock}
                           onClick={() => handleInitiateBuy(product)}
-                          className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center space-x-1.5 shadow-md active:scale-95 ${
+                          className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center space-x-1.5 shadow-xs active:scale-95 ${
                             isOutOfStock
-                              ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
-                              : 'bg-gradient-to-r from-[#7d4cf7] to-[#a16eff] hover:from-[#8e5ff9] hover:to-[#b080ff] text-white shadow-purple-900/40 hover:shadow-purple-900/60'
+                              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white'
                           }`}
                         >
                           <ShoppingCart className="w-3.5 h-3.5" />
@@ -867,30 +866,30 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <h2 className="text-xl font-black text-white tracking-tight flex items-center space-x-2">
-                <ShoppingBag className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
+                <ShoppingBag className="w-5 h-5 text-blue-600" />
                 <span>My Purchased ZENED U Updates</span>
               </h2>
-              <p className="text-xs text-purple-300/60">
+              <p className="text-xs text-slate-500">
                 All software licenses, secret login instructions, and download packages you have acquired are stored here permanently.
               </p>
             </div>
           </div>
 
           {loadingOrders ? (
-            <div className="p-8 text-center text-purple-300/60 font-medium text-xs">
+            <div className="p-8 text-center text-slate-400 font-medium text-xs">
               Loading your purchased items...
             </div>
           ) : myOrders.length === 0 ? (
-            <div className="p-12 text-center rounded-[24px] bg-[#0c051f] border border-[#210f3f] space-y-3 max-w-md mx-auto my-4">
-              <Package className="w-10 h-10 text-purple-400/40 mx-auto" />
-              <h3 className="text-base font-black text-white">No Purchased Updates Yet</h3>
-              <p className="text-xs text-purple-300/60">
+            <div className="p-12 text-center rounded-3xl bg-white border border-slate-200 space-y-3 max-w-md mx-auto my-4 shadow-xs">
+              <Package className="w-10 h-10 text-slate-300 mx-auto" />
+              <h3 className="text-base font-black text-slate-900">No Purchased Updates Yet</h3>
+              <p className="text-xs text-slate-500">
                 You have not purchased any products from the ZENED U Update catalog yet.
               </p>
               <button
                 onClick={() => setActiveTab('marketplace')}
-                className="px-4 py-2 rounded-xl bg-[#7d4cf7] text-white font-black text-xs transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white font-black text-xs transition cursor-pointer hover:bg-blue-700"
               >
                 Browse Catalog
               </button>
@@ -901,10 +900,10 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                 return (
                   <div
                     key={order.id}
-                    className="p-5 rounded-2xl bg-[#0e0621] border border-[#251252] hover:border-[#4d24a3] transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-md"
+                    className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-blue-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs"
                   >
                     <div className="flex items-start space-x-4">
-                      <div className="w-14 h-14 rounded-2xl bg-[#1b0d3d] border border-[#371973] overflow-hidden shrink-0 flex items-center justify-center text-purple-300">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center text-slate-400">
                         {order.productImage ? (
                           <img
                             src={order.productImage}
@@ -913,22 +912,22 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                             referrerPolicy="no-referrer"
                           />
                         ) : (
-                          <Package className="w-6 h-6 text-[#9e67fa]" />
+                          <Package className="w-6 h-6 text-blue-600" />
                         )}
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center space-x-2 flex-wrap">
-                          <h4 className="font-black text-white text-base">{order.productName}</h4>
-                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-black uppercase">
+                          <h4 className="font-black text-slate-900 text-base">{order.productName}</h4>
+                          <span className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black uppercase">
                             Delivered
                           </span>
                         </div>
-                        <div className="flex items-center space-x-3 text-xs text-purple-300/60 font-mono">
+                        <div className="flex items-center space-x-3 text-xs text-slate-500 font-mono">
                           <span>₦{order.price.toLocaleString()}</span>
                           <span>•</span>
                           <span>{new Date(order.purchasedAt).toLocaleDateString()}</span>
                           <span>•</span>
-                          <span className="text-[10px] text-purple-400">TX: {order.transactionId?.slice(-8) || order.id.slice(0, 8)}</span>
+                          <span className="text-[10px] text-slate-400">TX: {order.transactionId?.slice(-8) || order.id.slice(0, 8)}</span>
                         </div>
                       </div>
                     </div>
@@ -936,9 +935,9 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                     {/* View Secret Delivery Info Button */}
                     <button
                       onClick={() => setViewingSecretOrder(order)}
-                      className="px-4 py-2.5 rounded-xl bg-[#1c0e3d] hover:bg-[#2b165c] border border-[#4a2394] text-white font-black text-xs transition cursor-pointer flex items-center justify-center space-x-2 shadow-sm"
+                      className="px-4 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-black text-xs transition cursor-pointer flex items-center justify-center space-x-2 shadow-xs"
                     >
-                      <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+                      <Unlock className="w-3.5 h-3.5 text-blue-600" />
                       <span>View Secret Delivery Info</span>
                     </button>
                   </div>
@@ -953,29 +952,29 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
       {/* MODAL 1: ADD / EDIT PRODUCT MODAL (ADMIN ONLY)          */}
       {/* ======================================================== */}
       {isAddEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
           <div
-            className="relative w-full max-w-xl bg-[#0c051f] border border-[#3b1c78] rounded-[28px] shadow-[0_0_50px_rgba(125,76,247,0.3)] overflow-hidden my-auto max-h-[92vh] flex flex-col text-slate-200"
+            className="relative w-full max-w-xl bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col text-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-6 bg-gradient-to-b from-[#1b0d3d] to-[#0c051f] border-b border-[#2b165c] flex items-center justify-between shrink-0">
+            <div className="p-6 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-3">
-                <div className="p-2.5 rounded-xl bg-[#2a1359] border border-[#7d4cf7]/40 text-[#c8a6ff]">
+                <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-600">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white">
+                  <h3 className="text-lg font-black text-slate-900">
                     {editingProduct ? 'Edit ZENED Update Product' : 'Add New ZENED Update Product'}
                   </h3>
-                  <p className="text-xs text-purple-300/60">
+                  <p className="text-xs text-slate-500">
                     Provide complete product metadata and private delivery info.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAddEditModalOpen(false)}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -984,15 +983,15 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
             {/* Modal Body Form */}
             <form onSubmit={handleSaveProduct} className="p-6 overflow-y-auto space-y-4 flex-1">
               {formError && (
-                <div className="p-3.5 rounded-xl bg-red-950/50 border border-red-500/40 text-red-300 text-xs flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <div className="p-3.5 rounded-xl bg-pink-50 border border-pink-200 text-pink-700 text-xs flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-pink-600" />
                   <span>{formError}</span>
                 </div>
               )}
 
               {/* Product Name */}
               <div className="space-y-1.5">
-                <label className="text-xs font-black text-purple-200 uppercase tracking-wider block">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
                   Product Name *
                 </label>
                 <input
@@ -1001,14 +1000,14 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. VIP Telegram Auto-Forwarder Bot 2026"
-                  className="w-full bg-[#14082e] border border-[#2a1459] focus:border-[#7d4cf7] rounded-xl px-4 py-2.5 text-xs text-white placeholder-purple-300/40 focus:outline-none"
+                  className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none"
                 />
               </div>
 
               {/* Price & Stock Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-purple-200 uppercase tracking-wider block">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
                     Price (₦ NGN) *
                   </label>
                   <input
@@ -1019,12 +1018,12 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                     value={formPrice}
                     onChange={(e) => setFormPrice(e.target.value)}
                     placeholder="e.g. 5000"
-                    className="w-full bg-[#14082e] border border-[#2a1459] focus:border-[#7d4cf7] rounded-xl px-4 py-2.5 text-xs text-white placeholder-purple-300/40 focus:outline-none font-mono"
+                    className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none font-mono"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-purple-200 uppercase tracking-wider block">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
                     Stock Quantity
                   </label>
                   <input
@@ -1033,7 +1032,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                     value={formStock}
                     onChange={(e) => setFormStock(e.target.value)}
                     placeholder="e.g. 10"
-                    className="w-full bg-[#14082e] border border-[#2a1459] focus:border-[#7d4cf7] rounded-xl px-4 py-2.5 text-xs text-white placeholder-purple-300/40 focus:outline-none font-mono"
+                    className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none font-mono"
                   />
                 </div>
               </div>
@@ -1041,13 +1040,13 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
               {/* Category & Status Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-purple-200 uppercase tracking-wider block">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
                     Category Tag
                   </label>
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full bg-[#14082e] border border-[#2a1459] focus:border-[#7d4cf7] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none cursor-pointer"
+                    className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none cursor-pointer"
                   >
                     {CATEGORY_TAGS.filter((c) => c !== 'All').map((cat) => (
                       <option key={cat} value={cat}>
@@ -1058,13 +1057,13 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black text-purple-200 uppercase tracking-wider block">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
                     Product Status
                   </label>
                   <select
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value as any)}
-                    className="w-full bg-[#14082e] border border-[#2a1459] focus:border-[#7d4cf7] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none cursor-pointer"
+                    className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none cursor-pointer"
                   >
                     <option value="active">Active (Available for purchase)</option>
                     <option value="out_of_stock">Out of Stock</option>
@@ -1074,7 +1073,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
 
               {/* Short Description */}
               <div className="space-y-1.5">
-                <label className="text-xs font-black text-purple-200 uppercase tracking-wider block">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
                   Short Description *
                 </label>
                 <textarea
@@ -1083,14 +1082,14 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="Provide a clear, compelling description of this update, script, or digital service..."
-                  className="w-full bg-[#14082e] border border-[#2a1459] focus:border-[#7d4cf7] rounded-xl px-4 py-2.5 text-xs text-white placeholder-purple-300/40 focus:outline-none"
+                  className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none"
                 />
               </div>
 
               {/* Product Image: Upload & URL */}
               <div className="space-y-2">
-                <label className="text-xs font-black text-purple-200 uppercase tracking-wider block">
-                  Product Image (Large Visual Layout)
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+                  Product Image (Cover Photo)
                 </label>
 
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
@@ -1099,11 +1098,11 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                     value={formImageUrl}
                     onChange={(e) => setFormImageUrl(e.target.value)}
                     placeholder="Paste Image URL (https://...)"
-                    className="flex-1 w-full bg-[#14082e] border border-[#2a1459] focus:border-[#7d4cf7] rounded-xl px-4 py-2.5 text-xs text-white placeholder-purple-300/40 focus:outline-none"
+                    className="flex-1 w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none"
                   />
                   
-                  <label className="px-4 py-2.5 rounded-xl bg-[#281354] hover:bg-[#381a74] text-purple-200 hover:text-white font-bold text-xs cursor-pointer border border-[#4e279c] shrink-0 flex items-center space-x-2 transition">
-                    <Upload className="w-3.5 h-3.5" />
+                  <label className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border border-slate-200 shrink-0 flex items-center space-x-2 transition">
+                    <Upload className="w-3.5 h-3.5 text-blue-600" />
                     <span>Upload Image</span>
                     <input
                       type="file"
@@ -1116,13 +1115,13 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
 
                 {isUploadingImage && (
                   <div className="space-y-1">
-                    <div className="h-1.5 w-full bg-purple-950 rounded-full overflow-hidden">
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-400 transition-all duration-200"
+                        className="h-full bg-blue-600 transition-all duration-200"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-purple-300/60 font-mono">
+                    <span className="text-[10px] text-slate-500 font-mono">
                       Uploading image... {uploadProgress}%
                     </span>
                   </div>
@@ -1130,7 +1129,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
 
                 {/* Image Preview */}
                 {formImageUrl && (
-                  <div className="relative w-full h-32 rounded-xl bg-[#14082e] border border-[#2a1459] overflow-hidden">
+                  <div className="relative w-full h-32 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden">
                     <img
                       src={formImageUrl}
                       alt="Preview"
@@ -1140,7 +1139,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setFormImageUrl('')}
-                      className="absolute top-2 right-2 p-1 rounded-full bg-black/70 text-white hover:bg-black"
+                      className="absolute top-2 right-2 p-1 rounded-full bg-slate-900/80 text-white hover:bg-pink-600 transition cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -1149,17 +1148,17 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
               </div>
 
               {/* CRITICAL: Secret Delivery Information Field */}
-              <div className="space-y-1.5 bg-[#1b0d38] border border-amber-500/30 p-4 rounded-2xl">
+              <div className="space-y-1.5 bg-blue-50/60 border border-blue-200 p-4 rounded-2xl">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center space-x-1.5">
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <label className="text-xs font-black text-blue-900 uppercase tracking-wider flex items-center space-x-1.5">
+                    <Lock className="w-3.5 h-3.5 text-blue-600" />
                     <span>Secret Delivery Information *</span>
                   </label>
-                  <span className="text-[10px] font-bold text-amber-300/70 uppercase">
+                  <span className="text-[10px] font-bold text-pink-600 uppercase bg-pink-50 px-2 py-0.5 rounded border border-pink-200">
                     🔒 STRICTLY PRIVATE
                   </span>
                 </div>
-                <p className="text-[11px] text-purple-200/70 leading-relaxed">
+                <p className="text-[11px] text-slate-600 leading-relaxed">
                   This content is strictly private and will <strong>NEVER</strong> be displayed publicly. It is automatically revealed to the buyer only after their wallet payment is confirmed.
                 </p>
                 <textarea
@@ -1168,23 +1167,23 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                   value={formSecretInfo}
                   onChange={(e) => setFormSecretInfo(e.target.value)}
                   placeholder="Enter login credentials, private download links, API tokens, license keys, or step-by-step access instructions..."
-                  className="w-full bg-[#110526] border border-amber-500/40 focus:border-amber-400 rounded-xl px-4 py-2.5 text-xs text-white placeholder-purple-300/40 focus:outline-none font-mono"
+                  className="w-full bg-white border border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none font-mono"
                 />
               </div>
 
               {/* Submit Buttons */}
-              <div className="pt-3 border-t border-[#210f3f] flex items-center justify-end space-x-3">
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setIsAddEditModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs transition cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formSubmitting || isUploadingImage}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95 disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
                 >
                   {formSubmitting ? 'Saving...' : editingProduct ? 'Update Product' : 'Publish Product'}
                 </button>
@@ -1198,27 +1197,27 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
       {/* MODAL 2: PURCHASE CONFIRMATION MODAL                     */}
       {/* ======================================================== */}
       {confirmingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="relative w-full max-w-md bg-[#0c051f] border border-[#3b1c78] rounded-[28px] shadow-[0_0_50px_rgba(125,76,247,0.4)] p-6 space-y-5 text-slate-200"
+            className="relative w-full max-w-md bg-white border border-slate-200 rounded-3xl shadow-2xl p-6 space-y-5 text-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#210f3f] pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center space-x-2.5">
-                <div className="p-2 rounded-xl bg-[#2a1359] text-[#c8a6ff]">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-200">
                   <ShoppingCart className="w-5 h-5" />
                 </div>
-                <h3 className="text-base font-black text-white">Confirm Product Purchase</h3>
+                <h3 className="text-base font-black text-slate-900">Confirm Product Purchase</h3>
               </div>
               <button
                 onClick={() => setConfirmingProduct(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="bg-[#14082e] border border-[#2b165c] p-4 rounded-2xl space-y-3">
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3">
               <div className="flex items-center space-x-3">
                 {confirmingProduct.imageUrl ? (
                   <img
@@ -1228,38 +1227,38 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-xl bg-[#210f45] flex items-center justify-center text-purple-300">
+                  <div className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center text-slate-500">
                     <Package className="w-6 h-6" />
                   </div>
                 )}
                 <div>
-                  <h4 className="font-black text-white text-sm">{confirmingProduct.name}</h4>
-                  <span className="text-[10px] text-purple-300/60 uppercase font-mono">
+                  <h4 className="font-black text-slate-900 text-sm">{confirmingProduct.name}</h4>
+                  <span className="text-[10px] text-slate-500 uppercase font-mono">
                     {confirmingProduct.category}
                   </span>
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-[#23114a] space-y-1 text-xs">
-                <div className="flex justify-between text-purple-300/70">
+              <div className="pt-2 border-t border-slate-200 space-y-1 text-xs">
+                <div className="flex justify-between text-slate-600">
                   <span>Product Price:</span>
-                  <span className="font-black text-white font-mono">₦{confirmingProduct.price.toLocaleString()}</span>
+                  <span className="font-black text-slate-900 font-mono">₦{confirmingProduct.price.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-purple-300/70">
+                <div className="flex justify-between text-slate-600">
                   <span>Your Current Balance:</span>
-                  <span className="font-black text-emerald-400 font-mono">₦{walletBalance.toLocaleString()}</span>
+                  <span className="font-black text-blue-600 font-mono">₦{walletBalance.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-purple-300/70 pt-1 border-t border-[#23114a]">
+                <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-200">
                   <span>Balance After Purchase:</span>
-                  <span className="font-black text-white font-mono">
+                  <span className="font-black text-slate-900 font-mono">
                     ₦{(walletBalance - confirmingProduct.price).toLocaleString()}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/20 text-[11px] text-purple-200/80 flex items-center space-x-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-[11px] text-blue-700 flex items-center space-x-2">
+              <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
               <span>Instant auto-delivery: Secret access information is unlocked immediately.</span>
             </div>
 
@@ -1267,14 +1266,14 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
               <button
                 type="button"
                 onClick={() => setConfirmingProduct(null)}
-                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs"
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 disabled={isPurchasing}
                 onClick={handleExecutePurchase}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95 disabled:opacity-50 flex items-center space-x-1.5"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 flex items-center space-x-1.5"
               >
                 {isPurchasing ? (
                   <>
@@ -1297,40 +1296,40 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
       {/* MODAL 3: PURCHASE SUCCESS & SECRET DELIVERY INFO REVEAL   */}
       {/* ======================================================== */}
       {purchasedOrderSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="relative w-full max-w-lg bg-[#0c051f] border border-emerald-500/40 rounded-[28px] shadow-[0_0_60px_rgba(16,185,129,0.25)] p-6 sm:p-8 space-y-6 text-slate-200 max-h-[92vh] overflow-y-auto"
+            className="relative w-full max-w-lg bg-white border border-blue-200 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6 text-slate-800 max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center space-y-2">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+              <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mx-auto shadow-xs">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
-              <span className="px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider border border-emerald-500/30 inline-block">
+              <span className="px-3 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-wider border border-blue-200 inline-block">
                 Purchase Confirmed & Delivered
               </span>
-              <h3 className="text-2xl font-black text-white tracking-tight">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
                 Access Unlocked!
               </h3>
-              <p className="text-xs text-purple-200/70">
+              <p className="text-xs text-slate-600">
                 Payment of <strong>₦{purchasedOrderSuccess.price.toLocaleString()}</strong> was completed successfully from your wallet.
               </p>
             </div>
 
             {/* Secret Delivery Info Display */}
-            <div className="bg-[#15092e] border border-emerald-500/30 p-5 rounded-2xl space-y-3 shadow-inner">
+            <div className="bg-blue-50/50 border border-blue-200 p-5 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-emerald-300 text-xs font-black">
-                  <Key className="w-4 h-4 text-emerald-400" />
+                <div className="flex items-center space-x-2 text-blue-900 text-xs font-black">
+                  <Key className="w-4 h-4 text-blue-600" />
                   <span>SECRET DELIVERY INFORMATION</span>
                 </div>
                 <button
                   onClick={() => handleCopy(purchasedOrderSuccess.secretDeliveryInfo, 'success-info')}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
                 >
                   {copiedKey === 'success-info' ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-300" />
+                      <Check className="w-3.5 h-3.5 text-white" />
                       <span>Copied!</span>
                     </>
                   ) : (
@@ -1342,11 +1341,11 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                 </button>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-[#090317] border border-[#2b165c] text-xs font-mono text-emerald-200 whitespace-pre-wrap break-all leading-relaxed select-all">
+              <div className="p-3.5 rounded-xl bg-white border border-blue-200 text-xs font-mono text-slate-900 whitespace-pre-wrap break-all leading-relaxed select-all">
                 {purchasedOrderSuccess.secretDeliveryInfo}
               </div>
 
-              <p className="text-[10px] text-purple-300/50 italic">
+              <p className="text-[10px] text-slate-500 italic">
                 * You can also view this secret delivery information at any time under the "My Purchased Updates" tab.
               </p>
             </div>
@@ -1357,13 +1356,13 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                   setPurchasedOrderSuccess(null);
                   setActiveTab('my-orders');
                 }}
-                className="w-full px-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95"
+                className="w-full px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-xs active:scale-95"
               >
                 Go to My Purchased Updates
               </button>
               <button
                 onClick={() => setPurchasedOrderSuccess(null)}
-                className="w-full px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+                className="w-full px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider transition cursor-pointer"
               >
                 Done
               </button>
@@ -1376,26 +1375,26 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
       {/* MODAL 4: VIEW SECRET INFO MODAL (PAST ORDER)             */}
       {/* ======================================================== */}
       {viewingSecretOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="relative w-full max-w-lg bg-[#0c051f] border border-[#3b1c78] rounded-[28px] shadow-[0_0_50px_rgba(125,76,247,0.3)] p-6 space-y-5 text-slate-200"
+            className="relative w-full max-w-lg bg-white border border-slate-200 rounded-3xl shadow-2xl p-6 space-y-5 text-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#210f3f] pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center space-x-2.5">
-                <div className="p-2 rounded-xl bg-[#2a1359] text-emerald-400">
+                <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-200">
                   <Unlock className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-white">{viewingSecretOrder.productName}</h3>
-                  <span className="text-[10px] text-purple-300/60 font-mono">
+                  <h3 className="text-base font-black text-slate-900">{viewingSecretOrder.productName}</h3>
+                  <span className="text-[10px] text-slate-500 font-mono">
                     Purchased on {new Date(viewingSecretOrder.purchasedAt).toLocaleDateString()}
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => setViewingSecretOrder(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1403,16 +1402,16 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-[#c8a6ff] uppercase tracking-wider">
+                <span className="text-xs font-black text-slate-900 uppercase tracking-wider">
                   Secret Delivery Information
                 </span>
                 <button
                   onClick={() => handleCopy(viewingSecretOrder.secretDeliveryInfo, 'view-info')}
-                  className="px-2.5 py-1 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
                 >
                   {copiedKey === 'view-info' ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-300" />
+                      <Check className="w-3.5 h-3.5 text-white" />
                       <span>Copied!</span>
                     </>
                   ) : (
@@ -1424,7 +1423,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                 </button>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#14082e] border border-[#2b165c] text-xs font-mono text-emerald-300 whitespace-pre-wrap break-all leading-relaxed select-all">
+              <div className="p-4 rounded-xl bg-white border border-blue-200 text-xs font-mono text-slate-900 whitespace-pre-wrap break-all leading-relaxed select-all">
                 {viewingSecretOrder.secretDeliveryInfo}
               </div>
             </div>
@@ -1432,7 +1431,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setViewingSecretOrder(null)}
-                className="px-5 py-2.5 rounded-xl bg-[#7d4cf7] hover:bg-[#8e5ff9] text-white font-black text-xs transition cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition cursor-pointer"
               >
                 Close
               </button>
@@ -1445,35 +1444,35 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
       {/* MODAL 5: INSUFFICIENT FUNDS ALERT MODAL                  */}
       {/* ======================================================== */}
       {insufficientFundsFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="relative w-full max-w-md bg-[#0c051f] border border-red-500/40 rounded-[28px] shadow-[0_0_50px_rgba(239,68,68,0.25)] p-6 space-y-4 text-slate-200"
+            className="relative w-full max-w-md bg-white border border-pink-200 rounded-3xl shadow-2xl p-6 space-y-4 text-slate-800"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center space-x-3">
-              <div className="p-3 rounded-2xl bg-red-950/60 border border-red-500/40 text-red-400">
+              <div className="p-3 rounded-2xl bg-pink-50 border border-pink-200 text-pink-600">
                 <AlertCircle className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-black text-white">Insufficient Wallet Balance</h3>
-                <p className="text-xs text-purple-300/60">
+                <h3 className="text-base font-black text-slate-900">Insufficient Wallet Balance</h3>
+                <p className="text-xs text-slate-500">
                   You need more funds in your wallet to complete this purchase.
                 </p>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#14082e] border border-[#2b165c] space-y-2 text-xs">
-              <div className="flex justify-between text-purple-300/70">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-600">
                 <span>Product Price:</span>
-                <span className="font-black text-white font-mono">₦{insufficientFundsFor.price.toLocaleString()}</span>
+                <span className="font-black text-slate-900 font-mono">₦{insufficientFundsFor.price.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-purple-300/70">
+              <div className="flex justify-between text-slate-600">
                 <span>Current Balance:</span>
-                <span className="font-black text-red-400 font-mono">₦{walletBalance.toLocaleString()}</span>
+                <span className="font-black text-pink-600 font-mono">₦{walletBalance.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-purple-300/70 pt-2 border-t border-[#23114a]">
+              <div className="flex justify-between text-slate-600 pt-2 border-t border-slate-200">
                 <span>Shortage:</span>
-                <span className="font-black text-amber-300 font-mono">
+                <span className="font-black text-pink-600 font-mono">
                   ₦{(insufficientFundsFor.price - walletBalance).toLocaleString()}
                 </span>
               </div>
@@ -1483,7 +1482,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
               <button
                 type="button"
                 onClick={() => setInsufficientFundsFor(null)}
-                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs"
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -1493,7 +1492,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                   setInsufficientFundsFor(null);
                   onOpenWallet();
                 }}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#7d4cf7] to-[#b37eff] hover:from-[#8e5ff9] hover:to-[#be8eff] text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-lg active:scale-95"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-xs active:scale-95"
               >
                 Fund Wallet Now
               </button>

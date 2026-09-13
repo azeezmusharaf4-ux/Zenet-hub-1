@@ -456,59 +456,59 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl p-6 space-y-5 my-8 relative">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-          <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
-            <Edit2 className="w-5 h-5 text-cyan-400" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl p-6 space-y-5 my-8 relative text-slate-800">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+            <Edit2 className="w-5 h-5 text-blue-600" />
             <span>Admin Edit Listing</span>
           </h3>
           <button
             type="button"
             onClick={handleRequestClose}
-            className="p-1.5 text-slate-400 hover:text-white bg-slate-800 rounded-xl cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer transition border border-slate-200"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {error && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="p-3 bg-pink-50 border border-pink-200 text-pink-700 rounded-xl text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-pink-600" />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div className="space-y-1">
-            <label className="font-bold text-slate-300">Listing Title</label>
+            <label className="font-bold text-slate-700">Listing Title</label>
             <input
               type="text"
               required
               value={formData.title}
               onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-              className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">Price (₦ NGN)</label>
+              <label className="font-bold text-slate-700">Price (₦ NGN)</label>
               <input
                 type="number"
                 required
                 value={formData.price}
                 onChange={(e) => setFormData((prev) => ({ ...prev, price: Number(e.target.value) || 0 }))}
-                className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">Category</label>
+              <label className="font-bold text-slate-700">Category</label>
               <select
                 value={formData.category}
                 onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value as CategoryType }))}
-                className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
               >
                 <option value="Facebook">Facebook</option>
                 <option value="Instagram">Instagram</option>
@@ -529,75 +529,75 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">Target Region</label>
+              <label className="font-bold text-slate-700">Target Region</label>
               <input
                 type="text"
                 value={formData.country || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, country: e.target.value }))}
-                className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">Followers / Audience</label>
+              <label className="font-bold text-slate-700">Followers / Audience</label>
               <input
                 type="text"
                 value={formData.followers || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, followers: e.target.value }))}
-                className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">Account Age</label>
+              <label className="font-bold text-slate-700">Account Age</label>
               <input
                 type="text"
                 value={formData.accountAge || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, accountAge: e.target.value }))}
-                className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <label className="flex items-center gap-2 font-semibold text-slate-300 cursor-pointer">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <label className="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={formData.pva}
                 onChange={(e) => setFormData((prev) => ({ ...prev, pva: e.target.checked }))}
-                className="rounded accent-cyan-500"
+                className="rounded accent-blue-600"
               />
               <span>PVA</span>
             </label>
 
-            <label className="flex items-center gap-2 font-semibold text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={formData.twoFactor}
                 onChange={(e) => setFormData((prev) => ({ ...prev, twoFactor: e.target.checked }))}
-                className="rounded accent-cyan-500"
+                className="rounded accent-blue-600"
               />
               <span>2FA</span>
             </label>
 
-            <label className="flex items-center gap-2 font-semibold text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={!!formData.monetized}
                 onChange={(e) => setFormData((prev) => ({ ...prev, monetized: e.target.checked }))}
-                className="rounded accent-cyan-500"
+                className="rounded accent-blue-600"
               />
               <span>Monetized</span>
             </label>
 
-            <label className="flex items-center gap-2 font-semibold text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={!!formData.featured}
                 onChange={(e) => setFormData((prev) => ({ ...prev, featured: e.target.checked }))}
-                className="rounded accent-cyan-500"
+                className="rounded accent-blue-600"
               />
               <span>Featured</span>
             </label>
@@ -605,11 +605,11 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">Listing Status</label>
+              <label className="font-bold text-slate-700">Listing Status</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData((prev) => ({ ...prev, status: e.target.value as any }))}
-                className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
               >
                 <option value="active">Active</option>
                 <option value="sold">Sold Out</option>
@@ -618,11 +618,11 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-300">Approval Moderation</label>
+              <label className="font-bold text-slate-700">Approval Moderation</label>
               <select
                 value={formData.approvalStatus || 'approved'}
                 onChange={(e) => setFormData((prev) => ({ ...prev, approvalStatus: e.target.value as any }))}
-                className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
               >
                 <option value="approved">Approved</option>
                 <option value="pending">Pending</option>
@@ -632,36 +632,36 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="font-bold text-slate-300">Full Description</label>
+            <label className="font-bold text-slate-700">Full Description</label>
             <textarea
               rows={4}
               value={formData.description}
               onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-              className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-white text-slate-900 p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600"
             />
           </div>
 
           {/* MULTI-STOCK INVENTORY MANAGER SECTION */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
               <div>
-                <h4 className="font-extrabold text-white text-sm flex items-center gap-1.5">
-                  <Tag className="w-4 h-4 text-cyan-400" />
+                <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                  <Tag className="w-4 h-4 text-blue-600" />
                   <span>Multi-Stock Inventory Items</span>
                 </h4>
-                <p className="text-[10px] text-slate-400 mt-0.5">
+                <p className="text-[10px] text-slate-500 mt-0.5">
                   Each stock item is unique and sold once to a single buyer.
                 </p>
               </div>
 
               {/* Stock count badges */}
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 bg-emerald-950/80 border border-emerald-500/50 rounded-lg text-emerald-300 text-xs font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-xs font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
                   Available: {inventory.filter(i => (i.status || '').toLowerCase() !== 'sold').length}
                 </span>
                 {inventory.some(i => (i.status || '').toLowerCase() === 'sold') && (
-                  <span className="px-2.5 py-1 bg-rose-950/80 border border-rose-500/50 rounded-lg text-rose-300 text-xs font-bold">
+                  <span className="px-2.5 py-1 bg-pink-50 border border-pink-200 rounded-lg text-pink-700 text-xs font-bold">
                     Sold: {inventory.filter(i => (i.status || '').toLowerCase() === 'sold').length}
                   </span>
                 )}
@@ -669,14 +669,14 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
             </div>
 
             {/* Input Mode Selector */}
-            <div className="flex rounded-xl bg-slate-900 p-1 border border-slate-800">
+            <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200">
               <button
                 type="button"
                 onClick={() => setStockInputMode('bulk')}
                 className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer ${
                   stockInputMode === 'bulk'
-                    ? 'bg-cyan-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Add Items One Per Line (Bulk)
@@ -686,8 +686,8 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                 onClick={() => setStockInputMode('detailed')}
                 className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer ${
                   stockInputMode === 'detailed'
-                    ? 'bg-cyan-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Detailed Form Entry
@@ -696,12 +696,12 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
 
             {/* Mode 1: Bulk Lines */}
             {stockInputMode === 'bulk' && (
-              <div className="bg-slate-900 border border-slate-800/80 rounded-xl p-3 space-y-2.5">
+              <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                     Paste Stock Lines (One Per Line)
                   </span>
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] text-slate-400">
                     Appends without deleting existing stock
                   </span>
                 </div>
@@ -710,12 +710,12 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                   value={bulkStockText}
                   onChange={(e) => setBulkStockText(e.target.value)}
                   placeholder={`CODE-001\nCODE-002\nuser1@email.com:pass123\nuser2@email.com:pass456 | 2FA:XYZ`}
-                  className="w-full bg-slate-950 text-white text-xs font-mono p-2.5 rounded-lg border border-slate-800 focus:outline-none focus:border-cyan-500 placeholder:text-slate-600"
+                  className="w-full bg-slate-50 text-slate-900 text-xs font-mono p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-600 placeholder:text-slate-400"
                 />
                 <button
                   type="button"
                   onClick={handleAddBulkStock}
-                  className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold rounded-lg transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-cyan-950/50"
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Add Line(s) to Stock (Preserves Existing)</span>
@@ -725,22 +725,22 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
 
             {/* Mode 2: Detailed Form */}
             {stockInputMode === 'detailed' && (
-              <div className="bg-slate-900 border border-slate-800/80 rounded-xl p-3 space-y-3">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Add Single Stock Item</span>
+              <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-3">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Add Single Stock Item</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <input
                     type="text"
                     placeholder="Item Code / Username / Email *"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    className="bg-slate-950 text-slate-200 text-xs p-2 rounded-lg border border-slate-800 focus:outline-none focus:border-cyan-500 w-full font-mono"
+                    className="bg-slate-50 text-slate-900 text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-600 w-full font-mono"
                   />
                   <input
                     type="text"
                     placeholder="Password (If applicable)"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="bg-slate-950 text-slate-200 text-xs p-2 rounded-lg border border-slate-800 focus:outline-none focus:border-cyan-500 w-full font-mono"
+                    className="bg-slate-50 text-slate-900 text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-600 w-full font-mono"
                   />
                 </div>
                 <input
@@ -748,12 +748,12 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                   placeholder="2FA Codes / Backup Codes / Delivery Notes"
                   value={newInstructions}
                   onChange={(e) => setNewInstructions(e.target.value)}
-                  className="bg-slate-950 text-slate-200 text-xs p-2 rounded-lg border border-slate-800 focus:outline-none focus:border-cyan-500 w-full"
+                  className="bg-slate-50 text-slate-900 text-xs p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-blue-600 w-full"
                 />
                 <button
                   type="button"
                   onClick={handleAddInventoryItem}
-                  className="w-full py-2 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-400 border border-cyan-800/40 text-xs font-bold rounded-lg transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold rounded-lg transition active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <span>+ Add to Stock</span>
                 </button>
@@ -763,18 +763,18 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
             {/* Inventory Items List with filter tabs */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
                   Current Stock Items ({inventory.length})
                 </span>
 
-                <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-[10px] font-bold">
+                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px] font-bold">
                   <button
                     type="button"
                     onClick={() => setStockFilterTab('available')}
                     className={`px-2 py-0.5 rounded transition cursor-pointer ${
                       stockFilterTab === 'available'
-                        ? 'bg-emerald-600 text-white shadow'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     Available ({inventory.filter(i => (i.status || '').toLowerCase() !== 'sold').length})
@@ -784,8 +784,8 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                     onClick={() => setStockFilterTab('sold')}
                     className={`px-2 py-0.5 rounded transition cursor-pointer ${
                       stockFilterTab === 'sold'
-                        ? 'bg-rose-600 text-white shadow'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-pink-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     Sold ({inventory.filter(i => (i.status || '').toLowerCase() === 'sold').length})
@@ -795,8 +795,8 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                     onClick={() => setStockFilterTab('all')}
                     className={`px-2 py-0.5 rounded transition cursor-pointer ${
                       stockFilterTab === 'all'
-                        ? 'bg-cyan-600 text-white shadow'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     All ({inventory.length})
@@ -805,11 +805,11 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
               </div>
               
               {loadingInventory ? (
-                <div className="text-center py-4 text-xs text-slate-500 animate-pulse">
+                <div className="text-center py-4 text-xs text-slate-400 animate-pulse">
                   Loading inventory stock...
                 </div>
               ) : inventory.length === 0 ? (
-                <div className="text-center py-4 text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                <div className="text-center py-4 text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl bg-white">
                   No accounts in stock. Add some above.
                 </div>
               ) : (
@@ -828,15 +828,15 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                           key={item.id}
                           className={`border p-2.5 rounded-lg flex items-center justify-between gap-3 text-xs ${
                             isSold
-                              ? 'bg-rose-950/20 border-rose-900/40 opacity-80'
-                              : 'bg-slate-900 border-slate-800'
+                              ? 'bg-pink-50/40 border-pink-200/60 opacity-80'
+                              : 'bg-white border-slate-200'
                           }`}
                         >
                           <div className="min-w-0 flex-1 space-y-0.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-slate-400 text-[10px] font-bold">#{idx + 1}</span>
                               <span 
-                                className="text-white font-mono font-bold break-all select-all hover:text-purple-300 flex items-center gap-1 cursor-pointer"
+                                className="text-slate-900 font-mono font-bold break-all select-all hover:text-blue-600 flex items-center gap-1 cursor-pointer"
                                 onClick={() => {
                                   const val = item.accountEmail || item.delivery_value || '';
                                   if (val) {
@@ -846,50 +846,50 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                                 title="Click to copy Login/Email"
                               >
                                 <span>{item.accountEmail || item.delivery_value || 'Stock Item'}</span>
-                                <Copy className="w-2.5 h-2.5 text-purple-400 opacity-60" />
+                                <Copy className="w-2.5 h-2.5 text-blue-500 opacity-60" />
                               </span>
                               {item.accountPassword && (
                                 <span 
-                                  className="text-slate-400 font-mono select-all hover:text-purple-300 flex items-center gap-1 cursor-pointer bg-black/40 px-1 py-0.5 rounded border border-purple-900/30 text-[11px]"
+                                  className="text-slate-600 font-mono select-all hover:text-blue-600 flex items-center gap-1 cursor-pointer bg-slate-100 px-1 py-0.5 rounded border border-slate-200 text-[11px]"
                                   onClick={() => {
                                     navigator.clipboard.writeText(item.accountPassword);
                                   }}
                                   title="Click to copy Password"
                                 >
                                   <span>•</span>
-                                  <strong className="text-amber-300 font-bold">{item.accountPassword}</strong>
-                                  <Copy className="w-2.5 h-2.5 text-purple-400 opacity-60" />
+                                  <strong className="text-blue-700 font-bold">{item.accountPassword}</strong>
+                                  <Copy className="w-2.5 h-2.5 text-blue-500 opacity-60" />
                                 </span>
                               )}
                               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
                                 isSold
-                                  ? 'bg-rose-950 text-rose-400 border border-rose-900'
-                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-900'
+                                  ? 'bg-pink-50 text-pink-700 border border-pink-200'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
                               }`}>
                                 {item.status}
                               </span>
                             </div>
                             {item.additionalInstructions && (
-                              <p className="text-[10px] text-slate-400 line-clamp-1">{item.additionalInstructions}</p>
+                              <p className="text-[10px] text-slate-500 line-clamp-1">{item.additionalInstructions}</p>
                             )}
                           </div>
                           {confirmAdminDeleteId === item.id ? (
-                            <div className="flex items-center gap-1 bg-rose-950/80 border border-rose-800/80 px-2 py-1 rounded-lg animate-pulse shrink-0">
-                              <span className="text-[10px] text-rose-300 font-bold mr-1">Delete?</span>
+                            <div className="flex items-center gap-1 bg-pink-50 border border-pink-200 px-2 py-1 rounded-lg shrink-0">
+                              <span className="text-[10px] text-pink-700 font-bold mr-1">Delete?</span>
                               <button
                                 type="button"
                                 onClick={() => {
                                   handleRemoveInventoryItem(item.id);
                                   setConfirmAdminDeleteId(null);
                                 }}
-                                className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[10px] rounded transition cursor-pointer"
+                                className="px-1.5 py-0.5 bg-pink-600 hover:bg-pink-700 text-white font-extrabold text-[10px] rounded transition cursor-pointer"
                               >
                                 Yes
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setConfirmAdminDeleteId(null)}
-                                className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold text-[10px] rounded transition cursor-pointer"
+                                className="px-1.5 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-[10px] rounded transition cursor-pointer"
                               >
                                 No
                               </button>
@@ -898,14 +898,14 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                             <button
                               type="button"
                               onClick={() => setConfirmAdminDeleteId(item.id)}
-                              className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-md transition cursor-pointer shrink-0"
+                              className="p-1.5 text-pink-600 hover:text-pink-700 hover:bg-pink-50 rounded-md transition cursor-pointer shrink-0"
                               title="Delete account from inventory"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           ) : (
                             <span 
-                              className="p-1.5 text-slate-600 cursor-not-allowed opacity-40 shrink-0"
+                              className="p-1.5 text-slate-300 cursor-not-allowed opacity-40 shrink-0"
                               title="Cannot delete sold stock item"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -923,14 +923,14 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
             <button
               type="button"
               onClick={handleRequestClose}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl cursor-pointer text-xs"
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer text-xs transition border border-slate-200"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50 cursor-pointer text-xs"
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl shadow-xs flex items-center gap-2 disabled:opacity-50 cursor-pointer text-xs transition"
             >
               <Save className="w-4 h-4" />
               <span>{isSaving ? 'Saving Changes...' : 'Save Changes to Firestore'}</span>
@@ -940,15 +940,15 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
 
         {/* Unsaved Changes Confirmation Modal */}
         {showCancelConfirm && (
-          <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
-            <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl text-center">
-              <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white border border-slate-200 p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl text-center">
+              <div className="w-12 h-12 bg-pink-50 border border-pink-200 rounded-2xl flex items-center justify-center mx-auto text-pink-600">
                 <AlertCircle className="w-6 h-6" />
               </div>
               
               <div className="space-y-1">
-                <h3 className="font-extrabold text-white text-base">Unsaved Changes</h3>
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <h3 className="font-extrabold text-slate-900 text-base">Unsaved Changes</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
                   You have unsaved changes. Are you sure you want to cancel?
                 </p>
               </div>
@@ -957,7 +957,7 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCancelConfirm(false)}
-                  className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold text-xs cursor-pointer"
+                  className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs cursor-pointer border border-slate-200"
                 >
                   Continue Editing
                 </button>
@@ -967,7 +967,7 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                     setShowCancelConfirm(false);
                     onClose();
                   }}
-                  className="py-2.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-extrabold text-xs shadow-md cursor-pointer"
+                  className="py-2.5 px-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-extrabold text-xs shadow-xs cursor-pointer"
                 >
                   Discard Changes
                 </button>
@@ -1694,22 +1694,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
       <div 
-        className="relative w-full max-w-6xl bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] text-purple-100"
+        id="admin-panel-modal"
+        data-component="admin-panel"
+        className="relative w-full max-w-6xl bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] text-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Top Header Bar */}
-        <div className="bg-slate-950 px-5 py-3.5 border-b border-slate-800 flex items-center justify-between shrink-0 flex-wrap gap-2">
+        <div className="bg-white px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            {/* Admin Control Center Pill Capsule matching screenshot */}
-            <div className="px-4 py-2 rounded-full border border-rose-500/70 bg-[#2b0816] text-white shadow-lg shadow-rose-950/50 flex items-center gap-3">
-              <ShieldCheck className="w-5 h-5 text-[#ff3b68] shrink-0" />
-              <span className="text-sm sm:text-base font-extrabold text-white tracking-tight">
+            {/* Admin Control Center Pill Capsule */}
+            <div className="px-4 py-2 rounded-full border border-blue-200 bg-blue-50 text-slate-900 shadow-xs flex items-center gap-3">
+              <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
+              <span className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
                 Admin Control Center
               </span>
-              <span className="bg-[#ff2e63] text-black font-black text-[10px] sm:text-[11px] px-3 py-0.5 sm:py-1 rounded-full uppercase tracking-wider shrink-0 shadow-sm">
+              <span className="bg-pink-600 text-white font-black text-[10px] sm:text-[11px] px-3 py-0.5 sm:py-1 rounded-full uppercase tracking-wider shrink-0 shadow-xs">
                 ADMIN
               </span>
             </div>
@@ -1717,7 +1719,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-full transition cursor-pointer border border-slate-800 ml-auto"
+            className="p-2 text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition cursor-pointer border border-slate-200 ml-auto"
             title="Close Admin Panel"
           >
             <X className="w-5 h-5" />
@@ -1726,21 +1728,21 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
         {/* SECURITY ACCESS GATE FOR NON-ADMIN USERS */}
         {!isAdmin ? (
-          <div className="p-8 sm:p-12 text-center space-y-6 max-w-md mx-auto my-auto">
-            <div className="w-20 h-20 bg-rose-500/10 border border-rose-500/30 text-rose-500 rounded-3xl flex items-center justify-center mx-auto shadow-2xl">
+          <div className="p-8 sm:p-12 text-center space-y-6 max-w-md mx-auto my-auto bg-white">
+            <div className="w-20 h-20 bg-pink-50 border border-pink-200 text-pink-600 rounded-3xl flex items-center justify-center mx-auto shadow-xs">
               <ShieldAlert className="w-10 h-10" />
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-2xl font-black text-white">Access Denied</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <h3 className="text-2xl font-black text-slate-900">Access Denied</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
                 You do not have permission to access the Admin Center. This area is strictly restricted to authorized administrators with the admin role in Firestore.
               </p>
             </div>
 
             <button
               onClick={onClose}
-              className="w-full bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white font-extrabold text-xs py-3 rounded-xl shadow-lg transition cursor-pointer"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3 rounded-xl shadow-xs transition cursor-pointer"
             >
               Return to Home Page
             </button>
@@ -1748,19 +1750,19 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         ) : (
           <>
             {/* Primary Navigation Bar */}
-            <div className="bg-slate-950 border-b border-slate-800 px-5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+            <div className="bg-slate-50 border-b border-slate-200 px-5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
               <button
                 onClick={() => setActiveTab('listings')}
                 className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   activeTab === 'listings'
-                    ? 'border-cyan-400 text-cyan-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-blue-600'
                 }`}
               >
                 <Tag className="w-4 h-4" />
                 <span>Listings ({listings.length})</span>
                 {pendingCount > 0 && (
-                  <span className="bg-amber-500 text-slate-950 font-black text-[10px] px-1.5 py-0.2 rounded-full">
+                  <span className="bg-pink-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded-full">
                     {pendingCount}
                   </span>
                 )}
@@ -1771,8 +1773,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   onClick={() => setActiveTab('users')}
                   className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                     activeTab === 'users'
-                      ? 'border-cyan-400 text-cyan-400'
-                      : 'border-transparent text-slate-400 hover:text-white'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-500 hover:text-blue-600'
                   }`}
                 >
                   <Users className="w-4 h-4" />
@@ -1785,13 +1787,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   onClick={() => setActiveTab('admins')}
                   className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                     activeTab === 'admins'
-                      ? 'border-amber-400 text-amber-400 font-extrabold'
-                      : 'border-transparent text-slate-400 hover:text-white'
+                      ? 'border-pink-600 text-pink-600 font-extrabold'
+                      : 'border-transparent text-slate-500 hover:text-pink-600'
                   }`}
                 >
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <ShieldCheck className="w-4 h-4 text-pink-600" />
                   <span>Manage Admins</span>
-                  <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] px-1.5 py-0.2 rounded uppercase font-black">
+                  <span className="bg-pink-50 text-pink-700 border border-pink-200 text-[9px] px-1.5 py-0.2 rounded uppercase font-black">
                     OWNER
                   </span>
                 </button>
@@ -1803,13 +1805,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   onClick={() => setActiveTab('wallets')}
                   className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                     activeTab === 'wallets'
-                      ? 'border-emerald-400 text-emerald-400 font-extrabold'
-                      : 'border-transparent text-slate-400 hover:text-white'
+                      ? 'border-blue-600 text-blue-600 font-extrabold'
+                      : 'border-transparent text-slate-500 hover:text-blue-600'
                   }`}
                 >
-                  <Wallet className="w-4 h-4 text-emerald-400" />
+                  <Wallet className="w-4 h-4 text-blue-600" />
                   <span>Wallet Override</span>
-                  <span className="bg-emerald-400/20 text-emerald-300 border border-emerald-400/40 text-[9px] px-1.5 py-0.2 rounded uppercase font-black">
+                  <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[9px] px-1.5 py-0.2 rounded uppercase font-black">
                     OVERRIDE TOOL
                   </span>
                 </button>
@@ -1819,14 +1821,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 onClick={() => setActiveTab('orders')}
                 className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   activeTab === 'orders'
-                    ? 'border-cyan-400 text-cyan-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-blue-600'
                 }`}
               >
                 <CreditCard className="w-4 h-4" />
                 <span>Orders & Payments ({orders.length})</span>
                 {orders.filter(o => o.status === 'escrow_holding').length > 0 && (
-                  <span className="bg-emerald-500 text-slate-950 font-black text-[10px] px-1.5 py-0.2 rounded-full">
+                  <span className="bg-blue-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded-full">
                     {orders.filter(o => o.status === 'escrow_holding').length}
                   </span>
                 )}
@@ -1836,14 +1838,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 onClick={() => setActiveTab('inquiries_reports')}
                 className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   activeTab === 'inquiries_reports'
-                    ? 'border-cyan-400 text-cyan-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    ? 'border-pink-600 text-pink-600'
+                    : 'border-transparent text-slate-500 hover:text-pink-600'
                 }`}
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>Inquiries & Reports</span>
                 {(inquiries.filter(i => i.status === 'unread').length > 0 || reports.filter(r => r.status === 'pending').length > 0) && (
-                  <span className="bg-rose-500 text-white font-black text-[10px] px-1.5 py-0.2 rounded-full">
+                  <span className="bg-pink-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded-full">
                     {inquiries.filter(i => i.status === 'unread').length + reports.filter(r => r.status === 'pending').length}
                   </span>
                 )}
@@ -1853,8 +1855,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 onClick={() => setActiveTab('reviews')}
                 className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   activeTab === 'reviews'
-                    ? 'border-cyan-400 text-cyan-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-blue-600'
                 }`}
               >
                 <Star className="w-4 h-4" />
@@ -1865,8 +1867,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 onClick={() => setActiveTab('analytics')}
                 className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   activeTab === 'analytics'
-                    ? 'border-cyan-400 text-cyan-400'
-                    : 'border-transparent text-slate-400 hover:text-white'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-blue-600'
                 }`}
               >
                 <BarChart3 className="w-4 h-4" />

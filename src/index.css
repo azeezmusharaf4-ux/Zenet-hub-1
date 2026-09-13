@@ -11,7 +11,7 @@
 }
 
 html {
-  background-color: #F8FAFC !important;
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   -webkit-font-smoothing: antialiased;
@@ -25,7 +25,7 @@ html {
 }
 
 body {
-  background-color: #F8FAFC !important;
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   -webkit-font-smoothing: antialiased;
@@ -42,6 +42,7 @@ body {
 }
 
 #root {
+  background-color: #FFFFFF !important;
   width: 100%;
   max-width: 100vw;
   min-height: 100vh;
@@ -251,186 +252,221 @@ textarea {
   color: #475569 !important;
 }
 
-/* Brand Violet / Purple Text & Links */
-.text-purple-300,
-.text-purple-400,
-.text-\[\#9e67fa\],
-.text-\[\#a16eff\],
-.text-\[\#c1a0ff\] {
-  color: #6D28D9 !important;
-}
-
 /* =========================================================
-   BMB SMART CHAIN YELLOW / GOLD / AMBER ACCENTS
+   STRICT THEME COMPLIANCE: WHITE BACKGROUND + BLUE/PINK ACCENTS
    ========================================================= */
 
-/* Deep Amber / Gold Accents */
+/* Unapproved purple, violet, cyan, indigo text forced to Accent Blue or Pink */
+.text-purple-300,
+.text-purple-400,
+.text-purple-500,
+.text-purple-600,
+.text-indigo-400,
+.text-indigo-500,
+.text-indigo-600,
+.text-violet-400,
+.text-violet-500,
+.text-violet-600,
+.text-cyan-300,
+.text-cyan-400,
+.text-cyan-500,
+.text-cyan-600,
+.text-\[\#9e67fa\],
+.text-\[\#a16eff\],
+.text-\[\#c1a0ff\],
+.text-\[\#7C3AED\],
+.text-\[\#a855f7\],
+.text-\[\#00ff88\] {
+  color: #2563EB !important; /* Strict Theme Accent Blue */
+}
+
+/* Secondary Accent: Pink Text */
+.text-pink-400,
+.text-pink-500,
+.text-pink-600 {
+  color: #DB2777 !important; /* Strict Theme Accent Pink */
+}
+
+/* Unapproved amber / yellow / orange text forced to standard Slate or Accent Blue */
 .text-amber-300,
 .text-amber-400,
+.text-amber-500,
 .text-yellow-300,
-.text-yellow-400 {
-  color: #D97706 !important; /* Rich deep amber with > 5:1 contrast */
+.text-yellow-400,
+.text-yellow-500,
+.text-orange-400,
+.text-orange-500 {
+  color: #2563EB !important; /* Neutralized to Accent Blue */
   font-weight: 700 !important;
 }
 
-/* Amber / Yellow Badges - Rich background with ultra-dark, bold text */
-.bg-amber-100,
-.bg-amber-200 {
-  background-color: #FEF3C7 !important;
-  color: #92400E !important;
-  border-color: #FCD34D !important;
-}
-
-.bg-yellow-400,
-.bg-yellow-500,
-.bg-amber-400,
-.bg-amber-500 {
-  color: #0F172A !important;
-  font-weight: 800 !important;
-}
-
-/* Green / Emerald Prices & Balances */
+/* Unapproved green / emerald text mapped to Blue */
 .text-emerald-300,
 .text-emerald-400,
-.text-emerald-200,
+.text-emerald-500,
 .text-green-300,
 .text-green-400,
-.text-\[\#00ff88\] {
-  color: #047857 !important; /* Deep emerald-700 for razor-sharp prices */
-  font-weight: 800 !important;
+.text-green-500 {
+  color: #2563EB !important;
+  font-weight: 700 !important;
 }
 
-/* Blue Platform Badges */
+/* Approved Blue Platform & Data Badges */
 .text-blue-300,
 .text-blue-400,
-.text-blue-200 {
+.text-blue-500,
+.text-blue-600,
+.text-blue-700 {
   color: #1D4ED8 !important;
 }
 
-/* Red / Rose Badges & Errors */
+/* Approved Pink/Rose Badges & Notices */
 .text-rose-300,
 .text-rose-400,
-.text-rose-200,
+.text-rose-500,
+.text-rose-600,
 .text-red-300,
-.text-red-400 {
-  color: #BE123C !important;
+.text-red-400,
+.text-red-500 {
+  color: #BE185D !important; /* Refined Deep Pink */
 }
 
 /* =========================================================
-   VIBRANT BADGES & STATUS PILLS IN LIGHT MODE
+   STRICT BADGES & STATUS PILLS: WHITE / TINT WITH BLUE / PINK
    ========================================================= */
 .bg-blue-950\/80,
-.bg-blue-950 {
+.bg-blue-950,
+.bg-blue-900\/40,
+.bg-blue-50 {
   background-color: #EFF6FF !important;
   color: #1D4ED8 !important;
   border-color: #BFDBFE !important;
 }
 
 .bg-pink-950\/80,
-.bg-pink-950 {
+.bg-pink-950,
+.bg-pink-900\/40,
+.bg-pink-50 {
   background-color: #FDF2F8 !important;
   color: #BE185D !important;
   border-color: #FBCFE8 !important;
 }
 
-.bg-cyan-950\/80,
-.bg-cyan-950 {
-  background-color: #ECFEFF !important;
-  color: #0E7490 !important;
-  border-color: #A5F3FC !important;
-}
-
-.bg-rose-950\/80,
-.bg-rose-950 {
-  background-color: #FFF1F2 !important;
-  color: #BE123C !important;
-  border-color: #FECDD3 !important;
-}
-
+/* Neutralize unapproved badge backgrounds (purple, indigo, cyan, emerald, amber) */
 .bg-purple-950\/80,
-.bg-purple-950 {
-  background-color: #F3E8FF !important;
-  color: #6B21A8 !important;
-  border-color: #E9D5FF !important;
-}
-
+.bg-purple-950,
+.bg-purple-900\/50,
+.bg-purple-100,
+.bg-indigo-950,
+.bg-cyan-950\/80,
+.bg-cyan-950,
 .bg-emerald-950\/80,
 .bg-emerald-950,
-.bg-emerald-950\/70 {
-  background-color: #ECFDF5 !important;
-  color: #047857 !important;
-  border-color: #A7F3D0 !important;
-}
-
+.bg-emerald-950\/70,
+.bg-amber-100,
+.bg-amber-200,
 .bg-amber-950\/80,
 .bg-amber-950,
 .bg-amber-950\/70 {
-  background-color: #FEF3C7 !important;
-  color: #92400E !important;
-  border-color: #FDE68A !important;
+  background-color: #EFF6FF !important; /* Mapped to Accent Blue */
+  color: #1D4ED8 !important;
+  border-color: #BFDBFE !important;
+}
+
+.bg-rose-950\/80,
+.bg-rose-950,
+.bg-red-950 {
+  background-color: #FDF2F8 !important; /* Mapped to Accent Pink */
+  color: #BE185D !important;
+  border-color: #FBCFE8 !important;
 }
 
 /* =========================================================
-   PRESERVE WHITE TEXT ON COLORED / GRADIENT ACTION BUTTONS
+   STRICT BUTTON & INTERACTIVE PALETTE: BLUE OR PINK ACCENTS
    ========================================================= */
+
+/* Any unapproved button colors (purple, violet, indigo, cyan, amber, yellow, emerald)
+   are overridden immediately to the primary Accent Blue (#2563EB) */
 button.bg-purple-600,
 button.bg-purple-700,
+button.bg-purple-500,
 button.bg-\[\#7C3AED\],
 button.bg-\[\#5B21B6\],
 button.bg-indigo-600,
+button.bg-indigo-700,
+button.bg-cyan-500,
+button.bg-cyan-600,
 button.bg-emerald-600,
-button.bg-rose-600,
-button.bg-blue-600,
-button.bg-black,
-button.bg-slate-900,
-.bg-purple-600,
-.bg-purple-700,
-.bg-\[\#7C3AED\],
-.bg-\[\#5B21B6\],
-.bg-emerald-600,
-.bg-indigo-600,
-.bg-slate-900,
-.bg-gradient-to-r,
-.bg-gradient-to-tr,
-.bg-gradient-to-br {
-  color: #FFFFFF !important;
-}
-
-button.bg-purple-600 *,
-button.bg-purple-700 *,
-button.bg-\[\#7C3AED\] *,
-button.bg-\[\#5B21B6\] *,
-button.bg-indigo-600 *,
-button.bg-emerald-600 *,
-button.bg-rose-600 *,
-button.bg-blue-600 *,
-button.bg-black *,
-button.bg-slate-900 *,
-.bg-purple-600 *,
-.bg-purple-700 *,
-.bg-\[\#7C3AED\] *,
-.bg-\[\#5B21B6\] *,
-.bg-gradient-to-r *,
-.bg-gradient-to-tr *,
-.bg-gradient-to-br * {
-  color: #FFFFFF !important;
-}
-
-/* Amber/Yellow buttons must have crisp black text */
+button.bg-emerald-700,
 button.bg-amber-400,
 button.bg-amber-500,
 button.bg-yellow-400,
 button.bg-yellow-500,
-button.bg-amber-400 *,
-button.bg-amber-500 *,
-button.bg-yellow-400 *,
-button.bg-yellow-500 * {
-  color: #0F172A !important;
-  font-weight: 800 !important;
+.bg-purple-600,
+.bg-purple-700,
+.bg-purple-500,
+.bg-\[\#7C3AED\],
+.bg-\[\#5B21B6\],
+.bg-indigo-600,
+.bg-cyan-500,
+.bg-cyan-600,
+.bg-emerald-600 {
+  background-color: #2563EB !important;
+  color: #FFFFFF !important;
+  border-color: #1D4ED8 !important;
+}
+
+button.bg-purple-600:hover,
+button.bg-purple-700:hover,
+button.bg-\[\#7C3AED\]:hover,
+button.bg-indigo-600:hover,
+button.bg-cyan-600:hover,
+button.bg-emerald-600:hover {
+  background-color: #1D4ED8 !important;
+}
+
+/* Secondary Accent Buttons: Pink */
+button.bg-pink-600,
+button.bg-pink-700,
+.bg-pink-600,
+.bg-pink-700 {
+  background-color: #DB2777 !important;
+  color: #FFFFFF !important;
+  border-color: #BE185D !important;
+}
+
+button.bg-pink-600:hover,
+button.bg-pink-700:hover {
+  background-color: #BE185D !important;
+}
+
+/* Standard Blue Action Buttons */
+button.bg-blue-600,
+button.bg-blue-700,
+.bg-blue-600,
+.bg-blue-700 {
+  background-color: #2563EB !important;
+  color: #FFFFFF !important;
+}
+
+button.bg-blue-600:hover,
+button.bg-blue-700:hover {
+  background-color: #1D4ED8 !important;
+}
+
+/* Ensure text and SVGs inside accent buttons stay pure white */
+button.bg-blue-600 *,
+button.bg-blue-700 *,
+button.bg-pink-600 *,
+button.bg-pink-700 *,
+.bg-blue-600 *,
+.bg-pink-600 * {
+  color: #FFFFFF !important;
 }
 
 /* 6. Modal Backdrops & Overlays */
 .bg-slate-950\/90,
+.bg-slate-900\/60,
 .bg-black\/80,
 .bg-black\/70,
 .bg-black\/60,
@@ -443,13 +479,13 @@ button.bg-yellow-500 * {
   -webkit-backdrop-filter: blur(6px) !important;
 }
 
-/* 7. Form Inputs, Selects & Textareas */
+/* 7. Form Inputs, Selects & Textareas - Clean White with Blue Focus */
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
-  border-color: #CBD5E1 !important;
+  border-color: #E2E8F0 !important;
   font-weight: 500;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -457,21 +493,21 @@ textarea {
 input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
-  border-color: #D97706 !important;
+  border-color: #2563EB !important;
   outline: none !important;
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #64748B !important;
+  color: #94A3B8 !important;
   opacity: 0.85;
   font-weight: 400;
 }
 
 /* 8. Tables & Data Grids */
 table th {
-  background-color: #F8FAFC !important;
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
   border-color: #E2E8F0 !important;
   font-weight: 700 !important;
