@@ -1245,7 +1245,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                     <span className="text-purple-300/60 text-[10px] font-bold uppercase block">Auth Provider</span>
                     <span className="text-emerald-300 font-semibold flex items-center gap-1">
                       <Shield className="w-3.5 h-3.5" />
-                      Firebase Password / Google Auth
+                      Email & Password Auth
                     </span>
                   </div>
                 </div>

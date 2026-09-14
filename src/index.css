@@ -21,7 +21,8 @@ html {
   text-rendering: optimizeLegibility;
   width: 100%;
   max-width: 100vw;
-  overflow-x: clip !important;
+  overflow-x: hidden !important;
+  overflow-x: clip;
 }
 
 body {
@@ -38,7 +39,8 @@ body {
   max-width: 100vw;
   min-height: 100vh;
   min-height: 100dvh;
-  overflow-x: clip !important;
+  overflow-x: hidden !important;
+  overflow-x: clip;
 }
 
 #root {
@@ -49,7 +51,8 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow-x: clip !important;
+  overflow-x: hidden !important;
+  overflow-x: clip;
   position: relative;
 }
 
@@ -474,9 +477,23 @@ button.bg-pink-700 *,
 .bg-black\/40,
 .bg-\[\#05020d\]\/80,
 .bg-\[\#06030c\]\/85 {
-  background-color: rgba(15, 23, 42, 0.55) !important;
-  backdrop-filter: blur(6px) !important;
-  -webkit-backdrop-filter: blur(6px) !important;
+  background-color: rgba(15, 23, 42, 0.65) !important;
+}
+
+@supports (backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px)) {
+  .bg-slate-950\/90,
+  .bg-slate-900\/60,
+  .bg-black\/80,
+  .bg-black\/70,
+  .bg-black\/60,
+  .bg-black\/50,
+  .bg-black\/40,
+  .bg-\[\#05020d\]\/80,
+  .bg-\[\#06030c\]\/85 {
+    background-color: rgba(15, 23, 42, 0.55) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
 }
 
 /* 7. Form Inputs, Selects & Textareas - Clean White with Blue Focus */

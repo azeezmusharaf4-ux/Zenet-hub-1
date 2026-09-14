@@ -3,12 +3,11 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   sendPasswordResetEmail,
-  GoogleAuthProvider, 
-  signInWithPopup,
   updateProfile 
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { safeLocalStorage } from '../utils/storage';
 import { 
   X, 
   Lock, 
@@ -24,7 +23,6 @@ import {
   Wallet, 
   TrendingUp, 
   Sparkles, 
-  Phone, 
   ArrowRight
 } from 'lucide-react';
 
@@ -35,6 +33,7 @@ interface AuthModalProps {
   onSwitchMode?: (mode: 'login' | 'signup') => void;
   sessionExpiredNotice?: string;
   hideCloseButton?: boolean;
+  isFullScreenPage?: boolean;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -43,7 +42,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess,
   onSwitchMode,
   sessionExpiredNotice,
-  hideCloseButton = false
+  hideCloseButton = false,
+  isFullScreenPage = true
 }) => {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>(initialMode);
 
@@ -51,17 +51,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setMode(initialMode);
   }, [initialMode]);
   
-  // Registration Form Fields
+  // Credentials Form Fields
   const [username, setUsername] = useState('');
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   
-  // Password Visibility Toggles
+  // Password Visibility Toggle
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Referral Code
   const [referralCode, setReferralCode] = useState(() => {
@@ -69,7 +65,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const urlParams = new URLSearchParams(window.location.search);
       const paramRef = urlParams.get('ref') || urlParams.get('referral');
       if (paramRef) return paramRef.toUpperCase();
-      return localStorage.getItem('pending_referral_code') || '';
+      return safeLocalStorage.getItem('pending_referral_code') || '';
     } catch {
       return '';
     }
@@ -101,49 +97,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const strength = getPasswordStrength(password);
 
-  const handleGoogleSignIn = async () => {
-    if (loading) return;
-    setLoading(true);
-    setError('');
-    setSuccessMsg('');
-    try {
-      localStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
-      const provider = new GoogleAuthProvider();
-      const res = await signInWithPopup(auth, provider);
-      const user = res.user;
-
-      // Save user profile in Firestore
-      if (user) {
-        const userRef = doc(db, 'users', user.uid);
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || user.email?.split('@')[0] || 'User',
-          photoURL: user.photoURL || '',
-          createdAt: new Date().toISOString(),
-          status: 'active',
-          role: user.email === 'azeezmusharaf4@gmail.com' ? 'owner' : 'buyer'
-        }, { merge: true });
-      }
-
-      setStatusMsg('Securing connection and loading your customized dashboard...');
-      onSuccess();
-    } catch (err: any) {
-      console.warn('Google Sign-In notice:', err?.code || err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in popup closed before completion.');
-      } else {
-        setError(err.message || 'Google Sign-In failed.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      setError('Please enter your email address.');
+      setError('Please enter your Gmail/email address.');
       return;
     }
 
@@ -152,15 +109,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMsg('');
 
     try {
-      await sendPasswordResetEmail(auth, email);
-      setSuccessMsg(`If an account exists for ${email}, a password reset link has been sent to your inbox.`);
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      setSuccessMsg(`If an account exists for ${email.trim()}, a password reset link has been sent to your inbox.`);
     } catch (err: any) {
       console.warn('Password reset notice:', err?.code || err);
       const code = err.code || '';
       if (code === 'auth/invalid-email') {
-        setError('Please enter a valid email address.');
+        setError('Please enter a valid Gmail/email address.');
       } else {
-        setSuccessMsg(`If an account exists for ${email}, a password reset link has been sent to your inbox.`);
+        setSuccessMsg(`If an account exists for ${email.trim()}, a password reset link has been sent to your inbox.`);
       }
     } finally {
       setLoading(false);
@@ -177,14 +134,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError('');
     setSuccessMsg('');
 
-    if (!email || !password) {
-      setError('Please fill in all required fields.');
-      return;
-    }
+    const cleanUsername = username.trim();
+    const cleanEmail = email.trim().toLowerCase();
 
-    if (mode === 'signup') {
-      if (password !== confirmPassword) {
-        setError('Passwords do not match. Please verify your confirm password.');
+    if (mode === 'login') {
+      if (!cleanEmail || !password) {
+        setError('Please enter your Gmail/email address and password to log in.');
+        return;
+      }
+    } else {
+      if (!cleanUsername || !cleanEmail || !password) {
+        setError('Please fill in all required fields: Username, Gmail/email address, and Password.');
         return;
       }
       if (password.length < 6) {
@@ -194,49 +154,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     setLoading(true);
-    localStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
+    safeLocalStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
 
     try {
       if (mode === 'signup') {
         // Save referral code if provided
         if (referralCode.trim()) {
-          try {
-            localStorage.setItem('pending_referral_code', referralCode.trim().toUpperCase());
-          } catch (e) {
-            console.warn('LocalStorage error:', e);
-          }
+          safeLocalStorage.setItem('pending_referral_code', referralCode.trim().toUpperCase());
         }
 
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         const user = userCredential.user;
 
-        const effectiveDisplayName = username.trim() || displayNameFallback(fullName, email);
-
-        // Update Auth Profile
+        // Update Auth Profile display name
         await updateProfile(user, {
-          displayName: effectiveDisplayName
-        });
+          displayName: cleanUsername
+        }).catch(() => {});
 
         // Write User Profile to Firestore
         const userRef = doc(db, 'users', user.uid);
         await setDoc(userRef, {
           uid: user.uid,
-          email: user.email || '',
-          displayName: effectiveDisplayName,
-          username: username.trim() || effectiveDisplayName,
-          fullName: fullName.trim(),
-          phoneNumber: phone.trim(),
-          whatsapp: phone.trim(),
+          email: cleanEmail,
+          username: cleanUsername,
+          displayName: cleanUsername,
+          password: password,
           createdAt: new Date().toISOString(),
           status: 'active',
-          role: user.email === 'azeezmusharaf4@gmail.com' ? 'owner' : 'buyer'
-        }, { merge: true });
+          role: cleanEmail === 'azeezmusharaf4@gmail.com' ? 'owner' : 'buyer',
+          walletBalance: 0
+        }, { merge: true }).catch(() => {});
 
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        // Login Flow: Email & Password ONLY
+        const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+        const user = userCredential.user;
+
+        // Keep lastLoginAt updated without blocking or failing
+        const userRef = doc(db, 'users', user.uid);
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: cleanEmail,
+          lastLoginAt: new Date().toISOString()
+        }, { merge: true }).catch(() => {});
       }
 
-      setStatusMsg('Securing connection and loading your customized dashboard...');
+      setStatusMsg('Login successful! Entering marketplace...');
       onSuccess();
     } catch (err: any) {
       console.warn('Auth notice:', err?.code || err);
@@ -244,17 +207,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const code = err.code || '';
 
       if (code === 'auth/operation-not-allowed') {
-        msg = 'Email/Password Authentication is disabled in Firebase. Enable it in Firebase Console > Authentication, or sign in with Google.';
+        msg = 'Email/Password Authentication is currently unavailable. Please contact support.';
       } else if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         msg = mode === 'login' 
-          ? 'Invalid email or password. If you do not have an account yet, switch to "Create Account" to register.'
+          ? 'Incorrect email or password. Please verify your credentials and try again.'
           : 'Invalid credentials provided. Please check your email and password.';
       } else if (code === 'auth/email-already-in-use') {
-        msg = 'An account with this email already exists. Please switch to "Log In" to access your account.';
+        msg = 'An account with this Gmail/email address already exists. Please switch to "Log in" to access your account.';
       } else if (code === 'auth/weak-password') {
         msg = 'Password should be at least 6 characters.';
       } else if (code === 'auth/invalid-email') {
-        msg = 'Please enter a valid email address.';
+        msg = 'Please enter a valid Gmail/email address.';
       } else if (code === 'auth/too-many-requests') {
         msg = 'Too many failed login attempts. Please wait a moment or reset your password.';
       }
@@ -271,11 +234,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto w-full max-w-full overscroll-contain">
+    <div className={`fixed inset-0 z-50 flex ${
+      isFullScreenPage 
+        ? 'flex-col items-stretch justify-start p-0 m-0 bg-white' 
+        : 'items-center justify-center p-0 sm:p-4 md:p-6 bg-white sm:bg-black/40 sm:backdrop-blur-sm'
+    } overflow-y-auto overflow-x-hidden w-full max-w-full min-h-screen min-h-[100dvh] overscroll-contain`}>
       
       {/* Outer Container Card - 2 Column on Desktop */}
       <div 
-        className="bg-white border border-[#E9E2FA] rounded-2xl sm:rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl relative my-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col md:flex-row text-[#171329] min-h-0"
+        className={`bg-white ${
+          isFullScreenPage 
+            ? 'border-0 rounded-none w-full max-w-full m-0 min-h-screen min-h-[100dvh] shadow-none' 
+            : 'border-0 sm:border sm:border-[#E9E2FA] rounded-none sm:rounded-3xl w-full sm:max-w-5xl m-0 sm:my-auto sm:max-h-[90vh] shadow-none sm:shadow-2xl min-h-screen sm:min-h-0'
+        } overflow-x-hidden relative flex flex-col md:flex-row text-[#171329] flex-1`}
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -375,58 +346,57 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* RIGHT COLUMN: Registration Form & Auth Card */}
-        <div className="w-full md:w-7/12 p-4 sm:p-7 lg:p-9 flex flex-col justify-between overflow-y-auto flex-1 min-h-0 bg-white">
+        <div className="w-full md:w-7/12 pt-7 sm:pt-9 md:pt-10 pb-6 px-4 sm:px-7 lg:px-9 flex flex-col justify-between overflow-y-auto flex-1 min-h-0 bg-white">
           {statusMsg ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-4 sm:p-6 space-y-6 my-auto animate-in fade-in zoom-in duration-300">
-              <div className="w-16 h-16 rounded-full bg-[#EDE9FE] border border-[#C4B5FD] flex items-center justify-center relative shrink-0">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-4 sm:p-6 space-y-5 my-auto animate-in fade-in zoom-in duration-300">
+              <div className="w-14 h-14 rounded-full bg-[#EDE9FE] border border-[#C4B5FD] flex items-center justify-center relative shrink-0">
                 <span className="absolute inset-0 rounded-full border-2 border-[#C4B5FD] border-t-[#7C3AED] animate-spin"></span>
-                <CheckCircle2 className="w-8 h-8 text-[#7C3AED] animate-pulse" />
+                <CheckCircle2 className="w-7 h-7 text-[#7C3AED] animate-pulse" />
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-[#171329]">Login Successful</h3>
-                <p className="text-sm text-[#716B82] leading-relaxed max-w-sm">
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-bold text-[#171329]">Login Successful</h3>
+                <p className="text-xs sm:text-sm text-[#716B82] leading-relaxed max-w-sm">
                   {statusMsg}
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-4 sm:space-y-5">
+            <div className="space-y-3.5 sm:space-y-4">
             
             {/* Top Tag & Title */}
-            <div>
-              <span className="text-[10px] font-black tracking-widest text-[#7C3AED] uppercase block mb-1">
-                {mode === 'forgot' ? 'ACCOUNT RECOVERY' : mode === 'login' ? 'WELCOME BACK' : 'REGISTER ACCOUNT'}
+            <div className="mb-2 sm:mb-3">
+              <span className="text-[10px] font-bold tracking-widest text-[#7C3AED] uppercase block mb-1">
+                {mode === 'forgot' ? 'ACCOUNT RECOVERY' : mode === 'login' ? 'LOGIN' : 'REGISTER ACCOUNT'}
               </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-[#171329] tracking-tight">
-                {mode === 'forgot' ? 'Reset Password' : mode === 'login' ? 'Log In to Account' : 'Create Account'}
+              <h2 className="text-xl sm:text-2xl font-bold text-[#171329] tracking-tight">
+                {mode === 'forgot' ? 'Reset Password' : mode === 'login' ? 'Log in to Account' : 'Register Account'}
               </h2>
-              <p className="text-xs sm:text-sm text-[#716B82] mt-1">
+              <p className="text-xs text-[#716B82] mt-0.5 leading-normal">
                 {mode === 'forgot' 
-                  ? 'Enter your account email to receive a password reset link.' 
+                  ? 'Enter your account Gmail/email address to receive a password reset link.' 
                   : mode === 'login' 
-                  ? 'Access your dashboard, wallet balance, orders, and listings.' 
-                  : 'Join ZENET HUB Marketplace and start using your premium dashboard.'}
+                  ? 'Enter your Gmail/email address and password to log in.' 
+                  : 'Enter your username, Gmail/email address, and password to register your account.'}
               </p>
             </div>
 
             {/* Error Banner */}
             {error && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 sm:p-3.5 rounded-2xl flex flex-col gap-2 text-xs animate-in fade-in">
-                <div className="flex items-start gap-2.5">
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 p-2.5 sm:p-3 rounded-xl flex flex-col gap-1.5 text-xs animate-in fade-in">
+                <div className="flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
                   <span className="leading-relaxed">{error}</span>
                 </div>
-                {mode === 'login' && (error.includes('Invalid email or password') || error.includes('Create Account') || error.includes('invalid-credential')) && (
+                {mode === 'login' && (error.includes('register') || error.includes('Invalid username') || error.includes('invalid-credential')) && (
                   <button
                     type="button"
                     onClick={() => {
                       setMode('signup');
-                      if (password) setConfirmPassword(password);
                       setError('');
                     }}
-                    className="self-start mt-1 bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-[11px] px-3 py-1.5 rounded-xl border border-rose-300 transition cursor-pointer flex items-center gap-1.5"
+                    className="self-start mt-0.5 bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-[11px] px-2.5 py-1 rounded-lg border border-rose-300 transition cursor-pointer flex items-center gap-1"
                   >
-                    <span>Create an account now →</span>
+                    <span>Register account now →</span>
                   </button>
                 )}
               </div>
@@ -434,75 +404,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             {/* Success Message Banner */}
             {successMsg && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 sm:p-3.5 rounded-2xl flex items-start gap-2.5 text-xs animate-in fade-in">
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-2.5 sm:p-3 rounded-xl flex items-start gap-2 text-xs animate-in fade-in">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
                 <span className="leading-relaxed">{successMsg}</span>
               </div>
             )}
 
-            {/* Google Quick Sign-In Option */}
-            {mode !== 'forgot' && (
-              <div>
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#171329] font-bold py-3 px-4 rounded-2xl border border-[#E9E2FA] shadow-sm transition cursor-pointer text-xs sm:text-sm disabled:opacity-50 active:scale-[0.99] shrink-0 min-h-[44px]"
-                >
-                  <svg 
-                    width="18" 
-                    height="18" 
-                    viewBox="0 0 24 24" 
-                    className="w-4.5 h-4.5 min-w-[18px] min-h-[18px] max-w-[18px] max-h-[18px] shrink-0 block"
-                    style={{ width: '18px', height: '18px', minWidth: '18px', minHeight: '18px', maxWidth: '18px', maxHeight: '18px' }}
-                  >
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  <span className="truncate">Continue with Google</span>
-                </button>
-
-                <div className="relative flex items-center justify-center my-3 sm:my-4">
-                  <div className="border-t border-[#E9E2FA] w-full" />
-                  <span className="bg-white px-3 text-[11px] text-[#716B82] uppercase tracking-widest font-bold shrink-0">
-                    or fill details
-                  </span>
-                  <div className="border-t border-[#E9E2FA] w-full" />
-                </div>
-              </div>
-            )}
-
             {/* FORM */}
-            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5 text-xs sm:text-sm">
+            <form onSubmit={handleSubmit} className="space-y-3 text-xs sm:text-sm">
               
               {/* FORGOT PASSWORD FORM ONLY */}
               {mode === 'forgot' && (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-[#171329] font-bold mb-1.5">Email Address</label>
+                    <label className="block text-[#171329] font-bold mb-1 text-xs">Gmail / Email Address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                       <input
                         type="email"
-                        placeholder="name@domain.com"
+                        placeholder="name@gmail.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-10 pr-4 py-3 rounded-2xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-sm"
+                        className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-sm"
                       />
                     </div>
                   </div>
@@ -510,7 +434,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-extrabold py-3.5 rounded-2xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 min-h-[46px]"
+                    className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold py-2.5 sm:py-3 rounded-xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 min-h-[42px] text-sm"
                   >
                     {loading ? 'Sending...' : 'Send Reset Link →'}
                   </button>
@@ -518,7 +442,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="button"
                     onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
-                    className="w-full text-center text-xs text-[#716B82] hover:text-[#171329] font-bold transition flex items-center justify-center gap-1.5 pt-2 cursor-pointer"
+                    className="w-full text-center text-xs text-[#716B82] hover:text-[#171329] font-bold transition flex items-center justify-center gap-1.5 pt-1 cursor-pointer"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Back to Log In</span>
@@ -526,69 +450,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               )}
 
-              {/* SIGN UP FIELDS (2-COL GRID FOR INPUTS) */}
+              {/* REGISTRATION FLOW */}
               {mode === 'signup' && (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    
-                    {/* Username Field */}
+                  <div className="space-y-2.5">
+                    {/* Username Field (Registration only) */}
                     <div>
                       <label className="block text-[#171329] font-bold mb-1 text-xs">Username</label>
                       <div className="relative">
                         <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                         <input
                           type="text"
-                          placeholder="alex_zenet"
+                          placeholder="Choose a username"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           required
-                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-2.5 sm:py-2 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-sm sm:text-xs"
                         />
                       </div>
                     </div>
 
-                    {/* Full Name Field */}
+                    {/* Gmail / Email Address Field */}
                     <div>
-                      <label className="block text-[#171329] font-bold mb-1 text-xs">Full Name</label>
-                      <div className="relative">
-                        <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
-                        <input
-                          type="text"
-                          placeholder="Alex Johnson"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Email Field */}
-                    <div>
-                      <label className="block text-[#171329] font-bold mb-1 text-xs">Email Address</label>
+                      <label className="block text-[#171329] font-bold mb-1 text-xs">Gmail / Email Address</label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
                         <input
                           type="email"
-                          placeholder="name@domain.com"
+                          placeholder="name@gmail.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required
-                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Phone Number Field */}
-                    <div>
-                      <label className="block text-[#171329] font-bold mb-1 text-xs">Phone Number</label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
-                        <input
-                          type="tel"
-                          placeholder="08012345678"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-2.5 sm:py-2 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-sm sm:text-xs"
                         />
                       </div>
                     </div>
@@ -605,48 +498,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           onChange={(e) => setPassword(e.target.value)}
                           required
                           minLength={6}
-                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-9 py-2.5 sm:py-2 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-sm sm:text-xs"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329]"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] p-1"
                         >
                           {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                       </div>
                     </div>
-
-                    {/* Confirm Password Field */}
-                    <div>
-                      <label className="block text-[#171329] font-bold mb-1 text-xs">Confirm Password</label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
-                        <input
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          required
-                          minLength={6}
-                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329]"
-                        >
-                          {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-
                   </div>
 
                   {/* Password Strength Bar */}
                   {password && (
-                    <div className="space-y-1 pt-1">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-[#716B82]">
+                    <div className="space-y-1 pt-0.5">
+                      <div className="flex items-center justify-between text-[10px] font-semibold text-[#716B82]">
                         <span>Password Strength</span>
                         <span className="font-extrabold text-[#171329]">{strength.label}</span>
                       </div>
@@ -662,120 +530,123 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   )}
 
                   {/* Referral Code (Optional) */}
-                  <div className="pt-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[#171329] font-bold flex items-center gap-1 text-xs">
-                        <Gift className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span>Referral Code</span>
-                      </label>
-                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Optional</span>
-                    </div>
-                    <div className="relative">
+                  {referralCode && (
+                    <div className="pt-0.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[#171329] font-bold flex items-center gap-1 text-xs">
+                          <Gift className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span>Referral Code</span>
+                        </label>
+                        <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Applied</span>
+                      </div>
                       <input
                         type="text"
-                        placeholder="e.g. ZN-7A9B2"
                         value={referralCode}
                         onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                        className="w-full bg-[#F8F7FF] text-[#7C3AED] font-mono font-bold text-base sm:text-xs tracking-wider px-3 py-2.5 sm:py-2 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white placeholder:text-[#716B82]/40"
+                        className="w-full bg-[#F8F7FF] text-[#7C3AED] font-mono font-bold text-xs tracking-wider px-3 py-2 rounded-xl border border-[#E9E2FA]"
                       />
                     </div>
-                  </div>
+                  )}
 
-                  {/* Terms & Privacy Notice */}
-                  <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-3 rounded-2xl flex items-start gap-2 text-[11px] text-[#716B82] leading-relaxed mt-2">
-                    <span className="w-2 h-2 rounded-full bg-[#7C3AED] shrink-0 mt-1.5 shadow-sm"></span>
+                  {/* Terms Notice */}
+                  <div className="bg-[#F8F7FF] border border-[#E9E2FA] p-2.5 rounded-xl flex items-start gap-2 text-[11px] text-[#716B82] leading-relaxed">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#7C3AED] shrink-0 mt-1.5 shadow-sm"></span>
                     <span>
-                      By creating an account, you agree to use ZENET HUB Marketplace responsibly and keep your login details private.
+                      Your credentials belong exclusively to your account. Keep your login details confidential.
                     </span>
                   </div>
 
-                  {/* Create Account Submit Button */}
+                  {/* Register account Submit Button */}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-black py-3.5 rounded-2xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-3 active:scale-[0.99] min-h-[46px]"
+                    className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold py-2.5 sm:py-3 rounded-xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-2 active:scale-[0.99] min-h-[42px]"
                   >
                     {loading ? (
                       <>
                         <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        <span>Creating Account...</span>
+                        <span>Registering account...</span>
                       </>
                     ) : (
                       <>
-                        <span>Create account</span>
+                        <span>Register account</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
 
                   {/* Toggle to Login */}
-                  <div className="pt-3 text-center border-t border-[#E9E2FA]">
-                    <span className="text-xs text-[#716B82] block mb-2 font-semibold">Already registered?</span>
+                  <div className="pt-2 text-center border-t border-[#E9E2FA]">
+                    <span className="text-xs text-[#716B82] block mb-1.5 font-semibold">Already have an account?</span>
                     <button
                       type="button"
                       onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
-                      className="w-full bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] font-bold py-2.5 px-4 rounded-xl border border-[#E9E2FA] transition cursor-pointer text-xs min-h-[42px]"
+                      className="w-full bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] font-semibold py-2 px-3 rounded-xl border border-[#E9E2FA] transition cursor-pointer text-xs min-h-[38px]"
                     >
-                      Already have an account? <span className="text-[#7C3AED] font-bold ml-1">Login now</span>
+                      Already have an account? <span className="text-[#7C3AED] font-bold ml-1">Log in</span>
                     </button>
                   </div>
                 </>
               )}
 
-              {/* LOG IN FIELDS */}
+              {/* LOGIN FLOW - EMAIL & PASSWORD ONLY (NO USERNAME) */}
               {mode === 'login' && (
                 <>
-                  <div>
-                    <label className="block text-[#171329] font-bold mb-1 text-xs">Email Address</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
-                      <input
-                        type="email"
-                        placeholder="name@domain.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
-                      />
+                  <div className="space-y-2.5">
+                    {/* Gmail / Email Address Field */}
+                    <div>
+                      <label className="block text-[#171329] font-bold mb-1 text-xs">Gmail / Email Address</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
+                        <input
+                          type="email"
+                          placeholder="name@gmail.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-3 py-2.5 sm:py-2 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-sm sm:text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password Field */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[#171329] font-bold text-xs">Password</label>
+                        <button
+                          type="button"
+                          onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); }}
+                          className="text-xs font-semibold text-[#7C3AED] hover:text-[#5B21B6] transition cursor-pointer py-0.5"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-9 py-2.5 sm:py-2 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-sm sm:text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] p-1"
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-[#171329] font-bold text-xs">Password</label>
-                      <button
-                        type="button"
-                        onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); }}
-                        className="text-xs font-bold text-[#7C3AED] hover:text-[#5B21B6] transition cursor-pointer py-1"
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#716B82] shrink-0" />
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="w-full bg-[#F8F7FF] text-[#171329] placeholder-[#716B82]/50 pl-9 pr-9 py-3 sm:py-2.5 rounded-xl border border-[#E9E2FA] focus:outline-none focus:border-[#7C3AED] focus:bg-white transition text-base sm:text-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] p-1"
-                      >
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Submit Login Button */}
+                  {/* Submit Log In Button */}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-[#7C3AED] hover:bg-[#5B21B6] text-white font-black py-3.5 rounded-2xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-3 active:scale-[0.99] min-h-[46px]"
+                    className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold py-2.5 sm:py-3 rounded-xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm mt-3 active:scale-[0.99] min-h-[42px]"
                   >
                     {loading ? (
                       <>
@@ -784,21 +655,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </>
                     ) : (
                       <>
-                        <span>Log in to ZENET HUB</span>
+                        <span>Log in</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
                   </button>
 
-                  {/* Switch to Signup */}
-                  <div className="pt-3 text-center border-t border-[#E9E2FA]">
-                    <span className="text-xs text-[#716B82] block mb-2 font-semibold">New to ZENET HUB?</span>
+                  {/* Switch to Registration */}
+                  <div className="pt-2 text-center border-t border-[#E9E2FA]">
+                    <span className="text-xs text-[#716B82] block mb-1.5 font-semibold">Don't have an account yet?</span>
                     <button
                       type="button"
                       onClick={() => { setMode('signup'); setError(''); setSuccessMsg(''); }}
-                      className="w-full bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] font-bold py-2.5 px-4 rounded-xl border border-[#E9E2FA] transition cursor-pointer text-xs min-h-[42px]"
+                      className="w-full bg-[#F8F7FF] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] font-semibold py-2 px-3 rounded-xl border border-[#E9E2FA] transition cursor-pointer text-xs min-h-[38px]"
                     >
-                      Don't have an account yet? <span className="text-[#7C3AED] font-bold ml-1">Register now</span>
+                      Don't have an account yet? <span className="text-[#7C3AED] font-bold ml-1">Register account</span>
                     </button>
                   </div>
                 </>
@@ -810,7 +681,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {/* Copyright Footer */}
-          <div className="pt-6 text-center text-[10px] text-[#716B82] font-semibold border-t border-[#E9E2FA] mt-6">
+          <div className="pt-4 text-center text-[10px] text-[#716B82] font-semibold border-t border-[#E9E2FA] mt-4">
             © {new Date().getFullYear()} ZENET HUB Marketplace. All rights reserved.
           </div>
 

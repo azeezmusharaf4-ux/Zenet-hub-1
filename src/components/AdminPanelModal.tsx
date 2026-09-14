@@ -19,7 +19,8 @@ import {
   PurchaseRecord, 
   ReportItem, 
   SellerReview, 
-  CategoryType 
+  CategoryType,
+  InventoryAccountItem
 } from '../types';
 import {
   X,
@@ -304,14 +305,15 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
     }
 
     const itemId = 'inv_' + Math.random().toString(36).substr(2, 9);
-    const newItem = {
+    const newItem: InventoryAccountItem = {
       id: itemId,
       status: 'Available',
       accountEmail: newEmail.trim(),
       accountPassword: newPassword.trim(),
       additionalInstructions: newInstructions.trim(),
       notes: newInstructions.trim(),
-      delivery_value: newEmail.trim() + (newPassword.trim() ? ` | ${newPassword.trim()}` : '')
+      delivery_value: newEmail.trim() + (newPassword.trim() ? ` | ${newPassword.trim()}` : ''),
+      soldTo: null
     };
 
     const updatedInventoryList = [...inventory, newItem];
@@ -341,13 +343,13 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
       // Recalculate stock and status locally using the updated array to bypass caching latency
       const unusedCount = updatedInventoryList.filter(item => (item.status || '').toLowerCase() !== 'sold').length;
 
-      const updatedInventoryArray = updatedInventoryList.map(item => ({
+      const updatedInventoryArray: InventoryAccountItem[] = updatedInventoryList.map(item => ({
         id: item.id,
         status: item.status || 'Available',
         accountEmail: item.accountEmail || '',
         notes: item.notes || '',
         additionalInstructions: item.additionalInstructions || '',
-        soldTo: item.soldTo || null
+        soldTo: (item as any).soldTo || null
       }));
 
       const listingRef = doc(db, 'listings', listing.id);
@@ -395,13 +397,13 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
       // Calculate stock and status locally using the remaining array to bypass caching latency
       const unusedCount = remaining.filter(item => (item.status || '').toLowerCase() !== 'sold').length;
 
-      const updatedInventoryArray = remaining.map(item => ({
+      const updatedInventoryArray: InventoryAccountItem[] = remaining.map(item => ({
         id: item.id,
         status: item.status || 'Available',
         accountEmail: item.accountEmail || '',
         notes: item.notes || '',
         additionalInstructions: item.additionalInstructions || '',
-        soldTo: item.soldTo || null
+        soldTo: (item as any).soldTo || null
       }));
 
       const listingRef = doc(db, 'listings', listing.id);

@@ -14,7 +14,9 @@ export type CategoryType =
   | 'Threads' 
   | 'WhatsApp' 
   | 'YouTube' 
-  | 'Other';
+  | 'virtual_number'
+  | 'Other'
+  | string;
 
 export interface DigitalProductDetails {
   inventoryId?: string;
@@ -38,7 +40,8 @@ export interface InventoryAccountItem {
   twoFactorSecretKey?: string;
   twoFactorBackupCodes?: string;
   additionalInstructions?: string;
-  status: 'Available' | 'Sold' | 'available' | 'sold';
+  delivery_value?: string;
+  status: 'Available' | 'Sold' | 'available' | 'sold' | string;
   soldAt?: string | null;
   soldTo?: string | null;
   soldToEmail?: string | null;
@@ -95,7 +98,9 @@ export interface UserProfile {
   username?: string;
   fullName?: string;
   phoneNumber?: string;
+  password?: string;
   photoURL?: string;
+  avatarUrl?: string;
   whatsapp?: string;
   telegram?: string;
   bio?: string;
@@ -103,6 +108,7 @@ export interface UserProfile {
   emailNotifications?: boolean;
   createdAt: string;
   role?: 'owner' | 'admin' | 'seller' | 'buyer' | 'manager' | 'customer';
+  isOwner?: boolean;
   status?: 'active' | 'suspended';
   walletBalance?: number;
   paystackCustomerCode?: string;
@@ -311,11 +317,12 @@ export interface SocialBoostService {
   id: string;
   service?: string | number; // Upstream service ID alias
   rate?: number; // Upstream rate alias
+  pricePerThousandNgn?: number; // Selling price per 1,000 NGN alias
   platform: 'TikTok' | 'Instagram' | 'Facebook' | 'YouTube' | 'Twitter/X' | 'Telegram' | 'Spotify' | 'Threads' | 'Other' | string;
   category: string;
   name: string;
-  type: 'Followers' | 'Likes' | 'Views' | 'Comments' | 'Shares' | 'Subscribers' | 'Members' | 'Watch Hours' | 'Plays' | 'Reactions' | 'Other' | string;
-  ratePer1000: number; // Customer selling price per 1,000 in NGN
+  type?: 'Followers' | 'Likes' | 'Views' | 'Comments' | 'Shares' | 'Subscribers' | 'Members' | 'Watch Hours' | 'Plays' | 'Reactions' | 'Other' | string;
+  ratePer1000?: number; // Customer selling price per 1,000 in NGN
   providerRatePer1000?: number; // Upstream provider cost per 1,000 (Owner only)
   markupPer1000?: number; // Margin per 1,000 (Owner only)
   providerServiceId?: string | number; // Provider upstream service ID (Owner only)
@@ -325,7 +332,7 @@ export interface SocialBoostService {
   deliverySpeed?: string;
   refill?: boolean;
   quality?: string;
-  isActive: boolean;
+  isActive?: boolean;
   isBestValue?: boolean;
   isCheapest?: boolean;
   inputLabel?: string;
@@ -335,25 +342,28 @@ export interface SocialBoostService {
 
 export interface SocialBoostOrder {
   id: string;
-  orderId: string;
-  userId: string;
-  userEmail: string;
+  orderId?: string;
+  userId?: string;
+  userEmail?: string;
   userName?: string;
-  platform: string;
-  serviceId: string;
-  serviceName: string;
-  serviceType: string;
-  target: string;
+  platform?: string;
+  serviceId?: string;
+  serviceName?: string;
+  serviceType?: string;
+  target?: string;
+  targetUrl?: string;
+  link?: string;
   quantity: number;
-  charge: number; // in NGN
+  charge?: number; // in NGN
+  totalChargeNgn?: number;
   providerCost?: number;
   markup?: number;
   profit?: number;
   providerOrderId?: string;
-  status: 'pending' | 'in_progress' | 'processing' | 'completed' | 'partial' | 'canceled' | string;
+  status?: 'pending' | 'in_progress' | 'processing' | 'completed' | 'partial' | 'canceled' | string;
   startCount?: number;
   remains?: number;
-  createdAt: string;
+  createdAt?: string;
   updatedAt?: string;
 }
 

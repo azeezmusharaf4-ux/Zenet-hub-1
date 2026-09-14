@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Share, PlusSquare, Check } from 'lucide-react';
+import { safeSessionStorage } from '../utils/storage';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -38,7 +39,7 @@ export const PWAInstallBanner: React.FC = () => {
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [showIOSModal, setShowIOSModal] = useState<boolean>(false);
   const [isDismissed, setIsDismissed] = useState<boolean>(() => {
-    return typeof window !== 'undefined' ? !!sessionStorage.getItem('zenet_pwa_dismissed') : false;
+    return !!safeSessionStorage.getItem('zenet_pwa_dismissed');
   });
   const [installedSuccess, setInstalledSuccess] = useState<boolean>(false);
 
@@ -121,7 +122,7 @@ export const PWAInstallBanner: React.FC = () => {
 
   const handleDismiss = () => {
     setIsDismissed(true);
-    sessionStorage.setItem('zenet_pwa_dismissed', 'true');
+    safeSessionStorage.setItem('zenet_pwa_dismissed', 'true');
   };
 
   // Don't show banner if already installed or dismissed or not installable on current browser

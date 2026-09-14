@@ -7,6 +7,8 @@
       "properties": {
         "uid": { "type": "string" },
         "email": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
         "whatsapp": { "type": "string" },

@@ -104,31 +104,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   return errInfo;
 }
 
-// Validate connection per skill instructions asynchronously without blocking auth initialization
-if (typeof window !== 'undefined') {
-  const testConnection = async () => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      return;
-    }
-    try {
-      await getDocFromServer(doc(db, 'test', 'connection'));
-    } catch {
-      // Quietly allow offline mode fallback when network is slow or connecting
-    }
-  };
-
-  // Run testConnection after the initial execution frame to avoid racing with auth token init
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(() => {
-      testConnection().catch(() => {});
-    }, { timeout: 4000 });
-  } else {
-    setTimeout(() => {
-      testConnection().catch(() => {});
-    }, 2500);
-  }
-}
-
 /**
  * Sanitizes object payload by recursively stripping out any undefined property values
  * to prevent Firestore SDK throws on undefined field values.

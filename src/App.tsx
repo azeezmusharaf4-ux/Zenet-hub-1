@@ -277,7 +277,7 @@ export default function App() {
 
   // Navigation Drawer & Active View State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeView, setActiveView] = useState<ActiveAppView>('landing');
+  const [activeView, setActiveView] = useState<ActiveAppView>('marketplace');
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isZenetUpdateModalOpen, setIsZenetUpdateModalOpen] = useState(false);
   const [isZenetUpdateAdminModalOpen, setIsZenetUpdateAdminModalOpen] = useState(false);
@@ -306,7 +306,7 @@ export default function App() {
     }
     setUser(null);
     setAndCacheUserProfile(null);
-    setActiveView('landing');
+    setActiveView('marketplace');
   };
 
   const [dashboardTab, setDashboardTab] = useState<DashboardTab | null>(null);
@@ -745,6 +745,25 @@ export default function App() {
         setUser(currentUser);
         // Instant unlock - don't block the UI while fetching user doc
         setAuthLoading(false);
+        setAuthMode(null);
+        setSessionExpiredNotice('');
+        setActiveView((prev) => (prev === 'landing' ? 'marketplace' : prev));
+
+        // Immediately hydrate fallback profile if empty so user is never stuck on synchronization screen
+        setUserProfile((prev) => {
+          if (prev && prev.uid === currentUser.uid) return prev;
+          const fallbackProfile: UserProfile = {
+            uid: currentUser.uid,
+            email: currentUser.email || '',
+            username: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+            role: currentUser.email === 'azeezmusharaf4@gmail.com' ? 'owner' : 'buyer',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            walletBalance: 0
+          };
+          return fallbackProfile;
+        });
 
         // Sync user profile to Firestore & fetch role asynchronously in background
         const userRef = doc(db, 'users', currentUser.uid);
@@ -863,8 +882,12 @@ export default function App() {
 
           const profileData: UserProfile = {
             uid: currentUser.uid,
-            email: currentUser.email || '',
-            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Administrator',
+            email: currentUser.email || existingData.email || '',
+            username: existingData.username || currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+            displayName: existingData.displayName || currentUser.displayName || existingData.username || currentUser.email?.split('@')[0] || 'User',
+            fullName: existingData.fullName || undefined,
+            phoneNumber: existingData.phoneNumber || undefined,
+            password: existingData.password || undefined,
             createdAt: existingData.createdAt || new Date().toISOString(),
             role: assignedRole,
             status: existingData.status || 'active',
@@ -878,28 +901,30 @@ export default function App() {
             paystackCustomerCode: existingData.paystackCustomerCode || undefined
           };
 
-          await setDoc(userRef, sanitizeFirestorePayload(profileData), { merge: true });
           setAndCacheUserProfile(profileData);
-          if (activeView === 'landing') {
-            const urlParams = new URLSearchParams(window.location.search);
-            const vParam = urlParams.get('view') as ActiveAppView;
-            const validViews: ActiveAppView[] = [
-              'marketplace',
-              'social-boost',
-              'virtual-numbers',
-              'log-accounts',
-              'categories',
-              'support',
-              'admin_wallets'
-            ];
-            if (vParam && validViews.includes(vParam)) {
-              setActiveView(vParam);
-            } else {
-              setActiveView('marketplace');
-            }
+          setAuthMode(null);
+          setSessionExpiredNotice('');
+          const urlParams = new URLSearchParams(window.location.search);
+          const vParam = urlParams.get('view') as ActiveAppView;
+          const validViews: ActiveAppView[] = [
+            'marketplace',
+            'social-boost',
+            'virtual-numbers',
+            'log-accounts',
+            'categories',
+            'support',
+            'admin_wallets'
+          ];
+          if (vParam && validViews.includes(vParam)) {
+            setActiveView(vParam);
+          } else {
+            setActiveView('marketplace');
           }
+          await setDoc(userRef, sanitizeFirestorePayload(profileData), { merge: true }).catch((docErr) => {
+            console.warn('User profile background sync notice:', docErr);
+          });
         } catch (err) {
-          console.error('Error writing user profile:', err);
+          console.warn('Error during user profile sync:', err);
         }
       } else {
         setAndCacheUserProfile(null);
@@ -1809,7 +1834,7 @@ export default function App() {
   // Auth Loading Splash Screen
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#F8F7FF] text-[#171329] flex flex-col items-center justify-center p-4">
+      <div className="w-full min-h-screen min-h-[100dvh] bg-white text-[#171329] flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center space-y-4">
           <div className="w-14 h-14 rounded-2xl bg-[#7C3AED] shadow-sm flex items-center justify-center text-white font-black text-2xl">
             Z
@@ -1826,7 +1851,7 @@ export default function App() {
   // Enforce authentication: if no user is signed in, display a full-screen landing / authentication screen
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#F8F7FF] text-[#171329] font-sans antialiased flex flex-col items-center justify-center p-4 w-full">
+      <div className="w-full min-h-screen min-h-[100dvh] bg-white text-[#171329] font-sans antialiased flex flex-col m-0 p-0 overflow-x-hidden">
         <AuthModal
           mode={authMode === 'signup' ? 'signup' : 'login'}
           sessionExpiredNotice={sessionExpiredNotice}
@@ -1835,30 +1860,28 @@ export default function App() {
           }}
           onSwitchMode={(mode) => setAuthMode(mode)}
           onSuccess={() => {
-            // Success handler is managed by our dedicated useEffect to ensure smooth transition
+            setActiveView('marketplace');
+            setAuthMode(null);
+            setSessionExpiredNotice('');
           }}
           hideCloseButton={true}
+          isFullScreenPage={true}
         />
       </div>
     );
   }
 
-  // Prevent flash of un-synchronized profile data upon initial successful login
-  if (!userProfile) {
-    return (
-      <div className="min-h-screen bg-[#F8F7FF] text-[#171329] flex flex-col items-center justify-center p-4">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#7C3AED] shadow-sm flex items-center justify-center text-white font-black text-2xl">
-            Z
-          </div>
-          <div className="flex items-center space-x-2 text-xs font-bold text-[#716B82] tracking-wide uppercase">
-            <span className="w-4 h-4 border-2 border-[#E9E2FA] border-t-[#7C3AED] rounded-full animate-spin"></span>
-            <span>Synchronizing user session...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Reliable user profile fallback ensures the user instantly lands on marketplace without flash or delay
+  const activeUserProfile: UserProfile = userProfile || {
+    uid: user.uid,
+    email: user.email || '',
+    username: user.displayName || user.email?.split('@')[0] || 'User',
+    displayName: user.displayName || user.email?.split('@')[0] || 'User',
+    role: user.email === 'azeezmusharaf4@gmail.com' ? 'owner' : 'buyer',
+    status: 'active',
+    createdAt: new Date().toISOString(),
+    walletBalance: 0
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F7FF] text-[#171329] font-sans antialiased flex flex-row selection:bg-[#7C3AED] selection:text-white w-full max-w-full overflow-x-hidden">
@@ -2273,8 +2296,9 @@ export default function App() {
           }}
           onSwitchMode={(mode) => setAuthMode(mode)}
           onSuccess={() => {
-            // No-op here; let our dedicated useEffect close the modal
-            // only after both the authenticated user and userProfile states are fully synchronized.
+            setActiveView('marketplace');
+            setAuthMode(null);
+            setSessionExpiredNotice('');
           }}
         />
       )}
