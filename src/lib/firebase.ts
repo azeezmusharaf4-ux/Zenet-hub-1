@@ -1,5 +1,14 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth, setPersistence, browserLocalPersistence, onIdTokenChanged, User } from 'firebase/auth';
+import { 
+  getAuth, 
+  Auth, 
+  setPersistence, 
+  browserLocalPersistence, 
+  browserSessionPersistence, 
+  inMemoryPersistence, 
+  onIdTokenChanged, 
+  User 
+} from 'firebase/auth';
 import { getFirestore, Firestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
@@ -27,9 +36,12 @@ const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebas
 export const auth: Auth = getAuth(app);
 
 if (typeof window !== 'undefined') {
-  setPersistence(auth, browserLocalPersistence).catch((err) => {
-    console.warn('[Firebase Auth] Persistence initialization notice:', err);
-  });
+  setPersistence(auth, browserLocalPersistence)
+    .catch(() => setPersistence(auth, browserSessionPersistence))
+    .catch(() => setPersistence(auth, inMemoryPersistence))
+    .catch((err) => {
+      console.warn('[Firebase Auth] Persistence initialization notice:', err);
+    });
 }
 
 /**

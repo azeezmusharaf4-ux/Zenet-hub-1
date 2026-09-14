@@ -46,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#EDE9FE] w-full max-w-full overflow-x-hidden select-none safe-top-header">
+    <header className="sticky top-0 z-40 bg-white border-b border-[#EDE9FE] w-full max-w-full overflow-x-hidden select-none safe-top-header">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between space-x-2 sm:space-x-4">
         
         {/* Left Side: Brand Logo */}

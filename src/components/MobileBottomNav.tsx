@@ -25,7 +25,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav 
       id="zenet-mobile-bottom-nav"
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#EAE6F8] px-4 sm:px-6 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.625rem)] flex items-center justify-around shadow-[0_-4px_20px_rgba(15,23,42,0.06)] w-full max-w-full overflow-x-hidden"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#EAE6F8] px-3 sm:px-6 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around shadow-[0_-2px_10px_rgba(15,23,42,0.05)] w-full max-w-full overflow-x-hidden"
     >
       {/* 1. Home Tab */}
       <button

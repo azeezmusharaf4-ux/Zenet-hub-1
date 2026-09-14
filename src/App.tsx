@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { User, onAuthStateChanged, onIdTokenChanged, signOut } from 'firebase/auth';
 import { 
   collection, 
@@ -20,6 +20,9 @@ import { auth, db, sanitizeFirestorePayload, getSafeIdToken } from './lib/fireba
 import { AccountListing, CategoryType, FilterState, Inquiry, UserProfile, PurchaseRecord, ActiveAppView, WalletTransaction } from './types';
 import { isCategoryMatch } from './utils/category';
 import { safeApiFetch } from './utils/api';
+import { safeLocalStorage, safeSessionStorage } from './utils/storage';
+import { generateUserReferralCode } from './utils/referral';
+import type { DashboardTab } from './components/UserDashboardModal';
 
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
@@ -27,41 +30,51 @@ import { SafetyBanner } from './components/SafetyBanner';
 import { CategoryFilter } from './components/CategoryFilter';
 import { FeaturedListings } from './components/FeaturedListings';
 import { ListingCard } from './components/ListingCard';
-import { ListingDetailModal } from './components/ListingDetailModal';
-import { CreateListingModal } from './components/CreateListingModal';
 import { AuthModal } from './components/AuthModal';
-import { ContactSellerModal } from './components/ContactSellerModal';
-import { UserDashboardModal, DashboardTab } from './components/UserDashboardModal';
-import { SellerDashboardModal } from './components/SellerDashboardModal';
-import { SellerProfileModal } from './components/SellerProfileModal';
-import { AdminPanelModal } from './components/AdminPanelModal';
-import { PaymentModal } from './components/PaymentModal';
-import { InsufficientBalanceModal } from './components/InsufficientBalanceModal';
-import { PaymentSuccessModal } from './components/PaymentSuccessModal';
 import { NavigationDrawer } from './components/NavigationDrawer';
-import { PurchaseDetailsModal } from './components/PurchaseDetailsModal';
-import { WalletModal } from './components/WalletModal';
-import { CategoriesView } from './components/CategoriesView';
-import { SupportView } from './components/SupportView';
-import { LandingPage } from './components/LandingPage';
 import { Footer } from './components/Footer';
-import { VirtualNumbersView } from './components/VirtualNumbersView';
-import { LogAccountsView } from './components/LogAccountsView';
-import { AdminWalletsView } from './components/AdminWalletsView';
-import { ZenetUpdateModal } from './components/ZenetUpdateModal';
-import { ZenetUpdateAdminModal } from './components/ZenetUpdateAdminModal';
-import { SocialBoostView } from './components/SocialBoostView';
-import { VirtualNumbers2View } from './components/VirtualNumbers2View';
-import { SocialBoost2View } from './components/SocialBoost2View';
-import { Server2View } from './components/Server2View';
-import { HistoryView } from './components/HistoryView';
 import { HomeDashboardView } from './components/HomeDashboardView';
 import { MobileBottomNav } from './components/MobileBottomNav';
-import { ProfileView } from './components/ProfileView';
-import { EditProfileView } from './components/EditProfileView';
-import { ReferralsView, generateUserReferralCode } from './components/ReferralsView';
-import { ChangePasswordView } from './components/ChangePasswordView';
 import { PWAInstallBanner } from './components/PWAInstallPrompt';
+
+// Dynamic code-split views & modals for 10x faster mobile initial load
+const VirtualNumbersView = React.lazy(() => import('./components/VirtualNumbersView').then(m => ({ default: m.VirtualNumbersView })));
+const VirtualNumbers2View = React.lazy(() => import('./components/VirtualNumbers2View').then(m => ({ default: m.VirtualNumbers2View })));
+const SocialBoostView = React.lazy(() => import('./components/SocialBoostView').then(m => ({ default: m.SocialBoostView })));
+const SocialBoost2View = React.lazy(() => import('./components/SocialBoost2View').then(m => ({ default: m.SocialBoost2View })));
+const Server2View = React.lazy(() => import('./components/Server2View').then(m => ({ default: m.Server2View })));
+const LogAccountsView = React.lazy(() => import('./components/LogAccountsView').then(m => ({ default: m.LogAccountsView })));
+const CategoriesView = React.lazy(() => import('./components/CategoriesView').then(m => ({ default: m.CategoriesView })));
+const SupportView = React.lazy(() => import('./components/SupportView').then(m => ({ default: m.SupportView })));
+const HistoryView = React.lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
+const ProfileView = React.lazy(() => import('./components/ProfileView').then(m => ({ default: m.ProfileView })));
+const EditProfileView = React.lazy(() => import('./components/EditProfileView').then(m => ({ default: m.EditProfileView })));
+const ReferralsView = React.lazy(() => import('./components/ReferralsView').then(m => ({ default: m.ReferralsView })));
+const ChangePasswordView = React.lazy(() => import('./components/ChangePasswordView').then(m => ({ default: m.ChangePasswordView })));
+const AdminWalletsView = React.lazy(() => import('./components/AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
+const LandingPage = React.lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
+
+const ListingDetailModal = React.lazy(() => import('./components/ListingDetailModal').then(m => ({ default: m.ListingDetailModal })));
+const CreateListingModal = React.lazy(() => import('./components/CreateListingModal').then(m => ({ default: m.CreateListingModal })));
+const ContactSellerModal = React.lazy(() => import('./components/ContactSellerModal').then(m => ({ default: m.ContactSellerModal })));
+const UserDashboardModal = React.lazy(() => import('./components/UserDashboardModal').then(m => ({ default: m.UserDashboardModal })));
+const SellerDashboardModal = React.lazy(() => import('./components/SellerDashboardModal').then(m => ({ default: m.SellerDashboardModal })));
+const SellerProfileModal = React.lazy(() => import('./components/SellerProfileModal').then(m => ({ default: m.SellerProfileModal })));
+const AdminPanelModal = React.lazy(() => import('./components/AdminPanelModal').then(m => ({ default: m.AdminPanelModal })));
+const PaymentModal = React.lazy(() => import('./components/PaymentModal').then(m => ({ default: m.PaymentModal })));
+const InsufficientBalanceModal = React.lazy(() => import('./components/InsufficientBalanceModal').then(m => ({ default: m.InsufficientBalanceModal })));
+const PaymentSuccessModal = React.lazy(() => import('./components/PaymentSuccessModal').then(m => ({ default: m.PaymentSuccessModal })));
+const PurchaseDetailsModal = React.lazy(() => import('./components/PurchaseDetailsModal').then(m => ({ default: m.PurchaseDetailsModal })));
+const WalletModal = React.lazy(() => import('./components/WalletModal').then(m => ({ default: m.WalletModal })));
+const ZenetUpdateModal = React.lazy(() => import('./components/ZenetUpdateModal').then(m => ({ default: m.ZenetUpdateModal })));
+const ZenetUpdateAdminModal = React.lazy(() => import('./components/ZenetUpdateAdminModal').then(m => ({ default: m.ZenetUpdateAdminModal })));
+
+const ViewLoadingFallback = () => (
+  <div className="w-full py-16 flex flex-col items-center justify-center space-y-3">
+    <div className="w-8 h-8 rounded-full border-2 border-[#E9E2FA] border-t-[#7C3AED] animate-spin"></div>
+    <span className="text-xs font-bold text-[#716B82] uppercase tracking-wider">Loading...</span>
+  </div>
+);
 import { Phone, UserCheck } from 'lucide-react';
 
 import { 
@@ -206,7 +219,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
     try {
-      const cached = localStorage.getItem('zenet_cached_user_profile');
+      const cached = safeLocalStorage.getItem('zenet_cached_user_profile');
       return cached ? JSON.parse(cached) : null;
     } catch {
       return null;
@@ -225,9 +238,9 @@ export default function App() {
     });
     try {
       if (profile) {
-        localStorage.setItem('zenet_cached_user_profile', JSON.stringify(profile));
+        safeLocalStorage.setItem('zenet_cached_user_profile', JSON.stringify(profile));
       } else {
-        localStorage.removeItem('zenet_cached_user_profile');
+        safeLocalStorage.removeItem('zenet_cached_user_profile');
       }
     } catch (e) {
       console.warn('Could not cache user profile in localStorage:', e);
@@ -237,7 +250,7 @@ export default function App() {
   // Firestore listings & inquiries state
   const [listings, setListings] = useState<AccountListing[]>(() => {
     try {
-      const cached = localStorage.getItem('zenet_cached_listings');
+      const cached = safeLocalStorage.getItem('zenet_cached_listings');
       return cached ? JSON.parse(cached) : [];
     } catch (e) {
       return [];
@@ -245,7 +258,7 @@ export default function App() {
   });
   const [listingsLoading, setListingsLoading] = useState<boolean>(() => {
     try {
-      const cached = localStorage.getItem('zenet_cached_listings');
+      const cached = safeLocalStorage.getItem('zenet_cached_listings');
       const parsed = cached ? JSON.parse(cached) : [];
       return parsed.length === 0;
     } catch (e) {
@@ -255,7 +268,7 @@ export default function App() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [savedListingIds, setSavedListingIds] = useState<string[]>(() => {
     try {
-      const stored = localStorage.getItem('zenet_saved_ids');
+      const stored = safeLocalStorage.getItem('zenet_saved_ids');
       return stored ? JSON.parse(stored) : [];
     } catch (e) {
       return [];
@@ -296,8 +309,8 @@ export default function App() {
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string>('');
 
   const handleLogout = async () => {
-    localStorage.removeItem('zenet_last_seen_timestamp');
-    localStorage.removeItem('zenet_cached_user_profile');
+    safeLocalStorage.removeItem('zenet_last_seen_timestamp');
+    safeLocalStorage.removeItem('zenet_cached_user_profile');
     setSessionExpiredNotice('');
     try {
       await signOut(auth);
@@ -317,7 +330,7 @@ export default function App() {
   // Wallet State
   const [walletBalance, setWalletBalance] = useState<number>(() => {
     try {
-      const cached = localStorage.getItem('zenet_cached_user_profile');
+      const cached = safeLocalStorage.getItem('zenet_cached_user_profile');
       if (cached) {
         const parsed = JSON.parse(cached);
         return typeof parsed.walletBalance === 'number' ? parsed.walletBalance : 0;
@@ -361,7 +374,7 @@ export default function App() {
       if (document.visibilityState === 'visible') {
         try {
           await getSafeIdToken(auth.currentUser, false);
-          localStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
+          safeLocalStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
         } catch (e) {
           console.warn('[Session Reactivation] Notice:', e);
         }
@@ -597,7 +610,7 @@ export default function App() {
   // Recently Viewed Listings state
   const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>(() => {
     try {
-      const raw = localStorage.getItem('zenet_recent_ids');
+      const raw = safeLocalStorage.getItem('zenet_recent_ids');
       return raw ? JSON.parse(raw) : [];
     } catch (e) {
       return [];
@@ -609,7 +622,7 @@ export default function App() {
     setRecentlyViewedIds((prev) => {
       const updated = [listing.id, ...prev.filter((id) => id !== listing.id)].slice(0, 10);
       try {
-        localStorage.setItem('zenet_recent_ids', JSON.stringify(updated));
+        safeLocalStorage.setItem('zenet_recent_ids', JSON.stringify(updated));
       } catch (e) {
         console.warn('LocalStorage error:', e);
       }
@@ -718,7 +731,7 @@ export default function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const paramRef = urlParams.get('ref') || urlParams.get('referral');
       if (paramRef) {
-        localStorage.setItem('pending_referral_code', paramRef.trim().toUpperCase());
+        safeLocalStorage.setItem('pending_referral_code', paramRef.trim().toUpperCase());
       }
       const vParam = urlParams.get('view') as ActiveAppView;
       const validViews: ActiveAppView[] = [
@@ -739,9 +752,15 @@ export default function App() {
       console.warn('URL ref code parse error:', err);
     }
 
+    // Safety timeout: Never allow auth initialization to hang or freeze the screen on mobile devices
+    const authSafetyTimeout = setTimeout(() => {
+      setAuthLoading(false);
+    }, 1500);
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      clearTimeout(authSafetyTimeout);
       if (currentUser) {
-        localStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
+        safeLocalStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
         setUser(currentUser);
         // Instant unlock - don't block the UI while fetching user doc
         setAuthLoading(false);
@@ -786,10 +805,10 @@ export default function App() {
                       setAndCacheUserProfile(updatedProfile);
 
                       // Check for pending Buy Now order to resume after wallet funding verification
-                      const pendingListingId = sessionStorage.getItem('pending_buynow_listing_id') || localStorage.getItem('pending_buynow_listing_id');
+                      const pendingListingId = safeSessionStorage.getItem('pending_buynow_listing_id') || safeLocalStorage.getItem('pending_buynow_listing_id');
                       if (pendingListingId) {
-                        sessionStorage.removeItem('pending_buynow_listing_id');
-                        localStorage.removeItem('pending_buynow_listing_id');
+                        safeSessionStorage.removeItem('pending_buynow_listing_id');
+                        safeLocalStorage.removeItem('pending_buynow_listing_id');
 
                         getDoc(doc(db, 'listings', pendingListingId)).then((listingDocSnap) => {
                           if (listingDocSnap.exists()) {
@@ -841,7 +860,7 @@ export default function App() {
 
           // Check if brand new user or unlinked referral
           if (!referredBy) {
-            const pendingRefCode = localStorage.getItem('pending_referral_code');
+            const pendingRefCode = safeLocalStorage.getItem('pending_referral_code');
             if (pendingRefCode) {
               try {
                 const qRef = query(collection(db, 'users'), where('referralCode', '==', pendingRefCode.toUpperCase()));
@@ -871,7 +890,7 @@ export default function App() {
                     const newRefCount = (referrerData.referralCount || 0) + 1;
                     await setDoc(doc(db, 'users', referrerDoc.id), { referralCount: newRefCount }, { merge: true });
 
-                    localStorage.removeItem('pending_referral_code');
+                    safeLocalStorage.removeItem('pending_referral_code');
                   }
                 }
               } catch (err) {
@@ -938,11 +957,12 @@ export default function App() {
     const unsubscribeToken = onIdTokenChanged(auth, (refreshedUser) => {
       if (refreshedUser) {
         setUser(refreshedUser);
-        localStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
+        safeLocalStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
       }
     });
 
     return () => {
+      clearTimeout(authSafetyTimeout);
       unsubscribe();
       unsubscribeToken();
     };
@@ -985,7 +1005,7 @@ export default function App() {
       setListings(docsData);
       setListingsLoading(false);
       try {
-        localStorage.setItem('zenet_cached_listings', JSON.stringify(docsData));
+        safeLocalStorage.setItem('zenet_cached_listings', JSON.stringify(docsData));
       } catch (err) {
         console.warn('Listings cache write notice:', err);
       }
@@ -1482,7 +1502,7 @@ export default function App() {
 
   // Save shortlist to localStorage
   useEffect(() => {
-    localStorage.setItem('zenet_saved_ids', JSON.stringify(savedListingIds));
+    safeLocalStorage.setItem('zenet_saved_ids', JSON.stringify(savedListingIds));
   }, [savedListingIds]);
 
   // Handler: Toggle saved item
@@ -1982,6 +2002,7 @@ export default function App() {
 
         {/* Main Container */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-12 overflow-x-hidden">
+          <Suspense fallback={<ViewLoadingFallback />}>
 
           {/* VIEW: VIRTUAL NUMBERS MARKETPLACE */}
           {activeView === 'virtual-numbers' && (
@@ -2229,17 +2250,19 @@ export default function App() {
             />
           )}
 
-      </main>
+          </Suspense>
+        </main>
 
-      {/* Footer */}
-      <Footer onSelectCategory={(cat) => {
-        setFilters((prev) => ({ ...prev, category: cat }));
-        setActiveView('log-accounts');
-      }} />
+        {/* Footer */}
+        <Footer onSelectCategory={(cat) => {
+          setFilters((prev) => ({ ...prev, category: cat }));
+          setActiveView('log-accounts');
+        }} />
 
       </div> {/* Close main right area container */}
 
-      {/* MODALS */}
+      {/* MODALS WITH SUSPENSE */}
+      <Suspense fallback={null}>
 
       {/* Wallet Modal */}
       <WalletModal
@@ -2336,7 +2359,7 @@ export default function App() {
           onRemoveSaved={handleToggleSave}
           onClearRecentlyViewed={() => {
             setRecentlyViewedIds([]);
-            localStorage.removeItem('zenet_recent_ids');
+            safeLocalStorage.removeItem('zenet_recent_ids');
           }}
           onBuyNow={handleBuyNow}
           onContactSeller={(listing) => setContactListing(listing)}
@@ -2453,7 +2476,7 @@ export default function App() {
           currentBalance={latestWalletBalance}
           onOpenFundWallet={() => {
             try {
-              sessionStorage.setItem('pending_buynow_listing_id', insufficientBalanceListing.id);
+              safeSessionStorage.setItem('pending_buynow_listing_id', insufficientBalanceListing.id);
             } catch (e) {
               console.warn('Storage notice:', e);
             }
@@ -2479,24 +2502,24 @@ export default function App() {
       {/* 10. Product Deletion Confirmation Popup Modal */}
       {deletingListingId && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200"
           onClick={() => {
             if (!isDeleting) setDeletingListingId(null);
           }}
         >
           <div 
-            className="bg-[#170c2e] border border-rose-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white border border-rose-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-5 relative overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-16 h-16 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/40 shadow-inner">
-              <Trash2 className="w-8 h-8" />
+            <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
+              <Trash2 className="w-7 h-7" />
             </div>
             
-            <div className="space-y-2">
-              <h3 className="text-xl font-extrabold text-white">
+            <div className="space-y-1.5">
+              <h3 className="text-lg sm:text-xl font-black text-[#0F172A]">
                 Are you sure you want to delete this product?
               </h3>
-              <p className="text-xs sm:text-sm text-purple-300/80 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
                 This action is permanent. The product will be deleted from Firebase Firestore and removed immediately from the marketplace.
               </p>
             </div>
@@ -2506,7 +2529,7 @@ export default function App() {
                 type="button"
                 onClick={() => setDeletingListingId(null)}
                 disabled={isDeleting}
-                className="flex-1 px-5 py-3 rounded-2xl border border-[#371d67] bg-[#221043] hover:bg-[#2e165b] text-purple-200 font-bold text-xs sm:text-sm transition cursor-pointer"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-[#0F172A] font-bold text-xs sm:text-sm transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -2561,6 +2584,8 @@ export default function App() {
         isOwner={isOwner}
         isAdmin={isAdmin}
       />
+
+      </Suspense>
 
       {/* 13. Progressive Web App (PWA) Install Prompt Banner */}
       <PWAInstallBanner />

@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 /* =========================================================
-   BMB SMART CHAIN / ZENET HUB - CORE DESIGN SYSTEM & ENGINE
-   High-Contrast, Crisp Typography, Razor-Sharp Mobile CSS
+   ZENET HUB - CORE HIGH-PERFORMANCE DESIGN SYSTEM
+   Optimized for Mobile, iPhone X, and Low-End Devices
    ========================================================= */
 
-/* 1. Root & Reset */
+/* 1. Root & Box Reset */
 *, ::before, ::after {
   box-sizing: border-box;
 }
@@ -20,9 +20,8 @@ html {
   text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
   width: 100%;
-  max-width: 100vw;
+  max-width: 100%;
   overflow-x: hidden !important;
-  overflow-x: clip;
 }
 
 body {
@@ -36,35 +35,31 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  max-width: 100vw;
+  max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden !important;
-  overflow-x: clip;
 }
 
 #root {
   background-color: #FFFFFF !important;
   width: 100%;
-  max-width: 100vw;
+  max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden !important;
-  overflow-x: clip;
   position: relative;
 }
 
-/* 2. Global Typography Polish */
+/* 2. Global Typography & SVG Hygiene */
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
-  font-weight: 800 !important;
   letter-spacing: -0.025em;
   color: #0F172A !important;
 }
 
-/* Ensure SVG elements never stretch, skew, or distort */
 svg {
   flex-shrink: 0;
   max-width: 100%;
@@ -94,7 +89,7 @@ textarea {
   }
 }
 
-/* Ensure mobile buttons have comfortable min-height */
+/* Ensure mobile buttons have comfortable touch targets */
 @media screen and (max-width: 640px) {
   button:not(.inline-btn):not([class*="p-1"]):not([class*="p-0"]):not([class*="w-"]):not([class*="h-"]),
   .btn-touch {
@@ -102,7 +97,7 @@ textarea {
   }
 }
 
-/* Mobile Safe Area Inset Support */
+/* Mobile Safe Area Inset Support (iPhone X notch and home bar) */
 .safe-top-header {
   padding-top: max(env(safe-area-inset-top, 0px), 0px);
 }
@@ -123,8 +118,8 @@ textarea {
 
 /* Refined, unobtrusive custom scrollbars */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: #F1F5F9;
@@ -148,10 +143,10 @@ textarea {
 }
 
 /* =========================================================
-   LIGHT THEME SURFACE & CARD SYSTEM (BMB SMART CHAIN)
+   LIGHT THEME SURFACE & CARD SYSTEM (PURPLE & WHITE ZENET HUB)
    ========================================================= */
 
-/* 1. Main Backgrounds & Page Containers */
+/* Main Backgrounds & Page Containers */
 .bg-\[\#0F0F17\],
 .bg-\[\#0b0518\],
 .bg-\[\#0A0713\],
@@ -172,14 +167,11 @@ textarea {
   color: #0F172A !important;
 }
 
-/* 2. Cards, Modals & Main Content Panels */
+/* Cards, Modals & Main Content Panels */
 .bg-\[\#171827\],
 .bg-\[\#130a24\],
 .bg-\[\#150c2a\],
-.bg-\[\#150c2a\]\/95,
-.bg-\[\#150c2a\]\/80,
 .bg-\[\#180e30\],
-.bg-\[\#180e30\]\/90,
 .bg-\[\#190d33\],
 .bg-\[\#180c33\],
 .bg-\[\#120826\],
@@ -194,10 +186,9 @@ textarea {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   border-color: #E2E8F0 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* 3. Nested Sub-Panels, Filter Rows & Secondary Cards */
+/* Secondary Panels & Filter Rows */
 .bg-\[\#1a0f34\],
 .bg-\[\#1e1039\],
 .bg-\[\#1d0f3b\],
@@ -223,14 +214,7 @@ textarea {
   border-color: #E2E8F0 !important;
 }
 
-/* 4. Fine Borders & Dividers */
-[class*="border-\[\#"],
-.border-slate-800,
-.border-slate-700 {
-  border-color: #E2E8F0 !important;
-}
-
-/* 5. High-Contrast Text Legibility */
+/* High-Contrast Text Legibility */
 .text-white:not(button *):not(a *):not(.badge-text):not([class*="bg-"]):not([class*="from-"]):not([class*="to-"]) {
   color: #0F172A !important;
 }
@@ -242,232 +226,16 @@ textarea {
   color: #0F172A !important;
 }
 
-/* Secondary & Muted Body Text - Highly Legible Slate */
-.text-purple-300\/40,
-.text-purple-300\/50,
-.text-purple-300\/60,
+/* Secondary & Muted Body Text */
 .text-purple-300\/70,
 .text-purple-300\/80,
 .text-purple-200\/80,
-.text-purple-400\/60,
 .text-slate-400,
 .text-slate-300 {
   color: #475569 !important;
 }
 
-/* =========================================================
-   STRICT THEME COMPLIANCE: WHITE BACKGROUND + BLUE/PINK ACCENTS
-   ========================================================= */
-
-/* Unapproved purple, violet, cyan, indigo text forced to Accent Blue or Pink */
-.text-purple-300,
-.text-purple-400,
-.text-purple-500,
-.text-purple-600,
-.text-indigo-400,
-.text-indigo-500,
-.text-indigo-600,
-.text-violet-400,
-.text-violet-500,
-.text-violet-600,
-.text-cyan-300,
-.text-cyan-400,
-.text-cyan-500,
-.text-cyan-600,
-.text-\[\#9e67fa\],
-.text-\[\#a16eff\],
-.text-\[\#c1a0ff\],
-.text-\[\#7C3AED\],
-.text-\[\#a855f7\],
-.text-\[\#00ff88\] {
-  color: #2563EB !important; /* Strict Theme Accent Blue */
-}
-
-/* Secondary Accent: Pink Text */
-.text-pink-400,
-.text-pink-500,
-.text-pink-600 {
-  color: #DB2777 !important; /* Strict Theme Accent Pink */
-}
-
-/* Unapproved amber / yellow / orange text forced to standard Slate or Accent Blue */
-.text-amber-300,
-.text-amber-400,
-.text-amber-500,
-.text-yellow-300,
-.text-yellow-400,
-.text-yellow-500,
-.text-orange-400,
-.text-orange-500 {
-  color: #2563EB !important; /* Neutralized to Accent Blue */
-  font-weight: 700 !important;
-}
-
-/* Unapproved green / emerald text mapped to Blue */
-.text-emerald-300,
-.text-emerald-400,
-.text-emerald-500,
-.text-green-300,
-.text-green-400,
-.text-green-500 {
-  color: #2563EB !important;
-  font-weight: 700 !important;
-}
-
-/* Approved Blue Platform & Data Badges */
-.text-blue-300,
-.text-blue-400,
-.text-blue-500,
-.text-blue-600,
-.text-blue-700 {
-  color: #1D4ED8 !important;
-}
-
-/* Approved Pink/Rose Badges & Notices */
-.text-rose-300,
-.text-rose-400,
-.text-rose-500,
-.text-rose-600,
-.text-red-300,
-.text-red-400,
-.text-red-500 {
-  color: #BE185D !important; /* Refined Deep Pink */
-}
-
-/* =========================================================
-   STRICT BADGES & STATUS PILLS: WHITE / TINT WITH BLUE / PINK
-   ========================================================= */
-.bg-blue-950\/80,
-.bg-blue-950,
-.bg-blue-900\/40,
-.bg-blue-50 {
-  background-color: #EFF6FF !important;
-  color: #1D4ED8 !important;
-  border-color: #BFDBFE !important;
-}
-
-.bg-pink-950\/80,
-.bg-pink-950,
-.bg-pink-900\/40,
-.bg-pink-50 {
-  background-color: #FDF2F8 !important;
-  color: #BE185D !important;
-  border-color: #FBCFE8 !important;
-}
-
-/* Neutralize unapproved badge backgrounds (purple, indigo, cyan, emerald, amber) */
-.bg-purple-950\/80,
-.bg-purple-950,
-.bg-purple-900\/50,
-.bg-purple-100,
-.bg-indigo-950,
-.bg-cyan-950\/80,
-.bg-cyan-950,
-.bg-emerald-950\/80,
-.bg-emerald-950,
-.bg-emerald-950\/70,
-.bg-amber-100,
-.bg-amber-200,
-.bg-amber-950\/80,
-.bg-amber-950,
-.bg-amber-950\/70 {
-  background-color: #EFF6FF !important; /* Mapped to Accent Blue */
-  color: #1D4ED8 !important;
-  border-color: #BFDBFE !important;
-}
-
-.bg-rose-950\/80,
-.bg-rose-950,
-.bg-red-950 {
-  background-color: #FDF2F8 !important; /* Mapped to Accent Pink */
-  color: #BE185D !important;
-  border-color: #FBCFE8 !important;
-}
-
-/* =========================================================
-   STRICT BUTTON & INTERACTIVE PALETTE: BLUE OR PINK ACCENTS
-   ========================================================= */
-
-/* Any unapproved button colors (purple, violet, indigo, cyan, amber, yellow, emerald)
-   are overridden immediately to the primary Accent Blue (#2563EB) */
-button.bg-purple-600,
-button.bg-purple-700,
-button.bg-purple-500,
-button.bg-\[\#7C3AED\],
-button.bg-\[\#5B21B6\],
-button.bg-indigo-600,
-button.bg-indigo-700,
-button.bg-cyan-500,
-button.bg-cyan-600,
-button.bg-emerald-600,
-button.bg-emerald-700,
-button.bg-amber-400,
-button.bg-amber-500,
-button.bg-yellow-400,
-button.bg-yellow-500,
-.bg-purple-600,
-.bg-purple-700,
-.bg-purple-500,
-.bg-\[\#7C3AED\],
-.bg-\[\#5B21B6\],
-.bg-indigo-600,
-.bg-cyan-500,
-.bg-cyan-600,
-.bg-emerald-600 {
-  background-color: #2563EB !important;
-  color: #FFFFFF !important;
-  border-color: #1D4ED8 !important;
-}
-
-button.bg-purple-600:hover,
-button.bg-purple-700:hover,
-button.bg-\[\#7C3AED\]:hover,
-button.bg-indigo-600:hover,
-button.bg-cyan-600:hover,
-button.bg-emerald-600:hover {
-  background-color: #1D4ED8 !important;
-}
-
-/* Secondary Accent Buttons: Pink */
-button.bg-pink-600,
-button.bg-pink-700,
-.bg-pink-600,
-.bg-pink-700 {
-  background-color: #DB2777 !important;
-  color: #FFFFFF !important;
-  border-color: #BE185D !important;
-}
-
-button.bg-pink-600:hover,
-button.bg-pink-700:hover {
-  background-color: #BE185D !important;
-}
-
-/* Standard Blue Action Buttons */
-button.bg-blue-600,
-button.bg-blue-700,
-.bg-blue-600,
-.bg-blue-700 {
-  background-color: #2563EB !important;
-  color: #FFFFFF !important;
-}
-
-button.bg-blue-600:hover,
-button.bg-blue-700:hover {
-  background-color: #1D4ED8 !important;
-}
-
-/* Ensure text and SVGs inside accent buttons stay pure white */
-button.bg-blue-600 *,
-button.bg-blue-700 *,
-button.bg-pink-600 *,
-button.bg-pink-700 *,
-.bg-blue-600 *,
-.bg-pink-600 * {
-  color: #FFFFFF !important;
-}
-
-/* 6. Modal Backdrops & Overlays */
+/* Modal Backdrops - Lightweight Solid Alpha without heavy GPU blur */
 .bg-slate-950\/90,
 .bg-slate-900\/60,
 .bg-black\/80,
@@ -477,26 +245,10 @@ button.bg-pink-700 *,
 .bg-black\/40,
 .bg-\[\#05020d\]\/80,
 .bg-\[\#06030c\]\/85 {
-  background-color: rgba(15, 23, 42, 0.65) !important;
+  background-color: rgba(15, 23, 42, 0.6) !important;
 }
 
-@supports (backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px)) {
-  .bg-slate-950\/90,
-  .bg-slate-900\/60,
-  .bg-black\/80,
-  .bg-black\/70,
-  .bg-black\/60,
-  .bg-black\/50,
-  .bg-black\/40,
-  .bg-\[\#05020d\]\/80,
-  .bg-\[\#06030c\]\/85 {
-    background-color: rgba(15, 23, 42, 0.55) !important;
-    backdrop-filter: blur(4px) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
-  }
-}
-
-/* 7. Form Inputs, Selects & Textareas - Clean White with Blue Focus */
+/* Form Inputs, Selects & Textareas */
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
@@ -504,15 +256,14 @@ textarea {
   color: #0F172A !important;
   border-color: #E2E8F0 !important;
   font-weight: 500;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
-  border-color: #2563EB !important;
+  border-color: #7C3AED !important;
   outline: none !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15) !important;
 }
 
 input::placeholder,
@@ -522,31 +273,19 @@ textarea::placeholder {
   font-weight: 400;
 }
 
-/* 8. Tables & Data Grids */
-table th {
-  background-color: #FFFFFF !important;
-  color: #0F172A !important;
-  border-color: #E2E8F0 !important;
-  font-weight: 700 !important;
-}
-
-table td {
-  border-color: #E2E8F0 !important;
-  color: #1E293B !important;
-}
-
-table tr:hover {
-  background-color: #F1F5F9 !important;
-}
-
-/* 9. Safety against card clipping or breaking on mobile */
+/* Safety against card clipping or breaking on mobile */
 .listing-card,
 [class*="ListingCard"] {
   min-width: 0;
   overflow: hidden;
 }
 
-/* Ensure no horizontal flex items blow out viewport */
+/* Ensure horizontal flex items never blow out viewport */
 .flex-1 {
   min-width: 0;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
 }

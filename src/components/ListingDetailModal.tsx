@@ -70,9 +70,9 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
     : 'Verified account with instant digital delivery and secure takeover guaranteed.';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#07030e]/85 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#07030e]/90 overflow-y-auto">
       <div 
-        className="bg-[#120826] border border-[#2d1952] rounded-2xl sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col text-purple-100 p-4 sm:p-6 gap-4 sm:gap-5 my-auto max-h-[92dvh] sm:max-h-[90vh]"
+        className="bg-[#120826] border border-[#2d1952] rounded-2xl sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col text-purple-100 p-4 sm:p-6 gap-4 sm:gap-5 my-auto max-h-[92vh] max-h-[92dvh] sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         

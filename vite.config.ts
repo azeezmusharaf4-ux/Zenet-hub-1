@@ -11,8 +11,28 @@ export default defineConfig(() => {
       tailwindcss(),
     ],
     build: {
-      target: 'es2018',
+      target: ['es2018', 'safari12', 'ios12', 'chrome64'],
       minify: 'esbuild' as const,
+      cssTarget: ['safari12', 'ios12'],
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('firebase')) {
+                return 'vendor-firebase';
+              }
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'vendor-react';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              return 'vendor-core';
+            }
+          },
+        },
+      },
     },
     css: {
       postcss: {
@@ -35,3 +55,4 @@ export default defineConfig(() => {
     },
   };
 });
+
