@@ -1,9 +1,198 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read and write on all collections and subcollections
+    
+    // Helper function to check if caller is the verified administrator/owner
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == 'azeezmusharaf4@gmail.com' ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.role == 'owner'
+      );
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Account Deletion Requests (Strictly handled via server-side verification)
+    match /account_deletion_requests/{requestId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Listings Collection (Public marketplace catalog)
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (request.resource.data.sellerId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
+
+      match /inventory/{itemId} {
+        allow read, write: if isAuthenticated() && (
+          resource.data.sellerId == request.auth.uid || 
+          request.resource.data.sellerId == request.auth.uid || 
+          isAdmin()
+        );
+      }
+    }
+
+    // Inquiries Collection (Private communications between buyer and seller)
+    match /inquiries/{inquiryId} {
+      allow read: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.buyerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Purchases Collection (Escrow and transaction records)
+    match /purchases/{purchaseId} {
+      allow read: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.buyerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.buyerId == request.auth.uid || 
+        resource.data.sellerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Wallet Transactions
+    match /wallet_transactions/{transactionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (
+        (request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    // Virtual Number Orders (Provider 1)
+    match /virtual_number_orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (
+        (request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    // Virtual Number Orders (Provider 2)
+    match /orders_service_number_2/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (
+        (request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    // Social Boost Orders (Provider 1)
+    match /social_boost_orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (
+        (request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    // Social Boost Orders (Provider 2)
+    match /orders_social_boost_2/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (
+        (request.resource.data.userId == request.auth.uid) || isAdmin()
+      );
+    }
+
+    // ZENED U Update Products
+    match /zenedUpdateProducts/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ZENED U Update Orders
+    match /zenedUpdateOrders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (request.resource.data.buyerId == request.auth.uid || isAdmin());
+    }
+
+    // Reports
+    match /reports/{reportId} {
+      allow read: if isAuthenticated() && (resource.data.reporterId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.reporterId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (request.resource.data.reviewerId == request.auth.uid || isAdmin());
+      allow update, delete: if isAuthenticated() && (resource.data.reviewerId == request.auth.uid || isAdmin());
+    }
+
+    // Support Tickets
+    match /tickets/{ticketId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Referrals
+    match /referrals/{refId} {
+      allow read: if isAuthenticated() && (
+        resource.data.referrerId == request.auth.uid || 
+        resource.data.referredUserId == request.auth.uid || 
+        isAdmin()
+      );
+      allow write: if isAuthenticated() && (
+        request.resource.data.referrerId == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    // System Settings & Configuration (Social Boost pricing, catalogue, virtual numbers, platform rules)
+    match /system_settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // System Settings (Legacy and general settings)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Connection Health Check
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Catch-all fallback for administrative maintenance
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
     }
   }
 }

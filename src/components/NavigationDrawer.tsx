@@ -243,7 +243,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
         </div>
 
         {/* Bottom Logged In User Section */}
-        <div className="pt-3 mt-auto border-t border-[#EDE9FE] pb-[max(env(safe-area-inset-bottom,0px),0.75rem)]">
+        <div className="pt-3 mt-auto border-t border-[#EDE9FE]">
           {user ? (
             <div className="p-3 bg-white border border-[#DDD6FE] rounded-2xl shadow-sm space-y-2.5">
               <div className="flex items-center justify-between">

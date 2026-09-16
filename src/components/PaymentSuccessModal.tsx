@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AccountListing, PurchaseRecord } from '../types';
 import AccountCredentialsCard from './AccountCredentialsCard';
+import { copyToClipboard } from '../utils/clipboard';
 import { 
   CheckCircle2, 
   ShieldCheck, 
@@ -45,7 +46,7 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
 
   const handleCopyCode = () => {
     if (order.transferCode) {
-      navigator.clipboard.writeText(order.transferCode);
+      copyToClipboard(order.transferCode);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2500);
     }
@@ -53,7 +54,7 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
 
   const handleCopyEmail = () => {
     if (credentials?.accountEmail) {
-      navigator.clipboard.writeText(credentials.accountEmail);
+      copyToClipboard(credentials.accountEmail);
       setCopiedEmail(true);
       setTimeout(() => setCopiedEmail(false), 2000);
     }
@@ -61,7 +62,7 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
 
   const handleCopyPassword = () => {
     if (credentials?.accountPassword) {
-      navigator.clipboard.writeText(credentials.accountPassword);
+      copyToClipboard(credentials.accountPassword);
       setCopiedPassword(true);
       setTimeout(() => setCopiedPassword(false), 2000);
     }
@@ -70,7 +71,7 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
   const handleCopySecretKey = () => {
     const key = credentials?.twoFactorSecretKey;
     if (key) {
-      navigator.clipboard.writeText(key);
+      copyToClipboard(key);
       setCopiedSecretKey(true);
       setTimeout(() => setCopiedSecretKey(false), 2000);
     }
@@ -79,7 +80,7 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
   const handleCopyBackupCodes = () => {
     const codes = credentials?.twoFactorBackupCodes || credentials?.backupCodes;
     if (codes) {
-      navigator.clipboard.writeText(codes);
+      copyToClipboard(codes);
       setCopiedBackupCodes(true);
       setTimeout(() => setCopiedBackupCodes(false), 2000);
     }

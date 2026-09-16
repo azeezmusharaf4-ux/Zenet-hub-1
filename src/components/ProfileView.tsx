@@ -6,7 +6,6 @@ import {
   ShoppingBag, 
   Lock, 
   Moon, 
-  Trash2, 
   LogOut, 
   ChevronRight, 
   ShieldCheck, 
@@ -56,7 +55,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenAuth
 }) => {
   // Modal states for embedded actions
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -315,19 +313,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </button>
         )}
 
-        {/* Option: Delete Account */}
-        <button
-          id="profile-opt-delete-account"
-          onClick={() => setIsDeleteModalOpen(true)}
-          className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-rose-50/50 transition cursor-pointer active:bg-rose-100/60"
-        >
-          <div className="flex items-center gap-3.5">
-            <Trash2 className="w-5 h-5 text-rose-500 stroke-[2.2]" />
-            <span className="text-sm font-bold text-rose-600">Delete Account</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-rose-400" />
-        </button>
-
         {/* Option: Logout */}
         <button
           id="profile-opt-logout"
@@ -389,40 +374,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             >
               Done
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Delete Account Confirmation */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-5 border border-rose-200 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2.5 text-rose-600">
-              <Trash2 className="w-5 h-5" />
-              <h3 className="text-base font-black text-rose-700">Delete Account</h3>
-            </div>
-
-            <p className="text-xs text-[#64748B] leading-relaxed">
-              Are you sure you want to request deletion of your account (<strong className="text-[#0F172A]">{user?.email}</strong>)? All your order history and active credentials will be permanently closed.
-            </p>
-
-            <div className="space-y-2 pt-2">
-              <button
-                onClick={() => {
-                  setIsDeleteModalOpen(false);
-                  showToast('Account deletion request submitted to support for verification.', 'success');
-                }}
-                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3 rounded-2xl transition cursor-pointer text-xs"
-              >
-                Confirm Deletion Request
-              </button>
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="w-full bg-[#F1EEF9] hover:bg-[#EAE6F8] text-[#0F172A] font-bold py-3 rounded-2xl transition cursor-pointer text-xs"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       )}

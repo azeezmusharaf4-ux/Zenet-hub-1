@@ -231,7 +231,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
       <div 
         className="bg-white border border-[#E9E2FA] rounded-2xl sm:rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-[#171329] flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
@@ -301,22 +301,22 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
               {/* SUCCESS MESSAGE */}
               {successMessage && (
-                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-2xl flex items-start gap-3 shadow-sm animate-in fade-in zoom-in-95">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="bg-purple-50 border border-purple-200 text-purple-900 p-4 rounded-2xl flex items-start gap-3 shadow-sm animate-in fade-in zoom-in-95">
+                  <CheckCircle2 className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <span className="font-extrabold text-emerald-800 text-sm block">Deposit Verified!</span>
-                    <p className="text-xs leading-relaxed">{successMessage}</p>
+                    <span className="font-extrabold text-purple-950 text-sm block">Deposit Verified!</span>
+                    <p className="text-xs leading-relaxed text-purple-800">{successMessage}</p>
                   </div>
                 </div>
               )}
 
               {/* ERROR MESSAGE */}
               {errorMessage && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl flex items-start gap-3 shadow-sm animate-in fade-in zoom-in-95">
-                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="bg-purple-50 border border-purple-200 text-purple-900 p-4 rounded-2xl flex items-start gap-3 shadow-sm animate-in fade-in zoom-in-95">
+                  <AlertCircle className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <span className="font-extrabold text-rose-800 text-sm block">Funding Notice</span>
-                    <p className="text-xs leading-relaxed">{errorMessage}</p>
+                    <span className="font-extrabold text-purple-950 text-sm block">Funding Notice</span>
+                    <p className="text-xs leading-relaxed text-purple-800">{errorMessage}</p>
                   </div>
                 </div>
               )}
@@ -404,7 +404,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                   <div key={tx.id} className="bg-[#F8F7FF] border border-[#E9E2FA] p-3.5 rounded-2xl flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
-                        tx.type === 'deposit' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA]'
+                        tx.type === 'deposit' ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE]' : 'bg-[#EDE9FE] text-[#7C3AED] border border-[#E9E2FA]'
                       }`}>
                         {tx.type === 'deposit' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                       </div>
@@ -414,9 +414,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
                       </div>
                     </div>
 
-                    <span className={`font-mono font-extrabold text-sm ${
-                      tx.type === 'deposit' ? 'text-emerald-600' : 'text-[#7C3AED]'
-                    }`}>
+                    <span className="font-mono font-extrabold text-sm text-[#7C3AED]">
                       {tx.type === 'deposit' ? '+' : '-'}₦{tx.amount.toLocaleString()}
                     </span>
                   </div>

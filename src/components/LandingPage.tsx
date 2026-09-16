@@ -34,6 +34,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | null>(null);
 
   const scrollToSection = (id: string) => {
     setMobileMenuOpen(false);
@@ -41,6 +42,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const scrollToTop = () => {
+    setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const faqItems = [
@@ -74,7 +80,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2.5 group">
+          <button 
+            type="button"
+            onClick={scrollToTop} 
+            className="flex items-center gap-2.5 group text-left cursor-pointer bg-transparent border-0 p-0"
+          >
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-purple-600 via-violet-600 to-indigo-600 p-0.5 shadow-lg shadow-purple-600/30">
               <div className="w-full h-full bg-[#0d0718] rounded-[14px] flex items-center justify-center">
                 <Store className="w-5 h-5 text-purple-400 group-hover:scale-110 transition duration-300" />
@@ -91,7 +101,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Digital Marketplace
               </span>
             </div>
-          </a>
+          </button>
 
           {/* Nav Links - Desktop */}
           <div className="hidden md:flex items-center gap-8 text-xs font-bold text-purple-200/80">
@@ -536,10 +546,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div>
             <h5 className="font-extrabold text-white text-xs uppercase tracking-wider mb-3">Account & Access</h5>
             <ul className="space-y-2 font-medium">
-              <li><button onClick={() => onOpenAuth('login')} className="hover:text-white transition">Login</button></li>
-              <li><button onClick={() => onOpenAuth('signup')} className="hover:text-white transition">Register Account</button></li>
-              <li><a href="#" className="hover:text-white transition">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-white transition">Terms of Service</a></li>
+              <li><button onClick={() => onOpenAuth('login')} className="hover:text-white transition cursor-pointer">Login</button></li>
+              <li><button onClick={() => onOpenAuth('signup')} className="hover:text-white transition cursor-pointer">Register Account</button></li>
+              <li><button onClick={() => setLegalModal('privacy')} className="hover:text-white transition cursor-pointer text-left">Privacy Policy</button></li>
+              <li><button onClick={() => setLegalModal('terms')} className="hover:text-white transition cursor-pointer text-left">Terms of Service</button></li>
             </ul>
           </div>
 
@@ -547,22 +557,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <h5 className="font-extrabold text-white text-xs uppercase tracking-wider mb-3">Connect & Support</h5>
             <div className="space-y-2 font-medium">
               <a 
-                href="https://wa.me/2348000000000" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 transition"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>WhatsApp Channel</span>
-              </a>
-              <a 
                 href="https://t.me/zenethub" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="flex items-center gap-2 text-sky-400 hover:text-sky-300 transition"
               >
                 <Send className="w-4 h-4" />
-                <span>Telegram Support</span>
+                <span>Official Telegram Channel</span>
+              </a>
+              <a 
+                href="https://t.me/zenethub" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 transition"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Live Help Desk</span>
               </a>
             </div>
           </div>
@@ -574,6 +584,54 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <p>Powered by Paystack Dedicated Virtual Accounts & Firebase Escrow Protection</p>
         </div>
       </footer>
+
+      {/* Legal Disclosures Modal */}
+      {legalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#120826] border border-[#2d1952] rounded-2xl w-full max-w-lg p-6 text-purple-100 shadow-2xl relative max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-[#241344] pb-3 mb-4">
+              <h3 className="font-extrabold text-white text-lg">
+                {legalModal === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}
+              </h3>
+              <button 
+                onClick={() => setLegalModal(null)}
+                className="p-1.5 rounded-full hover:bg-[#23123f] text-purple-300 hover:text-white transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-y-auto space-y-3 text-xs leading-relaxed text-purple-200/90 pr-2">
+              {legalModal === 'privacy' ? (
+                <>
+                  <p className="font-semibold text-white">1. Data Collection & Confidentiality</p>
+                  <p>ZENET HUB protects customer privacy. We collect minimal identification necessary for authentication, escrow payment settlement via Paystack, and order delivery.</p>
+                  <p className="font-semibold text-white">2. Escrow & Payment Details</p>
+                  <p>All transactions are processed through encrypted, PCI-DSS compliant channels. We never store raw banking credentials or card numbers on our servers.</p>
+                  <p className="font-semibold text-white">3. Third-Party Integrations</p>
+                  <p>Data shared with verified fulfillment partners is strictly limited to transaction completion parameters (order identifiers and delivery specifications).</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-white">1. Marketplace Conditions</p>
+                  <p>ZENET HUB acts as an escrow platform connecting buyers and sellers of digital goods and services. All listings undergo verification guidelines.</p>
+                  <p className="font-semibold text-white">2. Wallet Balances & Refunds</p>
+                  <p>Funds in Dedicated Virtual Accounts are held in escrow until buyers confirm receipt or orders reach automated completion. Unfulfilled orders are refunded to the customer wallet.</p>
+                  <p className="font-semibold text-white">3. Acceptable Use</p>
+                  <p>Users must not attempt fraudulent chargebacks, unauthorized exploitation, or automated scraping. Violations result in immediate account termination.</p>
+                </>
+              )}
+            </div>
+            <div className="mt-5 pt-3 border-t border-[#241344] flex justify-end">
+              <button 
+                onClick={() => setLegalModal(null)}
+                className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2 px-5 rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -6,6 +6,7 @@ import { db, storage, sanitizeFirestorePayload } from '../lib/firebase';
 import { doc, setDoc, updateDoc, collection, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { processAndCompressImage } from '../lib/imageUtils';
+import { copyToClipboard } from '../utils/clipboard';
 
 interface EditListingModalProps {
   listing: AccountListing;
@@ -1386,7 +1387,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                     e.stopPropagation();
                                     const val = item.accountEmail || item.delivery_value || '';
                                     if (val) {
-                                      navigator.clipboard.writeText(val);
+                                      copyToClipboard(val);
                                       triggerNotification('success', `Copied Login/Email: ${val}`);
                                     }
                                   }}
@@ -1403,11 +1404,11 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (revealedPasswords[item.id]) {
-                                          navigator.clipboard.writeText(item.accountPassword);
+                                          copyToClipboard(item.accountPassword);
                                           triggerNotification('success', 'Copied password to clipboard!');
                                         } else {
                                           setRevealedPasswords(prev => ({ ...prev, [item.id]: true }));
-                                          navigator.clipboard.writeText(item.accountPassword);
+                                          copyToClipboard(item.accountPassword);
                                           triggerNotification('success', 'Password revealed and copied!');
                                         }
                                       }}

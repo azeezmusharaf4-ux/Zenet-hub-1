@@ -25,4 +25,29 @@ export function getDb(): Firestore | null {
   }
 }
 
+export interface DecodedAuthToken {
+  uid: string;
+  email?: string;
+}
+
+export function parseAndVerifyToken(authHeader?: string): DecodedAuthToken | null {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) return null;
+    if (payload.iss !== `https://securetoken.google.com/${firebaseConfig.projectId}`) return null;
+    if (payload.aud !== firebaseConfig.projectId) return null;
+    return {
+      uid: payload.sub || payload.user_id,
+      email: payload.email
+    };
+  } catch {
+    return null;
+  }
+}
+
 export { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction };

@@ -300,5 +300,59 @@
         }
       }
     }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "Registered user accounts and profiles"
+    },
+    "/listings/{listingId}": {
+      "schema": "listings",
+      "description": "Public social media account listings"
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": "inquiries",
+      "description": "Buyer inquiries and communications"
+    },
+    "/purchases/{purchaseId}": {
+      "schema": "purchases",
+      "description": "Escrow orders and completed transactions"
+    },
+    "/wallet_transactions/{transactionId}": {
+      "schema": "wallet_transactions",
+      "description": "User deposits, deductions, and wallet records"
+    },
+    "/system_settings/{settingId}": {
+      "schema": "social_boost_settings",
+      "description": "System settings including Social Boost pricing markup, catalogues, and platform configuration"
+    },
+    "/settings/{settingId}": {
+      "schema": "social_boost_settings",
+      "description": "General application settings"
+    },
+    "/social_boost_orders/{orderId}": {
+      "schema": "social_boost_orders",
+      "description": "Growth boosting orders processed via OneGridHub"
+    },
+    "/virtual_number_orders/{orderId}": {
+      "schema": "virtual_number_orders",
+      "description": "Virtual phone number SMS orders"
+    },
+    "/tickets/{ticketId}": {
+      "schema": "tickets",
+      "description": "Support tickets"
+    },
+    "/referrals/{refId}": {
+      "schema": "referrals",
+      "description": "User referral reward records"
+    },
+    "/zenedUpdateProducts/{productId}": {
+      "schema": "zenedUpdateProducts",
+      "description": "Exclusive digital product inventory"
+    },
+    "/zenedUpdateOrders/{orderId}": {
+      "schema": "zenedUpdateOrders",
+      "description": "Purchased update orders"
+    }
   }
 }

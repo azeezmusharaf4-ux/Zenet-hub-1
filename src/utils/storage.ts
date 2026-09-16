@@ -25,7 +25,16 @@ export const safeLocalStorage = {
         window.localStorage.setItem(key, value);
         return;
       }
-    } catch {}
+    } catch {
+      // In case of QuotaExceededError, attempt to purge large non-critical caches
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.removeItem('zenet_cached_listings');
+          window.localStorage.setItem(key, value);
+          return;
+        }
+      } catch {}
+    }
     memoryStore[`local_${key}`] = value;
   },
   removeItem: (key: string): void => {

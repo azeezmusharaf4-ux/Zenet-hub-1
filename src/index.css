@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 /* =========================================================
-   ZENET HUB - CORE HIGH-PERFORMANCE DESIGN SYSTEM
-   Optimized for Mobile, iPhone X, and Low-End Devices
+   BMB SMART CHAIN / ZENET HUB - CORE DESIGN SYSTEM & ENGINE
+   High-Contrast, Crisp Typography, Razor-Sharp Mobile CSS
    ========================================================= */
 
-/* 1. Root & Box Reset */
+/* 1. Root & Reset */
 *, ::before, ::after {
   box-sizing: border-box;
 }
@@ -20,8 +20,9 @@ html {
   text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
   width: 100%;
-  max-width: 100%;
+  max-width: 100vw;
   overflow-x: hidden !important;
+  overflow-x: clip;
 }
 
 body {
@@ -35,31 +36,35 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  max-width: 100%;
+  max-width: 100vw;
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden !important;
+  overflow-x: clip;
 }
 
 #root {
   background-color: #FFFFFF !important;
   width: 100%;
-  max-width: 100%;
+  max-width: 100vw;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden !important;
+  overflow-x: clip;
   position: relative;
 }
 
-/* 2. Global Typography & SVG Hygiene */
+/* 2. Global Typography Polish */
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  font-weight: 800 !important;
   letter-spacing: -0.025em;
   color: #0F172A !important;
 }
 
+/* Ensure SVG elements never stretch, skew, or distort */
 svg {
   flex-shrink: 0;
   max-width: 100%;
@@ -89,7 +94,7 @@ textarea {
   }
 }
 
-/* Ensure mobile buttons have comfortable touch targets */
+/* Ensure mobile buttons have comfortable min-height */
 @media screen and (max-width: 640px) {
   button:not(.inline-btn):not([class*="p-1"]):not([class*="p-0"]):not([class*="w-"]):not([class*="h-"]),
   .btn-touch {
@@ -97,7 +102,7 @@ textarea {
   }
 }
 
-/* Mobile Safe Area Inset Support (iPhone X notch and home bar) */
+/* Mobile Safe Area Inset Support */
 .safe-top-header {
   padding-top: max(env(safe-area-inset-top, 0px), 0px);
 }
@@ -111,15 +116,15 @@ textarea {
 }
 
 /* Scrollable containers momentum touch scrolling */
-.overflow-y-auto, .overflow-x-auto, [data-scrollable] {
+.overflow-y-auto, .overflow-y-scroll, .overflow-x-auto, .overflow-x-scroll, .overflow-auto, [data-scrollable], [role="dialog"], .modal-body {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
 /* Refined, unobtrusive custom scrollbars */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: #F1F5F9;
@@ -143,10 +148,10 @@ textarea {
 }
 
 /* =========================================================
-   LIGHT THEME SURFACE & CARD SYSTEM (PURPLE & WHITE ZENET HUB)
+   LIGHT THEME SURFACE & CARD SYSTEM (ZENET HUB)
    ========================================================= */
 
-/* Main Backgrounds & Page Containers */
+/* 1. Main Backgrounds & Page Containers: White / Light Lavender */
 .bg-\[\#0F0F17\],
 .bg-\[\#0b0518\],
 .bg-\[\#0A0713\],
@@ -163,15 +168,18 @@ textarea {
 .bg-\[\#0d0718\],
 .bg-\[\#0c051a\],
 .bg-slate-950 {
-  background-color: #F8FAFC !important;
+  background-color: #FAF5FF !important; /* Soft Light Lavender */
   color: #0F172A !important;
 }
 
-/* Cards, Modals & Main Content Panels */
+/* 2. Cards, Modals & Main Content Panels: Pure White */
 .bg-\[\#171827\],
 .bg-\[\#130a24\],
 .bg-\[\#150c2a\],
+.bg-\[\#150c2a\]\/95,
+.bg-\[\#150c2a\]\/80,
 .bg-\[\#180e30\],
+.bg-\[\#180e30\]\/90,
 .bg-\[\#190d33\],
 .bg-\[\#180c33\],
 .bg-\[\#120826\],
@@ -185,10 +193,11 @@ textarea {
 .bg-slate-900 {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
-  border-color: #E2E8F0 !important;
+  border-color: #F3E8FF !important;
+  box-shadow: 0 1px 3px 0 rgba(124, 58, 237, 0.04), 0 1px 2px -1px rgba(124, 58, 237, 0.04) !important;
 }
 
-/* Secondary Panels & Filter Rows */
+/* 3. Nested Sub-Panels, Filter Rows & Secondary Cards: Light Lavender Tint */
 .bg-\[\#1a0f34\],
 .bg-\[\#1e1039\],
 .bg-\[\#1d0f3b\],
@@ -209,12 +218,19 @@ textarea {
 .bg-\[\#25144b\],
 .bg-\[\#211145\],
 .bg-slate-800 {
-  background-color: #F8FAFC !important;
+  background-color: #FAF5FF !important;
   color: #0F172A !important;
-  border-color: #E2E8F0 !important;
+  border-color: #E9D5FF !important;
 }
 
-/* High-Contrast Text Legibility */
+/* 4. Fine Borders & Dividers */
+[class*="border-\[\#"],
+.border-slate-800,
+.border-slate-700 {
+  border-color: #E9D5FF !important;
+}
+
+/* 5. High-Contrast Dark Navy Text Legibility */
 .text-white:not(button *):not(a *):not(.badge-text):not([class*="bg-"]):not([class*="from-"]):not([class*="to-"]) {
   color: #0F172A !important;
 }
@@ -226,16 +242,257 @@ textarea {
   color: #0F172A !important;
 }
 
-/* Secondary & Muted Body Text */
+/* Secondary & Muted Body Text - Highly Legible Dark Slate */
+.text-purple-300\/40,
+.text-purple-300\/50,
+.text-purple-300\/60,
 .text-purple-300\/70,
 .text-purple-300\/80,
 .text-purple-200\/80,
+.text-purple-400\/60,
 .text-slate-400,
 .text-slate-300 {
-  color: #475569 !important;
+  color: #334155 !important;
 }
 
-/* Modal Backdrops - Lightweight Solid Alpha without heavy GPU blur */
+/* =========================================================
+   ZENET HUB SINGLE DESIGN STANDARD: PURPLE/VIOLET + LIGHT LAVENDER
+   ========================================================= */
+
+/* Main Purple / Violet Brand Text & Eyebrows */
+.text-purple-600,
+.text-purple-700,
+.text-violet-600,
+.text-violet-700,
+.text-indigo-600,
+.text-indigo-700,
+.text-\[\#7C3AED\],
+.text-\[\#6D28D9\],
+.text-\[\#a855f7\],
+.text-\[\#9e67fa\],
+.text-\[\#a16eff\],
+/* Normalize any stray blue, pink, cyan, green, amber, orange to Zenet Purple */
+.text-blue-500,
+.text-blue-600,
+.text-blue-700,
+.text-cyan-500,
+.text-cyan-600,
+.text-pink-500,
+.text-pink-600,
+.text-amber-500,
+.text-amber-600,
+.text-orange-500,
+.text-orange-600,
+.text-emerald-500,
+.text-emerald-600,
+.text-green-500,
+.text-green-600 {
+  color: #7C3AED !important; /* Zenet Main Purple */
+}
+
+/* Deep Purple Headings & Emphasis */
+.text-purple-800,
+.text-purple-900,
+.text-violet-800,
+.text-violet-900,
+.text-blue-800,
+.text-blue-900,
+.text-pink-700,
+.text-pink-800,
+.text-rose-700,
+.text-rose-800 {
+  color: #5B21B6 !important; /* Deep Violet */
+}
+
+/* Secondary Accents: Light Purple Text */
+.text-purple-400,
+.text-purple-500,
+.text-purple-300,
+.text-violet-400,
+.text-violet-500,
+.text-blue-400,
+.text-pink-400,
+.text-cyan-400,
+.text-amber-400,
+.text-emerald-400,
+.text-green-400 {
+  color: #6D28D9 !important; /* Clear, readable purple */
+  font-weight: 600;
+}
+
+/* Alert / Warning / Danger Text: Consistent High-Contrast Zenet Violet */
+.text-rose-400,
+.text-rose-500,
+.text-rose-600,
+.text-red-400,
+.text-red-500,
+.text-red-600 {
+  color: #6D28D9 !important;
+}
+
+/* =========================================================
+   STATUS PILLS, BADGES & CHIPS: LIGHT PURPLE ACCENTS
+   ========================================================= */
+
+/* Normalize all badges (purple, blue, pink, amber, emerald, rose) to Light Lavender + Purple */
+.bg-purple-50,
+.bg-purple-100,
+.bg-purple-950,
+.bg-purple-950\/80,
+.bg-purple-900\/50,
+.bg-blue-50,
+.bg-blue-100,
+.bg-blue-950,
+.bg-blue-950\/80,
+.bg-blue-900\/40,
+.bg-pink-50,
+.bg-pink-100,
+.bg-pink-950,
+.bg-pink-950\/80,
+.bg-pink-900\/40,
+.bg-amber-50,
+.bg-amber-100,
+.bg-amber-200,
+.bg-amber-950,
+.bg-amber-950\/80,
+.bg-amber-950\/90,
+.bg-amber-950\/60,
+.bg-amber-500\/20,
+.bg-amber-500\/10,
+.bg-emerald-50,
+.bg-emerald-100,
+.bg-emerald-950,
+.bg-emerald-950\/80,
+.bg-emerald-950\/90,
+.bg-emerald-950\/70,
+.bg-emerald-950\/60,
+.bg-emerald-950\/50,
+.bg-emerald-500\/20,
+.bg-emerald-500\/10,
+.bg-rose-50,
+.bg-rose-100,
+.bg-rose-950,
+.bg-rose-950\/80,
+.bg-rose-950\/90,
+.bg-rose-950\/70,
+.bg-rose-950\/40,
+.bg-rose-500\/20,
+.bg-rose-500\/10,
+.bg-cyan-50,
+.bg-cyan-950,
+.bg-blue-50\/50,
+.bg-blue-50\/60,
+.bg-pink-50\/50,
+.bg-pink-50\/60 {
+  background-color: #FAF5FF !important; /* Soft Light Lavender */
+  color: #5B21B6 !important;            /* Deep Purple */
+  border-color: #E9D5FF !important;      /* Light Purple Border */
+}
+
+/* Normalize stray badge dots to Zenet Purple */
+.bg-emerald-400,
+.bg-emerald-500,
+.bg-green-400,
+.bg-green-500,
+.bg-cyan-400,
+.bg-cyan-500,
+.bg-pink-500,
+.bg-blue-500 {
+  background-color: #7C3AED !important;
+}
+
+/* =========================================================
+   MAIN ACTION BUTTONS: ZENET HUB PURPLE/VIOLET
+   ========================================================= */
+
+/* Primary Action Buttons: Solid Zenet Violet */
+button.bg-purple-600,
+button.bg-purple-700,
+button.bg-purple-500,
+button.bg-\[\#7C3AED\],
+button.bg-\[\#5B21B6\],
+button.bg-violet-600,
+button.bg-violet-700,
+button.bg-blue-600,
+button.bg-blue-700,
+button.bg-pink-600,
+button.bg-pink-700,
+button.bg-indigo-600,
+button.bg-indigo-700,
+button.bg-cyan-500,
+button.bg-cyan-600,
+button.bg-emerald-600,
+button.bg-emerald-700,
+button.bg-amber-500,
+button.bg-rose-600,
+.bg-purple-600,
+.bg-purple-700,
+.bg-purple-500,
+.bg-\[\#7C3AED\],
+.bg-\[\#5B21B6\],
+.bg-violet-600,
+.bg-violet-700,
+.bg-blue-600,
+.bg-blue-700,
+.bg-pink-600,
+.bg-pink-700,
+.bg-indigo-600 {
+  background-color: #7C3AED !important;
+  color: #FFFFFF !important;
+  border-color: #6D28D9 !important;
+}
+
+button.bg-purple-600:hover,
+button.bg-purple-700:hover,
+button.bg-violet-600:hover,
+button.bg-blue-600:hover,
+button.bg-blue-700:hover,
+button.bg-pink-600:hover,
+button.bg-indigo-600:hover,
+button.bg-rose-600:hover {
+  background-color: #6D28D9 !important;
+  border-color: #5B21B6 !important;
+}
+
+/* Ensure text and SVGs inside primary action buttons stay pure white */
+button.bg-purple-600 *,
+button.bg-purple-700 *,
+button.bg-violet-600 *,
+button.bg-blue-600 *,
+button.bg-blue-700 *,
+button.bg-pink-600 *,
+button.bg-pink-700 *,
+.bg-purple-600 *,
+.bg-blue-600 *,
+.bg-pink-600 * {
+  color: #FFFFFF !important;
+}
+
+/* Secondary & Cancel Buttons: Light Lavender with Purple Border and Dark Navy Text */
+button.bg-purple-50,
+button.bg-purple-100,
+button.bg-blue-50,
+button.bg-pink-50,
+button.bg-rose-50,
+button.bg-slate-100,
+button.bg-\[\#20123e\] {
+  background-color: #FAF5FF !important;
+  color: #5B21B6 !important;
+  border-color: #E9D5FF !important;
+}
+
+button.bg-purple-50:hover,
+button.bg-purple-100:hover,
+button.bg-blue-50:hover,
+button.bg-pink-50:hover,
+button.bg-slate-100:hover,
+button.bg-\[\#20123e\]:hover {
+  background-color: #F3E8FF !important;
+  color: #4C1D95 !important;
+  border-color: #D8B4FE !important;
+}
+
+/* 6. Modal Backdrops & Overlays */
 .bg-slate-950\/90,
 .bg-slate-900\/60,
 .bg-black\/80,
@@ -243,12 +500,30 @@ textarea {
 .bg-black\/60,
 .bg-black\/50,
 .bg-black\/40,
+.bg-\[\#07030e\]\/85,
 .bg-\[\#05020d\]\/80,
 .bg-\[\#06030c\]\/85 {
-  background-color: rgba(15, 23, 42, 0.6) !important;
+  background-color: rgba(15, 23, 42, 0.65) !important;
 }
 
-/* Form Inputs, Selects & Textareas */
+@supports (backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px)) {
+  .bg-slate-950\/90,
+  .bg-slate-900\/60,
+  .bg-black\/80,
+  .bg-black\/70,
+  .bg-black\/60,
+  .bg-black\/50,
+  .bg-black\/40,
+  .bg-\[\#07030e\]\/85,
+  .bg-\[\#05020d\]\/80,
+  .bg-\[\#06030c\]\/85 {
+    background-color: rgba(15, 23, 42, 0.55) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
+}
+
+/* 7. Form Inputs, Selects & Textareas - Clean White with Purple Focus */
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
@@ -256,6 +531,7 @@ textarea {
   color: #0F172A !important;
   border-color: #E2E8F0 !important;
   font-weight: 500;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 input:not([type="checkbox"]):not([type="radio"]):focus,
@@ -273,19 +549,31 @@ textarea::placeholder {
   font-weight: 400;
 }
 
-/* Safety against card clipping or breaking on mobile */
+/* 8. Tables & Data Grids */
+table th {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #F3E8FF !important;
+  font-weight: 700 !important;
+}
+
+table td {
+  border-color: #F3E8FF !important;
+  color: #1E293B !important;
+}
+
+table tr:hover {
+  background-color: #FAF5FF !important;
+}
+
+/* 9. Safety against card clipping or breaking on mobile */
 .listing-card,
 [class*="ListingCard"] {
   min-width: 0;
   overflow: hidden;
 }
 
-/* Ensure horizontal flex items never blow out viewport */
+/* Ensure no horizontal flex items blow out viewport */
 .flex-1 {
   min-width: 0;
-}
-
-img {
-  max-width: 100%;
-  height: auto;
 }

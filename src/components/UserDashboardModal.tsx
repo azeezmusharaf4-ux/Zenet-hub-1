@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { AccountListing, Inquiry, UserProfile, PurchaseRecord, ReferralRecord } from '../types';
+import { copyToClipboard } from '../utils/clipboard';
 import { 
   X, 
   Store, 
@@ -149,7 +150,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
   const [replySentIds, setReplySentIds] = useState<string[]>([]);
 
   const handleCopyCredential = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text);
     setCopiedItemKey(key);
     setTimeout(() => setCopiedItemKey(null), 2000);
   };
@@ -291,16 +292,13 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
             {onSignOut && (
               <button
                 onClick={() => {
-                  if (confirm('Are you sure you want to log out of your ZENET account?')) {
-                    onClose();
-                    onSignOut();
-                  }
+                  onSignOut();
                 }}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 hover:border-rose-600 rounded-xl transition text-xs font-bold cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl transition text-xs font-bold cursor-pointer"
                 title="Log out of account"
               >
-                <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                <span>Sign out</span>
+                <LogOut className="w-3.5 h-3.5 text-purple-600" />
+                <span>Log Out</span>
               </button>
             )}
             <button
@@ -634,7 +632,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
 
                           <button
                             onClick={() => onRemoveSaved(listing.id)}
-                            className="p-1.5 text-purple-400/60 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition"
+                            className="p-1.5 text-purple-400/70 hover:text-purple-200 hover:bg-purple-900/40 rounded-lg transition"
                             title="Remove from saved"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -667,7 +665,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                 {recentlyViewedListings.length > 0 && onClearRecentlyViewed && (
                   <button
                     onClick={onClearRecentlyViewed}
-                    className="text-xs text-purple-400/80 hover:text-rose-300 font-semibold transition cursor-pointer"
+                    className="text-xs text-purple-400/80 hover:text-purple-200 font-semibold transition cursor-pointer"
                   >
                     Clear History
                   </button>
@@ -849,22 +847,22 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                   <span className="text-lg font-black text-white font-mono">{myListings.length}</span>
                 </div>
 
-                <div className="bg-[#0b201d] border border-[#1b4d44] p-3 rounded-2xl space-y-0.5">
-                  <span className="text-[10px] text-emerald-300/60 font-bold uppercase block">Active Inventory</span>
-                  <span className="text-lg font-black text-emerald-300 font-mono">
+                <div className="bg-[#1b0e36] border border-[#3b1d75] p-3 rounded-2xl space-y-0.5">
+                  <span className="text-[10px] text-purple-300/80 font-bold uppercase block">Active Inventory</span>
+                  <span className="text-lg font-black text-purple-200 font-mono">
                     {myListings.filter((l) => l.status === 'active').length}
                   </span>
                 </div>
 
-                <div className="bg-[#240e29] border border-[#481c52] p-3 rounded-2xl space-y-0.5">
-                  <span className="text-[10px] text-amber-300/60 font-bold uppercase block">Sold Accounts</span>
-                  <span className="text-lg font-black text-amber-300 font-mono">
+                <div className="bg-[#1b0e36] border border-[#3b1d75] p-3 rounded-2xl space-y-0.5">
+                  <span className="text-[10px] text-purple-300/80 font-bold uppercase block">Sold Accounts</span>
+                  <span className="text-lg font-black text-purple-200 font-mono">
                     {myListings.filter((l) => l.status === 'sold').length}
                   </span>
                 </div>
 
                 <div className="bg-[#190d3d] border border-[#3b1f7a] p-3 rounded-2xl space-y-0.5">
-                  <span className="text-[10px] text-cyan-300/60 font-bold uppercase block">Total Revenue</span>
+                  <span className="text-[10px] text-purple-300/80 font-bold uppercase block">Total Revenue</span>
                   <span className="text-lg font-black text-white font-mono">
                     ₦{myListings
                       .filter((l) => l.status === 'sold')
@@ -895,8 +893,8 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                           </span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
                             listing.status === 'sold'
-                              ? 'bg-rose-950/90 text-rose-300 border border-rose-800'
-                              : 'bg-emerald-950/90 text-emerald-300 border border-emerald-800'
+                              ? 'bg-purple-950/90 text-purple-300 border border-purple-800'
+                              : 'bg-purple-900/50 text-purple-200 border border-purple-700'
                           }`}>
                             {listing.status}
                           </span>
@@ -916,14 +914,14 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                         {listing.status === 'active' ? (
                           <button
                             onClick={() => onUpdateListingStatus(listing.id, 'sold')}
-                            className="bg-[#211043] hover:bg-[#2e165b] text-amber-300 border border-[#3e1e78] text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer"
+                            className="bg-[#211043] hover:bg-[#2e165b] text-purple-200 border border-[#3e1e78] text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer"
                           >
                             Mark as Sold
                           </button>
                         ) : (
                           <button
                             onClick={() => onUpdateListingStatus(listing.id, 'active')}
-                            className="bg-[#211043] hover:bg-[#2e165b] text-emerald-300 border border-[#3e1e78] text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer"
+                            className="bg-[#211043] hover:bg-[#2e165b] text-purple-200 border border-[#3e1e78] text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer"
                           >
                             Re-list Active
                           </button>
@@ -931,7 +929,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
 
                         <button
                           onClick={() => onDeleteListing(listing.id)}
-                          className="p-2 bg-rose-950/60 hover:bg-rose-900 text-rose-400 border border-rose-800/80 rounded-xl transition cursor-pointer"
+                          className="p-2 bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-800/80 rounded-xl transition cursor-pointer"
                           title="Delete Listing"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1257,14 +1255,11 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (confirm('Are you sure you want to log out of your ZENET account?')) {
-                        onClose();
-                        onSignOut();
-                      }
+                      onSignOut();
                     }}
-                    className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 font-bold px-5 py-2.5 rounded-full text-xs transition cursor-pointer flex items-center gap-2 shadow-md"
+                    className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold px-5 py-2.5 rounded-full text-xs transition cursor-pointer flex items-center gap-2 shadow-xs"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-4 h-4 text-purple-600" />
                     <span>Log Out of Account</span>
                   </button>
                 </div>

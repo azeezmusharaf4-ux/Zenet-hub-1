@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, onAuthStateChanged, onIdTokenChanged, signOut } from 'firebase/auth';
 import { 
   collection, 
@@ -20,9 +20,6 @@ import { auth, db, sanitizeFirestorePayload, getSafeIdToken } from './lib/fireba
 import { AccountListing, CategoryType, FilterState, Inquiry, UserProfile, PurchaseRecord, ActiveAppView, WalletTransaction } from './types';
 import { isCategoryMatch } from './utils/category';
 import { safeApiFetch } from './utils/api';
-import { safeLocalStorage, safeSessionStorage } from './utils/storage';
-import { generateUserReferralCode } from './utils/referral';
-import type { DashboardTab } from './components/UserDashboardModal';
 
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
@@ -30,49 +27,51 @@ import { SafetyBanner } from './components/SafetyBanner';
 import { CategoryFilter } from './components/CategoryFilter';
 import { FeaturedListings } from './components/FeaturedListings';
 import { ListingCard } from './components/ListingCard';
+import { ListingDetailModal } from './components/ListingDetailModal';
+import { CreateListingModal } from './components/CreateListingModal';
 import { AuthModal } from './components/AuthModal';
+import { ContactSellerModal } from './components/ContactSellerModal';
+import { UserDashboardModal, DashboardTab } from './components/UserDashboardModal';
+import { SellerDashboardModal } from './components/SellerDashboardModal';
+import { SellerProfileModal } from './components/SellerProfileModal';
+import { PaymentModal } from './components/PaymentModal';
+import { InsufficientBalanceModal } from './components/InsufficientBalanceModal';
+import { PaymentSuccessModal } from './components/PaymentSuccessModal';
 import { NavigationDrawer } from './components/NavigationDrawer';
+import { PurchaseDetailsModal } from './components/PurchaseDetailsModal';
+import { WalletModal } from './components/WalletModal';
+import { CategoriesView } from './components/CategoriesView';
+import { SupportView } from './components/SupportView';
+import { LandingPage } from './components/LandingPage';
 import { Footer } from './components/Footer';
+import { LogAccountsView } from './components/LogAccountsView';
+import { HistoryView } from './components/HistoryView';
 import { HomeDashboardView } from './components/HomeDashboardView';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { ProfileView } from './components/ProfileView';
+import { EditProfileView } from './components/EditProfileView';
+import { ReferralsView, generateUserReferralCode } from './components/ReferralsView';
+import { ChangePasswordView } from './components/ChangePasswordView';
 import { PWAInstallBanner } from './components/PWAInstallPrompt';
+import { LogoutConfirmModal } from './components/LogoutConfirmModal';
+import { AccountDeletionModal } from './components/AccountDeletionModal';
+import { safeLocalStorage } from './utils/storage';
 
-// Dynamic code-split views & modals for 10x faster mobile initial load
-const VirtualNumbersView = React.lazy(() => import('./components/VirtualNumbersView').then(m => ({ default: m.VirtualNumbersView })));
-const VirtualNumbers2View = React.lazy(() => import('./components/VirtualNumbers2View').then(m => ({ default: m.VirtualNumbers2View })));
-const SocialBoostView = React.lazy(() => import('./components/SocialBoostView').then(m => ({ default: m.SocialBoostView })));
-const SocialBoost2View = React.lazy(() => import('./components/SocialBoost2View').then(m => ({ default: m.SocialBoost2View })));
-const Server2View = React.lazy(() => import('./components/Server2View').then(m => ({ default: m.Server2View })));
-const LogAccountsView = React.lazy(() => import('./components/LogAccountsView').then(m => ({ default: m.LogAccountsView })));
-const CategoriesView = React.lazy(() => import('./components/CategoriesView').then(m => ({ default: m.CategoriesView })));
-const SupportView = React.lazy(() => import('./components/SupportView').then(m => ({ default: m.SupportView })));
-const HistoryView = React.lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
-const ProfileView = React.lazy(() => import('./components/ProfileView').then(m => ({ default: m.ProfileView })));
-const EditProfileView = React.lazy(() => import('./components/EditProfileView').then(m => ({ default: m.EditProfileView })));
-const ReferralsView = React.lazy(() => import('./components/ReferralsView').then(m => ({ default: m.ReferralsView })));
-const ChangePasswordView = React.lazy(() => import('./components/ChangePasswordView').then(m => ({ default: m.ChangePasswordView })));
-const AdminWalletsView = React.lazy(() => import('./components/AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
-const LandingPage = React.lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
-
-const ListingDetailModal = React.lazy(() => import('./components/ListingDetailModal').then(m => ({ default: m.ListingDetailModal })));
-const CreateListingModal = React.lazy(() => import('./components/CreateListingModal').then(m => ({ default: m.CreateListingModal })));
-const ContactSellerModal = React.lazy(() => import('./components/ContactSellerModal').then(m => ({ default: m.ContactSellerModal })));
-const UserDashboardModal = React.lazy(() => import('./components/UserDashboardModal').then(m => ({ default: m.UserDashboardModal })));
-const SellerDashboardModal = React.lazy(() => import('./components/SellerDashboardModal').then(m => ({ default: m.SellerDashboardModal })));
-const SellerProfileModal = React.lazy(() => import('./components/SellerProfileModal').then(m => ({ default: m.SellerProfileModal })));
+// Code-split heavy views & modals for lighter initial bundle
 const AdminPanelModal = React.lazy(() => import('./components/AdminPanelModal').then(m => ({ default: m.AdminPanelModal })));
-const PaymentModal = React.lazy(() => import('./components/PaymentModal').then(m => ({ default: m.PaymentModal })));
-const InsufficientBalanceModal = React.lazy(() => import('./components/InsufficientBalanceModal').then(m => ({ default: m.InsufficientBalanceModal })));
-const PaymentSuccessModal = React.lazy(() => import('./components/PaymentSuccessModal').then(m => ({ default: m.PaymentSuccessModal })));
-const PurchaseDetailsModal = React.lazy(() => import('./components/PurchaseDetailsModal').then(m => ({ default: m.PurchaseDetailsModal })));
-const WalletModal = React.lazy(() => import('./components/WalletModal').then(m => ({ default: m.WalletModal })));
+const VirtualNumbersView = React.lazy(() => import('./components/VirtualNumbersView').then(m => ({ default: m.VirtualNumbersView })));
+const SocialBoostView = React.lazy(() => import('./components/SocialBoostView').then(m => ({ default: m.SocialBoostView })));
+const Server2View = React.lazy(() => import('./components/Server2View').then(m => ({ default: m.Server2View })));
+const VirtualNumbers2View = React.lazy(() => import('./components/VirtualNumbers2View').then(m => ({ default: m.VirtualNumbers2View })));
+const SocialBoost2View = React.lazy(() => import('./components/SocialBoost2View').then(m => ({ default: m.SocialBoost2View })));
+const AdminWalletsView = React.lazy(() => import('./components/AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
 const ZenetUpdateModal = React.lazy(() => import('./components/ZenetUpdateModal').then(m => ({ default: m.ZenetUpdateModal })));
 const ZenetUpdateAdminModal = React.lazy(() => import('./components/ZenetUpdateAdminModal').then(m => ({ default: m.ZenetUpdateAdminModal })));
 
-const ViewLoadingFallback = () => (
-  <div className="w-full py-16 flex flex-col items-center justify-center space-y-3">
-    <div className="w-8 h-8 rounded-full border-2 border-[#E9E2FA] border-t-[#7C3AED] animate-spin"></div>
-    <span className="text-xs font-bold text-[#716B82] uppercase tracking-wider">Loading...</span>
+const LazyViewFallback: React.FC = () => (
+  <div className="w-full min-h-[360px] flex flex-col items-center justify-center p-8 text-center text-purple-600 animate-in fade-in duration-200">
+    <div className="w-10 h-10 border-3 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-3"></div>
+    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Loading...</span>
   </div>
 );
 import { Phone, UserCheck } from 'lucide-react';
@@ -307,8 +306,11 @@ export default function App() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string>('');
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isAccountDeletionModalOpen, setIsAccountDeletionModalOpen] = useState(false);
+  const [accountDeletionVerifyData, setAccountDeletionVerifyData] = useState<{ reqId: string; token: string } | null>(null);
 
-  const handleLogout = async () => {
+  const executeLogout = async () => {
     safeLocalStorage.removeItem('zenet_last_seen_timestamp');
     safeLocalStorage.removeItem('zenet_cached_user_profile');
     setSessionExpiredNotice('');
@@ -320,6 +322,11 @@ export default function App() {
     setUser(null);
     setAndCacheUserProfile(null);
     setActiveView('marketplace');
+    setIsLogoutConfirmOpen(false);
+  };
+
+  const handleLogout = () => {
+    setIsLogoutConfirmOpen(true);
   };
 
   const [dashboardTab, setDashboardTab] = useState<DashboardTab | null>(null);
@@ -353,9 +360,9 @@ export default function App() {
     const ticketsRef = collection(db, 'tickets');
     let q;
     if (isAdmin) {
-      q = query(ticketsRef, where('status', '==', 'open'));
+      q = query(ticketsRef, where('status', '==', 'open'), limit(50));
     } else {
-      q = query(ticketsRef, where('userId', '==', user.uid));
+      q = query(ticketsRef, where('userId', '==', user.uid), limit(50));
     }
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setUnreadTicketsCount(snapshot.docs.length);
@@ -729,6 +736,14 @@ export default function App() {
     // Detect referral query parameter or direct admin wallets / social boost / virtual numbers route on app load
     try {
       const urlParams = new URLSearchParams(window.location.search);
+      const actionParam = urlParams.get('action');
+      const reqIdParam = urlParams.get('reqId');
+      const tokenParam = urlParams.get('token');
+      if (actionParam === 'verify-account-deletion' && reqIdParam && tokenParam) {
+        setAccountDeletionVerifyData({ reqId: reqIdParam, token: tokenParam });
+        setIsAccountDeletionModalOpen(true);
+      }
+
       const paramRef = urlParams.get('ref') || urlParams.get('referral');
       if (paramRef) {
         safeLocalStorage.setItem('pending_referral_code', paramRef.trim().toUpperCase());
@@ -752,13 +767,7 @@ export default function App() {
       console.warn('URL ref code parse error:', err);
     }
 
-    // Safety timeout: Never allow auth initialization to hang or freeze the screen on mobile devices
-    const authSafetyTimeout = setTimeout(() => {
-      setAuthLoading(false);
-    }, 1500);
-
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      clearTimeout(authSafetyTimeout);
       if (currentUser) {
         safeLocalStorage.setItem('zenet_last_seen_timestamp', Date.now().toString());
         setUser(currentUser);
@@ -805,9 +814,8 @@ export default function App() {
                       setAndCacheUserProfile(updatedProfile);
 
                       // Check for pending Buy Now order to resume after wallet funding verification
-                      const pendingListingId = safeSessionStorage.getItem('pending_buynow_listing_id') || safeLocalStorage.getItem('pending_buynow_listing_id');
+                      const pendingListingId = safeLocalStorage.getItem('pending_buynow_listing_id');
                       if (pendingListingId) {
-                        safeSessionStorage.removeItem('pending_buynow_listing_id');
                         safeLocalStorage.removeItem('pending_buynow_listing_id');
 
                         getDoc(doc(db, 'listings', pendingListingId)).then((listingDocSnap) => {
@@ -962,7 +970,6 @@ export default function App() {
     });
 
     return () => {
-      clearTimeout(authSafetyTimeout);
       unsubscribe();
       unsubscribeToken();
     };
@@ -987,11 +994,12 @@ export default function App() {
     return () => unsubscribe();
   }, [user?.uid]);
 
-  // 2. Real-time Firestore Listings listener (Displays real listings from Firebase)
+  // 2. Real-time Firestore Listings listener (Bounded query to prevent huge payloads on low-end devices)
   useEffect(() => {
     const listingsRef = collection(db, 'listings');
+    const qListings = query(listingsRef, limit(80));
     
-    const unsubscribe = onSnapshot(listingsRef, (snapshot) => {
+    const unsubscribe = onSnapshot(qListings, (snapshot) => {
       const docsData: AccountListing[] = [];
       snapshot.docs.forEach((d) => {
         // Filter out legacy demo listings
@@ -1005,7 +1013,8 @@ export default function App() {
       setListings(docsData);
       setListingsLoading(false);
       try {
-        safeLocalStorage.setItem('zenet_cached_listings', JSON.stringify(docsData));
+        // Cache up to 40 items safely to protect memory and avoid QuotaExceededError
+        safeLocalStorage.setItem('zenet_cached_listings', JSON.stringify(docsData.slice(0, 40)));
       } catch (err) {
         console.warn('Listings cache write notice:', err);
       }
@@ -1025,7 +1034,7 @@ export default function App() {
     }
 
     const inquiriesRef = collection(db, 'inquiries');
-    const q = query(inquiriesRef, where('sellerId', '==', user.uid));
+    const q = query(inquiriesRef, where('sellerId', '==', user.uid), limit(50));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data: Inquiry[] = snapshot.docs.map((d) => ({
@@ -1048,7 +1057,7 @@ export default function App() {
     }
 
     const purchasesRef = collection(db, 'purchases');
-    const q = query(purchasesRef, where('buyerId', '==', user.uid));
+    const q = query(purchasesRef, where('buyerId', '==', user.uid), limit(50));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data: PurchaseRecord[] = snapshot.docs.map((d) => ({
@@ -1071,7 +1080,7 @@ export default function App() {
     }
 
     const txRef = collection(db, 'wallet_transactions');
-    const q = query(txRef, where('userId', '==', user.uid));
+    const q = query(txRef, where('userId', '==', user.uid), limit(50));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data: WalletTransaction[] = snapshot.docs.map((d) => ({
@@ -2002,7 +2011,7 @@ export default function App() {
 
         {/* Main Container */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-12 overflow-x-hidden">
-          <Suspense fallback={<ViewLoadingFallback />}>
+          <React.Suspense fallback={<LazyViewFallback />}>
 
           {/* VIEW: VIRTUAL NUMBERS MARKETPLACE */}
           {activeView === 'virtual-numbers' && (
@@ -2250,19 +2259,18 @@ export default function App() {
             />
           )}
 
-          </Suspense>
+          </React.Suspense>
         </main>
 
-        {/* Footer */}
-        <Footer onSelectCategory={(cat) => {
-          setFilters((prev) => ({ ...prev, category: cat }));
-          setActiveView('log-accounts');
-        }} />
+      {/* Footer */}
+      <Footer onSelectCategory={(cat) => {
+        setFilters((prev) => ({ ...prev, category: cat }));
+        setActiveView('log-accounts');
+      }} />
 
       </div> {/* Close main right area container */}
 
-      {/* MODALS WITH SUSPENSE */}
-      <Suspense fallback={null}>
+      {/* MODALS */}
 
       {/* Wallet Modal */}
       <WalletModal
@@ -2420,31 +2428,33 @@ export default function App() {
 
       {/* 7. Admin Moderation Panel */}
       {adminOpen && isOwner && (
-        <AdminPanelModal
-          listings={listings}
-          user={user}
-          userProfile={userProfile}
-          onClose={() => setAdminOpen(false)}
-          onApproveListing={async (id) => {
-            const listingRef = doc(db, 'listings', id);
-            await setDoc(listingRef, { approvalStatus: 'approved' }, { merge: true });
-          }}
-          onRejectListing={async (id) => {
-            const listingRef = doc(db, 'listings', id);
-            await setDoc(listingRef, { approvalStatus: 'rejected' }, { merge: true });
-          }}
-          onToggleFeatured={async (id, featured) => {
-            const listingRef = doc(db, 'listings', id);
-            await setDoc(listingRef, { featured: !featured }, { merge: true });
-          }}
-          onDeleteListing={handleRequestDeleteListing}
-          onUpdateUserProfile={(profile) => setUserProfile(profile)}
-          onUpdateListing={(updated) => {
-            setListings((prev) =>
-              prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
-            );
-          }}
-        />
+        <React.Suspense fallback={null}>
+          <AdminPanelModal
+            listings={listings}
+            user={user}
+            userProfile={userProfile}
+            onClose={() => setAdminOpen(false)}
+            onApproveListing={async (id) => {
+              const listingRef = doc(db, 'listings', id);
+              await setDoc(listingRef, { approvalStatus: 'approved' }, { merge: true });
+            }}
+            onRejectListing={async (id) => {
+              const listingRef = doc(db, 'listings', id);
+              await setDoc(listingRef, { approvalStatus: 'rejected' }, { merge: true });
+            }}
+            onToggleFeatured={async (id, featured) => {
+              const listingRef = doc(db, 'listings', id);
+              await setDoc(listingRef, { featured: !featured }, { merge: true });
+            }}
+            onDeleteListing={handleRequestDeleteListing}
+            onUpdateUserProfile={(profile) => setUserProfile(profile)}
+            onUpdateListing={(updated) => {
+              setListings((prev) =>
+                prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
+              );
+            }}
+          />
+        </React.Suspense>
       )}
 
       {/* 8. International Payment Modal (Wallet & Payment Hub) */}
@@ -2476,7 +2486,7 @@ export default function App() {
           currentBalance={latestWalletBalance}
           onOpenFundWallet={() => {
             try {
-              safeSessionStorage.setItem('pending_buynow_listing_id', insufficientBalanceListing.id);
+              sessionStorage.setItem('pending_buynow_listing_id', insufficientBalanceListing.id);
             } catch (e) {
               console.warn('Storage notice:', e);
             }
@@ -2502,24 +2512,24 @@ export default function App() {
       {/* 10. Product Deletion Confirmation Popup Modal */}
       {deletingListingId && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
           onClick={() => {
             if (!isDeleting) setDeletingListingId(null);
           }}
         >
           <div 
-            className="bg-white border border-rose-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-5 relative overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white border border-purple-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
-              <Trash2 className="w-7 h-7" />
+            <div className="w-16 h-16 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto border border-purple-200 shadow-inner">
+              <Trash2 className="w-8 h-8" />
             </div>
             
-            <div className="space-y-1.5">
-              <h3 className="text-lg sm:text-xl font-black text-[#0F172A]">
+            <div className="space-y-2">
+              <h3 className="text-xl font-extrabold text-slate-900">
                 Are you sure you want to delete this product?
               </h3>
-              <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                 This action is permanent. The product will be deleted from Firebase Firestore and removed immediately from the marketplace.
               </p>
             </div>
@@ -2529,7 +2539,7 @@ export default function App() {
                 type="button"
                 onClick={() => setDeletingListingId(null)}
                 disabled={isDeleting}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-[#0F172A] font-bold text-xs sm:text-sm transition cursor-pointer"
+                className="flex-1 px-5 py-3 rounded-2xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-slate-900 font-bold text-xs sm:text-sm transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -2537,7 +2547,7 @@ export default function App() {
                 type="button"
                 onClick={handleConfirmDeleteListing}
                 disabled={isDeleting}
-                className="flex-1 px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-rose-600/40 transition cursor-pointer flex items-center justify-center space-x-2"
+                className="flex-1 px-5 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-purple-600/20 transition cursor-pointer flex items-center justify-center space-x-2"
               >
                 {isDeleting ? (
                   <>
@@ -2554,38 +2564,38 @@ export default function App() {
       )}
 
       {/* 11. Zenet Update & System Upgrades Modal */}
-      <ZenetUpdateModal
-        isOpen={isZenetUpdateModalOpen}
-        onClose={() => setIsZenetUpdateModalOpen(false)}
-        user={user}
-        userProfile={userProfile}
-        walletBalance={walletBalance}
-        isOwner={isOwner}
-        isAdmin={isAdmin}
-        onOpenAuth={(mode) => setAuthMode(mode)}
-        onOpenWallet={() => setIsWalletModalOpen(true)}
-        onOpenAdminGenerator={() => setIsZenetUpdateAdminModalOpen(true)}
-        onNavigateService={(service) => {
-          setIsZenetUpdateModalOpen(false);
-          if (service === 'wallet') {
-            setIsWalletModalOpen(true);
-          } else {
-            setActiveView(service);
-          }
-        }}
-      />
+      <React.Suspense fallback={null}>
+        <ZenetUpdateModal
+          isOpen={isZenetUpdateModalOpen}
+          onClose={() => setIsZenetUpdateModalOpen(false)}
+          user={user}
+          userProfile={userProfile}
+          walletBalance={walletBalance}
+          isOwner={isOwner}
+          isAdmin={isAdmin}
+          onOpenAuth={(mode) => setAuthMode(mode)}
+          onOpenWallet={() => setIsWalletModalOpen(true)}
+          onOpenAdminGenerator={() => setIsZenetUpdateAdminModalOpen(true)}
+          onNavigateService={(service) => {
+            setIsZenetUpdateModalOpen(false);
+            if (service === 'wallet') {
+              setIsWalletModalOpen(true);
+            } else {
+              setActiveView(service);
+            }
+          }}
+        />
 
-      {/* 12. Zenet Update Admin Product Generator Modal (Owner/Admin Only) */}
-      <ZenetUpdateAdminModal
-        isOpen={isZenetUpdateAdminModalOpen}
-        onClose={() => setIsZenetUpdateAdminModalOpen(false)}
-        user={user}
-        userProfile={userProfile}
-        isOwner={isOwner}
-        isAdmin={isAdmin}
-      />
-
-      </Suspense>
+        {/* 12. Zenet Update Admin Product Generator Modal (Owner/Admin Only) */}
+        <ZenetUpdateAdminModal
+          isOpen={isZenetUpdateAdminModalOpen}
+          onClose={() => setIsZenetUpdateAdminModalOpen(false)}
+          user={user}
+          userProfile={userProfile}
+          isOwner={isOwner}
+          isAdmin={isAdmin}
+        />
+      </React.Suspense>
 
       {/* 13. Progressive Web App (PWA) Install Prompt Banner */}
       <PWAInstallBanner />
@@ -2600,6 +2610,33 @@ export default function App() {
             setAuthMode('login');
           } else {
             setIsWalletModalOpen(true);
+          }
+        }}
+      />
+
+      {/* 15. Clean Logout Confirmation Dialog */}
+      <LogoutConfirmModal
+        isOpen={isLogoutConfirmOpen}
+        onClose={() => setIsLogoutConfirmOpen(false)}
+        onConfirmLogout={executeLogout}
+      />
+
+      {/* 16. Secure Account Deletion Modal (Email Verification & Permanent Deletion) */}
+      <AccountDeletionModal
+        user={user}
+        isOpen={isAccountDeletionModalOpen}
+        verifyData={accountDeletionVerifyData}
+        onClose={() => {
+          setIsAccountDeletionModalOpen(false);
+          setAccountDeletionVerifyData(null);
+          if (window.location.search.includes('action=verify-account-deletion')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        }}
+        onDeletionComplete={() => {
+          executeLogout();
+          if (window.location.search.includes('action=verify-account-deletion')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
           }
         }}
       />

@@ -5,6 +5,7 @@
  * - Netlify static deployment with serverless functions (/api/* -> /.netlify/functions/*)
  * - Custom backend base URL if configured via VITE_API_URL / VITE_BACKEND_URL
  */
+import { getSafeIdToken } from '../lib/firebase';
 
 export const getApiUrl = (path: string): string => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
@@ -144,11 +145,23 @@ export const safeApiFetch = async (path: string, options: RequestInit = {}): Pro
   const executeFetch = async (targetUrl: string): Promise<{ ok: boolean; status: number; data: any; isHtml: boolean }> => {
     const headers: Record<string, string> = {
       'Accept': 'application/json, text/plain, */*',
+      'X-Requested-With': 'XMLHttpRequest',
       ...((options.headers as Record<string, string>) || {})
     };
 
     if (options.body && typeof options.body === 'string' && !headers['Content-Type'] && !headers['content-type']) {
       headers['Content-Type'] = 'application/json';
+    }
+
+    if (!headers['Authorization'] && !headers['authorization']) {
+      try {
+        const token = await getSafeIdToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      } catch {
+        // Fallback gracefully for unauthenticated public requests
+      }
     }
 
     const res = await fetch(targetUrl, {

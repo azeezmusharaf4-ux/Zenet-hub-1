@@ -1,4 +1,4 @@
-import { getDb, doc, getDoc, setDoc, updateDoc, collection, getDocs } from './_firebase';
+import { getDb, doc, getDoc, setDoc, updateDoc, collection, getDocs, parseAndVerifyToken } from './_firebase';
 import { runTransaction } from 'firebase/firestore';
 
 export const handler = async (event: any) => {
@@ -22,6 +22,16 @@ export const handler = async (event: any) => {
   }
 
   try {
+    const authHeader = event.headers?.authorization || event.headers?.Authorization;
+    const verifiedUser = parseAndVerifyToken(authHeader);
+    if (!verifiedUser) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Authentication required. Please log in to complete purchase.' })
+      };
+    }
+
     const db = getDb();
     if (!db) {
       return {
@@ -44,6 +54,15 @@ export const handler = async (event: any) => {
         statusCode: 400,
         headers,
         body: JSON.stringify({ error: 'Missing userId or listingId parameter.' })
+      };
+    }
+
+    const isOwner = (verifiedUser.email || '').trim().toLowerCase() === 'azeezmusharaf4@gmail.com';
+    if (verifiedUser.uid !== userId && !isOwner) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'Forbidden: You cannot initiate purchases for another user account.' })
       };
     }
 

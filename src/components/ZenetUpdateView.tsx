@@ -16,6 +16,7 @@ import {
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage, sanitizeFirestorePayload } from '../lib/firebase';
 import { UserProfile, ZenedUpdateProduct, ZenedUpdateOrder, WalletTransaction } from '../types';
+import { copyToClipboard } from '../utils/clipboard';
 import { 
   Sparkles, 
   ArrowLeft, 
@@ -127,7 +128,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2500);
   };

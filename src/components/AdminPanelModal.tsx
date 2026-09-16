@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db, sanitizeFirestorePayload } from '../lib/firebase';
 import { safeApiFetch } from '../utils/api';
+import { copyToClipboard } from '../utils/clipboard';
 import { 
   AccountListing, 
   UserProfile, 
@@ -842,7 +843,7 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                                 onClick={() => {
                                   const val = item.accountEmail || item.delivery_value || '';
                                   if (val) {
-                                    navigator.clipboard.writeText(val);
+                                    copyToClipboard(val);
                                   }
                                 }}
                                 title="Click to copy Login/Email"
@@ -854,7 +855,7 @@ const AdminEditListingModal: React.FC<AdminEditListingModalProps> = ({
                                 <span 
                                   className="text-slate-600 font-mono select-all hover:text-blue-600 flex items-center gap-1 cursor-pointer bg-slate-100 px-1 py-0.5 rounded border border-slate-200 text-[11px]"
                                   onClick={() => {
-                                    navigator.clipboard.writeText(item.accountPassword);
+                                    copyToClipboard(item.accountPassword);
                                   }}
                                   title="Click to copy Password"
                                 >
@@ -2036,7 +2037,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                             <>
                               <button
                                 onClick={() => handleApprove(item.id)}
-                                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow"
+                                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-sm"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                 Approve
@@ -2044,7 +2045,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                               <button
                                 onClick={() => handleReject(item.id)}
-                                className="px-3 py-1.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 font-bold text-xs rounded-xl border border-rose-500/30 transition cursor-pointer flex items-center gap-1"
+                                className="px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold text-xs rounded-xl border border-purple-200 transition cursor-pointer flex items-center gap-1"
                               >
                                 <XCircle className="w-3.5 h-3.5" />
                                 Reject
@@ -2058,8 +2059,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                 onClick={() => handleToggleSoldStatus(item)}
                                 className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition cursor-pointer flex items-center gap-1 ${
                                   item.status === 'sold'
-                                    ? 'bg-slate-800 text-slate-300 border-slate-700'
-                                    : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900'
+                                    ? 'bg-purple-50 text-slate-500 border-purple-200 hover:bg-purple-100'
+                                    : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
                                 }`}
                                 title="Toggle Sold / Active status"
                               >
@@ -2069,7 +2070,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                               <button
                                 onClick={() => setEditingListing(item)}
-                                className="p-2 bg-slate-900 hover:bg-slate-800 text-cyan-400 rounded-xl border border-slate-800 transition cursor-pointer"
+                                className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl border border-purple-200 transition cursor-pointer"
                                 title="Edit Listing Details"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -2080,8 +2081,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                   onClick={() => handleToggleFeaturedStatus(item)}
                                   className={`p-2 rounded-xl border transition cursor-pointer ${
                                     item.featured
-                                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                                      ? 'bg-purple-600 text-white border-purple-600'
+                                      : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
                                   }`}
                                   title={item.featured ? 'Remove from Featured' : 'Feature on Homepage'}
                                 >
@@ -2090,22 +2091,22 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                               )}
 
                               {confirmProductDeleteId === item.id ? (
-                                <div className="flex items-center gap-1 bg-rose-950 border border-rose-800 px-2 py-1 rounded-xl animate-pulse">
-                                  <span className="text-[9px] text-rose-300 font-bold mr-1">Confirm?</span>
+                                <div className="flex items-center gap-1 bg-purple-50 border border-purple-300 px-2 py-1 rounded-xl">
+                                  <span className="text-[9px] text-purple-900 font-bold mr-1">Confirm?</span>
                                   <button
                                     type="button"
                                     onClick={() => {
                                       handleDeleteListingItem(item.id);
                                       setConfirmProductDeleteId(null);
                                     }}
-                                    className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-[9px] rounded transition cursor-pointer"
+                                    className="px-1.5 py-0.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-[9px] rounded transition cursor-pointer"
                                   >
                                     Yes
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => setConfirmProductDeleteId(null)}
-                                    className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold text-[9px] rounded transition cursor-pointer"
+                                    className="px-1.5 py-0.5 bg-white hover:bg-purple-50 text-slate-800 border border-purple-200 font-extrabold text-[9px] rounded transition cursor-pointer"
                                   >
                                     No
                                   </button>
@@ -2113,7 +2114,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                               ) : (
                                 <button
                                   onClick={() => setConfirmProductDeleteId(item.id)}
-                                  className="p-2 bg-rose-950/80 hover:bg-rose-900 text-rose-400 rounded-xl border border-rose-800/60 transition cursor-pointer"
+                                  className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl border border-purple-200 transition cursor-pointer"
                                   title="Delete Listing"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -2121,8 +2122,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                               )}
                             </>
                           ) : (
-                            <span className="text-[10px] text-slate-500 px-2 py-1 bg-slate-900 rounded-lg border border-slate-800 flex items-center gap-1">
-                              <Lock className="w-3 h-3" />
+                            <span className="text-[10px] text-slate-500 px-2 py-1 bg-purple-50/50 rounded-lg border border-purple-100 flex items-center gap-1">
+                              <Lock className="w-3 h-3 text-purple-600" />
                               Managed by Creator
                             </span>
                           )}

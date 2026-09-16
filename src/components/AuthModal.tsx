@@ -237,7 +237,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     <div className={`fixed inset-0 z-50 flex ${
       isFullScreenPage 
         ? 'flex-col items-stretch justify-start p-0 m-0 bg-white' 
-        : 'items-center justify-center p-0 sm:p-4 md:p-6 bg-white sm:bg-black/60'
+        : 'items-center justify-center p-0 sm:p-4 md:p-6 bg-white sm:bg-black/40 sm:backdrop-blur-sm'
     } overflow-y-auto overflow-x-hidden w-full max-w-full min-h-screen min-h-[100dvh] overscroll-contain`}>
       
       {/* Outer Container Card - 2 Column on Desktop */}

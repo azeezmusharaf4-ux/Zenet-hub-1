@@ -42,6 +42,7 @@ import {
 import { UserProfile, SocialBoostService, SocialBoostOrder, SocialBoostPricingSettings } from '../types';
 import { auth, getSafeIdToken } from '../lib/firebase';
 import { safeApiFetch, sanitizeApiErrorMessage } from '../utils/api';
+import { copyToClipboard } from '../utils/clipboard';
 
 export type Server2Page = 'front' | 'buy-numbers' | 'boost-accounts';
 
@@ -201,7 +202,7 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
   const handleCopy = (text: string, label: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text);
     setCopiedText(label);
     setTimeout(() => setCopiedText(''), 2500);
   };

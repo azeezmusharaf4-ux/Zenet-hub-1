@@ -36,6 +36,7 @@ import { User } from 'firebase/auth';
 import { db, storage, sanitizeFirestorePayload } from '../lib/firebase';
 import { UserProfile, ZenedUpdateProduct } from '../types';
 import { processAndCompressImage } from '../lib/imageUtils';
+import { sanitizeUrl } from '../lib/sanitizeUrl';
 
 interface ZenetUpdateAdminModalProps {
   isOpen: boolean;
@@ -754,7 +755,7 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                           </div>
                           {item.privateDeliveryLink && (
                             <a
-                              href={item.privateDeliveryLink}
+                              href={sanitizeUrl(item.privateDeliveryLink)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:text-blue-800 shrink-0 p-1"

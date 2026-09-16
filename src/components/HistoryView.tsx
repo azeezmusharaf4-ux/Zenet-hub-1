@@ -28,6 +28,8 @@ import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { isValidOtpCode, resolveCountryInfo } from '../utils/api';
 import AccountCredentialsCard from './AccountCredentialsCard';
+import { copyToClipboard } from '../utils/clipboard';
+import { sanitizeUrl } from '../lib/sanitizeUrl';
 
 export type HistoryCategory = 'number' | 'log' | 'boost' | 'update';
 
@@ -66,7 +68,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   // Copy helper
   const handleCopy = (text: string, key: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
   };
@@ -843,7 +845,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                           <div className="min-w-0 pr-2">
                             <span className="text-[10px] font-bold text-[#716B82] uppercase block">Download Link</span>
                             <a
-                              href={item.privateDeliveryLink}
+                              href={sanitizeUrl(item.privateDeliveryLink)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="font-mono text-xs text-[#7C3AED] hover:underline truncate block"
@@ -852,7 +854,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                             </a>
                           </div>
                           <a
-                            href={item.privateDeliveryLink}
+                            href={sanitizeUrl(item.privateDeliveryLink)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-3 py-1 rounded-lg bg-[#7C3AED] text-white text-xs font-bold hover:bg-[#6D28D9] transition flex items-center gap-1 cursor-pointer shrink-0"

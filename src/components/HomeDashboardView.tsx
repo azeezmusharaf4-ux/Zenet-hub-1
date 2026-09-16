@@ -132,18 +132,18 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       </div>
 
       {/* 2. WALLET CARD: Premium Indigo-Violet Gradient with Real Balance & Paystack Fund Action */}
-      <div className="w-full bg-gradient-to-br from-[#5B4DF5] via-[#6557F6] to-[#7546F8] rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-white shadow-lg shadow-indigo-600/15 relative overflow-hidden">
+      <div className="w-full bg-gradient-to-br from-[#5B4DF5] via-[#6557F6] to-[#7546F8] rounded-[26px] sm:rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-indigo-600/20 relative overflow-hidden">
         {/* Soft atmospheric glow accents */}
-        <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
-        <div className="absolute -left-8 -bottom-8 w-24 h-24 rounded-full bg-purple-400/20 pointer-events-none" />
+        <div className="absolute -right-6 -top-6 w-36 h-36 rounded-full bg-white/10 blur-xl pointer-events-none" />
+        <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-purple-400/20 blur-xl pointer-events-none" />
 
-        <div className="relative z-10 space-y-3.5 sm:space-y-5">
+        <div className="relative z-10 space-y-4 sm:space-y-5">
           {/* Header Row: Label + Active Status Badge */}
           <div className="flex items-center justify-between">
             <span className="text-xs sm:text-sm font-semibold text-white/90 tracking-wide">
               Wallet Balance
             </span>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-white/20 text-white text-[11px] sm:text-xs font-semibold border border-white/20 shadow-2xs">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-white text-xs font-semibold border border-white/20 shadow-2xs">
               <CreditCard className="w-3.5 h-3.5 text-white" />
               <span>Active</span>
             </div>
@@ -151,7 +151,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
           {/* Balance Display (Real user wallet balance in NGN) */}
           <div>
-            <div className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white font-sans truncate">
+            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-sans">
               ₦{Number(walletBalance || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
@@ -160,7 +160,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <button
             id="wallet-add-money-btn"
             onClick={onOpenWallet}
-            className="w-full py-3 sm:py-3.5 px-4 rounded-xl sm:rounded-2xl bg-white text-[#5B4DF5] hover:bg-slate-50 active:scale-[0.99] font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition cursor-pointer group"
+            className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-white text-[#5B4DF5] hover:bg-slate-50 active:scale-[0.99] font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xs transition cursor-pointer group"
           >
             <Plus className="w-4 h-4 stroke-[3] text-[#5B4DF5] group-hover:rotate-90 transition-transform duration-200" />
             <span>Add Money</span>
@@ -170,26 +170,26 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
       {/* 3. QUICK ACTIONS: EXCLUSIVELY THE 4 REAL ZENET HUB SERVICES */}
       <div>
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <h2 className="text-base sm:text-xl font-extrabold text-[#0F172A] tracking-tight">
+        <div className="flex items-center justify-between mb-3.5 sm:mb-4">
+          <h2 className="text-lg sm:text-xl font-extrabold text-[#0F172A] tracking-tight">
             Quick Actions
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
           {/* Service 1: Social Media Accounts */}
           <button
             id="quick-action-social-accounts"
             onClick={() => onSelectView('log-accounts')}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-xl sm:rounded-[22px] p-3 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[115px] sm:min-h-[145px]"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px]"
           >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
-              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
+              <Users className="w-6 h-6" />
             </div>
             <span className="font-extrabold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#5B4DF5] transition-colors leading-tight">
               Social Media Accounts
             </span>
-            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-0.5 sm:mt-1 leading-snug">
+            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-1 leading-snug">
               Aged & verified logs
             </span>
           </button>
@@ -198,15 +198,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <button
             id="quick-action-service-number"
             onClick={() => onSelectView('virtual-numbers')}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-xl sm:rounded-[22px] p-3 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[115px] sm:min-h-[145px]"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px]"
           >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
-              <Phone className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
+              <Phone className="w-6 h-6" />
             </div>
             <span className="font-extrabold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#5B4DF5] transition-colors leading-tight">
               Service Number
             </span>
-            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-0.5 sm:mt-1 leading-snug">
+            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-1 leading-snug">
               Virtual OTP & SMS
             </span>
           </button>
@@ -215,15 +215,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <button
             id="quick-action-social-boost"
             onClick={() => onSelectView('social-boost')}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-xl sm:rounded-[22px] p-3 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[115px] sm:min-h-[145px]"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px]"
           >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
-              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
+              <TrendingUp className="w-6 h-6" />
             </div>
             <span className="font-extrabold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#5B4DF5] transition-colors leading-tight">
               Social Boost
             </span>
-            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-0.5 sm:mt-1 leading-snug">
+            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-1 leading-snug">
               Followers & growth
             </span>
           </button>
@@ -232,15 +232,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <button
             id="quick-action-zenet-update"
             onClick={onOpenZenetUpdate}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-xl sm:rounded-[22px] p-3 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[115px] sm:min-h-[145px]"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px]"
           >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
-              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
+              <Sparkles className="w-6 h-6" />
             </div>
             <span className="font-extrabold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#5B4DF5] transition-colors leading-tight">
               ZENET Update
             </span>
-            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-0.5 sm:mt-1 leading-snug">
+            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-1 leading-snug">
               System files & tools
             </span>
           </button>

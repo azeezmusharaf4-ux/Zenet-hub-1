@@ -1,4 +1,4 @@
-import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from './_firebase';
+import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, parseAndVerifyToken } from './_firebase';
 
 export const handler = async (event: any) => {
   const headers = {
@@ -13,6 +13,9 @@ export const handler = async (event: any) => {
   }
 
   try {
+    const authHeader = event.headers?.authorization || event.headers?.Authorization;
+    const verifiedUser = parseAndVerifyToken(authHeader);
+
     let body: any = {};
     if (typeof event.body === 'string') {
       try {
@@ -24,15 +27,13 @@ export const handler = async (event: any) => {
       body = event.body;
     }
 
-    const callerEmail = body.callerEmail || event.queryStringParameters?.callerEmail || event.headers?.['x-caller-email'] || event.headers?.['x-admin-email'] || '';
     const targetUid = body.targetUid || event.queryStringParameters?.targetUid || '';
     const targetEmail = body.targetEmail || event.queryStringParameters?.targetEmail || '';
     const action = body.action || event.queryStringParameters?.action || 'set';
     const amount = body.amount !== undefined ? body.amount : event.queryStringParameters?.amount;
     const reason = (body.reason || event.queryStringParameters?.reason || 'Manual Admin Wallet Balance Override').trim();
 
-    const normalizedCaller = (callerEmail || '').trim().toLowerCase();
-    const isAuthorizedOwner = normalizedCaller === 'azeezmusharaf4@gmail.com';
+    const isAuthorizedOwner = verifiedUser && (verifiedUser.email || '').trim().toLowerCase() === 'azeezmusharaf4@gmail.com';
 
     if (!isAuthorizedOwner) {
       return {
@@ -40,7 +41,7 @@ export const handler = async (event: any) => {
         headers,
         body: JSON.stringify({
           success: false,
-          error: 'Forbidden: Access Denied. Only the verified Owner (Azeezmusharaf4@gmail.com) is authorized to access the Admin Wallet Override tool.'
+          error: 'Forbidden: Access Denied. Only the authenticated Owner (Azeezmusharaf4@gmail.com) is authorized to access the Admin Wallet Override tool.'
         })
       };
     }

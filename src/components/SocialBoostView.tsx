@@ -50,6 +50,7 @@ import {
 import { UserProfile, SocialBoostService, SocialBoostOrder, SocialBoostPricingSettings } from '../types';
 import { auth, getSafeIdToken } from '../lib/firebase';
 import { safeApiFetch, sanitizeApiErrorMessage } from '../utils/api';
+import { copyToClipboard } from '../utils/clipboard';
 
 interface SocialBoostViewProps {
   userProfile: UserProfile | null;
@@ -746,7 +747,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   };
 
   const handleCopyOrderId = (id: string) => {
-    navigator.clipboard.writeText(id);
+    copyToClipboard(id);
     setCopiedOrderId(id);
     setTimeout(() => setCopiedOrderId(null), 2000);
   };

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { ReferralRecord, UserProfile } from '../types';
+import { copyToClipboard } from '../utils/clipboard';
 
 interface ReferralsViewProps {
   user: User | null;
@@ -106,7 +107,7 @@ export const ReferralsView: React.FC<ReferralsViewProps> = ({
   // Copy referral code to clipboard
   const handleCopyCode = () => {
     if (!currentReferralCode) return;
-    navigator.clipboard.writeText(currentReferralCode);
+    copyToClipboard(currentReferralCode);
     setCopied(true);
     showToast('Referral code copied to clipboard!', 'success');
     setTimeout(() => setCopied(false), 2500);

@@ -84,17 +84,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
                 alt={listing.title} 
                 className="w-full h-full rounded-[12px] object-cover"
                 loading="lazy"
-                decoding="async"
                 referrerPolicy="no-referrer"
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = 'none';
-                  const parent = e.currentTarget.parentElement;
-                  if (parent && !parent.querySelector('.fallback-icon')) {
-                    const fallback = document.createElement('div');
-                    fallback.className = 'fallback-icon w-6 h-6 sm:w-7 sm:h-7 text-white flex items-center justify-center drop-shadow-sm';
-                    parent.appendChild(fallback);
-                  }
-                }}
               />
             ) : (
               <div className="w-6 h-6 sm:w-7 sm:h-7 text-white flex items-center justify-center drop-shadow-sm">

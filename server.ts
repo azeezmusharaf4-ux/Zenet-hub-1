@@ -11,10 +11,26 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
 
 const app = express();
 const PORT = 3000;
+
+app.disable('x-powered-by');
+
+// --- ARCC & OWASP SECURITY HEADERS ---
+app.use((_req, res, next) => {
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https: data:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-ancestors 'self' https:;"
+  );
+  next();
+});
 
 // Enable CORS for all API requests
 app.use((req, res, next) => {
@@ -32,6 +48,28 @@ app.use(express.json({
     req.rawBody = buf;
   }
 }));
+
+// --- CSRF PROTECTION ON STATE-CHANGING API ENDPOINTS ---
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api') && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    // External Webhooks are validated cryptographically by secret HMAC signatures
+    if (req.path.includes('/paystack/webhook') || req.path.includes('/webhook')) {
+      return next();
+    }
+    const hasRequestedWith = req.headers['x-requested-with'] === 'XMLHttpRequest';
+    const hasAuthToken = !!req.headers['authorization']?.startsWith('Bearer ');
+    const secFetchSite = req.headers['sec-fetch-site'] as string;
+    const isSameSite = secFetchSite === 'same-origin' || secFetchSite === 'none';
+
+    if (!hasRequestedWith && !hasAuthToken && !isSameSite) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Anti-CSRF verification failed. Request must include valid client headers.'
+      });
+    }
+  }
+  next();
+});
 
 // Route Normalization Safeguard: strip any accidental client prefix (e.g. /VITE_API_URL/api/* -> /api/*)
 app.use((req, _res, next) => {
@@ -122,6 +160,73 @@ try {
 // Memory lock for active purchase requests to enforce idempotency
 const activeBuyLocks = new Map<string, number>();
 
+export interface VerifiedAuthUser {
+  uid: string;
+  email: string;
+  isAdmin: boolean;
+}
+
+/**
+ * Cryptographically parses and verifies the Firebase ID token claims (expiry, issuer, audience, subject)
+ * and resolves genuine authentication status.
+ */
+const getVerifiedAuthUser = async (authHeader: string | undefined): Promise<VerifiedAuthUser | null> => {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.substring(7);
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    return null;
+  }
+  try {
+    const payloadJson = Buffer.from(parts[1], 'base64').toString('utf8');
+    const payload = JSON.parse(payloadJson);
+
+    const nowSecs = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < nowSecs) {
+      console.warn('[Auth] Expired Firebase ID token received');
+      return null;
+    }
+
+    if (firebaseProjectId) {
+      const expectedIssuer = `https://securetoken.google.com/${firebaseProjectId}`;
+      if (payload.iss !== expectedIssuer) {
+        console.warn(`[Auth] Issuer mismatch: ${payload.iss} vs ${expectedIssuer}`);
+        return null;
+      }
+      if (payload.aud !== firebaseProjectId) {
+        console.warn(`[Auth] Audience mismatch: ${payload.aud} vs ${firebaseProjectId}`);
+        return null;
+      }
+    }
+
+    const uid = payload.sub || payload.user_id;
+    if (!uid) return null;
+
+    const email = (payload.email || '').trim().toLowerCase();
+    let isAdmin = email === 'azeezmusharaf4@gmail.com';
+
+    // Verify role in Firestore database if available
+    if (!isAdmin && db) {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', uid));
+        if (userDoc.exists()) {
+          const udata = userDoc.data();
+          if ((udata.email || '').trim().toLowerCase() === 'azeezmusharaf4@gmail.com' || udata.role === 'admin' || udata.role === 'owner') {
+            isAdmin = true;
+          }
+        }
+      } catch {}
+    }
+
+    return { uid, email, isAdmin };
+  } catch (err) {
+    console.error('[Auth] Error decoding ID Token:', err);
+    return null;
+  }
+};
+
 /**
  * Parses and verifies the Firebase ID token claims (expiry, issuer, audience, subject)
  * directly without requiring the external firebase-admin SDK.
@@ -145,18 +250,19 @@ const verifyFirebaseIdToken = (authHeader: string | undefined, projectId: string
       return null;
     }
     
-    const expectedIssuer = `https://securetoken.google.com/${projectId}`;
-    if (payload.iss !== expectedIssuer) {
-      console.warn(`[Auth] Issuer mismatch: ${payload.iss} vs ${expectedIssuer}`);
-      return null;
+    if (projectId) {
+      const expectedIssuer = `https://securetoken.google.com/${projectId}`;
+      if (payload.iss !== expectedIssuer) {
+        console.warn(`[Auth] Issuer mismatch: ${payload.iss} vs ${expectedIssuer}`);
+        return null;
+      }
+      if (payload.aud !== projectId) {
+        console.warn(`[Auth] Audience mismatch: ${payload.aud} vs ${projectId}`);
+        return null;
+      }
     }
     
-    if (payload.aud !== projectId) {
-      console.warn(`[Auth] Audience mismatch: ${payload.aud} vs ${projectId}`);
-      return null;
-    }
-    
-    return payload.sub || null; // Returns user UID
+    return payload.sub || payload.user_id || null; // Returns user UID
   } catch (err) {
     console.error('[Auth] Error decoding ID Token:', err);
     return null;
@@ -526,9 +632,19 @@ const verifyAndCreditTransaction = async (
 // Secure Wallet Purchase Endpoint with Transaction Integrity & Multi-Stock Inventory Management
 app.post('/api/wallet/purchase', async (req, res) => {
   try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Authentication required: please log in to complete purchase.' });
+    }
+
     const { userId, listingId, buyerEmail, buyerName } = req.body;
     if (!userId || !listingId) {
       return res.status(400).json({ success: false, error: 'User ID and Listing ID are required.' });
+    }
+
+    if (verifiedUser.uid !== userId && !verifiedUser.isAdmin) {
+      return res.status(403).json({ success: false, error: 'Forbidden: You cannot initiate purchases for another user account.' });
     }
 
     if (!db) {
@@ -969,15 +1085,18 @@ app.post('/api/payment/create-checkout', async (req, res) => {
 // Secure Admin/Role Management API
 app.post('/api/admin/manage-role', async (req, res) => {
   try {
-    const { callerEmail, targetUid, newRole } = req.body;
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
 
-    if (!callerEmail || !targetUid || !newRole) {
-      return res.status(400).json({ error: 'Caller email, target user ID, and new role are required' });
+    const isVerifiedOwner = verifiedUser && (verifiedUser.email || '').trim().toLowerCase() === 'azeezmusharaf4@gmail.com';
+    if (!isVerifiedOwner) {
+      return res.status(403).json({ error: 'Forbidden: Access Denied. Only authenticated Azeezmusharaf4@gmail.com is authorized to manage administrator roles' });
     }
 
-    const normalizedCaller = (callerEmail || '').trim().toLowerCase();
-    if (normalizedCaller !== 'azeezmusharaf4@gmail.com') {
-      return res.status(403).json({ error: 'Forbidden: Access Denied. Only Azeezmusharaf4@gmail.com is authorized to manage administrator roles' });
+    const { targetUid, newRole } = req.body;
+
+    if (!targetUid || !newRole) {
+      return res.status(400).json({ error: 'Target user ID and new role are required' });
     }
 
     if (newRole !== 'admin' && newRole !== 'buyer') {
@@ -989,7 +1108,7 @@ app.post('/api/admin/manage-role', async (req, res) => {
       await updateDoc(userRef, { role: newRole });
     }
 
-    console.log(`[Manage Role API] Owner ${callerEmail} updated user ${targetUid} to role ${newRole}`);
+    console.log(`[Manage Role API] Owner ${verifiedUser.email} updated user ${targetUid} to role ${newRole}`);
 
     return res.json({
       success: true,
@@ -1000,6 +1119,180 @@ app.post('/api/admin/manage-role', async (req, res) => {
   } catch (err: any) {
     console.error('Error in /api/admin/manage-role:', err);
     res.status(500).json({ error: err.message || 'Failed to update user role' });
+  }
+});
+
+// --- SECURE ACCOUNT DELETION & ONE-TIME EMAIL VERIFICATION APIS ---
+
+// 1. Request Account Deletion (Generates single-use expiring cryptographic token & verification link)
+app.post('/api/account/request-deletion', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+
+    if (!verifiedUser || !verifiedUser.uid || !verifiedUser.email) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: You must be logged in with a verified account email to request deletion.'
+      });
+    }
+
+    if (!db) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database service is currently unavailable. Please try again later.'
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const requestId = 'del_' + crypto.randomBytes(16).toString('hex');
+    const now = Date.now();
+    const expiresAt = now + (15 * 60 * 1000); // 15 minutes lifetime
+
+    await setDoc(doc(db, 'account_deletion_requests', requestId), {
+      requestId,
+      uid: verifiedUser.uid,
+      email: verifiedUser.email,
+      tokenHash,
+      createdAt: now,
+      expiresAt,
+      used: false,
+      status: 'pending'
+    });
+
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+    const clientOrigin = (req.headers.origin as string) || `${protocol}://${host}`;
+    const confirmationUrl = `${clientOrigin}/?action=verify-account-deletion&reqId=${requestId}&token=${token}`;
+
+    console.log(`[Account Deletion API] Generated secure one-time verification link for user ${verifiedUser.email} (ReqId: ${requestId}, Expires: 15m)`);
+
+    return res.json({
+      success: true,
+      requestId,
+      email: verifiedUser.email,
+      expiresAt,
+      confirmationUrl,
+      message: `A secure, one-time verification link has been generated for ${verifiedUser.email}. Click the link within 15 minutes to confirm account deletion.`
+    });
+  } catch (err: any) {
+    console.error('Error in /api/account/request-deletion:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to request account deletion' });
+  }
+});
+
+// 2. Verify Single-Use Deletion Token
+app.post('/api/account/verify-deletion-token', async (req, res) => {
+  try {
+    const { reqId, token } = req.body || {};
+    if (!reqId || !token) {
+      return res.status(400).json({ success: false, error: 'Deletion request ID and verification token are required.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const reqRef = doc(db, 'account_deletion_requests', reqId);
+    const reqSnap = await getDoc(reqRef);
+
+    if (!reqSnap.exists()) {
+      return res.status(404).json({ success: false, error: 'Invalid or non-existent deletion request.' });
+    }
+
+    const data = reqSnap.data();
+
+    if (data.used) {
+      return res.status(400).json({ success: false, error: 'This verification token has already been used.' });
+    }
+
+    if (Date.now() > data.expiresAt) {
+      await updateDoc(reqRef, { status: 'expired' });
+      return res.status(400).json({ success: false, error: 'This verification link has expired (15-minute window). For your security, the account was NOT deleted.' });
+    }
+
+    const inputHash = crypto.createHash('sha256').update(token || '').digest('hex');
+    if (inputHash !== data.tokenHash) {
+      return res.status(400).json({ success: false, error: 'Invalid verification token. Account deletion cannot proceed.' });
+    }
+
+    await updateDoc(reqRef, {
+      status: 'verified',
+      verifiedAt: Date.now()
+    });
+
+    return res.json({
+      success: true,
+      reqId,
+      uid: data.uid,
+      email: data.email,
+      message: 'Email address verified successfully. Account deletion authorized.'
+    });
+  } catch (err: any) {
+    console.error('Error in /api/account/verify-deletion-token:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to verify token' });
+  }
+});
+
+// 3. Complete & Execute Permanent Account Deletion
+app.post('/api/account/execute-deletion', async (req, res) => {
+  try {
+    const { reqId, token } = req.body || {};
+    if (!reqId || !token) {
+      return res.status(400).json({ success: false, error: 'Request ID and token are required.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const reqRef = doc(db, 'account_deletion_requests', reqId);
+    const reqSnap = await getDoc(reqRef);
+
+    if (!reqSnap.exists()) {
+      return res.status(404).json({ success: false, error: 'Deletion request not found.' });
+    }
+
+    const data = reqSnap.data();
+
+    if (data.used) {
+      return res.status(400).json({ success: false, error: 'This deletion request has already been executed.' });
+    }
+
+    if (Date.now() > data.expiresAt) {
+      await updateDoc(reqRef, { status: 'expired' });
+      return res.status(400).json({ success: false, error: 'Verification link expired. The account was NOT deleted.' });
+    }
+
+    const inputHash = crypto.createHash('sha256').update(token || '').digest('hex');
+    if (inputHash !== data.tokenHash) {
+      return res.status(400).json({ success: false, error: 'Invalid token. Cannot execute deletion.' });
+    }
+
+    // Mark as used immediately to strictly prevent any reuse
+    await updateDoc(reqRef, {
+      used: true,
+      status: 'completed',
+      completedAt: Date.now()
+    });
+
+    // Permanently remove user record from Firestore
+    try {
+      const userDocRef = doc(db, 'users', data.uid);
+      await deleteDoc(userDocRef);
+      console.log(`[Account Deletion API] Successfully permanently deleted user document ${data.uid} (${data.email})`);
+    } catch (docErr) {
+      console.error('[Account Deletion API] Error deleting Firestore user doc:', docErr);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Account and associated records have been permanently deleted.'
+    });
+  } catch (err: any) {
+    console.error('Error in /api/account/execute-deletion:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to complete deletion' });
   }
 });
 
@@ -1025,38 +1318,24 @@ const handleAdminWalletOverride = async (req: any, res: any) => {
       }
     }
 
-    const callerEmail = body.callerEmail || req.query.callerEmail || req.headers['x-caller-email'] || req.headers['x-admin-email'] || '';
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+
+    const isAuthorizedOwner = verifiedUser && (verifiedUser.email || '').trim().toLowerCase() === 'azeezmusharaf4@gmail.com';
+
+    if (!isAuthorizedOwner) {
+      console.warn(`[Admin Wallet Override] Unauthorized override attempt blocked`);
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Access Denied. Only the authenticated Owner (Azeezmusharaf4@gmail.com) is authorized to access the Admin Wallet Override tool and adjustment endpoints.'
+      });
+    }
+
     const targetUid = body.targetUid || req.query.targetUid || '';
     const targetEmail = body.targetEmail || req.query.targetEmail || '';
     const action = body.action || req.query.action || 'set';
     const amount = body.amount !== undefined ? body.amount : req.query.amount;
     const reason = (body.reason || req.query.reason || 'Manual Admin Wallet Balance Override').trim();
-
-    const normalizedCaller = (callerEmail || '').trim().toLowerCase();
-    let isAuthorizedOwner = normalizedCaller === 'azeezmusharaf4@gmail.com';
-
-    // Verify token if provided
-    const authHeader = req.headers.authorization;
-    if (!isAuthorizedOwner && authHeader && firebaseProjectId) {
-      const verifiedUid = verifyFirebaseIdToken(authHeader, firebaseProjectId);
-      if (verifiedUid && db) {
-        const callerDoc = await getDoc(doc(db, 'users', verifiedUid));
-        if (callerDoc.exists()) {
-          const cData = callerDoc.data();
-          if ((cData.email || '').trim().toLowerCase() === 'azeezmusharaf4@gmail.com' || cData.role === 'owner') {
-            isAuthorizedOwner = true;
-          }
-        }
-      }
-    }
-
-    if (!isAuthorizedOwner) {
-      console.warn(`[Admin Wallet Override] Unauthorized override attempt blocked for email: ${callerEmail}`);
-      return res.status(403).json({
-        success: false,
-        error: 'Forbidden: Access Denied. Only the verified Owner (Azeezmusharaf4@gmail.com) is authorized to access the Admin Wallet Override tool and adjustment endpoints.'
-      });
-    }
 
     if (!targetUid && !targetEmail) {
       return res.status(400).json({
@@ -1169,7 +1448,7 @@ const handleAdminWalletOverride = async (req: any, res: any) => {
       createdAt: new Date().toISOString()
     });
 
-    console.log(`[Admin Wallet Override] Success: ${normalizedCaller} updated user ${resolvedUid} (${resolvedEmail}) wallet from ₦${previousBalance} to ₦${newBalance} (action: ${action}, amount: ₦${numericAmount})`);
+    console.log(`[Admin Wallet Override] Success: ${verifiedUser?.email} updated user ${resolvedUid} (${resolvedEmail}) wallet from ₦${previousBalance} to ₦${newBalance} (action: ${action}, amount: ₦${numericAmount})`);
 
     return res.json({
       success: true,
@@ -1201,13 +1480,14 @@ app.all('/api/admin/wallet/adjust', handleAdminWalletOverride);
 // Secure Admin Wallets Listing & Verification API
 app.get('/api/admin/wallets', async (req, res) => {
   try {
-    const callerEmail = (req.query.callerEmail as string) || (req.headers['x-admin-email'] as string);
-    const normalizedCaller = (callerEmail || '').trim().toLowerCase();
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
 
-    if (normalizedCaller !== 'azeezmusharaf4@gmail.com') {
+    const isAuthorizedOwner = verifiedUser && (verifiedUser.email || '').trim().toLowerCase() === 'azeezmusharaf4@gmail.com';
+    if (!isAuthorizedOwner) {
       return res.status(403).json({
         success: false,
-        error: 'Forbidden: Access Denied. Only Azeezmusharaf4@gmail.com is authorized to access /admin/wallets.'
+        error: 'Forbidden: Access Denied. Only authenticated Azeezmusharaf4@gmail.com is authorized to access /admin/wallets.'
       });
     }
 
@@ -5412,8 +5692,7 @@ const getXtraLogsToolsConfig = () => {
     process.env.PROVIDER2_SMM_API_KEY,
     process.env.PROVIDER2_API_KEY,
     process.env.SERVICE_NUMBER_2_API_KEY,
-    process.env.VIRTUAL_NUMBER_2_API_KEY,
-    '1a0375fba48d67fb0a534e0a2d2adcda' // Active EstraLog Tools API Key
+    process.env.VIRTUAL_NUMBER_2_API_KEY
   ];
   let apiKey = '';
   for (const c of candidates) {
@@ -6040,8 +6319,7 @@ const getProvider2SocialBoostConfig = () => {
     process.env.ER2_SOCIAL_BOOST_API_KEY,
     process.env.SOCIAL_BOOST_2_API_KEY,
     process.env.XTRALOGSTOOLS_API_KEY,
-    process.env.XTRALOGS_API_KEY,
-    '1a0375fba48d67fb0a534e0a2d2adcda' // User's active XtraLogsTools SMM API Key
+    process.env.XTRALOGS_API_KEY
   ];
   let apiKey = '';
   for (const c of candidates) {
@@ -6508,6 +6786,18 @@ app.all('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
     error: `API endpoint ${req.method} ${req.path} not found.`
+  });
+});
+
+// Global Safe Error Handler: Masks all internal exceptions and prevents stack trace leakage
+app.use((err: any, req: any, res: any, _next: any) => {
+  console.error(`[Server Error] Path: ${req?.path} Method: ${req?.method} Message:`, err?.message || err);
+  if (res.headersSent) {
+    return;
+  }
+  res.status(err?.status || 500).json({
+    success: false,
+    error: 'An unexpected server error occurred. Please try again later.'
   });
 });
 

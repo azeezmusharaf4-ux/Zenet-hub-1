@@ -98,9 +98,6 @@ export const FeaturedListings: React.FC<FeaturedListingsProps> = React.memo(({
                       decoding="async"
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLElement).style.display = 'none';
-                      }}
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center p-4 text-center">

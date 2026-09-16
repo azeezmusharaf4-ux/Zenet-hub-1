@@ -243,36 +243,36 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
   if (!isAuthorized) {
     return (
       <div id="admin-wallets-access-denied" className="min-h-[80vh] flex items-center justify-center p-4 sm:p-6">
-        <div className="max-w-md w-full bg-slate-900/90 border border-rose-500/40 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-2xl backdrop-blur-xl">
-          <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mx-auto text-rose-400">
+        <div className="max-w-md w-full bg-white border border-purple-200 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-xl">
+          <div className="w-16 h-16 bg-purple-50 border border-purple-200 rounded-2xl flex items-center justify-center mx-auto text-purple-600">
             <Lock className="w-8 h-8" />
           </div>
 
           <div className="space-y-2">
-            <span className="inline-block bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] uppercase font-black px-3 py-1 rounded-full tracking-wider">
+            <span className="inline-block bg-purple-50 text-purple-700 border border-purple-200 text-[10px] uppercase font-black px-3 py-1 rounded-full tracking-wider">
               403 Forbidden • Restricted Tool
             </span>
-            <h2 className="text-xl sm:text-2xl font-black text-white">
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900">
               Admin Wallet Override Access Denied
             </h2>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Access to the <strong>Admin Wallet Override</strong> tool and <code className="text-rose-400 font-mono">/admin/wallets</code> route is strictly restricted to authorized administrator:
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Access to the <strong>Admin Wallet Override</strong> tool and <code className="text-purple-700 font-mono">/admin/wallets</code> route is strictly restricted to authorized administrator:
             </p>
-            <div className="bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs font-mono font-bold text-amber-300">
+            <div className="bg-purple-50/50 border border-purple-200 p-2.5 rounded-xl text-xs font-mono font-bold text-purple-900">
               {authorizedEmail}
             </div>
           </div>
 
-          <div className="bg-slate-950/60 border border-slate-800/80 p-3.5 rounded-2xl text-left space-y-1.5 text-xs text-slate-400">
+          <div className="bg-purple-50/30 border border-purple-100 p-3.5 rounded-2xl text-left space-y-1.5 text-xs text-slate-600">
             <div className="flex items-center justify-between">
               <span>Your Current Status:</span>
-              <span className="text-white font-semibold">
+              <span className="text-slate-900 font-semibold">
                 {user ? 'Logged In' : 'Not Authenticated'}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span>Active Account:</span>
-              <span className="text-rose-300 font-mono truncate max-w-[200px]">
+              <span className="text-purple-700 font-mono truncate max-w-[200px]">
                 {currentUserEmail || 'None'}
               </span>
             </div>
@@ -282,7 +282,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
             {!user && onOpenAuth && (
               <button
                 onClick={() => onOpenAuth('login')}
-                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold rounded-xl transition cursor-pointer text-xs flex items-center justify-center gap-2 shadow-lg"
+                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-xl transition cursor-pointer text-xs flex items-center justify-center gap-2 shadow-sm"
               >
                 <ShieldCheck className="w-4 h-4" />
                 <span>Log In with Authorized Admin Account</span>
@@ -291,7 +291,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
 
             <button
               onClick={onBackToMarketplace}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition cursor-pointer text-xs flex items-center justify-center gap-2"
+              className="w-full py-3 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 font-bold rounded-xl transition cursor-pointer text-xs flex items-center justify-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Return to Marketplace</span>
@@ -306,24 +306,24 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
   return (
     <div id="admin-wallets-workbench" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-950 border border-emerald-500/30 rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+      <div className="bg-white border border-purple-200 rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-start sm:items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center shrink-0 shadow-lg">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center shrink-0 shadow-sm">
             <Wallet className="w-6 h-6" />
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-black text-white">
+              <h1 className="text-lg sm:text-xl font-black text-slate-900">
                 Admin Wallet Override & Balance Tool
               </h1>
-              <span className="bg-emerald-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider">
+              <span className="bg-purple-600 text-white font-black text-[9px] px-2.5 py-0.5 rounded uppercase tracking-wider">
                 OWNER SECURED
               </span>
-              <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[9px] px-2 py-0.5 rounded font-mono font-bold">
+              <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[9px] px-2.5 py-0.5 rounded font-mono font-bold">
                 {authorizedEmail}
               </span>
             </div>
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-slate-600">
               Direct server-authoritative balance adjustments and ledger audit synchronization. All changes are logged immutably.
             </p>
           </div>
@@ -331,7 +331,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
 
         <button
           onClick={onBackToMarketplace}
-          className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-700 shrink-0 cursor-pointer"
+          className="px-4 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-purple-200 shrink-0 cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Exit to Marketplace</span>
@@ -340,25 +340,25 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
 
       {/* System Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl space-y-1">
-          <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Total User Accounts</span>
-          <div className="text-2xl font-black text-white flex items-center gap-2">
-            <UserIcon className="w-5 h-5 text-cyan-400" />
+        <div className="bg-white border border-purple-100 p-4 rounded-2xl space-y-1 shadow-xs">
+          <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Total User Accounts</span>
+          <div className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <UserIcon className="w-5 h-5 text-purple-600" />
             <span>{loadingUsers ? '...' : users.length}</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl space-y-1">
-          <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Cumulative Platform Wallets</span>
-          <div className="text-2xl font-black text-emerald-400 flex items-center gap-1.5 font-mono">
+        <div className="bg-white border border-purple-100 p-4 rounded-2xl space-y-1 shadow-xs">
+          <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Cumulative Platform Wallets</span>
+          <div className="text-2xl font-black text-purple-600 flex items-center gap-1.5 font-mono">
             <span>₦{loadingUsers ? '...' : totalSystemBalance.toLocaleString()}</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl space-y-1">
-          <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Audit Logged Overrides</span>
-          <div className="text-2xl font-black text-amber-400 flex items-center gap-2">
-            <Clock className="w-5 h-5" />
+        <div className="bg-white border border-purple-100 p-4 rounded-2xl space-y-1 shadow-xs">
+          <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Audit Logged Overrides</span>
+          <div className="text-2xl font-black text-slate-900 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-purple-600" />
             <span>{loadingLedger ? '...' : recentOverrides.length}</span>
           </div>
         </div>
@@ -367,26 +367,26 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
       {/* Main Grid: User Selection (Left) vs Override Terminal (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT: User Directory & Selection */}
-        <div className="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+        <div className="lg:col-span-5 bg-white border border-purple-100 rounded-3xl p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-emerald-400" />
-              <h3 className="font-bold text-sm text-white">Select Target User</h3>
+              <Search className="w-4 h-4 text-purple-600" />
+              <h3 className="font-bold text-sm text-slate-900">Select Target User</h3>
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">
+            <span className="text-[11px] text-slate-500 font-mono">
               {filteredUsers.length} Users Found
             </span>
           </div>
 
           {/* Search Box */}
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
             <input
               type="text"
               placeholder="Search by name, email, or UID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+              className="w-full bg-[#FAF5FF] border border-purple-200 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-600"
             />
           </div>
 
@@ -398,8 +398,8 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                 onClick={() => setRoleFilter(r)}
                 className={`px-3 py-1 rounded-lg text-[10px] font-extrabold uppercase transition cursor-pointer shrink-0 ${
                   roleFilter === r
-                    ? 'bg-emerald-500 text-slate-950'
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-50 text-slate-700 hover:text-slate-900 border border-purple-200'
                 }`}
               >
                 {r}
@@ -411,11 +411,11 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
           <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1 scrollbar-none">
             {loadingUsers ? (
               <div className="text-center py-10 text-xs text-slate-500 flex items-center justify-center gap-2">
-                <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+                <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
                 <span>Loading users from database...</span>
               </div>
             ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-10 text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+              <div className="text-center py-10 text-xs text-slate-500 border border-dashed border-purple-200 rounded-2xl">
                 No users found matching query.
               </div>
             ) : (
@@ -434,33 +434,33 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                     }}
                     className={`w-full text-left p-3 rounded-2xl border transition flex items-center justify-between gap-3 cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-950/60 border-emerald-400 shadow-md'
-                        : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-950'
+                        ? 'bg-purple-50 border-purple-300 shadow-xs'
+                        : 'bg-white border-purple-100 hover:border-purple-200 hover:bg-purple-50/40'
                     }`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-bold text-white truncate max-w-[160px]">
+                        <span className="text-xs font-bold text-slate-900 truncate max-w-[160px]">
                           {u.displayName || u.email?.split('@')[0] || 'User'}
                         </span>
                         <span className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase ${
                           u.role === 'admin' || u.role === 'owner'
-                            ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                            ? 'bg-purple-100 text-purple-800 border border-purple-200'
                             : u.role === 'seller'
-                            ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                            : 'bg-slate-800 text-slate-400'
+                            ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                            : 'bg-slate-100 text-slate-600'
                         }`}>
                           {u.role || 'buyer'}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{u.email}</p>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">{u.email}</p>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-xs font-mono font-black text-emerald-400">
+                      <div className="text-xs font-mono font-black text-purple-700">
                         ₦{balance.toLocaleString()}
                       </div>
-                      <span className="text-[9px] text-slate-500">Current Balance</span>
+                      <span className="text-[9px] text-slate-400">Current Balance</span>
                     </div>
                   </button>
                 );
@@ -470,27 +470,27 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
         </div>
 
         {/* RIGHT: Override Execution Terminal */}
-        <div className="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-6 shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="lg:col-span-7 bg-white border border-purple-100 rounded-3xl p-5 sm:p-6 space-y-6 shadow-sm">
+          <div className="flex items-center justify-between border-b border-purple-100 pb-4">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <h3 className="font-extrabold text-base text-white">Override Configuration</h3>
+              <ShieldCheck className="w-5 h-5 text-purple-600" />
+              <h3 className="font-extrabold text-base text-slate-900">Override Configuration</h3>
             </div>
             {selectedUser && (
-              <span className="text-xs font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
+              <span className="text-xs font-mono bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-xl">
                 Target: {selectedUser.email}
               </span>
             )}
           </div>
 
           {!selectedUser ? (
-            <div className="text-center py-16 space-y-3 border border-dashed border-slate-800 rounded-2xl">
-              <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+            <div className="text-center py-16 space-y-3 border border-dashed border-purple-200 rounded-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto text-purple-600">
                 <UserIcon className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <h4 className="font-bold text-white text-sm">No User Selected</h4>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                <h4 className="font-bold text-slate-900 text-sm">No User Selected</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
                   Please select a user from the directory on the left to review their balance and configure an override.
                 </p>
               </div>
@@ -498,16 +498,16 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
           ) : (
             <form onSubmit={handleExecuteOverride} className="space-y-5">
               {/* Target User Status Card */}
-              <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="bg-purple-50/50 border border-purple-100 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Active Account</span>
-                  <div className="font-bold text-sm text-white mt-0.5">{selectedUser.displayName || 'Unnamed User'}</div>
-                  <div className="text-xs text-slate-400 font-mono">{selectedUser.email} • UID: <code className="text-[10px] text-slate-500">{selectedUser.uid}</code></div>
+                  <span className="text-[10px] uppercase font-bold text-purple-600 tracking-wider">Active Account</span>
+                  <div className="font-bold text-sm text-slate-900 mt-0.5">{selectedUser.displayName || 'Unnamed User'}</div>
+                  <div className="text-xs text-slate-600 font-mono">{selectedUser.email} • UID: <code className="text-[10px] text-slate-500">{selectedUser.uid}</code></div>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-xl sm:text-right shrink-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Current Balance</span>
-                  <div className="text-lg font-black text-emerald-400 font-mono">
+                <div className="bg-white border border-purple-200 px-4 py-2.5 rounded-xl sm:text-right shrink-0 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">Current Balance</span>
+                  <div className="text-lg font-black text-purple-700 font-mono">
                     ₦{currentSelectedBalance.toLocaleString()}
                   </div>
                 </div>
@@ -515,15 +515,15 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
 
               {/* Action Mode Toggle */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300">Adjustment Mode</label>
+                <label className="text-xs font-bold text-slate-800">Adjustment Mode</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setAction('set')}
                     className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition cursor-pointer border flex items-center justify-center gap-1.5 ${
                       action === 'set'
-                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md'
-                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                        : 'bg-purple-50 text-slate-700 border-purple-200 hover:bg-purple-100'
                     }`}
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
@@ -535,8 +535,8 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                     onClick={() => setAction('add')}
                     className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition cursor-pointer border flex items-center justify-center gap-1.5 ${
                       action === 'add'
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
-                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                        : 'bg-purple-50 text-slate-700 border-purple-200 hover:bg-purple-100'
                     }`}
                   >
                     <TrendingUp className="w-3.5 h-3.5" />
@@ -548,8 +548,8 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                     onClick={() => setAction('deduct')}
                     className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition cursor-pointer border flex items-center justify-center gap-1.5 ${
                       action === 'deduct'
-                        ? 'bg-rose-500 text-white border-rose-400 shadow-md'
-                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                        : 'bg-purple-50 text-slate-700 border-purple-200 hover:bg-purple-100'
                     }`}
                   >
                     <TrendingDown className="w-3.5 h-3.5" />
@@ -561,16 +561,16 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
               {/* Amount Input & Presets */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-300">
+                  <label className="text-xs font-bold text-slate-800">
                     {action === 'set' ? 'New Target Balance (₦)' : 'Adjustment Amount (₦)'}
                   </label>
                   {action !== 'set' && (
-                    <span className="text-[11px] text-slate-400">Quick Presets</span>
+                    <span className="text-[11px] text-slate-500">Quick Presets</span>
                   )}
                 </div>
 
                 <div className="relative">
-                  <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">₦</span>
+                  <span className="absolute left-3.5 top-2.5 text-purple-600 font-bold text-sm">₦</span>
                   <input
                     type="number"
                     min="0"
@@ -579,7 +579,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2.5 text-sm font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                    className="w-full bg-white border border-purple-200 rounded-xl pl-8 pr-3 py-2.5 text-sm font-mono font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-600"
                   />
                 </div>
 
@@ -591,7 +591,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                         type="button"
                         key={p}
                         onClick={() => setAmount(String(p))}
-                        className="px-2.5 py-1 bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 rounded-lg text-[10px] font-mono font-bold transition cursor-pointer"
+                        className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 rounded-lg text-[10px] font-mono font-bold transition cursor-pointer"
                       >
                         +₦{p.toLocaleString()}
                       </button>
@@ -601,28 +601,26 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
               </div>
 
               {/* Real-time Calculation Summary Box */}
-              <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-3">
-                <div className="text-[11px] uppercase font-bold text-slate-400">Preview & Impact Summary</div>
+              <div className="bg-purple-50/40 border border-purple-100 p-4 rounded-2xl space-y-3">
+                <div className="text-[11px] uppercase font-bold text-slate-500">Preview & Impact Summary</div>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-slate-900/60 p-2 rounded-xl">
-                    <span className="text-[10px] text-slate-400">Previous</span>
-                    <div className="text-xs font-mono font-bold text-slate-300 mt-0.5">
+                  <div className="bg-white p-2 rounded-xl border border-purple-100">
+                    <span className="text-[10px] text-slate-500">Previous</span>
+                    <div className="text-xs font-mono font-bold text-slate-900 mt-0.5">
                       ₦{currentSelectedBalance.toLocaleString()}
                     </div>
                   </div>
 
-                  <div className="bg-slate-900/60 p-2 rounded-xl">
-                    <span className="text-[10px] text-slate-400">Delta</span>
-                    <div className={`text-xs font-mono font-extrabold mt-0.5 ${
-                      balanceDelta > 0 ? 'text-emerald-400' : balanceDelta < 0 ? 'text-rose-400' : 'text-slate-400'
-                    }`}>
+                  <div className="bg-white p-2 rounded-xl border border-purple-100">
+                    <span className="text-[10px] text-slate-500">Delta</span>
+                    <div className="text-xs font-mono font-extrabold mt-0.5 text-purple-700">
                       {balanceDelta > 0 ? `+₦${balanceDelta.toLocaleString()}` : balanceDelta < 0 ? `-₦${Math.abs(balanceDelta).toLocaleString()}` : '₦0'}
                     </div>
                   </div>
 
-                  <div className="bg-slate-900 p-2 rounded-xl border border-emerald-500/40">
-                    <span className="text-[10px] text-emerald-400 font-bold">New Balance</span>
-                    <div className="text-xs font-mono font-black text-emerald-300 mt-0.5">
+                  <div className="bg-white p-2 rounded-xl border border-purple-300">
+                    <span className="text-[10px] text-purple-700 font-bold">New Balance</span>
+                    <div className="text-xs font-mono font-black text-purple-900 mt-0.5">
                       ₦{previewNewBalance.toLocaleString()}
                     </div>
                   </div>
@@ -631,7 +629,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
 
               {/* Audit Reason */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300">
+                <label className="text-xs font-bold text-slate-800">
                   Reason for Override <span className="text-slate-500 text-[11px]">(Recorded in ledger)</span>
                 </label>
                 <input
@@ -639,7 +637,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                   placeholder="e.g. Customer dispute resolution refund, Manual bank wire credit, Correction"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                  className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-purple-600"
                 />
               </div>
 
@@ -647,18 +645,18 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
               {feedback && (
                 <div className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 animate-in fade-in duration-200 ${
                   feedback.type === 'success'
-                    ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
-                    : 'bg-rose-950/80 border-rose-500/50 text-rose-200'
+                    ? 'bg-purple-50 border-purple-300 text-purple-950'
+                    : 'bg-purple-50 border-purple-300 text-purple-950'
                 }`}>
                   {feedback.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <AlertCircle className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
                   )}
                   <div className="space-y-0.5 flex-1">
                     <p className="font-bold">{feedback.message}</p>
                     {feedback.txId && (
-                      <p className="text-[10px] font-mono text-emerald-400">Transaction ID: {feedback.txId}</p>
+                      <p className="text-[10px] font-mono text-purple-700">Transaction ID: {feedback.txId}</p>
                     )}
                   </div>
                 </div>
@@ -668,11 +666,11 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-xl text-xs transition cursor-pointer shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-black rounded-xl text-xs transition cursor-pointer shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
                     <span>Executing Secure Server Override...</span>
                   </>
                 ) : (
@@ -688,20 +686,20 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
       </div>
 
       {/* BOTTOM: Immutable Audit Ledger Stream */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-4 shadow-xl">
+      <div className="bg-white border border-purple-100 rounded-3xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-amber-400" />
-            <h3 className="font-bold text-sm text-white">Recent Admin Override Ledger Records</h3>
+            <Clock className="w-5 h-5 text-purple-600" />
+            <h3 className="font-bold text-sm text-slate-900">Recent Admin Override Ledger Records</h3>
           </div>
-          <span className="text-[11px] text-slate-400 font-mono">
+          <span className="text-[11px] text-slate-500 font-mono">
             {recentOverrides.length} Ledger Entries
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950 border-b border-slate-800 text-[10px] text-slate-400 uppercase font-black tracking-wider">
+          <table className="w-full text-left text-xs text-slate-700">
+            <thead className="bg-purple-50/70 border-b border-purple-100 text-[10px] text-slate-700 uppercase font-black tracking-wider">
               <tr>
                 <th className="p-3">Date & Time</th>
                 <th className="p-3">Target User</th>
@@ -713,7 +711,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                 <th className="p-3">Reason</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono">
+            <tbody className="divide-y divide-purple-100/60 font-mono">
               {recentOverrides.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-slate-500 font-sans text-xs">
@@ -722,37 +720,31 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                 </tr>
               ) : (
                 recentOverrides.slice(0, 10).map((record) => (
-                  <tr key={record.id} className="hover:bg-slate-950/40 transition">
-                    <td className="p-3 text-[11px] text-slate-400 whitespace-nowrap font-sans">
+                  <tr key={record.id} className="hover:bg-purple-50/40 transition">
+                    <td className="p-3 text-[11px] text-slate-600 whitespace-nowrap font-sans">
                       {record.date ? new Date(record.date).toLocaleString() : 'N/A'}
                     </td>
-                    <td className="p-3 text-white font-bold whitespace-nowrap">
+                    <td className="p-3 text-slate-900 font-bold whitespace-nowrap">
                       {record.userEmail || record.userId}
                     </td>
                     <td className="p-3">
-                      <span className={`text-[9px] px-2 py-0.5 rounded font-black uppercase ${
-                        record.action === 'add'
-                          ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                          : record.action === 'deduct'
-                          ? 'bg-rose-950 text-rose-400 border border-rose-800'
-                          : 'bg-cyan-950 text-cyan-400 border border-cyan-800'
-                      }`}>
+                      <span className="text-[9px] px-2 py-0.5 rounded font-black uppercase bg-purple-50 text-purple-700 border border-purple-200">
                         {record.action || record.type}
                       </span>
                     </td>
-                    <td className="p-3 font-bold text-white">
+                    <td className="p-3 font-bold text-slate-900">
                       ₦{(record.amount || 0).toLocaleString()}
                     </td>
-                    <td className="p-3 text-slate-400">
+                    <td className="p-3 text-slate-600">
                       ₦{(record.previousBalance || 0).toLocaleString()}
                     </td>
-                    <td className="p-3 text-emerald-400 font-bold">
+                    <td className="p-3 text-purple-700 font-bold">
                       ₦{(record.newBalance || 0).toLocaleString()}
                     </td>
-                    <td className="p-3 text-[11px] text-amber-300 font-sans">
+                    <td className="p-3 text-[11px] text-slate-600 font-sans">
                       {record.adminEmail || 'Azeezmusharaf4@gmail.com'}
                     </td>
-                    <td className="p-3 text-[11px] text-slate-400 font-sans max-w-xs truncate">
+                    <td className="p-3 text-[11px] text-slate-600 font-sans max-w-xs truncate">
                       {record.reason || 'Manual override'}
                     </td>
                   </tr>

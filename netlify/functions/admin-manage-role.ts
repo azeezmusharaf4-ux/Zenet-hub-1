@@ -1,4 +1,4 @@
-import { getDb, doc, updateDoc } from './_firebase';
+import { getDb, doc, updateDoc, parseAndVerifyToken } from './_firebase';
 
 export const handler = async (event: any) => {
   const headers = {
@@ -17,6 +17,9 @@ export const handler = async (event: any) => {
   }
 
   try {
+    const authHeader = event.headers?.authorization || event.headers?.Authorization;
+    const verifiedUser = parseAndVerifyToken(authHeader);
+
     let payload: any = {};
     try {
       payload = typeof event.body === 'string' ? JSON.parse(event.body || '{}') : (event.body || {});
@@ -24,22 +27,22 @@ export const handler = async (event: any) => {
       payload = {};
     }
 
-    const { callerEmail, targetUid, newRole } = payload;
+    const { targetUid, newRole } = payload;
 
-    if (!callerEmail || !targetUid || !newRole) {
+    if (!targetUid || !newRole) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Caller email, target user ID, and new role are required' })
+        body: JSON.stringify({ error: 'Target user ID and new role are required' })
       };
     }
 
-    const normalizedCaller = (callerEmail || '').trim().toLowerCase();
-    if (normalizedCaller !== 'azeezmusharaf4@gmail.com') {
+    const isVerifiedOwner = verifiedUser && (verifiedUser.email || '').trim().toLowerCase() === 'azeezmusharaf4@gmail.com';
+    if (!isVerifiedOwner) {
       return {
         statusCode: 403,
         headers,
-        body: JSON.stringify({ error: 'Forbidden: Access Denied. Only Azeezmusharaf4@gmail.com is authorized to manage administrator roles' })
+        body: JSON.stringify({ error: 'Forbidden: Access Denied. Only authenticated Azeezmusharaf4@gmail.com is authorized to manage administrator roles' })
       };
     }
 

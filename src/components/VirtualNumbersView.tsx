@@ -28,6 +28,7 @@ import {
 import { auth, getSafeIdToken } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { sanitizeApiErrorMessage, isValidOtpCode, isInvalidOtpCode, resolveCountryInfo } from '../utils/api';
+import { copyToClipboard } from '../utils/clipboard';
 
 export interface PriceOption {
   optionId: string;
@@ -660,7 +661,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
   // 6. Handle Copy
   const handleCopy = (text: string, type: string) => {
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text);
     setCopiedText(type);
     setTimeout(() => setCopiedText(null), 2000);
   };
