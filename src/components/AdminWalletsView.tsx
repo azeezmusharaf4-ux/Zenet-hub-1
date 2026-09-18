@@ -2,6 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User } from 'firebase/auth';
 import { 
   collection, 
+  doc,
+  getDoc,
+  updateDoc,
+  setDoc,
+  increment,
   onSnapshot, 
   query, 
   where, 
@@ -36,13 +41,15 @@ interface AdminWalletsViewProps {
   userProfile: UserProfile | null;
   onBackToMarketplace: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
+  onBalanceUpdated?: (newBalance: number) => void;
 }
 
 export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
   user,
   userProfile,
   onBackToMarketplace,
-  onOpenAuth
+  onOpenAuth,
+  onBalanceUpdated
 }) => {
   const authorizedEmail = 'azeezmusharaf4@gmail.com';
   const currentUserEmail = user?.email?.trim().toLowerCase() || '';
@@ -149,7 +156,10 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
 
   // System Stats
   const totalSystemBalance = useMemo(() => {
-    return users.reduce((acc, u) => acc + (Number(u.walletBalance) || 0), 0);
+    return users.reduce((acc, u) => {
+      const b = u.walletBalance !== undefined ? u.walletBalance : (u as any).balance;
+      return acc + (Number(b) || 0);
+    }, 0);
   }, [users]);
 
   const recentOverrides = useMemo(() => {
@@ -157,7 +167,8 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
   }, [overrideLedger]);
 
   // Calculated Preview
-  const currentSelectedBalance = selectedUser ? (Number(selectedUser.walletBalance) || 0) : 0;
+  const rawSelBal = selectedUser ? (selectedUser.walletBalance !== undefined ? selectedUser.walletBalance : (selectedUser as any).balance) : 0;
+  const currentSelectedBalance = typeof rawSelBal === 'number' ? rawSelBal : Number(rawSelBal || 0);
   const numAmount = parseFloat(amount) || 0;
   
   const previewNewBalance = useMemo(() => {
@@ -194,42 +205,125 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
 
     try {
       const token = await getSafeIdToken(user);
-      const response = await safeApiFetch('/api/admin/wallets/override', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          'x-caller-email': user.email || ''
-        },
-        body: JSON.stringify({
-          callerEmail: user.email,
-          targetUid: selectedUser.uid,
-          targetEmail: selectedUser.email,
-          action,
-          amount: numAmount,
-          reason: reason.trim() || 'Manual Admin Wallet Balance Override'
-        })
+      const finalTxId = `OVERRIDE_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+      const userDocRef = doc(db, 'users', selectedUser.uid);
+      const walletDocRef = doc(db, 'wallets', selectedUser.uid);
+
+      let balanceFieldValueUpdate: any = {};
+      let calculatedTargetBalance = currentSelectedBalance;
+
+      if (action === 'add') {
+        calculatedTargetBalance = currentSelectedBalance + numAmount;
+        balanceFieldValueUpdate = {
+          walletBalance: increment(numAmount),
+          balance: increment(numAmount)
+        };
+      } else if (action === 'deduct') {
+        const deductEffective = Math.min(numAmount, currentSelectedBalance);
+        calculatedTargetBalance = Math.max(0, currentSelectedBalance - numAmount);
+        balanceFieldValueUpdate = {
+          walletBalance: increment(-deductEffective),
+          balance: increment(-deductEffective)
+        };
+      } else {
+        calculatedTargetBalance = numAmount;
+        balanceFieldValueUpdate = {
+          walletBalance: numAmount,
+          balance: numAmount
+        };
+      }
+
+      // STEP 1: Direct atomic persistent write to Firestore users/{selectedUser.uid} document FIRST
+      await setDoc(userDocRef, {
+        ...balanceFieldValueUpdate,
+        lastWalletOverrideAt: new Date().toISOString(),
+        lastWalletOverrideBy: user.email || 'Azeezmusharaf4@gmail.com',
+        email: selectedUser.email || '',
+        uid: selectedUser.uid
+      }, { merge: true });
+
+      // STEP 2: Direct atomic persistent write to Firestore wallets/{selectedUser.uid} document FIRST
+      await setDoc(walletDocRef, {
+        userId: selectedUser.uid,
+        userEmail: selectedUser.email || '',
+        ...balanceFieldValueUpdate,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // STEP 3: Confirm document is committed to Firestore database by reading fresh snapshot
+      const freshSnap = await getDoc(userDocRef);
+      let confirmedBalance = calculatedTargetBalance;
+      if (freshSnap.exists()) {
+        const fData = freshSnap.data();
+        const rawF = fData?.walletBalance !== undefined ? fData?.walletBalance : fData?.balance;
+        confirmedBalance = typeof rawF === 'number' ? rawF : Number(rawF || 0);
+      }
+
+      // STEP 4: Record permanent immutable audit entry in wallet_transactions ledger
+      await setDoc(doc(db, 'wallet_transactions', finalTxId), {
+        id: finalTxId,
+        userId: selectedUser.uid,
+        userEmail: selectedUser.email || '',
+        amount: Math.abs(confirmedBalance - currentSelectedBalance),
+        previousBalance: currentSelectedBalance,
+        newBalance: confirmedBalance,
+        walletBalance: confirmedBalance,
+        balance: confirmedBalance,
+        action,
+        type: action === 'deduct' ? 'deduction' : 'deposit',
+        method: 'admin_wallet_override',
+        status: 'successful',
+        adminEmail: user.email || 'Azeezmusharaf4@gmail.com',
+        reason: reason.trim() || 'Manual Admin Wallet Balance Override',
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString()
       });
 
-      if (response && response.success) {
-        setFeedback({
-          type: 'success',
-          message: response.message || `Wallet balance successfully updated to ₦${(response.newBalance || previewNewBalance).toLocaleString()}`,
-          txId: response.txId
-        });
-        setAmount('');
-        setReason('');
-      } else {
-        setFeedback({
-          type: 'error',
-          message: response?.error || 'Failed to update wallet balance on server.'
-        });
+      // STEP 5: If the targeted account is the currently logged-in user (e.g. Owner funding themselves), sync UI immediately
+      const isCurrentLoggedInUser = (selectedUser.uid === user.uid) || 
+        (Boolean(selectedUser.email && user.email) && selectedUser.email?.trim().toLowerCase() === user.email?.trim().toLowerCase());
+      if (isCurrentLoggedInUser && onBalanceUpdated) {
+        onBalanceUpdated(confirmedBalance);
       }
+
+      // STEP 6: Update component local directory and selection with the confirmed balance
+      setSelectedUser((prev) => prev ? { ...prev, walletBalance: confirmedBalance, balance: confirmedBalance } : null);
+      setUsers((prev) => prev.map((u) => u.uid === selectedUser.uid ? { ...u, walletBalance: confirmedBalance, balance: confirmedBalance } : u));
+
+      // STEP 7: Optional server mirror notification (silent background)
+      try {
+        await safeApiFetch('/api/admin/wallets/override', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            'x-caller-email': user.email || ''
+          },
+          body: JSON.stringify({
+            callerEmail: user.email,
+            targetUid: selectedUser.uid,
+            targetEmail: selectedUser.email,
+            action,
+            amount: numAmount,
+            reason: reason.trim() || 'Manual Admin Wallet Balance Override'
+          })
+        }).catch(() => {});
+      } catch {}
+
+      // STEP 8: Show success state ONLY AFTER Firestore database document has been successfully committed
+      setFeedback({
+        type: 'success',
+        message: `Wallet balance successfully committed and updated to ₦${confirmedBalance.toLocaleString()}`,
+        txId: finalTxId
+      });
+      setAmount('');
+      setReason('');
     } catch (err: any) {
       console.error('Wallet override error:', err);
       setFeedback({
         type: 'error',
-        message: err.message || 'Server communication failed while adjusting wallet balance.'
+        message: err.message || 'Failed to adjust wallet balance in database.'
       });
     } finally {
       setIsSubmitting(false);
@@ -421,7 +515,8 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
             ) : (
               filteredUsers.map((u) => {
                 const isSelected = selectedUser?.uid === u.uid;
-                const balance = Number(u.walletBalance) || 0;
+                const rawB = u.walletBalance !== undefined ? u.walletBalance : (u as any).balance;
+                const balance = typeof rawB === 'number' ? rawB : Number(rawB || 0);
 
                 return (
                   <button

@@ -3,11 +3,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // Helper function to check if caller is the verified administrator/owner
+    function isOwnerEmail() {
+      return request.auth != null && 
+        request.auth.token.email is string && (
+          request.auth.token.email == 'azeezmusharaf4@gmail.com' ||
+          request.auth.token.email == 'Azeezmusharaf4@gmail.com' ||
+          request.auth.token.email.lower() == 'azeezmusharaf4@gmail.com'
+        );
+    }
+
     function isAdmin() {
       return request.auth != null && (
-        request.auth.token.email == 'azeezmusharaf4@gmail.com' ||
-        request.auth.token.role == 'admin' ||
-        request.auth.token.role == 'owner'
+        isOwnerEmail() ||
+        (request.auth.token.role is string && (request.auth.token.role == 'admin' || request.auth.token.role == 'owner')) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        ))
       );
     }
 
@@ -22,9 +34,15 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
+      allow create: if isOwner(userId) || isAdmin();
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Wallets Collection (Dual persistence with users/{userId})
+    match /wallets/{walletId} {
+      allow read: if isAuthenticated() && (walletId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated() && (walletId == request.auth.uid || isAdmin());
     }
 
     // Account Deletion Requests (Strictly handled via server-side verification)

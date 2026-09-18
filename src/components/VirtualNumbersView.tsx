@@ -29,6 +29,8 @@ import { auth, getSafeIdToken } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { sanitizeApiErrorMessage, isValidOtpCode, isInvalidOtpCode, resolveCountryInfo } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
+import { CountrySelectModal } from './CountrySelectModal';
+import { ServiceSelectModal } from './ServiceSelectModal';
 
 export interface PriceOption {
   optionId: string;
@@ -1081,9 +1083,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   type="button"
                   onClick={() => {
                     if (isUsaMode) return;
-                    setIsCountryModalOpen(!isCountryModalOpen);
-                    setIsServiceModalOpen(false);
-                    setCountrySearchQuery('');
+                    setIsCountryModalOpen(true);
                   }}
                   className={`w-full flex items-center justify-between space-x-3 bg-[#F8F7FF] hover:bg-[#F3F0FA] border border-[#E9E2FA] hover:border-[#6D28D9]/40 p-3.5 rounded-2xl transition text-left focus:outline-none group shadow-2xs ${
                     isUsaMode ? 'cursor-default' : 'cursor-pointer'
@@ -1118,100 +1118,17 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     </div>
                   </div>
                   {!isUsaMode && (
-                    <ChevronRight className={`w-5 h-5 text-[#94A3B8] group-hover:text-[#6D28D9] shrink-0 transition-transform ${isCountryModalOpen ? 'rotate-90 text-[#6D28D9]' : ''}`} />
+                    <ChevronRight className="w-5 h-5 text-[#94A3B8] group-hover:text-[#6D28D9] shrink-0 transition-transform" />
                   )}
                 </button>
-
-                {/* Compact Country Selection Panel */}
-                {isCountryModalOpen && !isUsaMode && (
-                  <div className="mt-2 bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl p-2.5 sm:p-3 shadow-xs space-y-2 animate-in fade-in duration-150">
-                    {/* Search Field clearly visible immediately at top */}
-                    <div className="relative">
-                      <Search className="w-4 h-4 text-[#716B82] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={countrySearchQuery}
-                        onChange={(e) => setCountrySearchQuery(e.target.value)}
-                        placeholder="Search country..."
-                        autoFocus
-                        className="w-full bg-white border border-[#E9E2FA] focus:border-[#6D28D9] rounded-xl pl-9 pr-8 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-2xs"
-                      />
-                      {countrySearchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => setCountrySearchQuery('')}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] cursor-pointer p-1"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Contained, compact scrollable list showing approximately 1-6 countries */}
-                    <div 
-                      className="max-h-[210px] overflow-y-auto overflow-x-hidden space-y-1 pr-1 overscroll-contain"
-                      style={{ WebkitOverflowScrolling: 'touch' }}
-                    >
-                      {countriesLoading ? (
-                        <div className="py-6 text-center text-xs text-[#6D28D9] font-bold flex items-center justify-center space-x-2">
-                          <Loader2 className="w-4 h-4 animate-spin text-[#6D28D9]" />
-                          <span>Loading countries...</span>
-                        </div>
-                      ) : filteredCountries.length === 0 ? (
-                        <div className="py-6 text-center text-xs text-[#716B82] font-semibold">
-                          No matching country found
-                        </div>
-                      ) : (
-                        filteredCountries.map((c) => {
-                          const isSelected = selectedCountry === c.id;
-                          const flag = getCountryFlagEmoji(c.code || c.id || c.name);
-                          const dialCode = getCountryDialCode(c.id, c.name, c.code);
-                          return (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedCountry(c.id);
-                                setSelectedService('');
-                                setIsCountryModalOpen(false);
-                                setCountrySearchQuery('');
-                              }}
-                              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer select-none ${
-                                isSelected
-                                  ? 'bg-[#6D28D9] text-white shadow-xs'
-                                  : 'bg-white hover:bg-[#EDE9FE]/50 text-[#171329] border border-[#E9E2FA]'
-                              }`}
-                            >
-                              <div className="flex items-center space-x-2.5 truncate">
-                                <span className="text-base shrink-0 select-none">{flag}</span>
-                                <span className="truncate font-bold">{c.name || c.id}</span>
-                              </div>
-                              {dialCode && (
-                                <span className={`text-[10px] font-mono font-bold shrink-0 ml-2 px-1.5 py-0.5 rounded ${
-                                  isSelected
-                                    ? 'bg-white/20 text-white'
-                                    : 'bg-[#FAF8FE] text-[#6D28D9] border border-[#E9E2FA]'
-                                }`}>
-                                  {dialCode}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Field 2: SERVICE */}
-              <div className={`relative ${isServiceModalOpen ? 'z-50' : 'z-10'}`}>
+              <div className="relative">
                 <button
                   type="button"
                   onClick={() => {
-                    setIsServiceModalOpen(!isServiceModalOpen);
-                    setIsCountryModalOpen(false);
-                    setServiceSearchQuery('');
+                    setIsServiceModalOpen(true);
                   }}
                   className="w-full flex items-center justify-between space-x-3 bg-[#F8F7FF] hover:bg-[#F3F0FA] border border-[#E9E2FA] hover:border-[#6D28D9]/40 p-3.5 rounded-2xl transition cursor-pointer text-left focus:outline-none group shadow-2xs"
                 >
@@ -1247,85 +1164,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                       )}
                     </div>
                   </div>
-                  <ChevronRight className={`w-5 h-5 text-[#94A3B8] group-hover:text-[#6D28D9] shrink-0 transition-transform ${isServiceModalOpen ? 'rotate-90 text-[#6D28D9]' : ''}`} />
+                  <ChevronRight className="w-5 h-5 text-[#94A3B8] group-hover:text-[#6D28D9] shrink-0 transition-transform" />
                 </button>
-
-                {/* Service Dropdown / Modal */}
-                {isServiceModalOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-2 z-50 bg-white border border-[#E9E2FA] rounded-2xl shadow-xl p-3.5">
-                    {!selectedCountry ? (
-                      <div className="py-6 text-center text-xs text-[#716B82] font-bold">
-                        Please select a country first to view available services
-                      </div>
-                    ) : (
-                      <>
-                        <div className="relative mb-3">
-                          <Search className="w-4 h-4 text-[#716B82] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={serviceSearchQuery}
-                            onChange={(e) => setServiceSearchQuery(e.target.value)}
-                            placeholder="Search service (e.g. WhatsApp, Telegram, Google, TikTok)..."
-                            autoFocus
-                            className="w-full bg-[#F8F7FF] border border-[#E9E2FA] focus:border-[#6D28D9] rounded-xl pl-9.5 pr-8 py-2.5 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-sm"
-                          />
-                          {serviceSearchQuery && (
-                            <button
-                              type="button"
-                              onClick={() => setServiceSearchQuery('')}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] cursor-pointer p-1"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-
-                        <div 
-                          className="max-h-[250px] overflow-y-auto overflow-x-hidden space-y-1.5 pr-1.5 custom-scrollbar touch-pan-y overscroll-contain"
-                          style={{ WebkitOverflowScrolling: 'touch' }}
-                        >
-                          {filteredServices.length === 0 ? (
-                            <div className="py-8 text-center text-xs text-[#716B82] font-bold">
-                              {servicesLoading ? 'Loading services...' : 'No service available for this country'}
-                            </div>
-                          ) : (
-                            filteredServices.map((s) => {
-                              const isSelected = selectedService === s.id;
-                              const displayName = getServiceDisplayName(s.id, s.name);
-                              return (
-                                <button
-                                  key={s.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedService(s.id);
-                                    setIsServiceModalOpen(false);
-                                    setServiceSearchQuery('');
-                                  }}
-                                  className={`w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition text-left cursor-pointer touch-manipulation select-none ${
-                                    isSelected
-                                      ? 'bg-[#6D28D9] text-white shadow-sm'
-                                      : 'text-[#171329] hover:bg-[#F8F7FF] active:bg-[#EDE9FE]'
-                                  }`}
-                                >
-                                  <span className="truncate font-semibold">{displayName}</span>
-                                  {s.price ? (
-                                    <span className={`text-[10px] font-bold shrink-0 ml-2 px-2 py-0.5 rounded-md ${
-                                      isSelected
-                                        ? 'bg-white/20 text-white'
-                                        : 'bg-emerald-50 text-[#047857] border border-emerald-200'
-                                    }`}>
-                                      ₦{(Number(s.price) + 300).toLocaleString()}
-                                    </span>
-                                  ) : null}
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Price Options Preview when Country & Service are Selected */}
@@ -1933,6 +1773,39 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: COUNTRY SELECTOR (SEARCHABLE MODAL)                                 */}
+      {/* ========================================================================= */}
+      <CountrySelectModal
+        isOpen={isCountryModalOpen && !isUsaMode}
+        onClose={() => setIsCountryModalOpen(false)}
+        countries={countries}
+        selectedCountryId={selectedCountry}
+        onSelectCountry={(countryId) => {
+          setSelectedCountry(countryId);
+          setSelectedService('');
+        }}
+        isLoading={countriesLoading}
+      />
+
+      {/* ========================================================================= */}
+      {/* MODAL: SERVICE SELECTOR (SEARCHABLE MODAL)                                 */}
+      {/* ========================================================================= */}
+      <ServiceSelectModal
+        isOpen={isServiceModalOpen}
+        onClose={() => setIsServiceModalOpen(false)}
+        services={services.map(s => ({
+          id: s.id,
+          name: getServiceDisplayName(s.id, s.name),
+          price: s.price
+        }))}
+        selectedServiceId={selectedService}
+        onSelectService={(serviceId) => setSelectedService(serviceId)}
+        isLoading={servicesLoading}
+        hasSelectedCountry={!!selectedCountry}
+        countryName={currentCountryObj?.name || getCountryDisplayName(selectedCountry)}
+      />
 
     </div>
   );

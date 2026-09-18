@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { 
   CreditCard,
   Plus, 
@@ -28,6 +30,7 @@ interface HomeDashboardViewProps {
   onSelectPurchase: (purchase: PurchaseRecord) => void;
   onOpenAuth: (mode: 'login' | 'signup') => void;
   onOpenDashboard: (tab?: DashboardTab) => void;
+  onBalanceChange?: (newBalance: number) => void;
 }
 
 export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
@@ -41,7 +44,71 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   onSelectPurchase,
   onOpenAuth,
   onOpenDashboard,
+  onBalanceChange,
 }) => {
+  // Direct Real-Time Firestore Balance Listener for Instant Dynamic Sync
+  const [liveBalance, setLiveBalance] = useState<number | null>(null);
+  const onBalanceChangeRef = React.useRef(onBalanceChange);
+  useEffect(() => {
+    onBalanceChangeRef.current = onBalanceChange;
+  }, [onBalanceChange]);
+
+  useEffect(() => {
+    if (!user?.uid || !db) {
+      setLiveBalance(null);
+      return;
+    }
+
+    const userDocRef = doc(db, 'users', user.uid);
+    const walletDocRef = doc(db, 'wallets', user.uid);
+
+    const unsubscribeUser = onSnapshot(
+      userDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          const raw = data?.walletBalance !== undefined ? data?.walletBalance : data?.balance;
+          const parsed = typeof raw === 'number' ? raw : (raw ? Number(raw) : 0);
+          const safe = isNaN(parsed) ? 0 : parsed;
+          setLiveBalance(safe);
+          if (onBalanceChangeRef.current) {
+            onBalanceChangeRef.current(safe);
+          }
+        }
+      },
+      (err) => {
+        console.warn('[HomeDashboardView] Real-time user balance listener notice:', err);
+      }
+    );
+
+    const unsubscribeWallet = onSnapshot(
+      walletDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          const raw = data?.walletBalance !== undefined ? data?.walletBalance : data?.balance;
+          const parsed = typeof raw === 'number' ? raw : (raw ? Number(raw) : 0);
+          const safe = isNaN(parsed) ? 0 : parsed;
+          setLiveBalance((prev) => (prev === null ? safe : Math.max(prev, safe)));
+          if (onBalanceChangeRef.current) {
+            onBalanceChangeRef.current(safe);
+          }
+        }
+      },
+      () => {
+        // Silent fallback if wallets/{userId} not initialized yet
+      }
+    );
+
+    return () => {
+      unsubscribeUser();
+      unsubscribeWallet();
+    };
+  }, [user?.uid]);
+
+  // Priority: live real-time listener balance > props.walletBalance > 0
+  const currentDisplayBalance = liveBalance !== null ? liveBalance : (walletBalance || 0);
+
   // 1. Time-aware dynamic greeting
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -152,7 +219,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           {/* Balance Display (Real user wallet balance in NGN) */}
           <div>
             <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-sans">
-              ₦{Number(walletBalance || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₦{Number(currentDisplayBalance || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { User, onAuthStateChanged, onIdTokenChanged, signOut } from 'firebase/auth';
 import { 
   collection, 
@@ -54,7 +54,6 @@ import { ReferralsView, generateUserReferralCode } from './components/ReferralsV
 import { ChangePasswordView } from './components/ChangePasswordView';
 import { PWAInstallBanner } from './components/PWAInstallPrompt';
 import { LogoutConfirmModal } from './components/LogoutConfirmModal';
-import { AccountDeletionModal } from './components/AccountDeletionModal';
 import { safeLocalStorage } from './utils/storage';
 
 // Code-split heavy views & modals for lighter initial bundle
@@ -307,8 +306,6 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string>('');
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
-  const [isAccountDeletionModalOpen, setIsAccountDeletionModalOpen] = useState(false);
-  const [accountDeletionVerifyData, setAccountDeletionVerifyData] = useState<{ reqId: string; token: string } | null>(null);
 
   const executeLogout = async () => {
     safeLocalStorage.removeItem('zenet_last_seen_timestamp');
@@ -419,9 +416,37 @@ export default function App() {
     }
   }, [user?.uid, Boolean(userProfile), authMode]);
 
+  // Dedicated authoritative sync function to refresh user profile & balance from Firestore
+  const refreshUserProfileAndBalance = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const uSnap = await getDoc(userRef);
+      if (uSnap.exists()) {
+        const data = uSnap.data() as UserProfile;
+        setAndCacheUserProfile(data);
+        const rawBal = (data as any)?.walletBalance;
+        const numBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
+        const safeBal = isNaN(numBal) ? 0 : numBal;
+        setWalletBalance(safeBal);
+        setLatestWalletBalance(safeBal);
+      }
+    } catch (err) {
+      console.warn('Error refreshing profile and balance:', err);
+    }
+  }, [user?.uid]);
+
   const handleAddWalletFunds = async (amount: number, gateway: string, reference?: string) => {
+    if (!user) return;
+    const numAmount = typeof amount === 'number' ? amount : Number(amount) || 0;
+    if (numAmount > 0) {
+      setWalletBalance((prev) => prev + numAmount);
+      setLatestWalletBalance((prev) => prev + numAmount);
+      setUserProfile((prev) => prev ? { ...prev, walletBalance: (prev.walletBalance || 0) + numAmount } : prev);
+    }
+
     // Verification is executed by server Paystack verify/webhook endpoints.
-    if (reference && user) {
+    if (reference) {
       try {
         const verifyRes = await safeApiFetch(`/api/paystack/verify/${encodeURIComponent(reference)}?userId=${encodeURIComponent(user.uid)}&isWalletFunding=true`);
         if (verifyRes.verified && verifyRes.status === 'success') {
@@ -431,6 +456,9 @@ export default function App() {
         console.warn('[Wallet Funding] Server verify notice:', vErr);
       }
     }
+
+    // Ensure database-level balance sync
+    await refreshUserProfileAndBalance();
   };
 
   // Helper for consistent SPA History Navigation & URL query params
@@ -736,14 +764,6 @@ export default function App() {
     // Detect referral query parameter or direct admin wallets / social boost / virtual numbers route on app load
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const actionParam = urlParams.get('action');
-      const reqIdParam = urlParams.get('reqId');
-      const tokenParam = urlParams.get('token');
-      if (actionParam === 'verify-account-deletion' && reqIdParam && tokenParam) {
-        setAccountDeletionVerifyData({ reqId: reqIdParam, token: tokenParam });
-        setIsAccountDeletionModalOpen(true);
-      }
-
       const paramRef = urlParams.get('ref') || urlParams.get('referral');
       if (paramRef) {
         safeLocalStorage.setItem('pending_referral_code', paramRef.trim().toUpperCase());
@@ -907,6 +927,12 @@ export default function App() {
             }
           }
 
+          const rawExistingBal = (existingData as any)?.walletBalance !== undefined 
+            ? (existingData as any)?.walletBalance 
+            : (existingData as any)?.balance;
+          const numExistingBal = typeof rawExistingBal === 'number' ? rawExistingBal : (rawExistingBal ? Number(rawExistingBal) : 0);
+          const safeExistingBal = isNaN(numExistingBal) ? 0 : numExistingBal;
+
           const profileData: UserProfile = {
             uid: currentUser.uid,
             email: currentUser.email || existingData.email || '',
@@ -924,11 +950,14 @@ export default function App() {
             referralRewardClaimed: existingData.referralRewardClaimed || false,
             referralCount: existingData.referralCount || 0,
             totalReferralEarnings: existingData.totalReferralEarnings || 0,
-            walletBalance: existingData.walletBalance || 0,
+            walletBalance: safeExistingBal,
+            balance: safeExistingBal,
             paystackCustomerCode: existingData.paystackCustomerCode || undefined
           };
 
           setAndCacheUserProfile(profileData);
+          setWalletBalance(safeExistingBal);
+          setLatestWalletBalance(safeExistingBal);
           setAuthMode(null);
           setSessionExpiredNotice('');
           const urlParams = new URLSearchParams(window.location.search);
@@ -947,7 +976,11 @@ export default function App() {
           } else {
             setActiveView('marketplace');
           }
-          await setDoc(userRef, sanitizeFirestorePayload(profileData), { merge: true }).catch((docErr) => {
+          const profilePayload = { ...profileData };
+          // CRITICAL: NEVER overwrite walletBalance or balance during auth profile background sync
+          delete (profilePayload as any).walletBalance;
+          delete (profilePayload as any).balance;
+          await setDoc(userRef, sanitizeFirestorePayload(profilePayload), { merge: true }).catch((docErr) => {
             console.warn('User profile background sync notice:', docErr);
           });
         } catch (err) {
@@ -975,23 +1008,41 @@ export default function App() {
     };
   }, []);
 
-  // 1b. Real-time User Profile sync
+  // 1b. Real-time User Profile & Wallet sync
   useEffect(() => {
     if (!user?.uid) return;
     const userRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userRef, (snapshot) => {
+    const walletRef = doc(db, 'wallets', user.uid);
+
+    const unsubscribeUser = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as UserProfile;
         setAndCacheUserProfile(data);
-        if (typeof data.walletBalance === 'number') {
-          setWalletBalance(data.walletBalance);
-          setLatestWalletBalance(data.walletBalance);
-        }
+        const rawBal = (data as any)?.walletBalance !== undefined ? (data as any)?.walletBalance : (data as any)?.balance;
+        const numBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
+        const safeBal = isNaN(numBal) ? 0 : numBal;
+        setWalletBalance(safeBal);
+        setLatestWalletBalance(safeBal);
       }
     }, (err) => {
       console.warn('User profile listener notice:', err);
     });
-    return () => unsubscribe();
+
+    const unsubscribeWallet = onSnapshot(walletRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        const rawBal = data?.walletBalance !== undefined ? data?.walletBalance : data?.balance;
+        const numBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
+        const safeBal = isNaN(numBal) ? 0 : numBal;
+        setWalletBalance((prev) => Math.max(prev, safeBal));
+        setLatestWalletBalance((prev) => Math.max(prev, safeBal));
+      }
+    }, () => {});
+
+    return () => {
+      unsubscribeUser();
+      unsubscribeWallet();
+    };
   }, [user?.uid]);
 
   // 2. Real-time Firestore Listings listener (Bounded query to prevent huge payloads on low-end devices)
@@ -1114,9 +1165,13 @@ export default function App() {
     // BRANCH 1: WALLET PAYMENT (Atomic Server-Side Execution with Idempotency & Zero-Deduction on Failure)
     if (paymentGateway === 'wallet') {
       try {
+        const token = await getSafeIdToken(auth.currentUser);
         const purchaseRes = await safeApiFetch('/api/wallet/purchase', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
           body: JSON.stringify({
             userId: user.uid,
             listingId: listing.id,
@@ -1127,6 +1182,15 @@ export default function App() {
 
         if (!purchaseRes || purchaseRes.success === false) {
           throw new Error(purchaseRes?.error || 'Failed to complete wallet purchase');
+        }
+
+        // Immediately sync deducted wallet balance across whole app
+        if (typeof purchaseRes.newBalance === 'number') {
+          setWalletBalance(purchaseRes.newBalance);
+          setLatestWalletBalance(purchaseRes.newBalance);
+          setUserProfile((prev) => prev ? { ...prev, walletBalance: purchaseRes.newBalance } : prev);
+        } else {
+          await refreshUserProfileAndBalance();
         }
 
         const completedRecord: PurchaseRecord = purchaseRes.purchaseRecord || {
@@ -2018,14 +2082,7 @@ export default function App() {
             <VirtualNumbersView
               userProfile={userProfile || ({ uid: user?.uid || '', email: user?.email || '', username: user?.displayName || 'User', role: 'customer', walletBalance } as any)}
               walletBalance={walletBalance}
-              onRefreshProfile={async () => {
-                if (!user) return;
-                const userRef = doc(db, 'users', user.uid);
-                const uSnap = await getDoc(userRef);
-                if (uSnap.exists()) {
-                  setUserProfile(uSnap.data() as UserProfile);
-                }
-              }}
+              onRefreshProfile={refreshUserProfileAndBalance}
               onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
             />
@@ -2043,14 +2100,7 @@ export default function App() {
               onCategoryFilterChange={(cat) => setFilters(prev => ({ ...prev, category: cat }))}
               searchQuery={filters.searchQuery}
               onSearchChange={(q) => setFilters(prev => ({ ...prev, searchQuery: q }))}
-              onRefreshProfile={async () => {
-                if (!user) return;
-                const userRef = doc(db, 'users', user.uid);
-                const uSnap = await getDoc(userRef);
-                if (uSnap.exists()) {
-                  setUserProfile(uSnap.data() as UserProfile);
-                }
-              }}
+              onRefreshProfile={refreshUserProfileAndBalance}
               onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
               onSelectListing={handleSelectListing}
@@ -2101,6 +2151,7 @@ export default function App() {
             <SocialBoostView
               userProfile={userProfile}
               walletBalance={walletBalance}
+              onRefreshProfile={refreshUserProfileAndBalance}
               onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
             />
@@ -2111,14 +2162,7 @@ export default function App() {
             <VirtualNumbers2View
               userProfile={userProfile}
               walletBalance={walletBalance}
-              onRefreshProfile={async () => {
-                if (!user) return;
-                const userRef = doc(db, 'users', user.uid);
-                const uSnap = await getDoc(userRef);
-                if (uSnap.exists()) {
-                  setUserProfile(uSnap.data() as UserProfile);
-                }
-              }}
+              onRefreshProfile={refreshUserProfileAndBalance}
               onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
             />
@@ -2129,14 +2173,7 @@ export default function App() {
             <SocialBoost2View
               userProfile={userProfile}
               walletBalance={walletBalance}
-              onRefreshProfile={async () => {
-                if (!user) return;
-                const userRef = doc(db, 'users', user.uid);
-                const uSnap = await getDoc(userRef);
-                if (uSnap.exists()) {
-                  setUserProfile(uSnap.data() as UserProfile);
-                }
-              }}
+              onRefreshProfile={refreshUserProfileAndBalance}
               onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
               onSwitchToServer1={() => handleSelectView('social-boost')}
@@ -2149,14 +2186,7 @@ export default function App() {
               userProfile={userProfile}
               walletBalance={walletBalance}
               initialPage="front"
-              onRefreshProfile={async () => {
-                if (!user) return;
-                const userRef = doc(db, 'users', user.uid);
-                const uSnap = await getDoc(userRef);
-                if (uSnap.exists()) {
-                  setUserProfile(uSnap.data() as UserProfile);
-                }
-              }}
+              onRefreshProfile={refreshUserProfileAndBalance}
               onBackToMarketplace={handleBackToMarketplace}
               onOpenWallet={() => handleSelectView('wallet')}
               onSwitchToServer1={() => handleSelectView('social-boost')}
@@ -2244,6 +2274,11 @@ export default function App() {
               userProfile={userProfile}
               walletBalance={walletBalance}
               purchases={purchases}
+              onBalanceChange={(newBal) => {
+                setWalletBalance(newBal);
+                setLatestWalletBalance(newBal);
+                setUserProfile((prev) => prev ? { ...prev, walletBalance: newBal } : prev);
+              }}
               onOpenWallet={() => {
                 if (!user) {
                   setAuthMode('login');
@@ -2573,6 +2608,12 @@ export default function App() {
           walletBalance={walletBalance}
           isOwner={isOwner}
           isAdmin={isAdmin}
+          onBalanceChange={(newBal) => {
+            setWalletBalance(newBal);
+            setLatestWalletBalance(newBal);
+            setUserProfile((prev) => prev ? { ...prev, walletBalance: newBal } : prev);
+          }}
+          onRefreshProfile={refreshUserProfileAndBalance}
           onOpenAuth={(mode) => setAuthMode(mode)}
           onOpenWallet={() => setIsWalletModalOpen(true)}
           onOpenAdminGenerator={() => setIsZenetUpdateAdminModalOpen(true)}
@@ -2619,26 +2660,6 @@ export default function App() {
         isOpen={isLogoutConfirmOpen}
         onClose={() => setIsLogoutConfirmOpen(false)}
         onConfirmLogout={executeLogout}
-      />
-
-      {/* 16. Secure Account Deletion Modal (Email Verification & Permanent Deletion) */}
-      <AccountDeletionModal
-        user={user}
-        isOpen={isAccountDeletionModalOpen}
-        verifyData={accountDeletionVerifyData}
-        onClose={() => {
-          setIsAccountDeletionModalOpen(false);
-          setAccountDeletionVerifyData(null);
-          if (window.location.search.includes('action=verify-account-deletion')) {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-        }}
-        onDeletionComplete={() => {
-          executeLogout();
-          if (window.location.search.includes('action=verify-account-deletion')) {
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-        }}
       />
 
     </div>

@@ -46,6 +46,8 @@ interface ZenetUpdateModalProps {
   onOpenWallet?: () => void;
   onOpenAdminGenerator?: () => void;
   onNavigateService?: (service: 'virtual-numbers' | 'log-accounts' | 'wallet') => void;
+  onBalanceChange?: (newBalance: number) => void;
+  onRefreshProfile?: () => Promise<void> | void;
 }
 
 export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
@@ -59,7 +61,9 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
   onOpenAuth,
   onOpenWallet,
   onOpenAdminGenerator,
-  onNavigateService
+  onNavigateService,
+  onBalanceChange,
+  onRefreshProfile,
 }) => {
   const [activeTab, setActiveTab] = useState<'marketplace' | 'purchases' | 'system_updates'>('marketplace');
   const [products, setProducts] = useState<ZenedUpdateProduct[]>([]);
@@ -250,6 +254,13 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
         walletBalance: newBalance,
         updatedAt: serverTimestamp()
       });
+
+      if (onBalanceChange) {
+        onBalanceChange(newBalance);
+      }
+      if (onRefreshProfile) {
+        await onRefreshProfile();
+      }
 
       // Step 6: Create Wallet Transaction record
       const txDocRef = doc(collection(db, 'wallet_transactions'));

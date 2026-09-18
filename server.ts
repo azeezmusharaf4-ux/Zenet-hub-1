@@ -137,11 +137,13 @@ app.use((req, res, next) => {
 // Initialize Server-side Firebase Firestore instance
 let db: any = null;
 let firebaseProjectId = '';
+let firebaseDatabaseId = '';
 try {
   const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
   if (fs.existsSync(firebaseConfigPath)) {
     const firebaseConfigData = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
     firebaseProjectId = firebaseConfigData.projectId || '';
+    firebaseDatabaseId = firebaseConfigData.firestoreDatabaseId || '(default)';
     const firebaseApp = getApps().length > 0 ? getApp() : initializeApp({
       apiKey: firebaseConfigData.apiKey,
       authDomain: firebaseConfigData.authDomain,
@@ -151,10 +153,132 @@ try {
       appId: firebaseConfigData.appId,
     });
     db = getFirestore(firebaseApp, firebaseConfigData.firestoreDatabaseId || undefined);
-    console.log(`Server-side Firestore initialized successfully (Project: ${firebaseProjectId})`);
+    console.log(`Server-side Firestore initialized successfully (Project: ${firebaseProjectId}, DB: ${firebaseDatabaseId})`);
   }
 } catch (fInitErr) {
   console.warn('Server-side Firestore initialization notice:', fInitErr);
+}
+
+// Firestore REST API helpers for executing operations with caller's verified ID token
+function toFirestoreRestValue(val: any): any {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') {
+    return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+  }
+  if (typeof val === 'string') return { stringValue: val };
+  if (Array.isArray(val)) {
+    return { arrayValue: { values: val.map(toFirestoreRestValue) } };
+  }
+  if (typeof val === 'object') {
+    const fields: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) fields[k] = toFirestoreRestValue(v);
+    }
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+function fromFirestoreRestValue(val: any): any {
+  if (!val) return null;
+  if ('stringValue' in val) return val.stringValue;
+  if ('integerValue' in val) return Number(val.integerValue);
+  if ('doubleValue' in val) return Number(val.doubleValue);
+  if ('booleanValue' in val) return Boolean(val.booleanValue);
+  if ('nullValue' in val) return null;
+  if ('timestampValue' in val) return val.timestampValue;
+  if ('arrayValue' in val) return (val.arrayValue?.values || []).map(fromFirestoreRestValue);
+  if ('mapValue' in val) {
+    const res: any = {};
+    for (const [k, v] of Object.entries(val.mapValue?.fields || {})) {
+      res[k] = fromFirestoreRestValue(v);
+    }
+    return res;
+  }
+  return null;
+}
+
+function parseFirestoreRestDoc(docObj: any): any {
+  if (!docObj || !docObj.fields) return null;
+  const res: any = {};
+  for (const [k, v] of Object.entries(docObj.fields)) {
+    res[k] = fromFirestoreRestValue(v);
+  }
+  if (docObj.name) {
+    const parts = docObj.name.split('/');
+    res.id = parts[parts.length - 1];
+  }
+  return res;
+}
+
+async function restGetFirestoreDoc(collectionPath: string, docId: string, idToken: string): Promise<any> {
+  const dbId = firebaseDatabaseId || '(default)';
+  const url = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/${dbId}/documents/${collectionPath}/${encodeURIComponent(docId)}`;
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${idToken}`,
+      'Accept': 'application/json'
+    }
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Firestore REST GET error (${res.status}): ${errText}`);
+  }
+  const data = await res.json();
+  return parseFirestoreRestDoc(data);
+}
+
+async function restPatchFirestoreDoc(collectionPath: string, docId: string, fields: Record<string, any>, idToken: string): Promise<any> {
+  const dbId = firebaseDatabaseId || '(default)';
+  const fieldKeys = Object.keys(fields);
+  const updateMask = fieldKeys.map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  const url = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/${dbId}/documents/${collectionPath}/${encodeURIComponent(docId)}${updateMask ? '?' + updateMask : ''}`;
+  
+  const firestoreFields: Record<string, any> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    firestoreFields[k] = toFirestoreRestValue(v);
+  }
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({ fields: firestoreFields })
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Firestore REST PATCH error (${res.status}): ${errText}`);
+  }
+  return await res.json();
+}
+
+async function restCreateFirestoreDoc(collectionPath: string, docId: string, fields: Record<string, any>, idToken: string): Promise<any> {
+  const dbId = firebaseDatabaseId || '(default)';
+  const url = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/${dbId}/documents/${collectionPath}?documentId=${encodeURIComponent(docId)}`;
+  
+  const firestoreFields: Record<string, any> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    firestoreFields[k] = toFirestoreRestValue(v);
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({ fields: firestoreFields })
+  });
+  if (!res.ok) {
+    return await restPatchFirestoreDoc(collectionPath, docId, fields, idToken);
+  }
+  return await res.json();
 }
 
 // Memory lock for active purchase requests to enforce idempotency
@@ -1122,180 +1246,6 @@ app.post('/api/admin/manage-role', async (req, res) => {
   }
 });
 
-// --- SECURE ACCOUNT DELETION & ONE-TIME EMAIL VERIFICATION APIS ---
-
-// 1. Request Account Deletion (Generates single-use expiring cryptographic token & verification link)
-app.post('/api/account/request-deletion', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const verifiedUser = await getVerifiedAuthUser(authHeader);
-
-    if (!verifiedUser || !verifiedUser.uid || !verifiedUser.email) {
-      return res.status(401).json({
-        success: false,
-        error: 'Unauthorized: You must be logged in with a verified account email to request deletion.'
-      });
-    }
-
-    if (!db) {
-      return res.status(500).json({
-        success: false,
-        error: 'Database service is currently unavailable. Please try again later.'
-      });
-    }
-
-    const token = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const requestId = 'del_' + crypto.randomBytes(16).toString('hex');
-    const now = Date.now();
-    const expiresAt = now + (15 * 60 * 1000); // 15 minutes lifetime
-
-    await setDoc(doc(db, 'account_deletion_requests', requestId), {
-      requestId,
-      uid: verifiedUser.uid,
-      email: verifiedUser.email,
-      tokenHash,
-      createdAt: now,
-      expiresAt,
-      used: false,
-      status: 'pending'
-    });
-
-    const protocol = req.headers['x-forwarded-proto'] || 'https';
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-    const clientOrigin = (req.headers.origin as string) || `${protocol}://${host}`;
-    const confirmationUrl = `${clientOrigin}/?action=verify-account-deletion&reqId=${requestId}&token=${token}`;
-
-    console.log(`[Account Deletion API] Generated secure one-time verification link for user ${verifiedUser.email} (ReqId: ${requestId}, Expires: 15m)`);
-
-    return res.json({
-      success: true,
-      requestId,
-      email: verifiedUser.email,
-      expiresAt,
-      confirmationUrl,
-      message: `A secure, one-time verification link has been generated for ${verifiedUser.email}. Click the link within 15 minutes to confirm account deletion.`
-    });
-  } catch (err: any) {
-    console.error('Error in /api/account/request-deletion:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Failed to request account deletion' });
-  }
-});
-
-// 2. Verify Single-Use Deletion Token
-app.post('/api/account/verify-deletion-token', async (req, res) => {
-  try {
-    const { reqId, token } = req.body || {};
-    if (!reqId || !token) {
-      return res.status(400).json({ success: false, error: 'Deletion request ID and verification token are required.' });
-    }
-
-    if (!db) {
-      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
-    }
-
-    const reqRef = doc(db, 'account_deletion_requests', reqId);
-    const reqSnap = await getDoc(reqRef);
-
-    if (!reqSnap.exists()) {
-      return res.status(404).json({ success: false, error: 'Invalid or non-existent deletion request.' });
-    }
-
-    const data = reqSnap.data();
-
-    if (data.used) {
-      return res.status(400).json({ success: false, error: 'This verification token has already been used.' });
-    }
-
-    if (Date.now() > data.expiresAt) {
-      await updateDoc(reqRef, { status: 'expired' });
-      return res.status(400).json({ success: false, error: 'This verification link has expired (15-minute window). For your security, the account was NOT deleted.' });
-    }
-
-    const inputHash = crypto.createHash('sha256').update(token || '').digest('hex');
-    if (inputHash !== data.tokenHash) {
-      return res.status(400).json({ success: false, error: 'Invalid verification token. Account deletion cannot proceed.' });
-    }
-
-    await updateDoc(reqRef, {
-      status: 'verified',
-      verifiedAt: Date.now()
-    });
-
-    return res.json({
-      success: true,
-      reqId,
-      uid: data.uid,
-      email: data.email,
-      message: 'Email address verified successfully. Account deletion authorized.'
-    });
-  } catch (err: any) {
-    console.error('Error in /api/account/verify-deletion-token:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Failed to verify token' });
-  }
-});
-
-// 3. Complete & Execute Permanent Account Deletion
-app.post('/api/account/execute-deletion', async (req, res) => {
-  try {
-    const { reqId, token } = req.body || {};
-    if (!reqId || !token) {
-      return res.status(400).json({ success: false, error: 'Request ID and token are required.' });
-    }
-
-    if (!db) {
-      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
-    }
-
-    const reqRef = doc(db, 'account_deletion_requests', reqId);
-    const reqSnap = await getDoc(reqRef);
-
-    if (!reqSnap.exists()) {
-      return res.status(404).json({ success: false, error: 'Deletion request not found.' });
-    }
-
-    const data = reqSnap.data();
-
-    if (data.used) {
-      return res.status(400).json({ success: false, error: 'This deletion request has already been executed.' });
-    }
-
-    if (Date.now() > data.expiresAt) {
-      await updateDoc(reqRef, { status: 'expired' });
-      return res.status(400).json({ success: false, error: 'Verification link expired. The account was NOT deleted.' });
-    }
-
-    const inputHash = crypto.createHash('sha256').update(token || '').digest('hex');
-    if (inputHash !== data.tokenHash) {
-      return res.status(400).json({ success: false, error: 'Invalid token. Cannot execute deletion.' });
-    }
-
-    // Mark as used immediately to strictly prevent any reuse
-    await updateDoc(reqRef, {
-      used: true,
-      status: 'completed',
-      completedAt: Date.now()
-    });
-
-    // Permanently remove user record from Firestore
-    try {
-      const userDocRef = doc(db, 'users', data.uid);
-      await deleteDoc(userDocRef);
-      console.log(`[Account Deletion API] Successfully permanently deleted user document ${data.uid} (${data.email})`);
-    } catch (docErr) {
-      console.error('[Account Deletion API] Error deleting Firestore user doc:', docErr);
-    }
-
-    return res.json({
-      success: true,
-      message: 'Account and associated records have been permanently deleted.'
-    });
-  } catch (err: any) {
-    console.error('Error in /api/account/execute-deletion:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Failed to complete deletion' });
-  }
-});
-
 // Secure Admin Wallet Override & Adjustment API (Strictly restricted to Azeezmusharaf4@gmail.com)
 const handleAdminWalletOverride = async (req: any, res: any) => {
   try {
@@ -1331,6 +1281,8 @@ const handleAdminWalletOverride = async (req: any, res: any) => {
       });
     }
 
+    const rawToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
+
     const targetUid = body.targetUid || req.query.targetUid || '';
     const targetEmail = body.targetEmail || req.query.targetEmail || '';
     const action = body.action || req.query.action || 'set';
@@ -1359,33 +1311,44 @@ const handleAdminWalletOverride = async (req: any, res: any) => {
       });
     }
 
-    if (!db) {
-      return res.status(500).json({
-        success: false,
-        error: 'Database service is not initialized on the server.'
-      });
-    }
-
     // Resolve target user document in Firestore
     let resolvedUid = targetUid;
     let targetUserData: any = null;
 
-    if (resolvedUid) {
-      const userRef = doc(db, 'users', resolvedUid);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        targetUserData = userSnap.data();
+    // 1. If rawToken is provided, try Firestore REST API with the admin's verified credentials
+    if (rawToken && resolvedUid) {
+      try {
+        targetUserData = await restGetFirestoreDoc('users', resolvedUid, rawToken);
+      } catch (restErr) {
+        console.warn('[Admin Wallet Override] REST GET user warning:', restErr);
+      }
+    }
+
+    // Fallback lookup via client SDK db
+    if (!targetUserData && resolvedUid && db) {
+      try {
+        const userRef = doc(db, 'users', resolvedUid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          targetUserData = userSnap.data();
+        }
+      } catch (dbErr) {
+        console.warn('[Admin Wallet Override] Client SDK GET user warning:', dbErr);
       }
     }
 
     // Fallback lookup by email if UID was not found or if targetEmail provided
-    if (!targetUserData && targetEmail) {
-      const normalizedTargetEmail = targetEmail.trim().toLowerCase();
-      const usersQ = query(collection(db, 'users'), where('email', '==', normalizedTargetEmail));
-      const usersSnap = await getDocs(usersQ);
-      if (!usersSnap.empty) {
-        resolvedUid = usersSnap.docs[0].id;
-        targetUserData = usersSnap.docs[0].data();
+    if (!targetUserData && targetEmail && db) {
+      try {
+        const normalizedTargetEmail = targetEmail.trim().toLowerCase();
+        const usersQ = query(collection(db, 'users'), where('email', '==', normalizedTargetEmail));
+        const usersSnap = await getDocs(usersQ);
+        if (!usersSnap.empty) {
+          resolvedUid = usersSnap.docs[0].id;
+          targetUserData = usersSnap.docs[0].data();
+        }
+      } catch (qErr) {
+        console.warn('[Admin Wallet Override] User email query warning:', qErr);
       }
     }
 
@@ -1407,31 +1370,48 @@ const handleAdminWalletOverride = async (req: any, res: any) => {
       newBalance = Math.max(0, previousBalance - numericAmount);
     }
 
-    const userDocRef = doc(db, 'users', resolvedUid);
     const resolvedEmail = targetUserData?.email || targetEmail || '';
+    const txId = `OVERRIDE_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-    if (targetUserData) {
-      await updateDoc(userDocRef, {
-        walletBalance: newBalance,
-        lastWalletOverrideAt: new Date().toISOString(),
-        lastWalletOverrideBy: 'Azeezmusharaf4@gmail.com'
-      });
-    } else {
-      await setDoc(userDocRef, {
-        uid: resolvedUid,
-        walletBalance: newBalance,
-        email: resolvedEmail,
-        createdAt: new Date().toISOString(),
-        lastWalletOverrideAt: new Date().toISOString(),
-        lastWalletOverrideBy: 'Azeezmusharaf4@gmail.com'
-      }, { merge: true });
+    // Execute user document update with admin token or fallback to db
+    let userUpdated = false;
+    if (rawToken) {
+      try {
+        await restPatchFirestoreDoc('users', resolvedUid, {
+          walletBalance: newBalance,
+          lastWalletOverrideAt: new Date().toISOString(),
+          lastWalletOverrideBy: 'Azeezmusharaf4@gmail.com',
+          email: resolvedEmail || undefined,
+          uid: resolvedUid
+        }, rawToken);
+        userUpdated = true;
+      } catch (restPatchErr) {
+        console.warn('[Admin Wallet Override] REST PATCH user failed, trying client SDK:', restPatchErr);
+      }
+    }
+
+    if (!userUpdated && db) {
+      const userDocRef = doc(db, 'users', resolvedUid);
+      if (targetUserData) {
+        await updateDoc(userDocRef, {
+          walletBalance: newBalance,
+          lastWalletOverrideAt: new Date().toISOString(),
+          lastWalletOverrideBy: 'Azeezmusharaf4@gmail.com'
+        });
+      } else {
+        await setDoc(userDocRef, {
+          uid: resolvedUid,
+          walletBalance: newBalance,
+          email: resolvedEmail,
+          createdAt: new Date().toISOString(),
+          lastWalletOverrideAt: new Date().toISOString(),
+          lastWalletOverrideBy: 'Azeezmusharaf4@gmail.com'
+        }, { merge: true });
+      }
     }
 
     // Record immutable audit entry in wallet_transactions ledger
-    const txId = `OVERRIDE_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-    const txDocRef = doc(db, 'wallet_transactions', txId);
-
-    await setDoc(txDocRef, {
+    const txPayload = {
       id: txId,
       userId: resolvedUid,
       userEmail: resolvedEmail,
@@ -1446,7 +1426,26 @@ const handleAdminWalletOverride = async (req: any, res: any) => {
       reason: reason || 'Manual Admin Wallet Balance Override',
       date: new Date().toISOString(),
       createdAt: new Date().toISOString()
-    });
+    };
+
+    let txRecorded = false;
+    if (rawToken) {
+      try {
+        await restCreateFirestoreDoc('wallet_transactions', txId, txPayload, rawToken);
+        txRecorded = true;
+      } catch (restTxErr) {
+        console.warn('[Admin Wallet Override] REST CREATE tx failed, trying client SDK:', restTxErr);
+      }
+    }
+
+    if (!txRecorded && db) {
+      try {
+        const txDocRef = doc(db, 'wallet_transactions', txId);
+        await setDoc(txDocRef, txPayload);
+      } catch (dbTxErr) {
+        console.warn('[Admin Wallet Override] Client SDK setDoc tx notice:', dbTxErr);
+      }
+    }
 
     console.log(`[Admin Wallet Override] Success: ${verifiedUser?.email} updated user ${resolvedUid} (${resolvedEmail}) wallet from ₦${previousBalance} to ₦${newBalance} (action: ${action}, amount: ₦${numericAmount})`);
 

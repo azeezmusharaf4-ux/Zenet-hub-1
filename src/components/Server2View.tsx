@@ -43,6 +43,8 @@ import { UserProfile, SocialBoostService, SocialBoostOrder, SocialBoostPricingSe
 import { auth, getSafeIdToken } from '../lib/firebase';
 import { safeApiFetch, sanitizeApiErrorMessage } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
+import { CountrySelectModal } from './CountrySelectModal';
+import { ServiceSelectModal } from './ServiceSelectModal';
 
 export type Server2Page = 'front' | 'buy-numbers' | 'boost-accounts';
 
@@ -1093,9 +1095,7 @@ export const Server2View: React.FC<Server2ViewProps> = ({
               <div
                 onClick={() => {
                   if (activeTab === 'all' && !countriesLoading) {
-                    setIsCountryModalOpen(!isCountryModalOpen);
-                    setIsServiceModalOpen(false);
-                    setCountrySearchQuery('');
+                    setIsCountryModalOpen(true);
                   }
                 }}
                 className={`bg-[#FAF8FE] border border-[#E9E2FA] ${
@@ -1127,92 +1127,15 @@ export const Server2View: React.FC<Server2ViewProps> = ({
                   </div>
                 </div>
                 {activeTab === 'all' && (
-                  <ChevronRight className={`w-4.5 h-4.5 text-[#64748B] group-hover:text-[#171329] transition transform ${isCountryModalOpen ? 'rotate-90 text-[#6D28D9]' : ''}`} />
+                  <ChevronRight className="w-4.5 h-4.5 text-[#64748B] group-hover:text-[#171329] transition" />
                 )}
               </div>
-
-              {/* Compact Country Selection Panel */}
-              {isCountryModalOpen && activeTab === 'all' && (
-                <div className="mt-2 bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl p-2.5 sm:p-3 shadow-xs space-y-2 animate-in fade-in duration-150">
-                  {/* Search Field clearly visible immediately at top */}
-                  <div className="relative">
-                    <Search className="w-4 h-4 text-[#716B82] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Search country..."
-                      value={countrySearchQuery}
-                      onChange={(e) => setCountrySearchQuery(e.target.value)}
-                      autoFocus
-                      className="w-full bg-white border border-[#E9E2FA] focus:border-[#6D28D9] rounded-xl pl-9 pr-8 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 font-bold focus:outline-none transition shadow-2xs"
-                    />
-                    {countrySearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setCountrySearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#716B82] hover:text-[#171329] cursor-pointer p-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Contained, compact scrollable list showing approximately 1-6 countries */}
-                  <div 
-                    className="max-h-[210px] overflow-y-auto overflow-x-hidden space-y-1 pr-1 overscroll-contain"
-                    style={{ WebkitOverflowScrolling: 'touch' }}
-                  >
-                    {countriesLoading ? (
-                      <div className="py-6 text-center text-xs text-[#6D28D9] font-bold flex items-center justify-center space-y-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#6D28D9]" />
-                        <span>Loading countries...</span>
-                      </div>
-                    ) : filteredCountries.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-[#716B82] font-semibold">
-                        {countries.length === 0 ? 'No countries available on this server.' : 'No countries found matching your search.'}
-                      </div>
-                    ) : (
-                      filteredCountries.map((c) => {
-                        const isSelected = selectedCountry === c.id;
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedCountry(c.id);
-                              setSelectedService('');
-                              setIsServiceInStock(false);
-                              setStockMessage('');
-                              setCalculatedPrice(0);
-                              setPriceOptions([]);
-                              setIsCountryModalOpen(false);
-                              setCountrySearchQuery('');
-                            }}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition text-left cursor-pointer select-none ${
-                              isSelected
-                                ? 'bg-[#6D28D9] text-white shadow-xs'
-                                : 'bg-white hover:bg-[#EDE9FE]/50 text-[#171329] border border-[#E9E2FA]'
-                            }`}
-                          >
-                            <div className="flex items-center space-x-2.5 truncate">
-                              <span className="text-base shrink-0">{getCountryFlagEmoji(c.code || c.name)}</span>
-                              <span className="truncate font-bold">{c.name}</span>
-                            </div>
-                            {isSelected && <Check className="w-4 h-4 text-white shrink-0" />}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Field 2: SERVICE */}
             <div
               onClick={() => {
-                if (!servicesLoading && services.length > 0) {
-                  setIsServiceModalOpen(true);
-                }
+                setIsServiceModalOpen(true);
               }}
               className={`bg-[#FAF8FE] border border-[#E9E2FA] ${
                 servicesLoading ? 'opacity-70 cursor-wait' : 'hover:border-[#6D28D9]/40 cursor-pointer'
@@ -1734,67 +1657,40 @@ export const Server2View: React.FC<Server2ViewProps> = ({
 
 
       {/* ========================================================================= */}
+      {/* MODAL: COUNTRY SELECTOR (SEARCHABLE MODAL)                                 */}
+      {/* ========================================================================= */}
+      <CountrySelectModal
+        isOpen={isCountryModalOpen && activeTab === 'all'}
+        onClose={() => setIsCountryModalOpen(false)}
+        countries={countries}
+        selectedCountryId={selectedCountry}
+        onSelectCountry={(countryId) => {
+          setSelectedCountry(countryId);
+          setSelectedService('');
+          setIsServiceInStock(false);
+          setStockMessage('');
+          setCalculatedPrice(0);
+          setPriceOptions([]);
+        }}
+        isLoading={countriesLoading}
+      />
+
+      {/* ========================================================================= */}
       {/* MODAL: SERVICE SELECTOR (SEARCHABLE MODAL)                                 */}
       {/* ========================================================================= */}
-      {isServiceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white border border-[#E9E2FA] rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-[#E9E2FA] flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#171329]">Select Service (Server 2)</h3>
-              <button onClick={() => setIsServiceModalOpen(false)} className="text-[#716B82] hover:text-[#171329] cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-3 border-b border-[#E9E2FA]">
-              <div className="relative">
-                <Search className="w-4 h-4 text-[#716B82] absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Search apps (WhatsApp, Telegram, etc.)..."
-                  value={serviceSearchQuery}
-                  onChange={(e) => setServiceSearchQuery(e.target.value)}
-                  className="w-full bg-[#F8F7FF] border border-[#E9E2FA] rounded-xl pl-9 pr-3 py-2 text-xs text-[#171329] placeholder-[#716B82]/50 focus:outline-none focus:border-[#7C3AED]"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {servicesLoading ? (
-                <div className="p-8 text-center text-[#716B82] text-xs flex flex-col items-center justify-center space-y-2">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#7C3AED]" />
-                  <span>Loading services...</span>
-                </div>
-              ) : filteredServices.length === 0 ? (
-                <div className="p-8 text-center text-[#716B82] text-xs">
-                  {services.length === 0 ? 'No services available for this country.' : 'No services found matching your search.'}
-                </div>
-              ) : (
-                filteredServices.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      setSelectedService(s.id);
-                      setIsServiceModalOpen(false);
-                      setServiceSearchQuery('');
-                    }}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl text-left text-xs transition cursor-pointer ${
-                      selectedService === s.id ? 'bg-[#7C3AED] text-white font-bold' : 'hover:bg-[#F8F7FF] text-[#171329]'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2.5">
-                      <Smartphone className="w-4 h-4 text-[#7C3AED]" />
-                      <span className="font-bold">{s.name}</span>
-                    </div>
-                    {selectedService === s.id && <Check className="w-4 h-4" />}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <ServiceSelectModal
+        isOpen={isServiceModalOpen}
+        onClose={() => setIsServiceModalOpen(false)}
+        services={services.map(s => ({
+          id: s.id,
+          name: s.name
+        }))}
+        selectedServiceId={selectedService}
+        onSelectService={(serviceId) => setSelectedService(serviceId)}
+        isLoading={servicesLoading}
+        hasSelectedCountry={!!selectedCountry}
+        countryName={selectedCountryObj?.name || ''}
+      />
 
       {/* ========================================================================= */}
       {/* MODAL: NUMBER ORDERS HISTORY                                              */}

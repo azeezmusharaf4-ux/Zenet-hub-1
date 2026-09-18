@@ -55,6 +55,7 @@ import { copyToClipboard } from '../utils/clipboard';
 interface SocialBoostViewProps {
   userProfile: UserProfile | null;
   walletBalance: number;
+  onRefreshProfile?: () => Promise<void> | void;
   onBackToMarketplace: () => void;
   onOpenWallet: () => void;
 }
@@ -287,6 +288,7 @@ const getPlatformVisuals = (platformName: string) => {
 export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   userProfile,
   walletBalance,
+  onRefreshProfile,
   onBackToMarketplace,
   onOpenWallet
 }) => {
@@ -668,6 +670,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
       setOrderSuccess(data.order);
       // Auto refresh orders
       fetchOrders();
+      if (onRefreshProfile) {
+        await onRefreshProfile();
+      }
     } catch (err: any) {
       console.error('[SocialBoost Order] Error:', err);
       setOrderError(sanitizeApiErrorMessage(err.message || 'Failed to process boosting order.'));

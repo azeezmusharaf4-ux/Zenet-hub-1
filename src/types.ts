@@ -111,6 +111,7 @@ export interface UserProfile {
   isOwner?: boolean;
   status?: 'active' | 'suspended';
   walletBalance?: number;
+  balance?: number;
   paystackCustomerCode?: string;
   referralCode?: string;
   referredBy?: string;
