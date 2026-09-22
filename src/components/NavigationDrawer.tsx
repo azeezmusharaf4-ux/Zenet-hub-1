@@ -16,6 +16,7 @@ import {
   Download
 } from 'lucide-react';
 import { UserProfile, ActiveAppView } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { promptPWAInstall } from './PWAInstallPrompt';
 
 interface NavigationDrawerProps {
@@ -58,7 +59,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const isOwner = user?.email?.trim().toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.role === 'owner';
+  const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   const menuItems = [

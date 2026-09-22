@@ -14,9 +14,11 @@ import {
   getDoc, 
   writeBatch, 
   limit, 
-  runTransaction 
+  runTransaction,
+  increment 
 } from 'firebase/firestore';
 import { auth, db, sanitizeFirestorePayload, getSafeIdToken } from './lib/firebase';
+import { isAuthorizedOwner, isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from './lib/authorizedOwners';
 import { AccountListing, CategoryType, FilterState, Inquiry, UserProfile, PurchaseRecord, ActiveAppView, WalletTransaction } from './types';
 import { isCategoryMatch } from './utils/category';
 import { safeApiFetch } from './utils/api';
@@ -52,9 +54,9 @@ import { ProfileView } from './components/ProfileView';
 import { EditProfileView } from './components/EditProfileView';
 import { ReferralsView, generateUserReferralCode } from './components/ReferralsView';
 import { ChangePasswordView } from './components/ChangePasswordView';
-import { PWAInstallBanner } from './components/PWAInstallPrompt';
 import { LogoutConfirmModal } from './components/LogoutConfirmModal';
 import { safeLocalStorage } from './utils/storage';
+import { ServiceUnavailableView } from './components/ServiceUnavailableView';
 
 // Code-split heavy views & modals for lighter initial bundle
 const AdminPanelModal = React.lazy(() => import('./components/AdminPanelModal').then(m => ({ default: m.AdminPanelModal })));
@@ -68,9 +70,9 @@ const ZenetUpdateModal = React.lazy(() => import('./components/ZenetUpdateModal'
 const ZenetUpdateAdminModal = React.lazy(() => import('./components/ZenetUpdateAdminModal').then(m => ({ default: m.ZenetUpdateAdminModal })));
 
 const LazyViewFallback: React.FC = () => (
-  <div className="w-full min-h-[360px] flex flex-col items-center justify-center p-8 text-center text-purple-600 animate-in fade-in duration-200">
-    <div className="w-10 h-10 border-3 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-3"></div>
-    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Loading...</span>
+  <div className="w-full min-h-[360px] flex flex-col items-center justify-center p-8 text-center text-[#5B4DF5] animate-in fade-in duration-200">
+    <div className="w-10 h-10 border-3 border-[#EBE7F7] border-t-[#5B4DF5] rounded-full animate-spin mb-3"></div>
+    <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Loading...</span>
   </div>
 );
 import { Phone, UserCheck } from 'lucide-react';
@@ -86,7 +88,8 @@ import {
   ChevronRight,
   TrendingUp,
   Award,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 
 const CATEGORY_ORDER: CategoryType[] = [
@@ -190,24 +193,24 @@ const CATEGORY_META: Record<CategoryType, { icon: string; title: string; subtitl
 };
 
 const ListingSkeleton = React.memo(() => (
-  <div className="w-full bg-[#150c2a]/95 border border-[#2b184d] rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 animate-pulse shadow-lg">
+  <div className="w-full bg-white border border-[#EBE7F7] rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 animate-pulse shadow-xs">
     <div className="space-y-2.5">
       <div className="flex items-start space-x-3">
-        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#231343] shrink-0" />
+        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#F1F0FB] shrink-0" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 bg-[#231343] rounded-md w-3/4" />
-          <div className="h-3 bg-[#1d0e37] rounded-md w-1/2" />
+          <div className="h-4 bg-[#F1F0FB] rounded-md w-3/4" />
+          <div className="h-3 bg-[#F8F7FD] rounded-md w-1/2" />
         </div>
       </div>
-      <div className="h-3 bg-[#1d0e37] rounded-md w-full" />
+      <div className="h-3 bg-[#F8F7FD] rounded-md w-full" />
       <div className="flex space-x-2">
-        <div className="h-5 bg-[#231343] rounded-full w-16" />
-        <div className="h-5 bg-[#231343] rounded-full w-20" />
+        <div className="h-5 bg-[#F1F0FB] rounded-full w-16" />
+        <div className="h-5 bg-[#F1F0FB] rounded-full w-20" />
       </div>
     </div>
-    <div className="pt-3 border-t border-[#231343] flex items-center justify-between">
-      <div className="h-6 bg-[#231343] rounded-md w-20" />
-      <div className="h-8 bg-[#2e1954] rounded-xl w-24" />
+    <div className="pt-3 border-t border-[#EBE7F7] flex items-center justify-between">
+      <div className="h-6 bg-[#F1F0FB] rounded-md w-20" />
+      <div className="h-8 bg-[#F1F0FB] rounded-xl w-24" />
     </div>
   </div>
 ));
@@ -306,6 +309,21 @@ export default function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string>('');
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [paymentSuccessToast, setPaymentSuccessToast] = useState<{
+    amount: number;
+    newBalance?: number;
+    reference: string;
+  } | null>(null);
+  const verifiedPaystackRefs = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (paymentSuccessToast) {
+      const timer = setTimeout(() => {
+        setPaymentSuccessToast(null);
+      }, 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [paymentSuccessToast]);
 
   const executeLogout = async () => {
     safeLocalStorage.removeItem('zenet_last_seen_timestamp');
@@ -345,7 +363,7 @@ export default function App() {
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [unreadTicketsCount, setUnreadTicketsCount] = useState<number>(0);
 
-  const isOwner = user?.email?.trim().toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.role === 'owner';
+  const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   // Listen to unread tickets count in Firestore
@@ -397,7 +415,9 @@ export default function App() {
   // Sync walletBalance with userProfile stably without triggering re-render loops
   useEffect(() => {
     if (userProfile) {
-      const raw = userProfile.walletBalance;
+      const raw = (userProfile as any).walletBalance !== undefined 
+        ? (userProfile as any).walletBalance 
+        : (userProfile as any).balance;
       const balance = typeof raw === 'number' 
         ? raw 
         : (raw ? Number(raw) : 0);
@@ -406,7 +426,7 @@ export default function App() {
     } else if (!user) {
       setWalletBalance((prev) => (prev !== 0 ? 0 : prev));
     }
-  }, [userProfile?.walletBalance, user?.uid]);
+  }, [userProfile?.walletBalance, (userProfile as any)?.balance, user?.uid]);
 
   // Smoothly close Authentication Modal only after both user AND userProfile (including role/wallet) are fully loaded and synchronized
   useEffect(() => {
@@ -421,15 +441,33 @@ export default function App() {
     if (!user?.uid) return;
     try {
       const userRef = doc(db, 'users', user.uid);
-      const uSnap = await getDoc(userRef);
-      if (uSnap.exists()) {
+      const walletRef = doc(db, 'wallets', user.uid);
+      const [uSnap, wSnap] = await Promise.all([
+        getDoc(userRef).catch(() => null),
+        getDoc(walletRef).catch(() => null)
+      ]);
+
+      let confirmedBal: number | null = null;
+
+      if (uSnap && uSnap.exists()) {
         const data = uSnap.data() as UserProfile;
         setAndCacheUserProfile(data);
-        const rawBal = (data as any)?.walletBalance;
+        const rawBal = (data as any)?.walletBalance !== undefined ? (data as any)?.walletBalance : (data as any)?.balance;
         const numBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
-        const safeBal = isNaN(numBal) ? 0 : numBal;
-        setWalletBalance(safeBal);
-        setLatestWalletBalance(safeBal);
+        confirmedBal = isNaN(numBal) ? 0 : numBal;
+      }
+
+      if (wSnap && wSnap.exists()) {
+        const wData = wSnap.data();
+        const rawWBal = wData?.walletBalance !== undefined ? wData?.walletBalance : wData?.balance;
+        const numWBal = typeof rawWBal === 'number' ? rawWBal : (rawWBal ? Number(rawWBal) : 0);
+        const safeWBal = isNaN(numWBal) ? 0 : numWBal;
+        confirmedBal = confirmedBal !== null ? Math.max(confirmedBal, safeWBal) : safeWBal;
+      }
+
+      if (confirmedBal !== null) {
+        setWalletBalance(confirmedBal);
+        setLatestWalletBalance(confirmedBal);
       }
     } catch (err) {
       console.warn('Error refreshing profile and balance:', err);
@@ -439,25 +477,32 @@ export default function App() {
   const handleAddWalletFunds = async (amount: number, gateway: string, reference?: string) => {
     if (!user) return;
     const numAmount = typeof amount === 'number' ? amount : Number(amount) || 0;
-    if (numAmount > 0) {
-      setWalletBalance((prev) => prev + numAmount);
-      setLatestWalletBalance((prev) => prev + numAmount);
-      setUserProfile((prev) => prev ? { ...prev, walletBalance: (prev.walletBalance || 0) + numAmount } : prev);
-    }
 
-    // Verification is executed by server Paystack verify/webhook endpoints.
+    // Verification and crediting are authoritatively executed by server Paystack verify endpoint (single source of truth)
     if (reference) {
       try {
-        const verifyRes = await safeApiFetch(`/api/paystack/verify/${encodeURIComponent(reference)}?userId=${encodeURIComponent(user.uid)}&isWalletFunding=true`);
-        if (verifyRes.verified && verifyRes.status === 'success') {
+        const verifyRes = await safeApiFetch(`/api/paystack/verify/${encodeURIComponent(reference)}?reference=${encodeURIComponent(reference)}&userId=${encodeURIComponent(user.uid)}&isWalletFunding=true`);
+        if (verifyRes && (verifyRes.verified || verifyRes.status === 'success' || verifyRes.alreadyProcessed)) {
           console.log('[Wallet Funding] Verified and balance synced from server.');
+          const credited = verifyRes.amount || numAmount;
+          if (typeof verifyRes.newBalance === 'number') {
+            setWalletBalance(verifyRes.newBalance);
+            setLatestWalletBalance(verifyRes.newBalance);
+          }
+          if (credited > 0) {
+            setPaymentSuccessToast({
+              amount: credited,
+              newBalance: verifyRes.newBalance,
+              reference
+            });
+          }
         }
       } catch (vErr) {
         console.warn('[Wallet Funding] Server verify notice:', vErr);
       }
     }
 
-    // Ensure database-level balance sync
+    // Authoritative Firestore refresh - single source of truth, no duplicate client writes
     await refreshUserProfileAndBalance();
   };
 
@@ -666,6 +711,7 @@ export default function App() {
   }, [navigateRoute]);
 
   const listingsRef = useRef(listings);
+  const isPurchasingRef = useRef(false);
   useEffect(() => {
     listingsRef.current = listings;
   }, [listings]);
@@ -805,7 +851,7 @@ export default function App() {
             email: currentUser.email || '',
             username: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
             displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
-            role: currentUser.email === 'azeezmusharaf4@gmail.com' ? 'owner' : 'buyer',
+            role: (isAuthorizedOwnerEmail(currentUser.email) || isAuthorizedOwnerUid(currentUser.uid)) ? 'owner' : 'buyer',
             status: 'active',
             createdAt: new Date().toISOString(),
             walletBalance: 0
@@ -815,47 +861,107 @@ export default function App() {
 
         // Sync user profile to Firestore & fetch role asynchronously in background
         const userRef = doc(db, 'users', currentUser.uid);
+        let verifiedDepositBal: number | undefined;
 
         // Check for return from Paystack checkout redirect
         try {
           const urlParams = new URLSearchParams(window.location.search);
-          const paystackRef = urlParams.get('reference') || urlParams.get('trxref') || (urlParams.get('paystack_verify') && urlParams.get('paystack_verify') !== 'true' ? urlParams.get('paystack_verify') : null);
-          if (paystackRef) {
-            const cleanUrl = window.location.origin + window.location.pathname;
-            window.history.replaceState({}, document.title, cleanUrl);
+          const paystackRef = urlParams.get('reference') || 
+            urlParams.get('trxref') || 
+            (urlParams.get('paystack_verify') && urlParams.get('paystack_verify') !== 'true' ? urlParams.get('paystack_verify') : null) ||
+            (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('zenith_pending_paystack_ref') : null) ||
+            (typeof localStorage !== 'undefined' ? localStorage.getItem('zenith_pending_paystack_ref') : null);
 
-            safeApiFetch(`/api/paystack/verify/${encodeURIComponent(paystackRef)}?userId=${encodeURIComponent(currentUser.uid)}`)
-              .then((verifyData) => {
-                if (verifyData && verifyData.verified) {
-                  console.log('[Paystack Auto-Verify] Payment verified successfully:', verifyData);
-                  getDoc(userRef).then((uSnap) => {
-                    if (uSnap.exists()) {
-                      const updatedProfile = uSnap.data() as UserProfile;
-                      setAndCacheUserProfile(updatedProfile);
+          if (paystackRef && !verifiedPaystackRefs.current.has(paystackRef)) {
+            verifiedPaystackRefs.current.add(paystackRef);
+            try {
+              sessionStorage.removeItem('zenith_pending_paystack_ref');
+              localStorage.removeItem('zenith_pending_paystack_ref');
+            } catch {}
 
-                      // Check for pending Buy Now order to resume after wallet funding verification
-                      const pendingListingId = safeLocalStorage.getItem('pending_buynow_listing_id');
-                      if (pendingListingId) {
-                        safeLocalStorage.removeItem('pending_buynow_listing_id');
+            try {
+              const verifyData = await safeApiFetch(`/api/paystack/verify/${encodeURIComponent(paystackRef)}?reference=${encodeURIComponent(paystackRef)}&userId=${encodeURIComponent(currentUser.uid)}`);
+              if (verifyData && (verifyData.verified || verifyData.status === 'success' || verifyData.alreadyProcessed)) {
+                console.log('[Paystack Auto-Verify] Payment verified successfully:', verifyData);
 
-                        getDoc(doc(db, 'listings', pendingListingId)).then((listingDocSnap) => {
-                          if (listingDocSnap.exists()) {
-                            const listingObj = { id: listingDocSnap.id, ...listingDocSnap.data() } as AccountListing;
-                            const liveBal = typeof updatedProfile.walletBalance === 'number'
-                              ? updatedProfile.walletBalance
-                              : Number(updatedProfile.walletBalance || 0);
+                // 1. If this was a LOG order fulfilled directly by the server
+                if (verifyData.delivered && verifyData.purchaseRecord) {
+                  const purchaseRec = verifyData.purchaseRecord as PurchaseRecord;
+                  setCompletedOrder(purchaseRec);
+                  setPurchases((prev) => [purchaseRec, ...prev.filter((p) => p.id !== purchaseRec.id)]);
+                  
+                  const cleanUrl = window.location.origin + window.location.pathname;
+                  window.history.replaceState({}, document.title, cleanUrl);
 
-                            if (liveBal >= listingObj.price) {
-                              handleBuyNow(listingObj);
-                            }
-                          }
-                        }).catch((lErr) => console.warn('Pending listing fetch error:', lErr));
-                      }
-                    }
+                  try {
+                    sessionStorage.removeItem('pending_buynow_listing_id');
+                    localStorage.removeItem('pending_buynow_listing_id');
+                    sessionStorage.removeItem('zenith_pending_listing_id');
+                    localStorage.removeItem('zenith_pending_listing_id');
+                  } catch {}
+
+                  await refreshUserProfileAndBalance();
+                  return;
+                }
+
+                const creditedAmount = Number(verifyData.amount || 0);
+                const newBal = typeof verifyData.newBalance === 'number' ? verifyData.newBalance : undefined;
+
+                if (typeof newBal === 'number') {
+                  verifiedDepositBal = newBal;
+                  setWalletBalance(newBal);
+                  setLatestWalletBalance(newBal);
+                }
+
+                if (creditedAmount > 0) {
+                  setPaymentSuccessToast({
+                    amount: creditedAmount,
+                    newBalance: newBal,
+                    reference: paystackRef
                   });
                 }
-              })
-              .catch((pvErr) => console.warn('Paystack auto-verify notice:', pvErr));
+
+                const cleanUrl = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+
+                await refreshUserProfileAndBalance();
+
+                // Check for pending Buy Now order to resume after wallet funding verification
+                const pendingListingId = safeLocalStorage.getItem('pending_buynow_listing_id') ||
+                  (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pending_buynow_listing_id') : null) ||
+                  safeLocalStorage.getItem('zenith_pending_listing_id') ||
+                  (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('zenith_pending_listing_id') : null);
+
+                if (pendingListingId) {
+                  safeLocalStorage.removeItem('pending_buynow_listing_id');
+                  safeLocalStorage.removeItem('zenith_pending_listing_id');
+                  try {
+                    sessionStorage.removeItem('pending_buynow_listing_id');
+                    sessionStorage.removeItem('zenith_pending_listing_id');
+                  } catch {}
+
+                  getDoc(doc(db, 'listings', pendingListingId)).then((listingDocSnap) => {
+                    if (listingDocSnap.exists()) {
+                      const listingObj = { id: listingDocSnap.id, ...listingDocSnap.data() } as AccountListing;
+                      getDoc(userRef).then((uSnap) => {
+                        if (uSnap.exists()) {
+                          const updatedProfile = uSnap.data() as UserProfile;
+                          const liveBal = typeof updatedProfile.walletBalance === 'number'
+                            ? updatedProfile.walletBalance
+                            : Number(updatedProfile.walletBalance || updatedProfile.balance || 0);
+
+                          if (liveBal >= listingObj.price) {
+                            handleBuyNow(listingObj);
+                          }
+                        }
+                      });
+                    }
+                  }).catch((lErr) => console.warn('Pending listing fetch error:', lErr));
+                }
+              }
+            } catch (pvErr) {
+              console.warn('Paystack auto-verify notice:', pvErr);
+            }
           }
         } catch (urlErr) {
           console.warn('Error checking Paystack return URL:', urlErr);
@@ -876,7 +982,7 @@ export default function App() {
           }
 
           // Bootstrap owner account
-          if (currentUser.email === 'azeezmusharaf4@gmail.com') {
+          if (isAuthorizedOwnerEmail(currentUser.email) || isAuthorizedOwnerUid(currentUser.uid)) {
             assignedRole = 'owner';
           }
 
@@ -931,7 +1037,10 @@ export default function App() {
             ? (existingData as any)?.walletBalance 
             : (existingData as any)?.balance;
           const numExistingBal = typeof rawExistingBal === 'number' ? rawExistingBal : (rawExistingBal ? Number(rawExistingBal) : 0);
-          const safeExistingBal = isNaN(numExistingBal) ? 0 : numExistingBal;
+          const safeExistingBal = Math.max(
+            isNaN(numExistingBal) ? 0 : numExistingBal,
+            typeof verifiedDepositBal === 'number' ? verifiedDepositBal : 0
+          );
 
           const profileData: UserProfile = {
             uid: currentUser.uid,
@@ -1157,6 +1266,7 @@ export default function App() {
     transferCode: string;
     buyerEmail: string;
     buyerName: string;
+    purchaseRecord?: any;
   }) => {
     if (!user) return;
 
@@ -1181,7 +1291,23 @@ export default function App() {
         });
 
         if (!purchaseRes || purchaseRes.success === false) {
-          throw new Error(purchaseRes?.error || 'Failed to complete wallet purchase');
+          const errMsg = purchaseRes?.error || 'Failed to complete wallet purchase';
+          if (errMsg.toLowerCase().includes('sold')) {
+            setListings((prev) =>
+              prev.map((l) =>
+                l.id === listing.id
+                  ? { ...l, status: 'sold', stock: 0, stockCount: 0 }
+                  : l
+              )
+            );
+            if (selectedListing?.id === listing.id) {
+              setSelectedListing(null);
+            }
+            alert('This listing is already sold out. Please explore our other available accounts.');
+            return;
+          }
+          alert(errMsg);
+          return;
         }
 
         // Immediately sync deducted wallet balance across whole app
@@ -1197,7 +1323,7 @@ export default function App() {
           id: purchaseRes.txId,
           listingId: listing.id,
           listingTitle: listing.title,
-          category: listing.category,
+          category: listing.category || 'Log Account',
           price: listing.price,
           paidAmount: listing.price,
           currency: 'NGN',
@@ -1213,17 +1339,47 @@ export default function App() {
           status: 'escrow_holding',
           transferCode: transferCode,
           imageUrl: listing.imageUrl,
-          digitalProductDetails: listing.digitalProductDetails
+          digitalProductDetails: listing.digitalProductDetails,
+          type: 'log_account',
+          transactionCategory: 'log'
         };
 
-        setCompletedOrder(null);
+        setPurchases((prev) => [completedRecord, ...prev.filter((p) => p.id !== completedRecord.id)]);
+        setSelectedListing(null);
         setBuyingListing(null);
-        handleSelectView('orders');
+        setCompletedOrder(completedRecord);
         return;
       } catch (err: any) {
-        console.error('Secure wallet purchase error:', err);
-        throw err;
+        const msg = err?.message || 'Wallet purchase failed';
+        if (msg.toLowerCase().includes('sold')) {
+          setListings((prev) =>
+            prev.map((l) =>
+              l.id === listing.id
+                ? { ...l, status: 'sold', stock: 0, stockCount: 0 }
+                : l
+            )
+          );
+          if (selectedListing?.id === listing.id) {
+            setSelectedListing(null);
+          }
+          alert('This listing is already sold out. Please explore our other available accounts.');
+          return;
+        }
+        console.warn('Wallet purchase notice:', msg);
+        alert(msg);
+        return;
       }
+    }
+
+    // If the server has already fulfilled and returned the purchase record
+    if ((orderInfo as any).purchaseRecord) {
+      const pRecord = (orderInfo as any).purchaseRecord as PurchaseRecord;
+      setBuyingListing(null);
+      setCompletedOrder(pRecord);
+      setPurchases((prev) => [pRecord, ...prev.filter((p) => p.id !== pRecord.id)]);
+      handleSelectView('orders');
+      await refreshUserProfileAndBalance();
+      return;
     }
 
     // BRANCH 2: DIRECT PAYSTACK CHECKOUT
@@ -1283,15 +1439,26 @@ export default function App() {
             secureData = targetItemDocSnap.data();
           }
 
+          const rawSec = {
+            ...(targetItemDocSnap.data() || {}),
+            ...(liveSecureSnap.exists() ? liveSecureSnap.data() : {})
+          };
+          delete rawSec.status;
+          delete rawSec.soldTo;
+          delete rawSec.soldToEmail;
+          delete rawSec.soldAt;
+          delete rawSec.orderId;
+
           secureDetails = {
+            ...rawSec,
             inventoryId: targetItemId,
-            accountEmail: secureData.accountEmail || '',
-            accountPassword: secureData.accountPassword || '',
-            recoveryInfo: secureData.recoveryInfo || secureData.notes || '',
-            backupCodes: secureData.backupCodes || secureData.twoFactorBackupCodes || secureData.twoFactorSecretKey || '',
-            twoFactorSecretKey: secureData.twoFactorSecretKey || '',
-            twoFactorBackupCodes: secureData.twoFactorBackupCodes || secureData.backupCodes || '',
-            additionalInstructions: secureData.additionalInstructions || ''
+            accountEmail: rawSec.accountEmail || rawSec.email || '',
+            accountPassword: rawSec.accountPassword || rawSec.password || '',
+            recoveryInfo: rawSec.recoveryInfo || rawSec.notes || '',
+            backupCodes: rawSec.backupCodes || rawSec.twoFactorBackupCodes || rawSec.twoFactorSecretKey || '',
+            twoFactorSecretKey: rawSec.twoFactorSecretKey || rawSec.twoFactorSecret || rawSec.twoFactor || rawSec['2fa'] || '',
+            twoFactorBackupCodes: rawSec.twoFactorBackupCodes || rawSec.backupCodes || '',
+            additionalInstructions: rawSec.additionalInstructions || rawSec.instructions || ''
           };
 
           // Mark inventory item as Sold in transaction
@@ -1340,15 +1507,23 @@ export default function App() {
           }
 
           const targetAcc = liveListingData.inventory[availableIdx];
+          const rawTarget = { ...(targetAcc || {}) };
+          delete rawTarget.status;
+          delete rawTarget.soldTo;
+          delete rawTarget.soldToEmail;
+          delete rawTarget.soldAt;
+          delete rawTarget.orderId;
+
           secureDetails = {
+            ...rawTarget,
             inventoryId: targetAcc.id || `inv_${availableIdx + 1}`,
-            accountEmail: targetAcc.accountEmail || '',
-            accountPassword: targetAcc.accountPassword || '',
-            recoveryInfo: targetAcc.recoveryInfo || targetAcc.notes || '',
-            backupCodes: targetAcc.backupCodes || targetAcc.twoFactorBackupCodes || targetAcc.twoFactorSecretKey || '',
-            twoFactorSecretKey: targetAcc.twoFactorSecretKey || '',
-            twoFactorBackupCodes: targetAcc.twoFactorBackupCodes || targetAcc.backupCodes || '',
-            additionalInstructions: targetAcc.additionalInstructions || ''
+            accountEmail: rawTarget.accountEmail || rawTarget.email || '',
+            accountPassword: rawTarget.accountPassword || rawTarget.password || '',
+            recoveryInfo: rawTarget.recoveryInfo || rawTarget.notes || '',
+            backupCodes: rawTarget.backupCodes || rawTarget.twoFactorBackupCodes || rawTarget.twoFactorSecretKey || '',
+            twoFactorSecretKey: rawTarget.twoFactorSecretKey || rawTarget.twoFactorSecret || rawTarget.twoFactor || rawTarget['2fa'] || '',
+            twoFactorBackupCodes: rawTarget.twoFactorBackupCodes || rawTarget.backupCodes || '',
+            additionalInstructions: rawTarget.additionalInstructions || rawTarget.instructions || ''
           };
 
           const updatedInventory = [...liveListingData.inventory];
@@ -1373,15 +1548,16 @@ export default function App() {
 
         } else {
           // Fallback to legacy single-stock digitalProductDetails
-          if (listing.digitalProductDetails?.accountEmail) {
+          if (listing.digitalProductDetails?.accountEmail || listing.digitalProductDetails) {
             secureDetails = {
-              accountEmail: listing.digitalProductDetails.accountEmail || '',
-              accountPassword: listing.digitalProductDetails.accountPassword || '',
-              recoveryInfo: listing.digitalProductDetails.recoveryInfo || '',
+              ...listing.digitalProductDetails,
+              accountEmail: listing.digitalProductDetails.accountEmail || listing.digitalProductDetails.email || '',
+              accountPassword: listing.digitalProductDetails.accountPassword || listing.digitalProductDetails.password || '',
+              recoveryInfo: listing.digitalProductDetails.recoveryInfo || listing.digitalProductDetails.notes || '',
               backupCodes: listing.digitalProductDetails.backupCodes || listing.digitalProductDetails.twoFactorBackupCodes || '',
-              twoFactorSecretKey: listing.digitalProductDetails.twoFactorSecretKey || '',
+              twoFactorSecretKey: listing.digitalProductDetails.twoFactorSecretKey || listing.digitalProductDetails.twoFactorSecret || listing.digitalProductDetails['2fa'] || '',
               twoFactorBackupCodes: listing.digitalProductDetails.twoFactorBackupCodes || listing.digitalProductDetails.backupCodes || '',
-              additionalInstructions: listing.digitalProductDetails.additionalInstructions || ''
+              additionalInstructions: listing.digitalProductDetails.additionalInstructions || listing.digitalProductDetails.instructions || ''
             };
           }
           transaction.update(listingRef, {
@@ -1522,9 +1698,10 @@ export default function App() {
       console.error('Error processing referral bonus reward:', refErr);
     }
 
-    // Close checkout and open Orders & History cleanly
+    // Close checkout and show completed order modal with credentials
     setBuyingListing(null);
-    setCompletedOrder(null);
+    setCompletedOrder(purchaseRecord);
+    setPurchases((prev) => [purchaseRecord, ...prev.filter((p) => p.id !== purchaseRecord.id)]);
     handleSelectView('orders');
   };
 
@@ -1535,6 +1712,59 @@ export default function App() {
       return;
     }
 
+    // Prevent concurrent double-purchases
+    if (isPurchasingRef.current) {
+      return;
+    }
+
+    // Pre-flight check: Is listing already marked sold or out of stock?
+    const inventoryAvailable = Array.isArray(listing.inventory)
+      ? listing.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
+      : undefined;
+    const docStock = listing.stockCount !== undefined ? listing.stockCount : (listing.stock !== undefined ? listing.stock : 1);
+    const effectiveStock = inventoryAvailable !== undefined ? inventoryAvailable : docStock;
+
+    const isOwnerOrSeller = user.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' || 
+      userProfile?.role === 'owner' || 
+      userProfile?.role === 'admin' || 
+      listing.sellerId === user.uid;
+
+    if (listing.status === 'sold' || effectiveStock <= 0) {
+      if (isOwnerOrSeller) {
+        // Auto-replenish stock for the owner/seller so testing and purchasing own accounts always works
+        try {
+          const listingRef = doc(db, 'listings', listing.id);
+          const snap = await getDoc(listingRef);
+          const liveData = snap.exists() ? snap.data() : null;
+          let updatedInv = liveData?.inventory;
+          if (Array.isArray(updatedInv) && updatedInv.length > 0) {
+            updatedInv = updatedInv.map((item: any, idx: number) => idx === 0 ? { ...item, status: 'Available' } : item);
+          }
+          await setDoc(listingRef, {
+            status: 'active',
+            stock: 1,
+            stockCount: 1,
+            ...(updatedInv ? { inventory: updatedInv } : {})
+          }, { merge: true });
+
+          listing = {
+            ...listing,
+            status: 'active',
+            stock: 1,
+            stockCount: 1,
+            ...(updatedInv ? { inventory: updatedInv } : {})
+          };
+          setListings((prev) => prev.map((l) => l.id === listing.id ? listing : l));
+        } catch (replenishErr) {
+          console.warn('Notice during auto-replenish:', replenishErr);
+        }
+      } else {
+        alert('This listing is currently sold out. Please explore our other available accounts.');
+        return;
+      }
+    }
+
+    isPurchasingRef.current = true;
     try {
       // 1. First check the user's walletBalance in Firebase
       const userRef = doc(db, 'users', user.uid);
@@ -1568,8 +1798,20 @@ export default function App() {
         setLatestWalletBalance(currentBalance);
         setInsufficientBalanceListing(listing);
       }
-    } catch (err) {
-      console.error('Error in streamlined buy now flow:', err);
+    } catch (err: any) {
+      const errMsg = err?.message || '';
+      if (errMsg.toLowerCase().includes('sold')) {
+        setListings((prev) =>
+          prev.map((l) =>
+            l.id === listing.id ? { ...l, status: 'sold', stock: 0, stockCount: 0 } : l
+          )
+        );
+        alert('This listing is already sold out. Please explore our other available accounts.');
+      } else {
+        console.warn('Streamlined buy now notice:', errMsg);
+      }
+    } finally {
+      isPurchasingRef.current = false;
     }
   };
 
@@ -1698,7 +1940,50 @@ export default function App() {
   // Handler: Update listing status
   const handleUpdateStatus = async (id: string, newStatus: 'active' | 'sold') => {
     const listingRef = doc(db, 'listings', id);
-    await setDoc(listingRef, { status: newStatus }, { merge: true });
+    if (newStatus === 'active') {
+      try {
+        const snap = await getDoc(listingRef);
+        const data = snap.exists() ? snap.data() : null;
+        const currentStock = data?.stockCount !== undefined ? data.stockCount : (data?.stock !== undefined ? data.stock : 0);
+        const newStock = Math.max(1, currentStock);
+
+        let updatedInv = data?.inventory;
+        if (Array.isArray(updatedInv) && updatedInv.length > 0) {
+          const hasAvail = updatedInv.some((acc: any) => (acc.status || '').toLowerCase() === 'available');
+          if (!hasAvail) {
+            updatedInv = updatedInv.map((item: any, idx: number) => 
+              idx === 0 ? { ...item, status: 'Available' } : item
+            );
+          }
+        }
+
+        await setDoc(listingRef, { 
+          status: 'active',
+          stock: newStock,
+          stockCount: newStock,
+          ...(updatedInv ? { inventory: updatedInv } : {})
+        }, { merge: true });
+
+        setListings((prev) => prev.map((item) => item.id === id ? {
+          ...item,
+          status: 'active',
+          stock: newStock,
+          stockCount: newStock,
+          ...(updatedInv ? { inventory: updatedInv } : {})
+        } : item));
+      } catch (err) {
+        console.warn('Error refreshing listing on active toggle:', err);
+        await setDoc(listingRef, { status: 'active', stock: 1, stockCount: 1 }, { merge: true });
+      }
+    } else {
+      await setDoc(listingRef, { status: 'sold', stock: 0, stockCount: 0 }, { merge: true });
+      setListings((prev) => prev.map((item) => item.id === id ? {
+        ...item,
+        status: 'sold',
+        stock: 0,
+        stockCount: 0
+      } : item));
+    }
   };
 
   // Delete listing state & handlers
@@ -1860,7 +2145,12 @@ export default function App() {
 
     return listings.filter((item) => {
       // 0. Exclude purchased/sold products from public marketplace
-      if (item.status === 'sold') return false;
+      const invAvail = Array.isArray(item.inventory)
+        ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
+        : undefined;
+      const stockVal = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
+      const effStock = invAvail !== undefined ? invAvail : stockVal;
+      if (item.status === 'sold' || effStock <= 0) return false;
 
       // 1. Category Filter (ALWAYS applied when filters.category !== 'All')
       if (filters.category !== 'All' && !isCategoryMatch(item.category, filters.category)) {
@@ -1911,14 +2201,32 @@ export default function App() {
 
   // Featured listings subset
   const featuredListings = useMemo(() => {
-    return listings.filter((item) => item.status !== 'sold' && (item.featured || item.sellerRating >= 4.9));
+    return listings.filter((item) => {
+      if (item.status === 'sold') return false;
+      const invAvail = Array.isArray(item.inventory)
+        ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
+        : undefined;
+      const stockVal = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
+      const effStock = invAvail !== undefined ? invAvail : stockVal;
+      return effStock > 0 && (item.featured || (item.sellerRating && item.sellerRating >= 4.9));
+    });
   }, [listings]);
 
   // Computed list subsets
   const myListings = useMemo(() => {
     if (!user) return [];
+    if (isOwner) {
+      // Verified Owner can view and manage all original owner listings (LAn8Lec9ccT6rGEiDdylF8FfPZZ2)
+      // plus any listings belonging to their own UID or any marketplace listings.
+      return listings.filter((item) => 
+        isOwner ||
+        item.sellerId === user.uid || 
+        item.sellerId === 'LAn8Lec9ccT6rGEiDdylF8FfPZZ2' ||
+        isAuthorizedOwnerUid(item.sellerId)
+      );
+    }
     return listings.filter((item) => item.sellerId === user.uid);
-  }, [listings, user]);
+  }, [listings, user, isOwner]);
 
   const savedListings = useMemo(() => {
     return listings.filter((item) => savedListingIds.includes(item.id));
@@ -1979,6 +2287,41 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F8F7FF] text-[#171329] font-sans antialiased flex flex-row selection:bg-[#7C3AED] selection:text-white w-full max-w-full overflow-x-hidden">
       
+      {/* Real-time Payment Success Notification Toast */}
+      {paymentSuccessToast && (
+        <div
+          id="zenith-payment-success-toast"
+          className="fixed top-5 right-4 sm:right-8 z-50 max-w-md w-[calc(100%-2rem)] bg-white border-2 border-emerald-500 rounded-2xl p-4 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] font-black uppercase tracking-wider text-emerald-700">
+                Payment Verified & Credited
+              </div>
+              <div className="text-sm font-bold text-slate-900 mt-0.5">
+                ₦{paymentSuccessToast.amount.toLocaleString()} NGN added to your wallet!
+              </div>
+              {typeof paymentSuccessToast.newBalance === 'number' && (
+                <div className="text-xs font-semibold text-slate-600 mt-1">
+                  New Wallet Balance: <span className="font-bold text-[#5B4DF5]">₦{paymentSuccessToast.newBalance.toLocaleString()} NGN</span>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPaymentSuccessToast(null)}
+              className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Desktop Sidebar Navigation */}
       <Sidebar
         user={user}
@@ -2077,14 +2420,11 @@ export default function App() {
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-12 overflow-x-hidden">
           <React.Suspense fallback={<LazyViewFallback />}>
 
-          {/* VIEW: VIRTUAL NUMBERS MARKETPLACE */}
-          {activeView === 'virtual-numbers' && (
-            <VirtualNumbersView
-              userProfile={userProfile || ({ uid: user?.uid || '', email: user?.email || '', username: user?.displayName || 'User', role: 'customer', walletBalance } as any)}
-              walletBalance={walletBalance}
-              onRefreshProfile={refreshUserProfileAndBalance}
+          {/* VIEW: SERVICE NUMBER (UNAVAILABLE) */}
+          {(activeView === 'virtual-numbers' || activeView === 'virtual-numbers-2') && (
+            <ServiceUnavailableView
+              serviceType="service-number"
               onBackToMarketplace={handleBackToMarketplace}
-              onOpenWallet={() => handleSelectView('wallet')}
             />
           )}
 
@@ -2143,53 +2483,19 @@ export default function App() {
               userProfile={userProfile}
               onBackToMarketplace={handleBackToMarketplace}
               onOpenAuth={(mode) => setAuthMode(mode)}
+              onBalanceUpdated={(newBal) => {
+                setWalletBalance(newBal);
+                setLatestWalletBalance(newBal);
+                setUserProfile((prev) => prev ? { ...prev, walletBalance: newBal, balance: newBal } : prev);
+              }}
             />
           )}
 
-          {/* VIEW: SOCIAL BOOST GROW HTH */}
-          {activeView === 'social-boost' && (
-            <SocialBoostView
-              userProfile={userProfile}
-              walletBalance={walletBalance}
-              onRefreshProfile={refreshUserProfileAndBalance}
+          {/* VIEW: SOCIAL BOOST (UNAVAILABLE) */}
+          {(activeView === 'social-boost' || activeView === 'social-boost-2' || activeView === 'server-tool') && (
+            <ServiceUnavailableView
+              serviceType="social-boost"
               onBackToMarketplace={handleBackToMarketplace}
-              onOpenWallet={() => handleSelectView('wallet')}
-            />
-          )}
-
-          {/* VIEW: SERVICE NUMBER 2 / VIRTUAL NUMBER 2 (NEW PROVIDER 2) */}
-          {activeView === 'virtual-numbers-2' && (
-            <VirtualNumbers2View
-              userProfile={userProfile}
-              walletBalance={walletBalance}
-              onRefreshProfile={refreshUserProfileAndBalance}
-              onBackToMarketplace={handleBackToMarketplace}
-              onOpenWallet={() => handleSelectView('wallet')}
-            />
-          )}
-
-          {/* VIEW: SOCIAL BOOST 2 (NEW PROVIDER 2) */}
-          {activeView === 'social-boost-2' && (
-            <SocialBoost2View
-              userProfile={userProfile}
-              walletBalance={walletBalance}
-              onRefreshProfile={refreshUserProfileAndBalance}
-              onBackToMarketplace={handleBackToMarketplace}
-              onOpenWallet={() => handleSelectView('wallet')}
-              onSwitchToServer1={() => handleSelectView('social-boost')}
-            />
-          )}
-
-          {/* VIEW: SERVER TOOL (EXTRA LOG TOOLS UNIFIED VIRTUAL NUMBERS & SOCIAL BOOST) */}
-          {activeView === 'server-tool' && (
-            <Server2View
-              userProfile={userProfile}
-              walletBalance={walletBalance}
-              initialPage="front"
-              onRefreshProfile={refreshUserProfileAndBalance}
-              onBackToMarketplace={handleBackToMarketplace}
-              onOpenWallet={() => handleSelectView('wallet')}
-              onSwitchToServer1={() => handleSelectView('social-boost')}
             />
           )}
 
@@ -2315,6 +2621,7 @@ export default function App() {
         walletBalance={walletBalance}
         onAddFunds={handleAddWalletFunds}
         transactions={walletTransactions}
+        initialTab={activeView === 'deposit-history' ? 'history' : 'fund'}
       />
 
       {/* Purchase Details Modal */}
@@ -2436,6 +2743,7 @@ export default function App() {
           }}
           onUpdateListingStatus={handleUpdateStatus}
           onDeleteListing={async (id: string) => { handleRequestDeleteListing(id); }}
+          onBuyNow={handleBuyNow}
           onUpdateProfile={async (updated) => {
             if (userProfile) {
               setUserProfile({ ...userProfile, ...updated });
@@ -2519,9 +2827,15 @@ export default function App() {
           onClose={() => setInsufficientBalanceListing(null)}
           listing={insufficientBalanceListing}
           currentBalance={latestWalletBalance}
+          onPayDirectWithPaystack={() => {
+            const targetListing = insufficientBalanceListing;
+            setInsufficientBalanceListing(null);
+            setBuyingListing(targetListing);
+          }}
           onOpenFundWallet={() => {
             try {
               sessionStorage.setItem('pending_buynow_listing_id', insufficientBalanceListing.id);
+              localStorage.setItem('pending_buynow_listing_id', insufficientBalanceListing.id);
             } catch (e) {
               console.warn('Storage notice:', e);
             }
@@ -2547,24 +2861,24 @@ export default function App() {
       {/* 10. Product Deletion Confirmation Popup Modal */}
       {deletingListingId && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
           onClick={() => {
             if (!isDeleting) setDeletingListingId(null);
           }}
         >
           <div 
-            className="bg-white border border-purple-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white border border-[#EBE7F7] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-16 h-16 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto border border-purple-200 shadow-inner">
+            <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-100 shadow-xs">
               <Trash2 className="w-8 h-8" />
             </div>
             
             <div className="space-y-2">
-              <h3 className="text-xl font-extrabold text-slate-900">
+              <h3 className="text-xl font-extrabold text-[#0F172A]">
                 Are you sure you want to delete this product?
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
                 This action is permanent. The product will be deleted from Firebase Firestore and removed immediately from the marketplace.
               </p>
             </div>
@@ -2574,7 +2888,7 @@ export default function App() {
                 type="button"
                 onClick={() => setDeletingListingId(null)}
                 disabled={isDeleting}
-                className="flex-1 px-5 py-3 rounded-2xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-slate-900 font-bold text-xs sm:text-sm transition cursor-pointer"
+                className="flex-1 px-5 py-3 rounded-2xl border border-[#EBE7F7] bg-[#F8F7FD] hover:bg-[#F1F0FB] text-[#0F172A] font-bold text-xs sm:text-sm transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -2582,7 +2896,7 @@ export default function App() {
                 type="button"
                 onClick={handleConfirmDeleteListing}
                 disabled={isDeleting}
-                className="flex-1 px-5 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-purple-600/20 transition cursor-pointer flex items-center justify-center space-x-2"
+                className="flex-1 px-5 py-3 rounded-2xl bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-extrabold text-xs sm:text-sm shadow-md shadow-[#5B4DF5]/20 transition cursor-pointer flex items-center justify-center space-x-2"
               >
                 {isDeleting ? (
                   <>
@@ -2638,10 +2952,7 @@ export default function App() {
         />
       </React.Suspense>
 
-      {/* 13. Progressive Web App (PWA) Install Prompt Banner */}
-      <PWAInstallBanner />
-
-      {/* 14. Mobile Bottom Navigation Bar (Home, Wallet, Profile) */}
+      {/* 13. Mobile Bottom Navigation Bar (Home, Wallet, Profile) */}
       <MobileBottomNav
         activeView={activeView}
         onSelectView={handleSelectView}

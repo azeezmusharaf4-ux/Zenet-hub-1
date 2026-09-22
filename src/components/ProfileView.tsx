@@ -18,6 +18,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { ActiveAppView, UserProfile } from '../types';
 import { DashboardTab } from './UserDashboardModal';
 
@@ -59,7 +60,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const isOwner = user?.email?.trim().toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.role === 'owner';
+  const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   // Display Name

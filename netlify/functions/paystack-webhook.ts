@@ -136,33 +136,53 @@ export const handler = async (event: any) => {
 
           if (targetUserId) {
             const userRef = doc(db, 'users', targetUserId);
+            const walletRef = doc(db, 'wallets', targetUserId);
             let finalNewBalance = amountNGN;
 
             await runTransaction(db, async (transaction) => {
               const uSnap = await transaction.get(userRef);
-              const curBal = uSnap.exists() ? Number(uSnap.data().walletBalance || 0) : 0;
+              const uData = uSnap.exists() ? uSnap.data() : {};
+              const rawBal = uData.walletBalance !== undefined ? uData.walletBalance : uData.balance;
+              const curBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
               finalNewBalance = curBal + amountNGN;
 
               if (uSnap.exists()) {
                 transaction.update(userRef, {
                   walletBalance: finalNewBalance,
+                  balance: finalNewBalance,
+                  lastFundedAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString()
                 });
               } else {
                 transaction.set(userRef, {
                   id: targetUserId,
+                  uid: targetUserId,
                   email: customerEmail || '',
                   walletBalance: finalNewBalance,
+                  balance: finalNewBalance,
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString()
                 }, { merge: true });
               }
 
+              transaction.set(walletRef, {
+                userId: targetUserId,
+                userEmail: customerEmail || '',
+                walletBalance: finalNewBalance,
+                balance: finalNewBalance,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+
               transaction.set(txDocRef, {
                 id: reference,
+                reference: reference,
                 userId: targetUserId,
                 userEmail: customerEmail || '',
                 amount: amountNGN,
+                previousBalance: curBal,
+                newBalance: finalNewBalance,
+                walletBalance: finalNewBalance,
+                balance: finalNewBalance,
                 type: 'deposit',
                 method: accountNumber ? 'dedicated_virtual_account' : 'paystack',
                 status: 'successful',

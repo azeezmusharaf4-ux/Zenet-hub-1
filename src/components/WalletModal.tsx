@@ -22,6 +22,7 @@ interface WalletModalProps {
   walletBalance: number;
   onAddFunds?: (amount: number, gateway: string, reference?: string) => void;
   transactions: WalletTransaction[];
+  initialTab?: 'fund' | 'history';
 }
 
 export const WalletModal: React.FC<WalletModalProps> = ({
@@ -30,9 +31,17 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   user,
   walletBalance,
   onAddFunds,
-  transactions
+  transactions,
+  initialTab = 'fund'
 }) => {
-  const [activeTab, setActiveTab] = useState<'fund' | 'history'>('fund');
+  const [activeTab, setActiveTab] = useState<'fund' | 'history'>(initialTab);
+
+  // Sync tab when initialTab changes or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   
   // Wallet Funding State
   const [amount, setAmount] = useState<number>(5000);
@@ -139,20 +148,18 @@ export const WalletModal: React.FC<WalletModalProps> = ({
         throw new Error(initData.error);
       }
 
-      // Priority 1: Redirect to Official Paystack Hosted Checkout page if authorization_url is provided
-      if (initData?.authorization_url) {
-        setStepMessage('Redirecting to Paystack Checkout...');
-        window.location.href = initData.authorization_url;
-        return;
+      // Save pending reference in session and local storage
+      const pendingRef = initData?.reference;
+      if (pendingRef) {
+        try {
+          sessionStorage.setItem('zenith_pending_paystack_ref', pendingRef);
+          localStorage.setItem('zenith_pending_paystack_ref', pendingRef);
+          sessionStorage.setItem('zenith_pending_funding_user', user.uid);
+          sessionStorage.setItem('zenith_pending_amount', String(amount));
+        } catch {}
       }
 
-      if (initData?.access_code && initData?.mode === 'live_paystack') {
-        setStepMessage('Redirecting to Paystack Checkout...');
-        window.location.href = `https://checkout.paystack.com/${initData.access_code}`;
-        return;
-      }
-
-      // Priority 2: Paystack Inline Popup JS (Only with valid pk_live_ or pk_test_ public key)
+      // Priority 1: Paystack Inline Popup JS (clean in-page checkout modal without losing context)
       const rawKey = initData?.publicKey || (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || '';
       const publicKey = formatPaystackPublicKey(rawKey);
 
@@ -162,7 +169,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
 
         if (isScriptLoaded && (window as any).PaystackPop) {
           const paystackObj = (window as any).PaystackPop;
-          const refToVerify = initData?.reference || `PST_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+          const refToVerify = pendingRef || `PST_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
           const onPaystackSuccess = function (response: any) {
             setIsProcessing(true);
@@ -170,16 +177,16 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             const actualRef = response?.reference || response?.trxref || refToVerify;
             
             // Strictly verify via backend endpoint before crediting
-            safeApiFetch(`/api/paystack/verify/${encodeURIComponent(actualRef)}?userId=${encodeURIComponent(user.uid)}&isWalletFunding=true`)
+            safeApiFetch(`/api/paystack/verify/${encodeURIComponent(actualRef)}?reference=${encodeURIComponent(actualRef)}&userId=${encodeURIComponent(user.uid)}&isWalletFunding=true`)
               .then((verifyData) => {
-                if (verifyData.verified && verifyData.status === 'success') {
+                if (verifyData && (verifyData.verified || verifyData.status === 'success' || verifyData.alreadyProcessed)) {
                   const credited = verifyData.amount || amount;
                   setSuccessMessage(`Success! ₦${Number(credited).toLocaleString()} NGN has been verified and credited to your wallet.`);
                   if (onAddFunds) {
                     onAddFunds(Number(credited), 'paystack', actualRef);
                   }
                 } else {
-                  setErrorMessage(verifyData.error || verifyData.message || 'Payment verification failed on Paystack.');
+                  setErrorMessage(verifyData?.error || verifyData?.message || 'Payment verification failed on Paystack.');
                 }
               })
               .catch((err: any) => {
@@ -197,39 +204,61 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             setStepMessage('');
           };
 
-          // Standard setup with verified public key
-          const handler = paystackObj.setup({
-            key: publicKey,
-            email: user.email,
-            amount: Math.round(amount * 100),
-            ref: refToVerify,
-            currency: 'NGN',
-            channels: ['bank_transfer', 'opay', 'bank', 'ussd', 'card'],
-            metadata: {
-              userId: user.uid,
-              userEmail: user.email,
-              isWalletFunding: true,
-              expectedAmountNaira: amount,
-              custom_fields: [
-                { display_name: 'User ID', variable_name: 'user_id', value: user.uid },
-                { display_name: 'Funding Type', variable_name: 'funding_type', value: 'wallet_funding' }
-              ]
-            },
-            callback: onPaystackSuccess,
-            onClose: onPaystackClose
-          });
-          
-          if (handler && typeof handler.openIframe === 'function') {
-            handler.openIframe();
-            return;
+          try {
+            const handler = paystackObj.setup({
+              key: publicKey,
+              email: user.email,
+              amount: Math.round(amount * 100),
+              ref: refToVerify,
+              currency: 'NGN',
+              channels: ['bank_transfer', 'opay', 'bank', 'ussd', 'card'],
+              metadata: {
+                userId: user.uid,
+                userEmail: user.email,
+                isWalletFunding: true,
+                expectedAmountNaira: amount,
+                custom_fields: [
+                  { display_name: 'User ID', variable_name: 'user_id', value: user.uid },
+                  { display_name: 'Funding Type', variable_name: 'funding_type', value: 'wallet_funding' }
+                ]
+              },
+              callback: onPaystackSuccess,
+              onClose: onPaystackClose
+            });
+            
+            if (handler && typeof handler.openIframe === 'function') {
+              handler.openIframe();
+              return;
+            }
+          } catch (inlineErr) {
+            console.warn('[Paystack Inline] Setup exception, falling back to redirect:', inlineErr);
           }
         }
       }
 
-      // Priority 3: If we have an access code from Paystack session, redirect to checkout.paystack.com
+      // Priority 2: Redirect to Official Paystack Hosted Checkout page if authorization_url is provided
+      if (initData?.authorization_url) {
+        setStepMessage('Redirecting to Paystack Checkout...');
+        try {
+          if (window.top && window.top !== window) {
+            window.top.location.href = initData.authorization_url;
+            return;
+          }
+        } catch {}
+        window.location.href = initData.authorization_url;
+        return;
+      }
+
       if (initData?.access_code) {
         setStepMessage('Redirecting to Paystack Checkout...');
-        window.location.href = `https://checkout.paystack.com/${initData.access_code}`;
+        const checkoutUrl = `https://checkout.paystack.com/${initData.access_code}`;
+        try {
+          if (window.top && window.top !== window) {
+            window.top.location.href = checkoutUrl;
+            return;
+          }
+        } catch {}
+        window.location.href = checkoutUrl;
         return;
       }
 
@@ -419,41 +448,56 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           )}
 
           {/* TAB 2: HISTORY */}
-          {activeTab === 'history' && (
-            <div className="space-y-3 animate-in fade-in duration-150">
-              <h4 className="font-extrabold text-slate-900 text-sm">Wallet Ledger & Deposits</h4>
+          {activeTab === 'history' && (() => {
+            const depositTransactions = (transactions || []).filter((tx) => {
+              // Deposit History:
+              // Must show ONLY wallet deposit transactions.
+              // Must NOT show debits.
+              // Must NOT show purchases.
+              if (tx.type !== 'deposit') return false;
 
-              {transactions.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  No wallet transactions recorded yet.
+              const desc = (tx.description || '').toLowerCase();
+              if (desc.includes('purchase') || desc.includes('payment') || desc.includes('debit') || desc.includes('bought') || desc.includes('charge')) {
+                return false;
+              }
+              return true;
+            });
+
+            return (
+              <div className="space-y-3 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-slate-900 text-sm">Deposit History</h4>
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    {depositTransactions.length} {depositTransactions.length === 1 ? 'deposit' : 'deposits'}
+                  </span>
                 </div>
-              ) : (
-                transactions.map((tx) => (
-                  <div key={tx.id} className="bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 p-3.5 rounded-xl flex items-center justify-between text-xs transition">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
-                        tx.type === 'deposit' 
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
-                          : 'bg-rose-50 text-rose-600 border border-rose-200'
-                      }`}>
-                        {tx.type === 'deposit' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <span className="font-bold text-slate-900 block">{tx.description}</span>
-                        <span className="text-[10px] text-slate-400">{tx.date}</span>
-                      </div>
-                    </div>
 
-                    <span className={`font-mono font-extrabold text-sm ${
-                      tx.type === 'deposit' ? 'text-emerald-600' : 'text-slate-900'
-                    }`}>
-                      {tx.type === 'deposit' ? '+' : '-'}₦{tx.amount.toLocaleString()}
-                    </span>
+                {depositTransactions.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    No deposit transactions recorded yet.
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ) : (
+                  depositTransactions.map((tx) => (
+                    <div key={tx.id} className="bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 p-3.5 rounded-xl flex items-center justify-between text-xs transition">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                          <ArrowDownLeft className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-900 block">{tx.description}</span>
+                          <span className="text-[10px] text-slate-400">{tx.date}</span>
+                        </div>
+                      </div>
+
+                      <span className="font-mono font-extrabold text-sm text-emerald-600">
+                        +₦{tx.amount.toLocaleString()}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            );
+          })()}
         </div>
 
       </div>

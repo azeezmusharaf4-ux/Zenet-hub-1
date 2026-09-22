@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserProfile } from '../types';
-import { Server2View } from './Server2View';
+import { ServiceUnavailableView } from './ServiceUnavailableView';
 
 interface SocialBoost2ViewProps {
   userProfile: UserProfile | null;
@@ -12,25 +12,12 @@ interface SocialBoost2ViewProps {
 }
 
 export const SocialBoost2View: React.FC<SocialBoost2ViewProps> = ({
-  userProfile,
-  walletBalance,
-  onRefreshProfile,
-  onBackToMarketplace,
-  onOpenWallet,
-  onSwitchToServer1
+  onBackToMarketplace
 }) => {
   return (
-    <Server2View
-      initialPage="boost-accounts"
-      hideSwitcherTabs={true}
-      userProfile={userProfile}
-      walletBalance={walletBalance}
-      onRefreshProfile={async () => {
-        if (onRefreshProfile) await onRefreshProfile();
-      }}
+    <ServiceUnavailableView
+      serviceType="social-boost"
       onBackToMarketplace={onBackToMarketplace}
-      onOpenWallet={onOpenWallet}
-      onSwitchToServer1={onSwitchToServer1}
     />
   );
 };

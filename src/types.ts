@@ -21,12 +21,28 @@ export type CategoryType =
 export interface DigitalProductDetails {
   inventoryId?: string;
   accountEmail?: string;
+  email?: string;
   accountPassword?: string;
+  password?: string;
+  recoveryEmail?: string;
+  recovery_email?: string;
   recoveryInfo?: string;
+  recovery?: string;
+  notes?: string;
   backupCodes?: string;
+  backupCode?: string;
   twoFactorSecretKey?: string;
+  twoFactorSecret?: string;
   twoFactorBackupCodes?: string;
+  twoFactor?: string;
+  phoneNumber?: string;
+  phone?: string;
+  username?: string;
+  accountUsername?: string;
+  delivery_value?: string;
   additionalInstructions?: string;
+  instructions?: string;
+  [key: string]: any;
 }
 
 export interface InventoryAccountItem {
@@ -312,6 +328,9 @@ export interface ZenedUpdateOrder {
   purchasedAt: string;
   status: 'completed' | string;
   transactionId?: string;
+  type?: string;
+  category?: string;
+  transactionCategory?: string;
 }
 
 export interface SocialBoostService {

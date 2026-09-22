@@ -116,7 +116,13 @@ export const getNetlifyFunctionFallback = (path: string): string | null => {
     return `/.netlify/functions/paystack-initialize${qs}`;
   }
   if (pathname.startsWith('/api/paystack/verify')) {
-    return `/.netlify/functions/paystack-verify${qs}`;
+    const sub = pathname.replace('/api/paystack/verify', '').replace(/^\//, '');
+    let searchParams = new URLSearchParams(search || '');
+    if (sub && !searchParams.has('reference')) {
+      searchParams.set('reference', decodeURIComponent(sub));
+    }
+    const finalSearch = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return `/.netlify/functions/paystack-verify${finalSearch}`;
   }
   if (pathname.startsWith('/api/paystack/webhook')) {
     return `/.netlify/functions/paystack-webhook${qs}`;

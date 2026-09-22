@@ -11,6 +11,7 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { 
   HelpCircle, 
   ShieldCheck, 
@@ -53,7 +54,7 @@ export const SupportView: React.FC<SupportViewProps> = ({
   onOpenAuth,
   onBackToMarketplace
 }) => {
-  const effectiveIsOwner = isOwner || userProfile?.role === 'owner' || user?.email === 'azeezmusharaf4@gmail.com';
+  const effectiveIsOwner = isOwner || isAuthorizedOwner(user, userProfile);
   const effectiveIsAdmin = isAdmin || effectiveIsOwner || userProfile?.role === 'admin';
 
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
@@ -259,10 +260,10 @@ export const SupportView: React.FC<SupportViewProps> = ({
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200 max-w-6xl mx-auto pb-12 select-none">
+    <div className="space-y-6 animate-in fade-in duration-200 max-w-6xl mx-auto pb-12 select-none text-[#0F172A]">
       
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-purple-950/90 via-[#170a33] to-indigo-950/90 border border-[#381d6d] p-6 sm:p-8 rounded-3xl space-y-3 shadow-2xl relative overflow-hidden">
+      <div className="bg-[#F8F7FD] border border-[#EBE7F7] p-6 sm:p-8 rounded-3xl space-y-3 shadow-xs relative overflow-hidden">
         {onBackToMarketplace && (
           <button
             type="button"
@@ -270,7 +271,7 @@ export const SupportView: React.FC<SupportViewProps> = ({
               window.scrollTo({ top: 0, behavior: 'instant' });
               onBackToMarketplace();
             }}
-            className="inline-flex items-center gap-2 text-purple-300 hover:text-white font-extrabold text-xs transition bg-[#170c30] px-4 py-2 rounded-xl border border-purple-900/40 cursor-pointer shadow-sm relative z-10 active:scale-95"
+            className="inline-flex items-center gap-2 text-[#64748B] hover:text-[#0F172A] font-extrabold text-xs transition bg-white px-4 py-2 rounded-xl border border-[#EBE7F7] cursor-pointer shadow-2xs relative z-10 active:scale-95"
             title="Back to Marketplace"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -279,49 +280,49 @@ export const SupportView: React.FC<SupportViewProps> = ({
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 relative z-10">
-          <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
-            <HelpCircle className="w-3.5 h-3.5 text-purple-400" />
+          <div className="inline-flex items-center gap-2 bg-[#EDE9FE] text-[#5B4DF5] border border-[#DDD6FE] text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+            <HelpCircle className="w-3.5 h-3.5 text-[#5B4DF5]" />
             <span>Central Support & Escrow Resolution Center</span>
           </div>
 
           {effectiveIsAdmin && (
-            <span className="bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-md">
-              <ShieldCheck className="w-4 h-4 text-slate-950" />
+            <span className="bg-amber-500 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+              <ShieldCheck className="w-4 h-4 text-white" />
               {effectiveIsOwner ? 'OWNER MODERATION PANEL' : 'ADMIN SUPPORT PANEL'}
             </span>
           )}
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight relative z-10">
+        <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight relative z-10">
           {effectiveIsAdmin ? 'Support & Escalated Dispute Management' : 'How can we help you today?'}
         </h1>
 
-        <p className="text-xs sm:text-sm text-purple-200/80 max-w-3xl leading-relaxed relative z-10">
+        <p className="text-xs sm:text-sm text-[#64748B] max-w-3xl leading-relaxed relative z-10">
           All customer issues, order disputes, escrow holds, payment verification, delivery concerns, and platform reports are handled centrally through our encrypted Support & Ticket system.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 relative z-10">
-          <div className="bg-[#150a2b] border border-[#2e1952] p-3.5 rounded-2xl flex items-center gap-3">
-            <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+          <div className="bg-white border border-[#EBE7F7] p-3.5 rounded-2xl flex items-center gap-3 shadow-2xs">
+            <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
             <div>
-              <span className="text-xs font-bold text-white block">7-Day Escrow Guarantee</span>
-              <span className="text-[10px] text-purple-300/60 font-semibold block">Full refund warranty protection</span>
+              <span className="text-xs font-bold text-[#0F172A] block">7-Day Escrow Guarantee</span>
+              <span className="text-[10px] text-[#64748B] font-semibold block">Full refund warranty protection</span>
             </div>
           </div>
 
-          <div className="bg-[#150a2b] border border-[#2e1952] p-3.5 rounded-2xl flex items-center gap-3">
-            <Clock className="w-5 h-5 text-amber-400 shrink-0" />
+          <div className="bg-white border border-[#EBE7F7] p-3.5 rounded-2xl flex items-center gap-3 shadow-2xs">
+            <Clock className="w-5 h-5 text-amber-500 shrink-0" />
             <div>
-              <span className="text-xs font-bold text-white block">Average Reply: &lt; 30 Mins</span>
-              <span className="text-[10px] text-purple-300/60 font-semibold block">24/7 Moderation Desk</span>
+              <span className="text-xs font-bold text-[#0F172A] block">Average Reply: &lt; 30 Mins</span>
+              <span className="text-[10px] text-[#64748B] font-semibold block">24/7 Moderation Desk</span>
             </div>
           </div>
 
-          <div className="bg-[#150a2b] border border-[#2e1952] p-3.5 rounded-2xl flex items-center gap-3">
-            <Lock className="w-5 h-5 text-cyan-400 shrink-0" />
+          <div className="bg-white border border-[#EBE7F7] p-3.5 rounded-2xl flex items-center gap-3 shadow-2xs">
+            <Lock className="w-5 h-5 text-[#5B4DF5] shrink-0" />
             <div>
-              <span className="text-xs font-bold text-white block">Centralized Ticket System</span>
-              <span className="text-[10px] text-purple-300/60 font-semibold block">End-to-end issue logging</span>
+              <span className="text-xs font-bold text-[#0F172A] block">Centralized Ticket System</span>
+              <span className="text-[10px] text-[#64748B] font-semibold block">End-to-end issue logging</span>
             </div>
           </div>
         </div>
@@ -329,26 +330,26 @@ export const SupportView: React.FC<SupportViewProps> = ({
 
       {/* ADMIN OR OWNER SUPPORT MANAGEMENT DASHBOARD */}
       {effectiveIsAdmin && (
-        <div className="bg-[#120826] border border-[#2c1752] p-5 sm:p-6 rounded-3xl space-y-5 shadow-2xl">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#261448]">
+        <div className="bg-white border border-[#EBE7F7] p-5 sm:p-6 rounded-3xl space-y-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#EBE7F7]">
             <div>
-              <h2 className="text-lg font-black text-white flex items-center gap-2">
-                <Inbox className="w-5 h-5 text-amber-400" />
+              <h2 className="text-lg font-black text-[#0F172A] flex items-center gap-2">
+                <Inbox className="w-5 h-5 text-amber-500" />
                 <span>All Customer Tickets & Disputes ({tickets.length})</span>
               </h2>
-              <p className="text-xs text-purple-300/70">
+              <p className="text-xs text-[#64748B]">
                 Logged user issues requiring admin review, response, or escrow intervention
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold px-3 py-1 rounded-xl">
+              <span className="bg-amber-50 text-amber-700 border border-amber-200 font-bold px-3 py-1 rounded-xl">
                 Open: <strong>{tickets.filter(t => t.status === 'open').length}</strong>
               </span>
-              <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold px-3 py-1 rounded-xl">
+              <span className="bg-[#EDE9FE] text-[#5B4DF5] border border-[#DDD6FE] font-bold px-3 py-1 rounded-xl">
                 In Progress: <strong>{tickets.filter(t => t.status === 'in_progress').length}</strong>
               </span>
-              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold px-3 py-1 rounded-xl">
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-3 py-1 rounded-xl">
                 Resolved: <strong>{tickets.filter(t => t.status === 'resolved').length}</strong>
               </span>
             </div>
@@ -357,20 +358,20 @@ export const SupportView: React.FC<SupportViewProps> = ({
           {/* Admin Search & Filters */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="relative">
-              <Search className="w-4 h-4 text-purple-400 absolute left-3 top-3" />
+              <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-3" />
               <input
                 type="text"
                 placeholder="Search ticket #, email, subject..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#0d051a] text-white pl-9 pr-3 py-2.5 rounded-xl border border-[#2d1850] focus:outline-none focus:border-purple-500 text-xs"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] pl-9 pr-3 py-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] text-xs placeholder-[#94A3B8]"
               />
             </div>
 
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="bg-[#0d051a] text-white p-2.5 rounded-xl border border-[#2d1850] focus:outline-none focus:border-purple-500 text-xs font-bold"
+              className="bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] text-xs font-bold"
             >
               <option value="all">All Ticket Statuses</option>
               <option value="open">Open / Pending Review</option>
@@ -382,7 +383,7 @@ export const SupportView: React.FC<SupportViewProps> = ({
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-[#0d051a] text-white p-2.5 rounded-xl border border-[#2d1850] focus:outline-none focus:border-purple-500 text-xs font-bold"
+              className="bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] text-xs font-bold"
             >
               <option value="all">All Categories</option>
               <option value="product_issue">Product / Delivery Issue</option>
@@ -396,11 +397,11 @@ export const SupportView: React.FC<SupportViewProps> = ({
 
           {/* Tickets List for Admin */}
           {loadingTickets ? (
-            <div className="py-12 text-center text-purple-300/70 text-xs font-bold">
+            <div className="py-12 text-center text-[#64748B] text-xs font-bold">
               Loading support tickets from Firestore...
             </div>
           ) : filteredTickets.length === 0 ? (
-            <div className="py-12 text-center text-purple-300/60 text-xs bg-[#0c051a] rounded-2xl border border-[#231244] p-6">
+            <div className="py-12 text-center text-[#64748B] text-xs bg-[#F8F7FD] rounded-2xl border border-[#EBE7F7] p-6">
               No tickets found matching current filters.
             </div>
           ) : (
@@ -412,26 +413,26 @@ export const SupportView: React.FC<SupportViewProps> = ({
                 return (
                   <div
                     key={ticket.id}
-                    className={`bg-[#0d051a] border rounded-2xl p-4 transition ${
+                    className={`bg-[#F8F7FD] border rounded-2xl p-4 transition ${
                       isSelected
-                        ? 'border-amber-500 ring-2 ring-amber-500/20 shadow-lg'
+                        ? 'border-[#5B4DF5] ring-2 ring-[#5B4DF5]/20 bg-white shadow-md'
                         : isUnreadByAdmin
-                        ? 'border-purple-500/80 bg-[#150a2b]'
-                        : 'border-[#261448] hover:border-[#3d1f70]'
+                        ? 'border-[#5B4DF5] bg-white'
+                        : 'border-[#EBE7F7] hover:border-[#DDD6FE]'
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-xs font-black text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/30">
+                          <span className="font-mono text-xs font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                             {ticket.ticketNumber || '#ZN-00000'}
                           </span>
                           <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase ${
                             ticket.status === 'open'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
                               : ticket.status === 'in_progress'
-                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              ? 'bg-[#EDE9FE] text-[#5B4DF5] border border-[#DDD6FE]'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           }`}>
                             {ticket.status.replace('_', ' ')}
                           </span>
@@ -440,21 +441,21 @@ export const SupportView: React.FC<SupportViewProps> = ({
                               NEW UNREAD
                             </span>
                           )}
-                          <span className="text-[10px] text-purple-300/60 font-semibold">
+                          <span className="text-[10px] text-[#64748B] font-semibold">
                             {ticket.category.replace('_', ' ').toUpperCase()}
                           </span>
                         </div>
 
-                        <h3 className="font-extrabold text-white text-sm">{ticket.subject}</h3>
-                        <p className="text-xs text-purple-200/80 line-clamp-2">{ticket.message}</p>
-                        <p className="text-[11px] text-purple-300/60 font-mono">
-                          Submitted by: <strong className="text-white">{ticket.userName}</strong> ({ticket.userEmail}) • {new Date(ticket.createdAt).toLocaleString()}
+                        <h3 className="font-extrabold text-[#0F172A] text-sm">{ticket.subject}</h3>
+                        <p className="text-xs text-[#64748B] line-clamp-2">{ticket.message}</p>
+                        <p className="text-[11px] text-[#94A3B8] font-mono">
+                          Submitted by: <strong className="text-[#0F172A]">{ticket.userName}</strong> ({ticket.userEmail}) • {new Date(ticket.createdAt).toLocaleString()}
                         </p>
                       </div>
 
                       <button
                         onClick={() => setSelectedTicket(isSelected ? null : ticket)}
-                        className="bg-[#241247] hover:bg-[#321961] text-white font-bold px-4 py-2 rounded-xl text-xs border border-[#3f1f78] transition cursor-pointer shrink-0"
+                        className="bg-white hover:bg-[#F8F7FD] text-[#0F172A] font-bold px-4 py-2 rounded-xl text-xs border border-[#EBE7F7] transition cursor-pointer shrink-0 shadow-2xs"
                       >
                         {isSelected ? 'Close Ticket Details' : 'Manage & Reply'}
                       </button>
@@ -462,9 +463,9 @@ export const SupportView: React.FC<SupportViewProps> = ({
 
                     {/* Expanded Detail & Admin Reply Box */}
                     {isSelected && (
-                      <div className="mt-4 pt-4 border-t border-[#261448] space-y-4 bg-[#120726] p-4 rounded-xl">
+                      <div className="mt-4 pt-4 border-t border-[#EBE7F7] space-y-4 bg-white p-4 rounded-xl border border-[#EBE7F7]">
                         <div className="space-y-2">
-                          <h4 className="font-extrabold text-purple-300 text-xs uppercase tracking-wider">
+                          <h4 className="font-extrabold text-[#0F172A] text-xs uppercase tracking-wider">
                             Ticket Message History & Conversation Thread
                           </h4>
                           
@@ -475,21 +476,21 @@ export const SupportView: React.FC<SupportViewProps> = ({
                                   key={msg.id || i}
                                   className={`p-3 rounded-xl text-xs space-y-1 ${
                                     msg.senderRole === 'owner' || msg.senderRole === 'admin'
-                                      ? 'bg-purple-950/80 border border-purple-500/30 ml-4'
-                                      : 'bg-[#0a0314] border border-[#28134d] mr-4'
+                                      ? 'bg-[#EDE9FE] border border-[#DDD6FE] ml-4'
+                                      : 'bg-[#F8F7FD] border border-[#EBE7F7] mr-4'
                                   }`}
                                 >
                                   <div className="flex items-center justify-between text-[10px]">
-                                    <span className={`font-bold ${msg.senderRole === 'owner' ? 'text-amber-400 font-extrabold' : msg.senderRole === 'admin' ? 'text-purple-300' : 'text-emerald-400'}`}>
+                                    <span className={`font-bold ${msg.senderRole === 'owner' ? 'text-amber-700 font-extrabold' : msg.senderRole === 'admin' ? 'text-[#5B4DF5]' : 'text-emerald-700'}`}>
                                       {msg.senderName} ({msg.senderRole.toUpperCase()})
                                     </span>
-                                    <span className="text-purple-300/50 font-mono">{new Date(msg.createdAt).toLocaleString()}</span>
+                                    <span className="text-[#64748B] font-mono">{new Date(msg.createdAt).toLocaleString()}</span>
                                   </div>
-                                  <p className="text-white whitespace-pre-wrap">{msg.message}</p>
+                                  <p className="text-[#0F172A] whitespace-pre-wrap">{msg.message}</p>
                                 </div>
                               ))
                             ) : (
-                              <div className="p-3 bg-[#0a0314] rounded-xl text-xs text-white">
+                              <div className="p-3 bg-[#F8F7FD] rounded-xl text-xs text-[#0F172A]">
                                 <p className="whitespace-pre-wrap">{ticket.message}</p>
                               </div>
                             )}
@@ -497,15 +498,15 @@ export const SupportView: React.FC<SupportViewProps> = ({
                         </div>
 
                         {/* Admin Action Bar */}
-                        <div className="space-y-3 pt-2 border-t border-[#261448]">
+                        <div className="space-y-3 pt-2 border-t border-[#EBE7F7]">
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                            <label className="text-xs font-bold text-white">Send Admin / Moderator Response:</label>
+                            <label className="text-xs font-bold text-[#0F172A]">Send Admin / Moderator Response:</label>
                             <div className="flex items-center gap-2">
-                              <span className="text-[11px] text-purple-300/70 font-semibold">Update Status:</span>
+                              <span className="text-[11px] text-[#64748B] font-semibold">Update Status:</span>
                               <select
                                 value={adminNewStatus}
                                 onChange={(e) => setAdminNewStatus(e.target.value as any)}
-                                className="bg-[#0c051a] text-white px-2.5 py-1 rounded-lg border border-[#3d1f70] text-xs font-bold"
+                                className="bg-[#F8F7FD] text-[#0F172A] px-2.5 py-1 rounded-lg border border-[#EBE7F7] text-xs font-bold"
                               >
                                 <option value="in_progress">In Progress</option>
                                 <option value="resolved">Resolved</option>
@@ -520,14 +521,14 @@ export const SupportView: React.FC<SupportViewProps> = ({
                             value={adminReplyText}
                             onChange={(e) => setAdminReplyText(e.target.value)}
                             placeholder="Type official response to user here..."
-                            className="w-full bg-[#080212] text-white p-3 rounded-xl border border-[#351966] focus:outline-none focus:border-amber-500 text-xs resize-none"
+                            className="w-full bg-[#F8F7FD] text-[#0F172A] p-3 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] text-xs resize-none placeholder-[#94A3B8]"
                           />
 
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={handleSendReply}
                               disabled={isUpdatingTicket || !adminReplyText.trim()}
-                              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs py-2 px-5 rounded-xl shadow-lg transition cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                              className="bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold text-xs py-2 px-5 rounded-xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center gap-2"
                             >
                               <Send className="w-3.5 h-3.5" />
                               <span>{isUpdatingTicket ? 'Updating Ticket...' : 'Send Official Response'}</span>
@@ -555,17 +556,17 @@ export const SupportView: React.FC<SupportViewProps> = ({
           
           {/* User's Ticket History */}
           {user && (
-            <div className="bg-[#120826] border border-[#2c1752] p-5 sm:p-6 rounded-3xl space-y-4 shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-[#261448]">
-                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Inbox className="w-4 h-4 text-purple-400" />
+            <div className="bg-white border border-[#EBE7F7] p-5 sm:p-6 rounded-3xl space-y-4 shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-[#EBE7F7]">
+                <h2 className="text-base font-extrabold text-[#0F172A] flex items-center gap-2">
+                  <Inbox className="w-4 h-4 text-[#5B4DF5]" />
                   My Support Tickets ({tickets.length})
                 </h2>
-                <span className="text-[11px] text-purple-300/60 font-semibold">Live Ticket Tracking</span>
+                <span className="text-[11px] text-[#64748B] font-semibold">Live Ticket Tracking</span>
               </div>
 
               {tickets.length === 0 ? (
-                <div className="py-8 text-center text-purple-300/60 text-xs bg-[#0c051a] rounded-2xl border border-[#231244] p-4">
+                <div className="py-8 text-center text-[#64748B] text-xs bg-[#F8F7FD] rounded-2xl border border-[#EBE7F7] p-4">
                   You have not submitted any support tickets yet. Use the form on the right to open a ticket if you need assistance.
                 </div>
               ) : (
@@ -574,37 +575,37 @@ export const SupportView: React.FC<SupportViewProps> = ({
                     const hasAdminResponse = !!t.adminResponse;
 
                     return (
-                      <div key={t.id} className="bg-[#0c051a] border border-[#28134d] p-4 rounded-2xl space-y-2">
+                      <div key={t.id} className="bg-[#F8F7FD] border border-[#EBE7F7] p-4 rounded-2xl space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-xs font-black text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/30">
+                          <span className="font-mono text-xs font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                             {t.ticketNumber || '#ZN-00000'}
                           </span>
                           <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase ${
                             t.status === 'open'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
                               : t.status === 'in_progress'
-                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              ? 'bg-[#EDE9FE] text-[#5B4DF5] border border-[#DDD6FE]'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           }`}>
                             {t.status.replace('_', ' ')}
                           </span>
                         </div>
 
-                        <h4 className="font-extrabold text-white text-xs">{t.subject}</h4>
-                        <p className="text-[11px] text-purple-200/80">{t.message}</p>
+                        <h4 className="font-extrabold text-[#0F172A] text-xs">{t.subject}</h4>
+                        <p className="text-[11px] text-[#64748B]">{t.message}</p>
 
                         {/* Admin reply section */}
                         {hasAdminResponse && (
-                          <div className="bg-[#180a33] border border-purple-500/30 p-3 rounded-xl mt-2 space-y-1">
-                            <div className="flex items-center justify-between text-[10px] font-bold text-amber-400">
+                          <div className="bg-white border border-[#DDD6FE] p-3 rounded-xl mt-2 space-y-1 shadow-2xs">
+                            <div className="flex items-center justify-between text-[10px] font-bold text-[#5B4DF5]">
                               <span>Official Support Response ({t.respondedBy || 'Moderator'}):</span>
-                              <span className="text-purple-300/50 font-mono">{t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : ''}</span>
+                              <span className="text-[#64748B] font-mono">{t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : ''}</span>
                             </div>
-                            <p className="text-xs text-white whitespace-pre-wrap">{t.adminResponse}</p>
+                            <p className="text-xs text-[#0F172A] whitespace-pre-wrap">{t.adminResponse}</p>
                           </div>
                         )}
 
-                        <div className="text-[10px] text-purple-300/50 font-mono pt-1">
+                        <div className="text-[10px] text-[#94A3B8] font-mono pt-1">
                           Submitted: {new Date(t.createdAt).toLocaleString()}
                         </div>
                       </div>
@@ -617,8 +618,8 @@ export const SupportView: React.FC<SupportViewProps> = ({
 
           {/* FAQs Accordion */}
           <div className="space-y-4">
-            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
-              <HelpCircle className="w-5 h-5 text-purple-400" />
+            <h2 className="text-base font-extrabold text-[#0F172A] flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-[#5B4DF5]" />
               Frequently Asked Questions
             </h2>
 
@@ -629,22 +630,22 @@ export const SupportView: React.FC<SupportViewProps> = ({
                 return (
                   <div
                     key={idx}
-                    className="bg-[#120826] border border-[#2c1752] rounded-2xl overflow-hidden transition"
+                    className="bg-white border border-[#EBE7F7] rounded-2xl overflow-hidden transition shadow-xs"
                   >
                     <button
                       onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                      className="w-full text-left p-4 flex items-center justify-between gap-3 text-xs sm:text-sm font-extrabold text-white hover:text-purple-300 transition cursor-pointer"
+                      className="w-full text-left p-4 flex items-center justify-between gap-3 text-xs sm:text-sm font-extrabold text-[#0F172A] hover:text-[#5B4DF5] transition cursor-pointer"
                     >
                       <span>{faq.q}</span>
                       {isOpen ? (
-                        <ChevronUp className="w-4 h-4 text-purple-400 shrink-0" />
+                        <ChevronUp className="w-4 h-4 text-[#5B4DF5] shrink-0" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-purple-400 shrink-0" />
+                        <ChevronDown className="w-4 h-4 text-[#64748B] shrink-0" />
                       )}
                     </button>
 
                     {isOpen && (
-                      <div className="p-4 pt-0 text-xs text-purple-200/80 leading-relaxed border-t border-[#231244] bg-[#0c051a]">
+                      <div className="p-4 pt-0 text-xs text-[#64748B] leading-relaxed border-t border-[#EBE7F7] bg-[#F8F7FD]">
                         <p className="whitespace-pre-line">{faq.a}</p>
                       </div>
                     )}
@@ -657,31 +658,31 @@ export const SupportView: React.FC<SupportViewProps> = ({
         </div>
 
         {/* Right 1 Col: Create Ticket Form */}
-        <div className="bg-[#120826] border border-[#2c1752] p-5 sm:p-6 rounded-3xl space-y-4 shadow-xl self-start">
-          <div className="space-y-1 pb-2 border-b border-[#261448]">
-            <h3 className="font-extrabold text-white text-base flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-purple-400" />
+        <div className="bg-white border border-[#EBE7F7] p-5 sm:p-6 rounded-3xl space-y-4 shadow-xs self-start">
+          <div className="space-y-1 pb-2 border-b border-[#EBE7F7]">
+            <h3 className="font-extrabold text-[#0F172A] text-base flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-[#5B4DF5]" />
               Submit Support Ticket
             </h3>
-            <p className="text-xs text-purple-300/70">
+            <p className="text-xs text-[#64748B]">
               Direct encrypted line to ZENET Escrow Moderators
             </p>
           </div>
 
           {submitSuccess && (
-            <div className="bg-emerald-950/80 border border-emerald-500/50 p-3 rounded-2xl text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
-              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{submitSuccess}</span>
             </div>
           )}
 
           <form onSubmit={handleTicketSubmit} className="space-y-3">
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1 text-xs">Issue Category</label>
+              <label className="block text-[#0F172A] font-semibold mb-1 text-xs">Issue Category</label>
               <select
                 value={ticketCategory}
                 onChange={(e) => setTicketCategory(e.target.value as any)}
-                className="w-full bg-[#100722] text-white p-2.5 rounded-xl border border-[#2d1850] focus:outline-none focus:border-purple-500 text-xs font-bold"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] text-xs font-bold"
               >
                 <option value="general">💬 General Inquiry</option>
                 <option value="product_issue">📦 Product / Delivery Problem</option>
@@ -693,11 +694,11 @@ export const SupportView: React.FC<SupportViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1 text-xs">Priority Level</label>
+              <label className="block text-[#0F172A] font-semibold mb-1 text-xs">Priority Level</label>
               <select
                 value={ticketPriority}
                 onChange={(e) => setTicketPriority(e.target.value as any)}
-                className="w-full bg-[#100722] text-white p-2.5 rounded-xl border border-[#2d1850] focus:outline-none focus:border-purple-500 text-xs font-bold"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] text-xs font-bold"
               >
                 <option value="low">Low Priority</option>
                 <option value="medium">Medium Priority</option>
@@ -707,33 +708,33 @@ export const SupportView: React.FC<SupportViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1 text-xs">Subject / Title</label>
+              <label className="block text-[#0F172A] font-semibold mb-1 text-xs">Subject / Title</label>
               <input
                 type="text"
                 required
                 value={ticketSubject}
                 onChange={(e) => setTicketSubject(e.target.value)}
                 placeholder="e.g. Virtual Account Deposit Pending / Credentials Login Error"
-                className="w-full bg-[#100722] text-white p-2.5 rounded-xl border border-[#2d1850] focus:outline-none focus:border-purple-500 text-xs"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] text-xs placeholder-[#94A3B8]"
               />
             </div>
 
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1 text-xs">Detailed Description</label>
+              <label className="block text-[#0F172A] font-semibold mb-1 text-xs">Detailed Description</label>
               <textarea
                 required
                 rows={4}
                 value={ticketMessage}
                 onChange={(e) => setTicketMessage(e.target.value)}
                 placeholder="Describe your issue, order ID, or transaction reference here..."
-                className="w-full bg-[#100722] text-white p-2.5 rounded-xl border border-[#2d1850] focus:outline-none focus:border-purple-500 text-xs resize-none"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] text-xs resize-none placeholder-[#94A3B8]"
               />
             </div>
 
             <button
               type="submit"
               disabled={ticketSubmitting}
-              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs py-2.5 rounded-xl shadow-lg transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold text-xs py-2.5 rounded-xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {ticketSubmitting ? (
                 <span>Submitting Ticket...</span>
@@ -747,14 +748,14 @@ export const SupportView: React.FC<SupportViewProps> = ({
           </form>
 
           {/* Direct Support Info */}
-          <div className="pt-3 border-t border-[#231244] space-y-2 text-[11px] text-purple-300/70">
-            <span className="font-bold text-white block">Official Channel Direct Info:</span>
-            <div className="flex items-center gap-2 text-purple-200">
-              <Mail className="w-3.5 h-3.5 text-purple-400" />
+          <div className="pt-3 border-t border-[#EBE7F7] space-y-2 text-[11px] text-[#64748B]">
+            <span className="font-bold text-[#0F172A] block">Official Channel Direct Info:</span>
+            <div className="flex items-center gap-2 text-[#0F172A]">
+              <Mail className="w-3.5 h-3.5 text-[#5B4DF5]" />
               <span>support@zenetmarket.com</span>
             </div>
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold">
-              <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="flex items-center gap-2 text-emerald-600 font-semibold">
+              <HelpCircle className="w-3.5 h-3.5 text-emerald-600" />
               <span>WhatsApp Support: +234 800 ZENET SAFE</span>
             </div>
           </div>

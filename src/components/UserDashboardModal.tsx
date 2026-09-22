@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { AccountListing, Inquiry, UserProfile, PurchaseRecord, ReferralRecord } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { copyToClipboard } from '../utils/clipboard';
 import { 
   X, 
@@ -95,7 +96,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
   onOpenAuth,
   onSelectView
 }) => {
-  const isOwner = user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.role === 'owner';
+  const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab);
@@ -617,18 +618,27 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                         </button>
 
                         <div className="flex items-center gap-2">
-                          {onBuyNow && (
-                            <button
-                              onClick={() => {
-                                onClose();
-                                onBuyNow(listing);
-                              }}
-                              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1 shadow-md"
-                            >
-                              <Lock className="w-3 h-3 text-purple-200" />
-                              <span>Buy Now</span>
-                            </button>
-                          )}
+                          {onBuyNow && (() => {
+                            const invAvail = Array.isArray(listing.inventory)
+                              ? listing.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
+                              : undefined;
+                            const docStock = listing.stockCount !== undefined ? listing.stockCount : (listing.stock !== undefined ? listing.stock : 1);
+                            const effStock = invAvail !== undefined ? invAvail : docStock;
+                            const isSoldOut = listing.status === 'sold' || effStock <= 0;
+
+                            return (
+                              <button
+                                onClick={() => {
+                                  onClose();
+                                  onBuyNow(listing);
+                                }}
+                                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1 shadow-md active:scale-95"
+                              >
+                                <Lock className="w-3 h-3 text-purple-200" />
+                                <span>{isSoldOut ? 'Sold Out' : 'Buy Now'}</span>
+                              </button>
+                            );
+                          })()}
 
                           <button
                             onClick={() => onRemoveSaved(listing.id)}
@@ -911,6 +921,20 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        {onBuyNow && (
+                          <button
+                            onClick={() => {
+                              onClose();
+                              onBuyNow(listing);
+                            }}
+                            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-purple-600/30 active:scale-95"
+                            title="Buy this account"
+                          >
+                            <Lock className="w-3.5 h-3.5 text-purple-200" />
+                            <span>Buy</span>
+                          </button>
+                        )}
+
                         {listing.status === 'active' ? (
                           <button
                             onClick={() => onUpdateListingStatus(listing.id, 'sold')}

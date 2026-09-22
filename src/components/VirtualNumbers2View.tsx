@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserProfile } from '../types';
-import { Server2View } from './Server2View';
+import { ServiceUnavailableView } from './ServiceUnavailableView';
 
 interface VirtualNumbers2ViewProps {
   userProfile?: UserProfile | null;
@@ -13,23 +13,12 @@ interface VirtualNumbers2ViewProps {
 }
 
 export const VirtualNumbers2View: React.FC<VirtualNumbers2ViewProps> = ({
-  userProfile = null,
-  walletBalance,
-  onRefreshProfile,
-  onBackToMarketplace,
-  onOpenWallet
+  onBackToMarketplace
 }) => {
   return (
-    <Server2View
-      initialPage="buy-numbers"
-      hideSwitcherTabs={true}
-      userProfile={userProfile || null}
-      walletBalance={walletBalance}
-      onRefreshProfile={async () => {
-        if (onRefreshProfile) await onRefreshProfile();
-      }}
+    <ServiceUnavailableView
+      serviceType="service-number"
       onBackToMarketplace={onBackToMarketplace}
-      onOpenWallet={onOpenWallet}
     />
   );
 };

@@ -15,6 +15,7 @@ export default defineConfig(() => {
       }),
     ],
     build: {
+      target: ['es2015', 'chrome49', 'safari10', 'edge18'],
       cssTarget: ['chrome49', 'safari10'],
       minify: 'terser' as const,
       terserOptions: {

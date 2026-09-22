@@ -139,11 +139,63 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     };
   }, [user?.uid]);
 
-  // Categorize orders
-  // 1. Number Orders
+  // Mutually Exclusive Strict Category Classification Helpers
+  // 1. Zenet Update
+  const isZenetUpdateRecord = (p: any): boolean => {
+    if (!p) return false;
+    if (p.type === 'zenet_update' || p.transactionCategory === 'zenet_update') return true;
+    if (p.category === 'Zenet Update' || p.category === 'zenet_update') return true;
+
+    // Strict negative guards: numbers, social boosts, and account credentials are NOT zenet updates
+    if (p.phoneNumber || p.type === 'virtual_number' || p.type === 'social_boost') return false;
+    if (p.digitalProductDetails?.accountEmail || p.digitalProductDetails?.accountPassword) return false;
+    if (p.target && p.quantity) return false;
+
+    const title = (p.listingTitle || p.productName || p.name || '').toLowerCase().trim();
+    return title.startsWith('zenet update') || title.includes('update package') || title.includes('zenet hub official update');
+  };
+
+  // 2. Service / Virtual Number
+  const isNumberRecord = (p: any): boolean => {
+    if (!p) return false;
+    if (isZenetUpdateRecord(p)) return false;
+    if (p.type === 'virtual_number' || p.transactionCategory === 'virtual_number' || p.category === 'virtual_number') return true;
+    if (p.phoneNumber && !p.digitalProductDetails?.accountEmail) return true;
+    if (p.providerActivationId || p.tierName) return true;
+
+    const title = (p.listingTitle || p.service || '').toLowerCase();
+    return (title.includes('virtual number') || title.includes('service number') || title.includes('sms verification')) && !title.includes('social boost');
+  };
+
+  // 3. Social Boost
+  const isBoostRecord = (p: any): boolean => {
+    if (!p) return false;
+    if (isZenetUpdateRecord(p) || isNumberRecord(p)) return false;
+    if (p.type === 'social_boost' || p.transactionCategory === 'social_boost' || p.category === 'social_boost') return true;
+    if (p.quantity && p.target) return true;
+    if (p.providerOrderId) return true;
+
+    const title = (p.listingTitle || p.serviceName || '').toLowerCase();
+    return title.includes('social boost') || title.includes('followers') || title.includes('views') || title.includes('likes') || title.includes('subscribers');
+  };
+
+  // 4. Log Account
+  const isLogRecord = (p: any): boolean => {
+    if (!p) return false;
+    if (isZenetUpdateRecord(p) || isNumberRecord(p) || isBoostRecord(p)) return false;
+
+    if (p.type === 'log' || p.type === 'log_account' || p.transactionCategory === 'log') return true;
+    if (p.digitalProductDetails?.accountEmail || p.digitalProductDetails?.accountPassword) return true;
+    if (p.listingId && (p.category || p.sellerId)) return true;
+
+    return Boolean(p.listingTitle || p.id);
+  };
+
+  // Categorize orders strictly into mutually exclusive sections
+  // 1. Number Orders (ONLY Service Numbers)
   const numberOrders = useMemo(() => {
     const fromPurchases = purchases
-      .filter((p) => p.type === 'virtual_number' || p.category === 'virtual_number' || Boolean(p.phoneNumber))
+      .filter((p) => isNumberRecord(p))
       .map((p) => ({
         id: p.id,
         orderId: p.transactionId || p.id,
@@ -154,28 +206,30 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         service: p.listingTitle || 'Virtual Number',
         country: (p as any).country || '',
         price: p.paidAmount || p.price || 0,
-        createdAt: p.purchasedAt || new Date().toISOString(),
+        createdAt: p.purchasedAt || (p as any).createdAt || new Date().toISOString(),
         source: 'purchases'
       }));
 
-    const fromApi = apiNumberOrders.map((o) => ({
-      id: o.orderId || o.id,
-      orderId: o.orderId || o.id,
-      phoneNumber: o.phoneNumber || o.phone || '',
-      smsCode: o.code || o.smsCode || '',
-      smsText: o.smsText || '',
-      status: o.status || 'WAITING',
-      service: o.service || 'Virtual Number',
-      country: o.country || '',
-      price: o.customerPrice || o.price || 0,
-      createdAt: o.createdAt || new Date().toISOString(),
-      source: 'api'
-    }));
+    const fromApi = apiNumberOrders
+      .filter((o) => isNumberRecord(o))
+      .map((o) => ({
+        id: o.orderId || o.id,
+        orderId: o.orderId || o.id,
+        phoneNumber: o.phoneNumber || o.phone || '',
+        smsCode: o.code || o.smsCode || '',
+        smsText: o.smsText || '',
+        status: o.status || 'WAITING',
+        service: o.service || 'Virtual Number',
+        country: o.country || '',
+        price: o.customerPrice || o.price || 0,
+        createdAt: o.createdAt || new Date().toISOString(),
+        source: 'api'
+      }));
 
-    // Deduplicate by phoneNumber or id
+    // Deduplicate by phoneNumber or id or orderId
     const combined = [...fromApi];
     for (const p of fromPurchases) {
-      if (!combined.some((c) => (c.phoneNumber && c.phoneNumber === p.phoneNumber) || c.id === p.id)) {
+      if (!combined.some((c) => (c.phoneNumber && c.phoneNumber === p.phoneNumber) || c.id === p.id || c.orderId === p.orderId)) {
         combined.push(p);
       }
     }
@@ -183,25 +237,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [purchases, apiNumberOrders]);
 
-  // 2. Log Account Orders
+  // 2. Log Account Orders (ONLY Log Accounts)
   const logOrders = useMemo(() => {
     return purchases
-      .filter((p) => {
-        // Exclude virtual numbers, social boost, and update products
-        if (p.type === 'virtual_number' || p.phoneNumber) return false;
-        if (p.type === 'social_boost') return false;
-        if (p.type === 'zenet_update') return false;
-        const titleLower = (p.listingTitle || '').toLowerCase();
-        if (titleLower.includes('update package') || titleLower.includes('zenet update')) return false;
-        return true;
-      })
-      .sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime());
+      .filter((p) => isLogRecord(p))
+      .sort((a, b) => new Date(b.purchasedAt || (b as any).createdAt || 0).getTime() - new Date(a.purchasedAt || (a as any).createdAt || 0).getTime());
   }, [purchases]);
 
-  // 3. Social Boost Orders
+  // 3. Social Boost Orders (ONLY Social Boost)
   const boostOrders = useMemo(() => {
     const fromPurchases = purchases
-      .filter((p) => p.type === 'social_boost')
+      .filter((p) => isBoostRecord(p))
       .map((p) => ({
         id: p.id,
         orderId: p.transactionId || p.id,
@@ -210,19 +256,21 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         quantity: (p as any).quantity || 1000,
         charge: p.paidAmount || p.price || 0,
         status: (p as any).orderStatus || p.status || 'completed',
-        createdAt: p.purchasedAt || new Date().toISOString()
+        createdAt: p.purchasedAt || (p as any).createdAt || new Date().toISOString()
       }));
 
-    const fromApi = apiBoostOrders.map((o) => ({
-      id: o.orderId || o.id,
-      orderId: o.orderId || o.id,
-      serviceName: o.serviceName || 'Social Boost Order',
-      target: o.target || '',
-      quantity: o.quantity || 0,
-      charge: o.charge || 0,
-      status: o.status || 'pending',
-      createdAt: o.createdAt || new Date().toISOString()
-    }));
+    const fromApi = apiBoostOrders
+      .filter((o) => isBoostRecord(o))
+      .map((o) => ({
+        id: o.orderId || o.id,
+        orderId: o.orderId || o.id,
+        serviceName: o.serviceName || 'Social Boost Order',
+        target: o.target || '',
+        quantity: o.quantity || 0,
+        charge: o.charge || 0,
+        status: o.status || 'pending',
+        createdAt: o.createdAt || new Date().toISOString()
+      }));
 
     const combined = [...fromApi];
     for (const p of fromPurchases) {
@@ -234,33 +282,31 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [purchases, apiBoostOrders]);
 
-  // 4. Zenet Update Orders
+  // 4. Zenet Update Orders (ONLY Zenet Updates)
   const updateOrders = useMemo(() => {
     const fromPurchases = purchases
-      .filter((p) => {
-        if (p.type === 'zenet_update') return true;
-        const titleLower = (p.listingTitle || '').toLowerCase();
-        return titleLower.includes('update') || titleLower.includes('zenet update');
-      })
+      .filter((p) => isZenetUpdateRecord(p))
       .map((p) => ({
         id: p.id,
         productName: p.listingTitle || 'Zenet Update Package',
         price: p.paidAmount || p.price || 0,
-        secretDeliveryInfo: p.digitalProductDetails?.additionalInstructions || p.digitalProductDetails?.accountPassword || '',
-        privateDeliveryLink: (p as any).privateDeliveryLink || '',
-        purchasedAt: p.purchasedAt || new Date().toISOString(),
+        secretDeliveryInfo: p.digitalProductDetails?.additionalInstructions || p.digitalProductDetails?.accountPassword || (p as any).secretDeliveryInfo || '',
+        privateDeliveryLink: (p as any).privateDeliveryLink || (p as any).secretDetails || '',
+        purchasedAt: p.purchasedAt || (p as any).date || (p as any).createdAt || new Date().toISOString(),
         transactionId: p.transactionId || p.id
       }));
 
-    const fromApi = apiUpdateOrders.map((u) => ({
-      id: u.id,
-      productName: u.productName || u.name || 'Zenet Update Package',
-      price: u.price || 0,
-      secretDeliveryInfo: u.secretDeliveryInfo || '',
-      privateDeliveryLink: u.privateDeliveryLink || '',
-      purchasedAt: u.purchasedAt || u.createdAt || new Date().toISOString(),
-      transactionId: u.transactionId || u.id
-    }));
+    const fromApi = apiUpdateOrders
+      .filter((u) => isZenetUpdateRecord(u))
+      .map((u) => ({
+        id: u.id,
+        productName: u.productName || u.name || 'Zenet Update Package',
+        price: u.price || 0,
+        secretDeliveryInfo: u.secretDeliveryInfo || '',
+        privateDeliveryLink: u.privateDeliveryLink || '',
+        purchasedAt: u.purchasedAt || u.createdAt || new Date().toISOString(),
+        transactionId: u.transactionId || u.id
+      }));
 
     const combined = [...fromApi];
     for (const p of fromPurchases) {
@@ -594,13 +640,26 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                     </div>
 
                     {/* Credentials Box */}
-                    {creds && (creds.accountEmail || creds.accountPassword || creds.backupCodes || creds.additionalInstructions) ? (
+                    {creds || (item as any).accountEmail ? (
                       <div className="pt-1">
                         <AccountCredentialsCard
-                          email={creds.accountEmail || ''}
-                          password={creds.accountPassword || ''}
-                          recoveryInfo={creds.twoFactorSecretKey || creds.twoFactorBackupCodes || creds.backupCodes || creds.recoveryInfo || ''}
-                          instructions={creds.additionalInstructions || ''}
+                          credentials={{
+                            ...(creds || {}),
+                            ...((item as any).accountEmail ? { accountEmail: (item as any).accountEmail } : {}),
+                            ...((item as any).accountPassword ? { accountPassword: (item as any).accountPassword } : {}),
+                            ...((item as any).phoneNumber ? { phoneNumber: (item as any).phoneNumber } : {}),
+                            ...((item as any).recoveryEmail ? { recoveryEmail: (item as any).recoveryEmail } : {}),
+                            ...((item as any).username ? { username: (item as any).username } : {}),
+                            ...((item as any).delivery_value ? { delivery_value: (item as any).delivery_value } : {}),
+                          }}
+                          listingId={item.listingId}
+                          purchaseId={item.id}
+                          email={creds?.accountEmail || (item as any).accountEmail || ''}
+                          password={creds?.accountPassword || (item as any).accountPassword || ''}
+                          recoveryInfo={creds?.recoveryInfo || ''}
+                          twoFactorSecret={creds?.twoFactorSecretKey || creds?.twoFactorSecret || ''}
+                          backupCodes={creds?.twoFactorBackupCodes || creds?.backupCodes || ''}
+                          instructions={creds?.additionalInstructions || ''}
                         />
                       </div>
                     ) : (

@@ -14,6 +14,7 @@ import {
   limit 
 } from 'firebase/firestore';
 import { db, getSafeIdToken } from '../lib/firebase';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { safeApiFetch } from '../utils/api';
 import { UserProfile, WalletTransaction } from '../types';
 import {
@@ -51,9 +52,8 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
   onOpenAuth,
   onBalanceUpdated
 }) => {
-  const authorizedEmail = 'azeezmusharaf4@gmail.com';
-  const currentUserEmail = user?.email?.trim().toLowerCase() || '';
-  const isAuthorized = currentUserEmail === authorizedEmail || userProfile?.role === 'owner';
+  const isAuthorized = isAuthorizedOwner(user, userProfile);
+  const currentUserEmail = user?.email?.trim() || userProfile?.email?.trim() || '';
 
   // Real-time collections state
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -195,8 +195,8 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
       return;
     }
 
-    if (!user || (user.email?.trim().toLowerCase() !== authorizedEmail && userProfile?.role !== 'owner')) {
-      setFeedback({ type: 'error', message: 'Access Denied: Only Azeezmusharaf4@gmail.com (Owner) is authorized to execute wallet overrides.' });
+    if (!isAuthorized) {
+      setFeedback({ type: 'error', message: 'Access Denied: Only an authorized Owner is permitted to execute wallet overrides.' });
       return;
     }
 
@@ -350,10 +350,10 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
               Admin Wallet Override Access Denied
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Access to the <strong>Admin Wallet Override</strong> tool and <code className="text-purple-700 font-mono">/admin/wallets</code> route is strictly restricted to authorized administrator:
+              Access to the <strong>Admin Wallet Override</strong> tool and <code className="text-purple-700 font-mono">/admin/wallets</code> route is strictly restricted to authorized platform owners.
             </p>
             <div className="bg-purple-50/50 border border-purple-200 p-2.5 rounded-xl text-xs font-mono font-bold text-purple-900">
-              {authorizedEmail}
+              Authorized Owner Role Required
             </div>
           </div>
 
@@ -414,7 +414,7 @@ export const AdminWalletsView: React.FC<AdminWalletsViewProps> = ({
                 OWNER SECURED
               </span>
               <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[9px] px-2.5 py-0.5 rounded font-mono font-bold">
-                {authorizedEmail}
+                AUTHORIZED OWNER
               </span>
             </div>
             <p className="text-xs text-slate-600">

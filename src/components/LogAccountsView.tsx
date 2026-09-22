@@ -10,6 +10,7 @@ import {
   Database
 } from 'lucide-react';
 import { UserProfile, AccountListing, CategoryType } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { ListingCard } from './ListingCard';
 
 interface LogAccountsViewProps {
@@ -71,7 +72,15 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
   // Sort and filter listings
   const filteredAndSortedListings = useMemo(() => {
     // 1. Exclude virtual numbers and sold items
-    let activeListings = listings.filter(item => item.status !== 'sold');
+    let activeListings = listings.filter(item => {
+      if (item.status === 'sold') return false;
+      const invAvail = Array.isArray(item.inventory)
+        ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
+        : undefined;
+      const stock = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
+      const effectiveStock = invAvail !== undefined ? invAvail : stock;
+      return effectiveStock > 0;
+    });
 
     // 2. Apply Category Filter
     if (categoryFilter !== 'All') {
@@ -110,7 +119,14 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
     const counts: Record<string, number> = {};
     listings.forEach(item => {
       if (item.status !== 'sold') {
-        counts[item.category] = (counts[item.category] || 0) + 1;
+        const invAvail = Array.isArray(item.inventory)
+          ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
+          : undefined;
+        const stock = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
+        const effectiveStock = invAvail !== undefined ? invAvail : stock;
+        if (effectiveStock > 0) {
+          counts[item.category] = (counts[item.category] || 0) + 1;
+        }
       }
     });
     return counts;
@@ -234,7 +250,7 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
               onToggleSave={onToggleSave}
               onViewSellerProfile={onViewSellerProfile}
               onDelete={onDeleteListing}
-              canDelete={userProfile?.role === 'owner' || userProfile?.email?.trim().toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.role === 'admin' || (userProfile?.role === 'seller' && userProfile.uid === item.sellerId)}
+              canDelete={isAuthorizedOwner(null, userProfile) || userProfile?.role === 'owner' || userProfile?.role === 'admin' || (userProfile?.role === 'seller' && userProfile.uid === item.sellerId)}
             />
           ))}
         </div>

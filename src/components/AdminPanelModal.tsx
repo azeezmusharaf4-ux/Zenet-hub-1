@@ -11,6 +11,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db, sanitizeFirestorePayload } from '../lib/firebase';
+import { isAuthorizedOwner, isAuthorizedOwnerEmail } from '../lib/authorizedOwners';
 import { safeApiFetch } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
 import { 
@@ -996,7 +997,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   onUpdateUserProfile,
   onUpdateListing
 }) => {
-  const isOwner = (user?.email?.trim().toLowerCase() === 'azeezmusharaf4@gmail.com') || userProfile?.role === 'owner';
+  const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   // Navigation tabs
@@ -1391,12 +1392,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   // User Actions
   const handleUpdateUserRole = async (uid: string, newRole: 'admin' | 'seller' | 'buyer') => {
     const targetUser = users.find(u => u.uid === uid);
-    if (targetUser?.email === 'azeezmusharaf4@gmail.com' || targetUser?.role === 'owner') {
+    if (isAuthorizedOwner(null, targetUser) || targetUser?.role === 'owner') {
       alert('Forbidden: Primary OWNER role cannot be changed or demoted.');
       return;
     }
     if (!isOwner) {
-      alert('Forbidden: Only the site OWNER (azeezmusharaf4@gmail.com) is authorized to promote or remove Administrators.');
+      alert('Forbidden: Only an authorized site OWNER is permitted to promote or remove Administrators.');
       return;
     }
     try {
@@ -1422,12 +1423,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   };
 
   const handleToggleUserSuspend = async (userItem: UserProfile) => {
-    if (userItem.email === 'azeezmusharaf4@gmail.com' || userItem.role === 'owner') {
+    if (isAuthorizedOwner(null, userItem) || userItem.role === 'owner') {
       alert('Action Denied: Primary OWNER account cannot be suspended.');
       return;
     }
     if (!isOwner && userItem.role === 'admin') {
-      alert('Action Denied: Only the Primary OWNER can suspend administrator accounts.');
+      alert('Action Denied: Only an authorized OWNER can suspend administrator accounts.');
       return;
     }
     const newStatus = userItem.status === 'suspended' ? 'active' : 'suspended';
@@ -1442,12 +1443,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   const handleDeleteUser = async (uid: string) => {
     const target = users.find(u => u.uid === uid);
-    if (target?.email === 'azeezmusharaf4@gmail.com' || target?.role === 'owner') {
+    if (isAuthorizedOwner(null, target) || target?.role === 'owner') {
       alert('Action Denied: Primary OWNER account cannot be deleted.');
       return;
     }
     if (!isOwner && target?.role === 'admin') {
-      alert('Action Denied: Only the Primary OWNER can delete administrator accounts.');
+      alert('Action Denied: Only an authorized OWNER can delete administrator accounts.');
       return;
     }
     if (!window.confirm('Are you sure you want to remove this user document from Firestore?')) return;
@@ -1675,19 +1676,19 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   if (!isAdmin) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#06030c]/85 backdrop-blur-md">
-        <div className="bg-[#120826] border border-rose-800/80 rounded-2xl w-full max-w-md p-6 text-center shadow-2xl space-y-4">
-          <div className="w-12 h-12 bg-rose-950/80 border border-rose-500/40 rounded-full flex items-center justify-center mx-auto text-rose-400">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="bg-white border border-[#EBE7F7] rounded-3xl w-full max-w-md p-6 text-center shadow-2xl space-y-4 text-[#0F172A]">
+          <div className="w-12 h-12 bg-rose-50 border border-rose-200 rounded-full flex items-center justify-center mx-auto text-rose-600">
             <ShieldCheck className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-black text-white">Access Restricted</h2>
-          <p className="text-xs text-purple-200/80 leading-relaxed">
+          <h2 className="text-lg font-black text-[#0F172A]">Access Restricted</h2>
+          <p className="text-xs text-[#64748B] leading-relaxed">
             The Admin Control Center is strictly reserved for authorized Admin accounts.
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 px-4 rounded-xl transition cursor-pointer text-xs"
+            className="w-full bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-bold py-2.5 px-4 rounded-xl transition cursor-pointer text-xs shadow-md shadow-[#5B4DF5]/20"
           >
             Return to Marketplace
           </button>
@@ -1697,24 +1698,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
       <div 
         id="admin-panel-modal"
         data-component="admin-panel"
-        className="relative w-full max-w-6xl bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] text-slate-800"
+        className="relative w-full max-w-6xl bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] text-[#0F172A]"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Top Header Bar */}
-        <div className="bg-white px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 flex-wrap gap-2">
+        <div className="bg-white px-5 py-3.5 border-b border-[#EBE7F7] flex items-center justify-between shrink-0 flex-wrap gap-2">
           <div className="flex items-center gap-3">
             {/* Admin Control Center Pill Capsule */}
-            <div className="px-4 py-2 rounded-full border border-blue-200 bg-blue-50 text-slate-900 shadow-xs flex items-center gap-3">
-              <ShieldCheck className="w-5 h-5 text-blue-600 shrink-0" />
-              <span className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
+            <div className="px-4 py-2 rounded-full border border-[#EBE7F7] bg-[#F8F7FD] text-[#0F172A] shadow-xs flex items-center gap-3">
+              <ShieldCheck className="w-5 h-5 text-[#5B4DF5] shrink-0" />
+              <span className="text-sm sm:text-base font-extrabold text-[#0F172A] tracking-tight">
                 Admin Control Center
               </span>
-              <span className="bg-pink-600 text-white font-black text-[10px] sm:text-[11px] px-3 py-0.5 sm:py-1 rounded-full uppercase tracking-wider shrink-0 shadow-xs">
+              <span className="bg-[#5B4DF5] text-white font-black text-[10px] sm:text-[11px] px-3 py-0.5 sm:py-1 rounded-full uppercase tracking-wider shrink-0 shadow-xs">
                 ADMIN
               </span>
             </div>
@@ -1722,7 +1723,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full transition cursor-pointer border border-slate-200 ml-auto"
+            className="p-2 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F1F0FB] rounded-full transition cursor-pointer border border-[#EBE7F7] ml-auto"
             title="Close Admin Panel"
           >
             <X className="w-5 h-5" />
@@ -2318,7 +2319,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   </div>
 
                   <div className="bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-mono text-amber-300 shrink-0">
-                    Active Admins: <strong>{users.filter(u => u.role === 'admin' || u.role === 'owner' || u.email === 'azeezmusharaf4@gmail.com').length}</strong>
+                    Active Admins: <strong>{users.filter(u => u.role === 'admin' || u.role === 'owner' || isAuthorizedOwner(null, u)).length}</strong>
                   </div>
                 </div>
 
@@ -2355,7 +2356,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       (u.uid && u.uid.toLowerCase().includes(adminSearch.toLowerCase()))
                     )
                     .map((u) => {
-                      const isThisOwner = u.email === 'azeezmusharaf4@gmail.com' || u.role === 'owner';
+                      const isThisOwner = isAuthorizedOwner(null, u) || u.role === 'owner';
                       const isThisAdmin = !isThisOwner && u.role === 'admin';
 
                       return (

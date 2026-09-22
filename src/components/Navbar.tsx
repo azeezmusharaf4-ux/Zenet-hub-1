@@ -5,6 +5,7 @@ import {
   PlusCircle 
 } from 'lucide-react';
 import { UserProfile } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { DashboardTab } from './UserDashboardModal';
 
 interface NavbarProps {
@@ -42,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeView,
   onGoHome
 }) => {
-  const isOwner = userProfile?.role === 'owner' || user?.email === 'azeezmusharaf4@gmail.com';
+  const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   return (

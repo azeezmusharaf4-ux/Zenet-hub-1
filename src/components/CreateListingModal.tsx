@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
 import { CategoryType, AccountListing, UserProfile } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { X, PlusCircle, ShieldCheck, Sparkles, Image, Check, AlertCircle, Key, Lock, Eye, EyeOff, Info, Edit, Trash2 } from 'lucide-react';
 
 interface CreateListingModalProps {
@@ -418,23 +419,23 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
   };
 
   // RBAC Guard: Only Admins & Owner can list products
-  const canManageProducts = userProfile?.role === 'admin' || userProfile?.role === 'owner' || user?.email === 'azeezmusharaf4@gmail.com';
+  const canManageProducts = userProfile?.role === 'admin' || isAuthorizedOwner(user, userProfile);
 
   if (!canManageProducts) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#06030c]/85 backdrop-blur-md">
-        <div className="bg-[#120826] border border-rose-800/80 rounded-2xl w-full max-w-md p-6 text-center shadow-2xl space-y-4">
-          <div className="w-12 h-12 bg-rose-950/80 border border-rose-500/40 rounded-full flex items-center justify-center mx-auto text-rose-400">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="bg-white border border-rose-200 rounded-2xl w-full max-w-md p-6 text-center shadow-2xl space-y-4">
+          <div className="w-12 h-12 bg-rose-50 border border-rose-200 rounded-full flex items-center justify-center mx-auto text-rose-600">
             <ShieldCheck className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-black text-white">Access Restricted</h2>
-          <p className="text-xs text-purple-200/80 leading-relaxed">
+          <h2 className="text-lg font-black text-[#0F172A]">Access Restricted</h2>
+          <p className="text-xs text-[#64748B] leading-relaxed">
             Product creation and listing management are strictly reserved for authorized Admin accounts.
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 px-4 rounded-xl transition cursor-pointer text-xs"
+            className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-bold py-2.5 px-4 rounded-xl transition cursor-pointer text-xs shadow-sm"
           >
             Return to Marketplace
           </button>
@@ -444,22 +445,22 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#06030c]/85 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
       <div 
-        className="bg-[#120826] border border-[#2d1952] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-auto max-h-[92vh] flex flex-col relative text-purple-100"
+        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-auto max-h-[92vh] flex flex-col relative text-[#0F172A]"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div className="bg-[#0e061e] px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#241344] flex items-center justify-between shrink-0">
+        <div className="bg-[#F8F7FD] px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#EBE7F7] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
-            <PlusCircle className="w-5 h-5 text-purple-400" />
-            <h2 className="font-extrabold text-white text-base sm:text-lg">List Social Media Account</h2>
+            <PlusCircle className="w-5 h-5 text-[#5B4DF5]" />
+            <h2 className="font-extrabold text-[#0F172A] text-base sm:text-lg">List Social Media Account</h2>
           </div>
           <button
             type="button"
             onClick={handleRequestClose}
-            className="p-1.5 sm:p-2 text-purple-300 hover:text-white bg-[#1e1039] border border-[#371d67] rounded-full transition cursor-pointer"
+            className="p-1.5 sm:p-2 text-[#64748B] hover:text-[#0F172A] bg-white border border-[#EBE7F7] rounded-full transition cursor-pointer shadow-2xs"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
@@ -469,7 +470,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-5 text-xs sm:text-sm">
           
           {error && (
-            <div className="bg-rose-950/80 border border-rose-800 text-rose-300 p-3 rounded-xl flex items-center gap-2">
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -477,7 +478,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
 
           {/* Category Picker */}
           <div>
-            <label className="block text-purple-300/80 font-semibold mb-2">Account Platform Category *</label>
+            <label className="block text-[#64748B] font-semibold mb-2">Account Platform Category *</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2">
               {([
                 'Facebook', 'Instagram', 'TikTok', 'YouTube', 'Gmail',
@@ -490,8 +491,8 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                   onClick={() => setCategory(cat)}
                   className={`py-2 px-2.5 rounded-full font-bold border transition text-center text-xs cursor-pointer truncate ${
                     category === cat
-                      ? 'bg-purple-600/40 text-purple-100 border-purple-400 shadow-md ring-2 ring-purple-500/50'
-                      : 'bg-[#180c33] text-purple-300/70 border-[#2d1a55] hover:border-purple-500/40'
+                      ? 'bg-[#EDE9FE] text-[#5B4DF5] border-[#5B4DF5] shadow-xs ring-2 ring-[#5B4DF5]/20'
+                      : 'bg-[#F8F7FD] text-[#64748B] border-[#EBE7F7] hover:border-[#5B4DF5]/40 hover:text-[#0F172A]'
                   }`}
                 >
                   {cat}
@@ -503,19 +504,19 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
           {/* Title & Price */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
-              <label className="block text-purple-300/80 font-semibold mb-1">Listing Title *</label>
+              <label className="block text-[#64748B] font-semibold mb-1">Listing Title *</label>
               <input
                 type="text"
                 placeholder="e.g., Monetized 120K Followers TikTok Account (USA Audience)"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1">Price (₦ Naira) *</label>
+              <label className="block text-[#64748B] font-semibold mb-1">Price (₦ Naira) *</label>
               <input
                 type="number"
                 min="1"
@@ -523,7 +524,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 required
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               />
             </div>
           </div>
@@ -531,59 +532,59 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
           {/* Followers / Audience & Account Age */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1">Followers / Audience / Batch Size</label>
+              <label className="block text-[#64748B] font-semibold mb-1">Followers / Audience / Batch Size</label>
               <input
                 type="text"
                 placeholder="e.g., 50,000 Followers or 5 Aged Accounts"
                 value={followers}
                 onChange={(e) => setFollowers(e.target.value)}
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1">Account Age / Creation Year</label>
+              <label className="block text-[#64748B] font-semibold mb-1">Account Age / Creation Year</label>
               <input
                 type="text"
                 placeholder="e.g., 4 Years Old (2020)"
                 value={accountAge}
                 onChange={(e) => setAccountAge(e.target.value)}
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               />
             </div>
           </div>
 
           {/* Toggle Flags (PVA, 2FA, Monetized) */}
-          <div className="bg-[#170c30] p-4 rounded-3xl border border-[#2e1852] space-y-3">
-            <span className="block text-xs font-bold text-purple-300/80 uppercase">Verification & Security Features</span>
+          <div className="bg-[#F8F7FD] p-4 rounded-3xl border border-[#EBE7F7] space-y-3">
+            <span className="block text-xs font-bold text-[#64748B] uppercase">Verification & Security Features</span>
             
             <div className="flex flex-wrap items-center gap-4 text-xs">
-              <label className="flex items-center gap-2 cursor-pointer text-purple-200">
+              <label className="flex items-center gap-2 cursor-pointer text-[#0F172A]">
                 <input
                   type="checkbox"
                   checked={pva}
                   onChange={(e) => setPva(e.target.checked)}
-                  className="w-4 h-4 rounded bg-[#100722] border-[#2e1852] text-purple-600 focus:ring-0"
+                  className="w-4 h-4 rounded bg-white border-[#EBE7F7] text-[#5B4DF5] focus:ring-0"
                 />
                 <span>Phone Verified (PVA)</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer text-purple-200">
+              <label className="flex items-center gap-2 cursor-pointer text-[#0F172A]">
                 <input
                   type="checkbox"
                   checked={twoFactor}
                   onChange={(e) => setTwoFactor(e.target.checked)}
-                  className="w-4 h-4 rounded bg-[#100722] border-[#2e1852] text-indigo-500 focus:ring-0"
+                  className="w-4 h-4 rounded bg-white border-[#EBE7F7] text-[#5B4DF5] focus:ring-0"
                 />
                 <span>2FA Enabled</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer text-purple-200">
+              <label className="flex items-center gap-2 cursor-pointer text-[#0F172A]">
                 <input
                   type="checkbox"
                   checked={monetized}
                   onChange={(e) => setMonetized(e.target.checked)}
-                  className="w-4 h-4 rounded bg-[#100722] border-[#2e1852] text-amber-500 focus:ring-0"
+                  className="w-4 h-4 rounded bg-white border-[#EBE7F7] text-amber-500 focus:ring-0"
                 />
                 <span>Monetized / Ad Ready</span>
               </label>
@@ -593,33 +594,33 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
           {/* Country, Niche, Guarantee */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1">Target Country</label>
+              <label className="block text-[#64748B] font-semibold mb-1">Target Country</label>
               <input
                 type="text"
                 placeholder="Nigeria, United States, UK, Global"
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1">Niche / Category</label>
+              <label className="block text-[#64748B] font-semibold mb-1">Niche / Category</label>
               <input
                 type="text"
                 placeholder="Gaming, Crypto, Fashion, E-commerce"
                 value={niche}
                 onChange={(e) => setNiche(e.target.value)}
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1">Warranty Days</label>
+              <label className="block text-[#64748B] font-semibold mb-1">Warranty Days</label>
               <select
                 value={warrantyDays}
                 onChange={(e) => setWarrantyDays(Number(e.target.value))}
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               >
                 <option value={3}>3 Days Replacement</option>
                 <option value={7}>7 Days Replacement</option>
@@ -631,31 +632,31 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
 
           {/* Description */}
           <div>
-            <label className="block text-purple-300/80 font-semibold mb-1">Account Description & Public Overview *</label>
+            <label className="block text-[#64748B] font-semibold mb-1">Account Description & Public Overview *</label>
             <textarea
               rows={3}
               placeholder="Describe account engagement, reach, audience demographics, monetization status, and general highlights for buyers..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-[#170c30] text-purple-100 p-3 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+              className="w-full bg-[#F8F7FD] text-[#0F172A] p-3 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
             />
           </div>
 
           {/* Secure Digital Product Details Section (Multi-Stock Inventory Manager) */}
-          <div className="bg-[#180938] border border-[#3b1d73] p-4 sm:p-5 rounded-3xl space-y-4 shadow-xl relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-500/20 pb-3">
+          <div className="bg-[#F8F7FD] border border-[#EBE7F7] p-4 sm:p-5 rounded-3xl space-y-4 shadow-xs relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#EBE7F7] pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-purple-900/60 border border-purple-500/40 flex items-center justify-center text-amber-300">
+                <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] border border-[#DDD6FE] flex items-center justify-center text-[#5B4DF5]">
                   <Key className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-white text-sm flex items-center gap-2">
+                  <h3 className="font-extrabold text-[#0F172A] text-sm flex items-center gap-2">
                     Product Stock / Inventory
-                    <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-emerald-400" /> Private Escrow
+                    <span className="bg-white text-[#5B4DF5] border border-[#DDD6FE] text-[10px] px-2 py-0.5 rounded-full uppercase font-bold flex items-center gap-1 shadow-2xs">
+                      <Lock className="w-3 h-3 text-[#5B4DF5]" /> Private Escrow
                     </span>
                   </h3>
-                  <p className="text-[11px] text-purple-200/70">
+                  <p className="text-[11px] text-[#64748B]">
                     Each stock item is unique and sold only once to one customer.
                   </p>
                 </div>
@@ -663,29 +664,29 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
 
               {/* Stock Count Pill */}
               <div className="flex items-center gap-2 self-start sm:self-auto">
-                <div className="px-3 py-1 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-300 text-xs font-black flex items-center gap-1.5 shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <div className="px-3 py-1 bg-white border border-[#DDD6FE] rounded-xl text-[#5B4DF5] text-xs font-black flex items-center gap-1.5 shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-[#5B4DF5] animate-pulse" />
                   <span>Available Stock: {inventoryAccounts.length}</span>
                 </div>
               </div>
             </div>
 
             {/* Privacy Alert Banner */}
-            <div className="bg-purple-950/60 border border-purple-500/30 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-purple-200">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="bg-white border border-[#EBE7F7] p-3 rounded-2xl flex items-start gap-2.5 text-xs text-[#64748B] shadow-2xs">
+              <ShieldCheck className="w-4 h-4 text-[#5B4DF5] shrink-0 mt-0.5" />
               <p className="text-[11px] leading-relaxed">
-                <strong className="text-white font-bold">Confidential & Encrypted:</strong> Customers never see unused stock. Upon purchase, the server atomically reserves and reveals <span className="text-emerald-300 font-bold">exactly ONE unique item</span> to the buyer.
+                <strong className="text-[#0F172A] font-bold">Confidential & Encrypted:</strong> Customers never see unused stock. Upon purchase, the server atomically reserves and reveals <span className="text-[#5B4DF5] font-bold">exactly ONE unique item</span> to the buyer.
               </p>
             </div>
 
             {/* List of currently added accounts in the inventory */}
             {inventoryAccounts.length > 0 && (
-              <div className="space-y-2 mb-4 bg-[#12062a] p-3.5 rounded-2xl border border-purple-500/20">
+              <div className="space-y-2 mb-4 bg-white p-3.5 rounded-2xl border border-[#EBE7F7] shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase font-black text-purple-300 tracking-wider flex items-center gap-1.5">
+                  <span className="text-[11px] uppercase font-black text-[#0F172A] tracking-wider flex items-center gap-1.5">
                     <span>Available Stock Items ({inventoryAccounts.length})</span>
                   </span>
-                  <span className="text-[10px] text-purple-300/60 font-semibold">
+                  <span className="text-[10px] text-[#64748B] font-semibold">
                     1 item sold per customer purchase
                   </span>
                 </div>
@@ -693,23 +694,23 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                   {inventoryAccounts.map((item, idx) => (
                     <div 
                       key={item.id}
-                      className="bg-[#1a0c3a]/70 border border-purple-900/60 hover:border-purple-500/40 p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs transition"
+                      className="bg-[#F8F7FD] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs transition"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="bg-purple-900/80 text-purple-200 text-[10px] font-black px-2 py-0.5 rounded-md border border-purple-700/50">
+                          <span className="bg-[#EDE9FE] text-[#5B4DF5] text-[10px] font-black px-2 py-0.5 rounded-md border border-[#DDD6FE]">
                             Item #{idx + 1}
                           </span>
-                          <span className="text-white font-mono font-medium truncate max-w-[240px]">
+                          <span className="text-[#0F172A] font-mono font-medium truncate max-w-[240px]">
                             {item.accountEmail || item.delivery_value || 'Stock Item'}
                           </span>
                           {item.accountPassword && (
-                            <span className="text-purple-300/60 font-mono text-[11px]">
+                            <span className="text-[#64748B] font-mono text-[11px]">
                               • pass: ••••••
                             </span>
                           )}
                           {editingIndex === idx && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-900">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
                               Editing
                             </span>
                           )}
@@ -722,7 +723,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                             setStockInputMode('detailed');
                             handleEditAccountLocal(idx);
                           }}
-                          className="p-1.5 text-purple-300 hover:text-white hover:bg-purple-900/40 rounded-lg transition cursor-pointer"
+                          className="p-1.5 text-[#64748B] hover:text-[#0F172A] hover:bg-[#EDE9FE] rounded-lg transition cursor-pointer"
                           title="Edit Stock Item"
                         >
                           <Edit className="w-3.5 h-3.5" />
@@ -730,7 +731,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRemoveAccountLocal(idx)}
-                          className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                           title="Delete Stock Item"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -743,7 +744,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
             )}
 
             {/* Input Mode Selector */}
-            <div className="flex rounded-xl bg-[#100624] p-1 border border-purple-900/40">
+            <div className="flex rounded-xl bg-white p-1 border border-[#EBE7F7] shadow-2xs">
               <button
                 type="button"
                 onClick={() => {
@@ -752,8 +753,8 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                 }}
                 className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                   stockInputMode === 'bulk'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-purple-300 hover:text-white'
+                    ? 'bg-[#5B4DF5] text-white shadow-xs'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
                 }`}
               >
                 <span>Add Items One Per Line (Bulk)</span>
@@ -763,8 +764,8 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                 onClick={() => setStockInputMode('detailed')}
                 className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                   stockInputMode === 'detailed'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-purple-300 hover:text-white'
+                    ? 'bg-[#5B4DF5] text-white shadow-xs'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
                 }`}
               >
                 <span>Detailed Credentials Form</span>
@@ -773,12 +774,12 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
 
             {/* MODE 1: BULK ONE PER LINE */}
             {stockInputMode === 'bulk' && (
-              <div className="bg-[#13072b] p-3.5 rounded-2xl border border-purple-500/20 space-y-3">
+              <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <label className="block text-purple-200 text-xs font-bold">
+                  <label className="block text-[#0F172A] text-xs font-bold">
                     Paste Multiple Stock Items (One per line)
                   </label>
-                  <span className="text-[10px] text-purple-300/60">
+                  <span className="text-[10px] text-[#64748B]">
                     Supports code, email:pass, or delivery lines
                   </span>
                 </div>
@@ -787,14 +788,14 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                   value={bulkStockText}
                   onChange={(e) => setBulkStockText(e.target.value)}
                   placeholder={`CODE-001\nCODE-002\nCODE-003\nuser@domain.com:password123 | 2FA:JBSWY3DPEHPK3PXP\nacc_login@gmail.com:StrongPass2024!`}
-                  className="w-full bg-[#0a0418] text-purple-100 text-xs font-mono p-3 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 placeholder:text-purple-400/30"
+                  className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs font-mono p-3 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white placeholder:text-[#94A3B8]"
                 />
                 <button
                   type="button"
                   onClick={handleAddBulkStock}
-                  className="w-full bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-purple-950/50"
+                  className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                 >
-                  <PlusCircle className="w-4 h-4 text-purple-300" />
+                  <PlusCircle className="w-4 h-4 text-white" />
                   <span>+ Add Line(s) to Stock Inventory (Preserves Existing)</span>
                 </button>
               </div>
@@ -802,37 +803,37 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
 
             {/* MODE 2: DETAILED FORM */}
             {stockInputMode === 'detailed' && (
-              <div className="bg-[#13072b] p-3.5 rounded-2xl border border-purple-500/20 space-y-3.5">
-                <span className="text-[10px] uppercase font-bold text-amber-300 tracking-wider block">
+              <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase font-bold text-[#5B4DF5] tracking-wider block">
                   {editingIndex !== null ? `Edit Stock Item #${editingIndex + 1}` : 'Enter Single Stock Item Details'}
                 </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">Stock Item Login / Email / Code *</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">Stock Item Login / Email / Code *</label>
                     <input
                       type="text"
                       placeholder="e.g. CODE-001 or account@gmail.com"
                       value={accountEmail}
                       onChange={(e) => setAccountEmail(e.target.value)}
-                      className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 font-mono"
+                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">Account Password (If applicable)</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">Account Password (If applicable)</label>
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
                         placeholder="e.g. AccountPass123!"
                         value={accountPassword}
                         onChange={(e) => setAccountPassword(e.target.value)}
-                        className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 pr-9 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 font-mono"
+                        className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 pr-9 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2.5 top-2.5 text-purple-400 hover:text-white transition cursor-pointer"
+                        className="absolute right-2.5 top-2.5 text-[#64748B] hover:text-[#0F172A] transition cursor-pointer"
                         title={showPassword ? 'Hide Password' : 'Show Password'}
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -843,47 +844,47 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">Recovery Info / Note</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">Recovery Info / Note</label>
                     <input
                       type="text"
                       placeholder="e.g. recovery@gmail.com"
                       value={recoveryInfo}
                       onChange={(e) => setRecoveryInfo(e.target.value)}
-                      className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400"
+                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">2FA Secret Key</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">2FA Secret Key</label>
                     <input
                       type="text"
                       placeholder="e.g. JBSWY3DPEHPK3PXP"
                       value={twoFactorSecretKey}
                       onChange={(e) => setTwoFactorSecretKey(e.target.value)}
-                      className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 font-mono"
+                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">2FA Backup Codes</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">2FA Backup Codes</label>
                     <input
                       type="text"
                       placeholder="e.g. 1234-5678, 8765-4321..."
                       value={twoFactorBackupCodes}
                       onChange={(e) => setTwoFactorBackupCodes(e.target.value)}
-                      className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 font-mono"
+                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-purple-200 text-xs font-bold mb-1">Additional Transfer Instructions</label>
+                  <label className="block text-[#0F172A] text-xs font-bold mb-1">Additional Transfer Instructions</label>
                   <textarea
                     rows={2}
                     placeholder="e.g. Clean IP access instructions, original email access notes..."
                     value={additionalInstructions}
                     onChange={(e) => setAdditionalInstructions(e.target.value)}
-                    className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400"
+                    className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
                   />
                 </div>
 
@@ -891,9 +892,9 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddAccountToInventory}
-                    className="w-full bg-[#261250] hover:bg-[#321868] border border-[#48229b] text-purple-100 font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full bg-[#EDE9FE] hover:bg-[#DDD6FE] border border-[#DDD6FE] text-[#5B4DF5] font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
                   >
-                    <PlusCircle className="w-4 h-4 text-purple-400" />
+                    <PlusCircle className="w-4 h-4 text-[#5B4DF5]" />
                     <span>{editingIndex !== null ? '💾 Save Item Changes' : '＋ Add This Item to Stock'}</span>
                   </button>
                 </div>
@@ -904,41 +905,41 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
           {/* Direct Seller Contact Details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1">WhatsApp Number (Optional)</label>
+              <label className="block text-[#64748B] font-semibold mb-1">WhatsApp Number (Optional)</label>
               <input
                 type="text"
                 placeholder="e.g. +2348012345678"
                 value={sellerWhatsapp}
                 onChange={(e) => setSellerWhatsapp(e.target.value)}
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               />
             </div>
 
             <div>
-              <label className="block text-purple-300/80 font-semibold mb-1">Telegram Username (Optional)</label>
+              <label className="block text-[#64748B] font-semibold mb-1">Telegram Username (Optional)</label>
               <input
                 type="text"
                 placeholder="e.g. @zenet_seller"
                 value={sellerTelegram}
                 onChange={(e) => setSellerTelegram(e.target.value)}
-                className="w-full bg-[#170c30] text-purple-100 p-2.5 rounded-2xl border border-[#2e1852] focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
               />
             </div>
           </div>
 
           {/* Submit & Cancel Actions */}
-          <div className="pt-3 border-t border-[#251347] flex items-center justify-end gap-3">
+          <div className="pt-3 border-t border-[#EBE7F7] flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={handleRequestClose}
-              className="px-5 py-3 text-purple-300 hover:text-white bg-[#1e1039] hover:bg-[#28154e] border border-[#371d67] rounded-full font-bold text-xs sm:text-sm transition cursor-pointer"
+              className="px-5 py-3 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] rounded-full font-bold text-xs sm:text-sm transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold py-3 rounded-full shadow-lg shadow-purple-600/30 transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2"
+              className="flex-1 bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold py-3 rounded-full shadow-md transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2"
             >
               <PlusCircle className="w-4 h-4" />
               <span>{loading ? 'Publishing Listing...' : 'Publish Account Listing'}</span>
@@ -949,15 +950,15 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
 
         {/* Unsaved Changes Confirmation Dialog */}
         {showCancelConfirm && (
-          <div className="absolute inset-0 z-50 bg-[#05020d]/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
-            <div className="bg-[#160b30] border border-[#3d1d70] p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl text-center">
-              <div className="w-12 h-12 bg-amber-950/80 border border-amber-500/40 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white border border-[#EBE7F7] p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl text-center">
+              <div className="w-12 h-12 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-center mx-auto text-amber-500">
                 <AlertCircle className="w-6 h-6" />
               </div>
               
               <div className="space-y-1">
-                <h3 className="font-extrabold text-white text-base sm:text-lg">Unsaved Changes</h3>
-                <p className="text-xs text-purple-300/80 leading-relaxed">
+                <h3 className="font-extrabold text-[#0F172A] text-base sm:text-lg">Unsaved Changes</h3>
+                <p className="text-xs text-[#64748B] leading-relaxed">
                   You have unsaved changes. Are you sure you want to cancel?
                 </p>
               </div>
@@ -966,7 +967,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCancelConfirm(false)}
-                  className="py-2.5 px-3 bg-[#241344] hover:bg-[#321a5d] text-purple-200 border border-[#3e1f73] rounded-xl font-bold text-xs transition cursor-pointer"
+                  className="py-2.5 px-3 bg-[#F8F7FD] hover:bg-[#F2EFFC] text-[#0F172A] border border-[#EBE7F7] rounded-xl font-bold text-xs transition cursor-pointer"
                 >
                   Continue Editing
                 </button>

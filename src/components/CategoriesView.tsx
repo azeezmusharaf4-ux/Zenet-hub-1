@@ -191,7 +191,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
     <div className="space-y-6 animate-in fade-in duration-200 max-w-7xl mx-auto pb-12">
       
       {/* Category Header Banner */}
-      <div className="bg-gradient-to-r from-purple-950/90 via-[#170a33] to-indigo-950/90 border border-[#381d6d] p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-2xl">
+      <div className="bg-[#F8F7FD] border border-[#EBE7F7] p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-xs">
         {onBackToMarketplace && (
           <button
             type="button"
@@ -199,7 +199,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
               window.scrollTo({ top: 0, behavior: 'instant' });
               onBackToMarketplace();
             }}
-            className="inline-flex items-center gap-2 text-purple-300 hover:text-white font-extrabold text-xs transition bg-[#170c30] px-4 py-2.5 rounded-xl border border-purple-900/40 cursor-pointer shadow-sm mb-4 active:scale-95"
+            className="inline-flex items-center gap-2 text-[#64748B] hover:text-[#0F172A] font-extrabold text-xs transition bg-white px-4 py-2.5 rounded-xl border border-[#EBE7F7] cursor-pointer shadow-2xs mb-4 active:scale-95"
             title="Back to Marketplace"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -208,16 +208,16 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
         )}
 
         <div className="relative z-10 space-y-2 max-w-2xl">
-          <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
-            <Layers className="w-3.5 h-3.5 text-purple-400" />
+          <div className="inline-flex items-center gap-2 bg-[#EDE9FE] text-[#5B4DF5] border border-[#DDD6FE] text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+            <Layers className="w-3.5 h-3.5 text-[#5B4DF5]" />
             <span>Escrow Categories Catalog</span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
             Browse Verified Digital Accounts by Category
           </h1>
 
-          <p className="text-xs sm:text-sm text-purple-200/80 leading-relaxed">
+          <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
             All accounts are manually audited and backed by ZENET 7-Day Escrow Money-Back Protection. Select a category below to filter active listings.
           </p>
         </div>
@@ -234,29 +234,29 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
             <div
               key={cat.type}
               onClick={() => onSelectCategory(cat.type)}
-              className={`bg-gradient-to-br ${cat.bgGradient} border ${cat.borderAccent} p-5 sm:p-6 rounded-3xl space-y-4 hover:border-purple-400/60 transition duration-200 cursor-pointer shadow-xl group relative overflow-hidden`}
+              className="bg-white border border-[#EBE7F7] p-5 sm:p-6 rounded-3xl space-y-4 hover:border-[#5B4DF5]/50 transition duration-200 cursor-pointer shadow-xs hover:shadow-md group relative overflow-hidden text-[#0F172A]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3.5">
-                  <div className={`w-12 h-12 rounded-2xl ${platformConfig.avatarBg} flex items-center justify-center p-2 shadow-lg border border-white/20 shrink-0 text-white`}>
+                  <div className={`w-12 h-12 rounded-2xl ${platformConfig.avatarBg} flex items-center justify-center p-2 shadow-sm border border-[#EBE7F7] shrink-0 text-white`}>
                     {platformConfig.iconSvg}
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-white text-base sm:text-lg group-hover:text-purple-200 transition">
+                    <h3 className="font-extrabold text-[#0F172A] text-base sm:text-lg group-hover:text-[#5B4DF5] transition">
                       {cat.title}
                     </h3>
-                    <span className="text-xs text-purple-300/70 font-mono font-semibold">
+                    <span className="text-xs text-[#64748B] font-mono font-semibold">
                       {count} Active Escrow {count === 1 ? 'Listing' : 'Listings'}
                     </span>
                   </div>
                 </div>
 
-                <div className="w-9 h-9 rounded-full bg-[#1c0e3a] border border-[#371b6d] flex items-center justify-center text-purple-300 group-hover:bg-purple-600 group-hover:text-white transition shrink-0">
+                <div className="w-9 h-9 rounded-full bg-[#F8F7FD] border border-[#EBE7F7] flex items-center justify-center text-[#64748B] group-hover:bg-[#5B4DF5] group-hover:text-white transition shrink-0 shadow-2xs">
                   <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition" />
                 </div>
               </div>
 
-              <p className="text-xs text-purple-200/75 leading-relaxed line-clamp-2">
+              <p className="text-xs text-[#64748B] leading-relaxed line-clamp-2">
                 {cat.description}
               </p>
 
@@ -265,18 +265,18 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                 {cat.popularBadges.map((badge, idx) => (
                   <span
                     key={idx}
-                    className="bg-[#180c35]/80 text-purple-200/90 border border-[#381a6c] text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1"
+                    className="bg-[#F8F7FD] text-[#0F172A] border border-[#EBE7F7] text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1"
                   >
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <CheckCircle2 className="w-3 h-3 text-[#5B4DF5]" />
                     {badge}
                   </span>
                 ))}
               </div>
 
               {/* Footer CTA */}
-              <div className="pt-2 border-t border-purple-500/20 flex items-center justify-between text-xs font-extrabold text-purple-300 group-hover:text-white">
+              <div className="pt-2 border-t border-[#EBE7F7] flex items-center justify-between text-xs font-extrabold text-[#5B4DF5] group-hover:text-[#4838EE]">
                 <span>View All {cat.type} Listings</span>
-                <span className="text-[10px] bg-purple-950/80 text-purple-300 border border-purple-800/80 px-2 py-0.5 rounded uppercase">
+                <span className="text-[10px] bg-[#EDE9FE] text-[#5B4DF5] border border-[#DDD6FE] px-2 py-0.5 rounded uppercase">
                   ESCROW ACTIVE
                 </span>
               </div>

@@ -353,6 +353,18 @@
     "/zenedUpdateOrders/{orderId}": {
       "schema": "zenedUpdateOrders",
       "description": "Purchased update orders"
+    },
+    "/wallets/{walletId}": {
+      "schema": "users",
+      "description": "User wallet balance mirror for dual persistence"
+    },
+    "/listings/{listingId}/inventory/{itemId}": {
+      "schema": "listings",
+      "description": "Individual account stock items for multi-stock listings"
+    },
+    "/listings/{listingId}/inventory/{itemId}/secure/{detailId}": {
+      "schema": "listings",
+      "description": "Sensitive credentials and backup codes for inventory accounts"
     }
   }
 }

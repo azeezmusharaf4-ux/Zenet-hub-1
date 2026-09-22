@@ -4,12 +4,18 @@ service cloud.firestore {
     
     // Helper function to check if caller is the verified administrator/owner
     function isOwnerEmail() {
-      return request.auth != null && 
-        request.auth.token.email is string && (
-          request.auth.token.email == 'azeezmusharaf4@gmail.com' ||
-          request.auth.token.email == 'Azeezmusharaf4@gmail.com' ||
-          request.auth.token.email.lower() == 'azeezmusharaf4@gmail.com'
-        );
+      return request.auth != null && (
+        (request.auth.token.email is string && (
+          request.auth.token.email.lower() == 'azeezmusharaf4@gmail.com' ||
+          request.auth.token.email.lower() == 'muzenteofficial001@gmail.com' ||
+          request.auth.token.email.lower() == 'azeezmusharaf@gmail.com' ||
+          request.auth.token.email == 'zenet-backend-service@zenetmarketplace.internal' ||
+          request.auth.token.email == 'system-backend@zenetmarketplace.app'
+        )) ||
+        request.auth.uid == 'LAn8Lec9ccT6rGEiDdylF8FfPZZ2' ||
+        request.auth.uid == '6nTqAgRTFkYoIUmlZwUN52rRmwt2' ||
+        request.auth.uid == 'SO3NblzYl2cQGoYtxuf58Wq1kOw1'
+      );
     }
 
     function isAdmin() {
@@ -54,15 +60,48 @@ service cloud.firestore {
     match /listings/{listingId} {
       allow read: if true;
       allow create: if isAuthenticated() && (request.resource.data.sellerId == request.auth.uid || isAdmin());
-      allow update: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (
+        resource.data.sellerId == request.auth.uid || 
+        isAdmin() ||
+        // Allow buyers to update stock and status during checkout
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'stockCount', 'status', 'inventory', 'updatedAt'])
+      );
       allow delete: if isAuthenticated() && (resource.data.sellerId == request.auth.uid || isAdmin());
 
+      // Inventory subcollection: status and availability of accounts (contains NO credentials/passwords)
       match /inventory/{itemId} {
-        allow read, write: if isAuthenticated() && (
-          resource.data.sellerId == request.auth.uid || 
-          request.resource.data.sellerId == request.auth.uid || 
+        allow read: if true;
+        allow create: if isAuthenticated() && (
+          get(/databases/$(database)/documents/listings/$(listingId)).data.sellerId == request.auth.uid || 
           isAdmin()
         );
+        allow update: if isAuthenticated() && (
+          get(/databases/$(database)/documents/listings/$(listingId)).data.sellerId == request.auth.uid || 
+          isAdmin() ||
+          (request.resource.data.soldTo == request.auth.uid) ||
+          (resource.data.soldTo == request.auth.uid)
+        );
+        allow delete: if isAuthenticated() && (
+          get(/databases/$(database)/documents/listings/$(listingId)).data.sellerId == request.auth.uid || 
+          isAdmin()
+        );
+
+        // Secure subcollection: credentials and backup codes for inventory accounts
+        match /secure/{detailId} {
+          allow read: if isAuthenticated() && (
+            isAdmin() ||
+            get(/databases/$(database)/documents/listings/$(listingId)).data.sellerId == request.auth.uid ||
+            (
+              exists(/databases/$(database)/documents/listings/$(listingId)/inventory/$(itemId)) &&
+              get(/databases/$(database)/documents/listings/$(listingId)/inventory/$(itemId)).data.soldTo == request.auth.uid
+            ) ||
+            (resource.data != null && resource.data.soldTo == request.auth.uid)
+          );
+          allow write: if isAuthenticated() && (
+            isAdmin() ||
+            get(/databases/$(database)/documents/listings/$(listingId)).data.sellerId == request.auth.uid
+          );
+        }
       }
     }
 

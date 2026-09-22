@@ -31,6 +31,7 @@ import { sanitizeApiErrorMessage, isValidOtpCode, isInvalidOtpCode, resolveCount
 import { copyToClipboard } from '../utils/clipboard';
 import { CountrySelectModal } from './CountrySelectModal';
 import { ServiceSelectModal } from './ServiceSelectModal';
+import { ServiceUnavailableView } from './ServiceUnavailableView';
 
 export interface PriceOption {
   optionId: string;
@@ -62,6 +63,17 @@ interface VirtualNumbersViewProps {
 }
 
 export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
+  onBackToMarketplace
+}) => {
+  return (
+    <ServiceUnavailableView
+      serviceType="service-number"
+      onBackToMarketplace={onBackToMarketplace}
+    />
+  );
+};
+
+export const _OldVirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   userProfile,
   walletBalance,
   onRefreshProfile,

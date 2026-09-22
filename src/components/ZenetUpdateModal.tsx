@@ -269,6 +269,8 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
         userId: user.uid,
         userEmail: user.email || '',
         type: 'purchase',
+        category: 'zenet_update',
+        transactionCategory: 'zenet_update',
         amount: realPrice,
         description: `Purchase: ${freshData.name || product.name}`,
         date: new Date().toISOString(),
@@ -291,7 +293,10 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
         secretDeliveryInfo: secretLink,
         purchasedAt: new Date().toISOString(),
         status: 'completed',
-        transactionId: txDocRef.id
+        transactionId: txDocRef.id,
+        type: 'zenet_update',
+        category: 'Zenet Update',
+        transactionCategory: 'zenet_update'
       };
 
       await setDoc(orderDocRef, sanitizeFirestorePayload({
@@ -312,7 +317,9 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
         sellerName: 'ZENET HUB Official Updates',
         amount: realPrice,
         price: realPrice,
+        type: 'zenet_update',
         category: 'Zenet Update',
+        transactionCategory: 'zenet_update',
         status: 'completed',
         secretDetails: secretLink,
         credentials: secretLink,

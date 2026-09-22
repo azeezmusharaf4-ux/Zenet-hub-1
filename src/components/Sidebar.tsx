@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { UserProfile, ActiveAppView } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 
 interface SidebarProps {
   user: User | null;
@@ -48,7 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   walletBalance = 0,
   ordersCount = 0
 }) => {
-  const isOwner = user?.email?.trim().toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.role === 'owner';
+  const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   const menuItems = [

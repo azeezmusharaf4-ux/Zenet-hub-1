@@ -158,18 +158,12 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
           {/* Buy Button */}
           <button
             onClick={() => {
-              if (isSoldOut) return;
               if (onBuyNow) {
                 onClose();
                 onBuyNow(current);
               }
             }}
-            disabled={isSoldOut}
-            className={`w-full flex items-center justify-center gap-1.5 font-extrabold text-xs py-3 px-4 rounded-2xl transition cursor-pointer ${
-              isSoldOut
-                ? 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'
-                : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-600/20 active:scale-[0.98]'
-            }`}
+            className="w-full flex items-center justify-center gap-1.5 font-extrabold text-xs py-3 px-4 rounded-2xl transition cursor-pointer bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-600/20 active:scale-[0.98]"
           >
             <Lock className="w-3.5 h-3.5 text-purple-100" />
             <span>{isSoldOut ? 'Sold Out' : 'Buy Now'}</span>

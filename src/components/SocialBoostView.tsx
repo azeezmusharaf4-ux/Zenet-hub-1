@@ -51,6 +51,7 @@ import { UserProfile, SocialBoostService, SocialBoostOrder, SocialBoostPricingSe
 import { auth, getSafeIdToken } from '../lib/firebase';
 import { safeApiFetch, sanitizeApiErrorMessage } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
+import { ServiceUnavailableView } from './ServiceUnavailableView';
 
 interface SocialBoostViewProps {
   userProfile: UserProfile | null;
@@ -286,6 +287,17 @@ const getPlatformVisuals = (platformName: string) => {
 };
 
 export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
+  onBackToMarketplace
+}) => {
+  return (
+    <ServiceUnavailableView
+      serviceType="social-boost"
+      onBackToMarketplace={onBackToMarketplace}
+    />
+  );
+};
+
+export const _OldSocialBoostView: React.FC<SocialBoostViewProps> = ({
   userProfile,
   walletBalance,
   onRefreshProfile,

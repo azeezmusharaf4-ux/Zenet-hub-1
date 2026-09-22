@@ -17,8 +17,17 @@ export const FeaturedListings: React.FC<FeaturedListingsProps> = React.memo(({
   onContactSeller,
   onBuyNow,
 }) => {
-  const featured = listings.filter((item) => item.featured || item.badges?.includes('Featured'));
-  const itemsToDisplay = featured.length > 0 ? featured : listings.slice(0, 3);
+  const activeListings = listings.filter((item) => {
+    if (item.status === 'sold') return false;
+    const invAvail = Array.isArray(item.inventory)
+      ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
+      : undefined;
+    const stock = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
+    const effectiveStock = invAvail !== undefined ? invAvail : stock;
+    return effectiveStock > 0;
+  });
+  const featured = activeListings.filter((item) => item.featured || item.badges?.includes('Featured'));
+  const itemsToDisplay = featured.length > 0 ? featured : activeListings.slice(0, 3);
 
   if (itemsToDisplay.length === 0) return null;
 
@@ -155,6 +164,7 @@ export const FeaturedListings: React.FC<FeaturedListingsProps> = React.memo(({
                   {/* Rounded Buy Button */}
                   <button
                     onClick={() => {
+                      if (isSold) return;
                       if (onBuyNow) {
                         onBuyNow(item);
                       } else {
@@ -162,7 +172,11 @@ export const FeaturedListings: React.FC<FeaturedListingsProps> = React.memo(({
                       }
                     }}
                     disabled={isSold}
-                    className="px-4 py-2 rounded-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-black text-xs transition cursor-pointer flex items-center gap-1 shadow-sm shadow-purple-600/20 hover:scale-105"
+                    className={`px-4 py-2 rounded-full font-black text-xs transition flex items-center gap-1 shadow-sm ${
+                      isSold
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 pointer-events-none'
+                        : 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white cursor-pointer shadow-purple-600/20 hover:scale-105'
+                    }`}
                   >
                     <span>{isSold ? 'Sold' : 'Buy Now'}</span>
                     <ChevronRight className="w-3.5 h-3.5" />

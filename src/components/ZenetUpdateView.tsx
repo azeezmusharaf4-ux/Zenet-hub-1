@@ -16,6 +16,7 @@ import {
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage, sanitizeFirestorePayload } from '../lib/firebase';
 import { UserProfile, ZenedUpdateProduct, ZenedUpdateOrder, WalletTransaction } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { copyToClipboard } from '../utils/clipboard';
 import { 
   Sparkles, 
@@ -79,7 +80,7 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
   onRefreshProfile
 }) => {
   // Check admin/owner permissions
-  const isOwner = user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com';
+  const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin' || userProfile?.role === 'owner';
 
   // Products state

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
 import { AccountListing, Inquiry, UserProfile, PurchaseRecord, CategoryType } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { 
   X, 
   Store, 
@@ -18,7 +19,8 @@ import {
   Send, 
   Search, 
   Image, 
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -38,6 +40,7 @@ interface SellerDashboardModalProps {
   onOpenCreateListing: () => void;
   onUpdateListingStatus: (listingId: string, newStatus: 'active' | 'sold') => Promise<void>;
   onDeleteListing: (listingId: string) => Promise<void>;
+  onBuyNow?: (listing: AccountListing) => void;
   onUpdateProfile?: (profileData: Partial<UserProfile>) => Promise<void>;
   onUpdateListing?: (updated: AccountListing) => void;
 }
@@ -53,6 +56,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   onOpenCreateListing,
   onUpdateListingStatus,
   onDeleteListing,
+  onBuyNow,
   onUpdateProfile,
   onUpdateListing
 }) => {
@@ -73,11 +77,12 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<string | null>(null);
 
-  if (!user || userProfile?.role === 'buyer') return null;
+  const isOwnerUser = isAuthorizedOwner(user, userProfile);
+  if (!user || (!isOwnerUser && userProfile?.role === 'buyer')) return null;
 
-  // Filter inquiries related to seller's listings or where sellerId matches user.uid
+  // Filter inquiries related to seller's listings or where sellerId matches user.uid (Owners can see store inquiries)
   const sellerInquiries = inquiries.filter(
-    (inq) => inq.sellerId === user.uid || myListings.some((l) => l.id === inq.listingId)
+    (inq) => isOwnerUser || inq.sellerId === user.uid || myListings.some((l) => l.id === inq.listingId)
   );
 
   // Calculate Seller Sales Statistics
@@ -503,6 +508,20 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
 
                       {/* Right Action buttons */}
                       <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                        {onBuyNow && (
+                          <button
+                            onClick={() => {
+                              onClose();
+                              onBuyNow(listing);
+                            }}
+                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                            title="Buy this account"
+                          >
+                            <Lock className="w-3.5 h-3.5 text-purple-200" />
+                            <span>Buy</span>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => setEditingListing(listing)}
                           className="bg-white hover:bg-purple-50/50 text-slate-700 border border-purple-100 text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5"

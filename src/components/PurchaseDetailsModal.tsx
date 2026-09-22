@@ -17,16 +17,22 @@ export const PurchaseDetailsModal: React.FC<PurchaseDetailsModalProps> = ({
 }) => {
   if (!purchase) return null;
 
-  const credentials = purchase.digitalProductDetails;
-  const email = credentials?.accountEmail || (purchase as any).accountEmail || '';
-  const password = credentials?.accountPassword || (purchase as any).accountPassword || '';
-  const recoveryInfo =
-    credentials?.recoveryInfo ||
-    credentials?.twoFactorSecretKey ||
-    credentials?.twoFactorBackupCodes ||
-    credentials?.backupCodes ||
-    '';
-  const instructions = credentials?.additionalInstructions || '';
+  const rawCredentials = purchase.digitalProductDetails || {};
+  const credentials = {
+    ...rawCredentials,
+    ...((purchase as any).accountEmail ? { accountEmail: (purchase as any).accountEmail } : {}),
+    ...((purchase as any).accountPassword ? { accountPassword: (purchase as any).accountPassword } : {}),
+    ...((purchase as any).phoneNumber ? { phoneNumber: (purchase as any).phoneNumber } : {}),
+    ...((purchase as any).recoveryEmail ? { recoveryEmail: (purchase as any).recoveryEmail } : {}),
+    ...((purchase as any).username ? { username: (purchase as any).username } : {}),
+    ...((purchase as any).delivery_value ? { delivery_value: (purchase as any).delivery_value } : {}),
+  };
+  const email = credentials?.accountEmail || (credentials as any)?.email || '';
+  const password = credentials?.accountPassword || (credentials as any)?.password || '';
+  const recoveryInfo = credentials?.recoveryInfo || '';
+  const twoFactorSecret = credentials?.twoFactorSecretKey || credentials?.twoFactorSecret || '';
+  const backupCodes = credentials?.twoFactorBackupCodes || credentials?.backupCodes || '';
+  const instructions = credentials?.additionalInstructions || (credentials as any)?.instructions || '';
 
   return (
     <div
@@ -47,11 +53,16 @@ export const PurchaseDetailsModal: React.FC<PurchaseDetailsModalProps> = ({
           <X className="w-4 h-4" />
         </button>
 
-        {/* Simplified High-Contrast Credentials Card */}
+        {/* High-Contrast Credentials Card with ALL Login Details */}
         <AccountCredentialsCard
+          credentials={credentials}
+          listingId={purchase.listingId}
+          purchaseId={purchase.id}
           email={email}
           password={password}
           recoveryInfo={recoveryInfo}
+          twoFactorSecret={twoFactorSecret}
+          backupCodes={backupCodes}
           instructions={instructions}
         />
 

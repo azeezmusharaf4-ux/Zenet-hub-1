@@ -43,8 +43,14 @@
   force = true
 
 [[redirects]]
+  from = "/api/paystack/verify/:reference"
+  to = "/.netlify/functions/paystack-verify?reference=:reference"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/paystack/verify/*"
-  to = "/.netlify/functions/paystack-verify"
+  to = "/.netlify/functions/paystack-verify?reference=:splat"
   status = 200
   force = true
 

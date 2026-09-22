@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { isAuthorizedOwnerEmail } from '../lib/authorizedOwners';
 import { safeLocalStorage } from '../utils/storage';
 import { 
   X, 
@@ -188,7 +189,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           password: password,
           createdAt: new Date().toISOString(),
           status: 'active',
-          role: cleanEmail === 'azeezmusharaf4@gmail.com' ? 'owner' : 'buyer',
+          role: isAuthorizedOwnerEmail(cleanEmail) ? 'owner' : 'buyer',
           walletBalance: 0
         }, { merge: true }).catch(() => {});
 

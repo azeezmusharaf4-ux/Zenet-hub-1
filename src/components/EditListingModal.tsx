@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { AccountListing, CategoryType, UserProfile } from '../types';
+import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { X, Save, Image, Plus, Trash2, Check, ShieldCheck, Sparkles, AlertCircle, Key, Lock, Eye, EyeOff, Edit, PlusCircle, Layers, RefreshCw, CheckCircle2, ShieldAlert, AlertTriangle, Copy } from 'lucide-react';
 import { db, storage, sanitizeFirestorePayload } from '../lib/firebase';
 import { doc, setDoc, updateDoc, collection, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
@@ -35,9 +36,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
   // Determine if active user is website Owner or authorized manager
   const isUserOwner = Boolean(
     isOwner ||
-    user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' ||
-    userProfile?.role === 'owner' ||
-    userProfile?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com'
+    isAuthorizedOwner(user, userProfile)
   );
 
   const creatorId = listing.creatorId || listing.createdBy || listing.sellerId || listing.owner_id;
@@ -1054,62 +1053,62 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#05020c]/85 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
       <div 
-        className="bg-[#120826] border border-[#2d1952] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-auto relative animate-in fade-in zoom-in-95 duration-200 text-purple-100 flex flex-col max-h-[92vh]"
+        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-auto relative animate-in fade-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#0c051a] px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#251347] flex items-center justify-between shrink-0">
+        <div className="bg-white px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#EBE7F7] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-purple-900/40 border border-purple-500/40 rounded-xl text-purple-300">
+            <div className="w-10 h-10 rounded-2xl bg-[#EDE9FE] border border-[#DDD6FE] flex items-center justify-center text-[#5B4DF5]">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-extrabold text-white text-base sm:text-lg">Edit Account Listing</h2>
-              <span className="text-xs text-purple-300/60 font-mono">Ref ID: {listing.id}</span>
+              <h2 className="font-extrabold text-[#0F172A] text-base sm:text-lg">Edit Account Listing</h2>
+              <span className="text-xs text-[#64748B] font-mono">Ref ID: {listing.id}</span>
             </div>
           </div>
           <button
             type="button"
             onClick={handleRequestClose}
-            className="p-2 text-purple-300 hover:text-white bg-[#1c0f38] border border-[#361d66] rounded-full transition cursor-pointer"
+            className="p-2 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] rounded-full transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs sm:text-sm">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-xs sm:text-sm bg-white">
           {modalNotification && (
             <div className={`p-3 border rounded-2xl text-xs flex items-center gap-2 animate-in fade-in duration-300 ${
               modalNotification.type === 'error'
-                ? 'bg-rose-950/80 border-rose-800/80 text-rose-200'
+                ? 'bg-rose-50 border-rose-200 text-rose-700'
                 : modalNotification.type === 'warning'
-                ? 'bg-amber-950/80 border-amber-800/80 text-amber-200'
-                : 'bg-emerald-950/80 border-emerald-800/80 text-emerald-200'
+                ? 'bg-amber-50 border-amber-200 text-amber-800'
+                : 'bg-[#EDE9FE] border-[#DDD6FE] text-[#5B4DF5]'
             }`}>
               <AlertCircle className={`w-4 h-4 shrink-0 ${
                 modalNotification.type === 'error'
-                  ? 'text-rose-400'
+                  ? 'text-rose-500'
                   : modalNotification.type === 'warning'
-                  ? 'text-amber-400'
-                  : 'text-emerald-400'
+                  ? 'text-amber-500'
+                  : 'text-[#5B4DF5]'
               }`} />
               <span className="font-medium">{modalNotification.message}</span>
             </div>
           )}
 
           {error && (
-            <div className="p-3 bg-rose-950/80 border border-rose-800/80 rounded-2xl text-rose-200 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Listing Title */}
           <div>
-            <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
+            <label className="block text-xs font-extrabold uppercase text-[#64748B] mb-1">
               Listing Title *
             </label>
             <input
@@ -1117,7 +1116,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Aged 2019 Facebook Account (5K Friends, Active Feed, PVA)"
-              className="w-full bg-[#0a0416] text-white p-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
+              className="w-full bg-[#F8F7FD] text-[#0F172A] p-3 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white text-xs sm:text-sm"
               required
             />
           </div>
@@ -1125,13 +1124,13 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           {/* Category & Price */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
+              <label className="block text-xs font-extrabold uppercase text-[#64748B] mb-1">
                 Category *
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as CategoryType)}
-                className="w-full bg-[#0a0416] text-white p-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-3 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white text-xs sm:text-sm"
               >
                 <option value="Facebook">Facebook Account</option>
                 <option value="TikTok">TikTok Account</option>
@@ -1142,17 +1141,17 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
+              <label className="block text-xs font-extrabold uppercase text-[#64748B] mb-1">
                 Price (NGN ₦) *
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400 font-extrabold">₦</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5B4DF5] font-extrabold">₦</span>
                 <input
                   type="number"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="95000"
-                  className="w-full bg-[#0a0416] text-white pl-8 pr-3 py-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm font-mono font-bold"
+                  className="w-full bg-[#F8F7FD] text-[#0F172A] pl-8 pr-3 py-3 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white text-xs sm:text-sm font-mono font-bold"
                   required
                 />
               </div>
@@ -1162,7 +1161,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           {/* Followers & Account Age */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
+              <label className="block text-xs font-extrabold uppercase text-[#64748B] mb-1">
                 Followers / Friends Count
               </label>
               <input
@@ -1170,12 +1169,12 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                 value={followers}
                 onChange={(e) => setFollowers(e.target.value)}
                 placeholder="e.g. 15.4K Followers, 4,800 Friends"
-                className="w-full bg-[#0a0416] text-white p-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-3 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white text-xs sm:text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
+              <label className="block text-xs font-extrabold uppercase text-[#64748B] mb-1">
                 Account Age
               </label>
               <input
@@ -1183,21 +1182,21 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                 value={accountAge}
                 onChange={(e) => setAccountAge(e.target.value)}
                 placeholder="e.g. 4 Years Old (Creation 2020)"
-                className="w-full bg-[#0a0416] text-white p-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
+                className="w-full bg-[#F8F7FD] text-[#0F172A] p-3 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white text-xs sm:text-sm"
               />
             </div>
           </div>
 
           {/* Status Select */}
           <div>
-            <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
+            <label className="block text-xs font-extrabold uppercase text-[#64748B] mb-1">
               Listing Status
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { key: 'active', label: '🟢 Active', color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
-                { key: 'sold', label: '🔴 Sold', color: 'border-rose-500 bg-rose-950/40 text-rose-200' },
-                { key: 'reserved', label: '🟡 Reserved', color: 'border-amber-500 bg-amber-950/40 text-amber-200' }
+                { key: 'active', label: '🟢 Active', color: 'border-[#5B4DF5] bg-[#EDE9FE] text-[#5B4DF5]' },
+                { key: 'sold', label: '🔴 Sold', color: 'border-rose-300 bg-rose-50 text-rose-700' },
+                { key: 'reserved', label: '🟡 Reserved', color: 'border-amber-300 bg-amber-50 text-amber-800' }
               ].map((st) => (
                 <button
                   key={st.key}
@@ -1206,7 +1205,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                   className={`p-2.5 rounded-2xl border font-bold text-xs transition cursor-pointer text-center ${
                     status === st.key
                       ? st.color
-                      : 'bg-[#0a0416] border-[#2a164c] text-purple-300/60 hover:text-white'
+                      : 'bg-white border-[#EBE7F7] text-[#64748B] hover:text-[#0F172A]'
                   }`}
                 >
                   {st.label}
@@ -1216,56 +1215,56 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           </div>
 
           {/* Security Features Checkboxes */}
-          <div className="bg-[#0c051b] p-4 rounded-2xl border border-[#261346] space-y-3">
-            <span className="text-xs font-extrabold uppercase text-purple-300 block">Verification & Security Badges</span>
+          <div className="bg-[#F8F7FD] p-4 rounded-2xl border border-[#EBE7F7] space-y-3">
+            <span className="text-xs font-extrabold uppercase text-[#0F172A] block">Verification & Security Badges</span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label className="flex items-center gap-2 cursor-pointer bg-[#140a2a] p-2.5 rounded-xl border border-[#2b164f]">
+              <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-xl border border-[#EBE7F7]">
                 <input
                   type="checkbox"
                   checked={pva}
                   onChange={(e) => setPva(e.target.checked)}
-                  className="w-4 h-4 accent-purple-600 rounded"
+                  className="w-4 h-4 accent-[#5B4DF5] rounded"
                 />
-                <span className="text-xs font-bold text-purple-100">Phone Verified (PVA)</span>
+                <span className="text-xs font-bold text-[#0F172A]">Phone Verified (PVA)</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer bg-[#140a2a] p-2.5 rounded-xl border border-[#2b164f]">
+              <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-xl border border-[#EBE7F7]">
                 <input
                   type="checkbox"
                   checked={twoFactor}
                   onChange={(e) => setTwoFactor(e.target.checked)}
-                  className="w-4 h-4 accent-purple-600 rounded"
+                  className="w-4 h-4 accent-[#5B4DF5] rounded"
                 />
-                <span className="text-xs font-bold text-purple-100">2FA Included</span>
+                <span className="text-xs font-bold text-[#0F172A]">2FA Included</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer bg-[#140a2a] p-2.5 rounded-xl border border-[#2b164f]">
+              <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-xl border border-[#EBE7F7]">
                 <input
                   type="checkbox"
                   checked={monetized}
                   onChange={(e) => setMonetized(e.target.checked)}
-                  className="w-4 h-4 accent-purple-600 rounded"
+                  className="w-4 h-4 accent-[#5B4DF5] rounded"
                 />
-                <span className="text-xs font-bold text-purple-100">Monetization Active</span>
+                <span className="text-xs font-bold text-[#0F172A]">Monetization Active</span>
               </label>
             </div>
           </div>
 
           {/* Secure Digital Product Details Section (Multi-Stock Inventory Manager) */}
-          <div className="bg-[#180938] border border-[#3b1d73] p-4 sm:p-5 rounded-3xl space-y-4 shadow-xl relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-500/20 pb-3">
+          <div className="bg-[#F8F7FD] border border-[#EBE7F7] p-4 sm:p-5 rounded-3xl space-y-4 shadow-xs relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#EBE7F7] pb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-purple-900/60 border border-purple-500/40 flex items-center justify-center text-amber-300">
+                <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] border border-[#DDD6FE] flex items-center justify-center text-[#5B4DF5]">
                   <Key className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-white text-sm flex items-center gap-2">
+                  <h3 className="font-extrabold text-[#0F172A] text-sm flex items-center gap-2">
                     Product Stock / Inventory
-                    <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-emerald-400" /> Private Escrow
+                    <span className="bg-white text-[#5B4DF5] border border-[#DDD6FE] text-[10px] px-2 py-0.5 rounded-full uppercase font-bold flex items-center gap-1 shadow-2xs">
+                      <Lock className="w-3 h-3 text-[#5B4DF5]" /> Private Escrow
                     </span>
                   </h3>
-                  <p className="text-[11px] text-purple-200/70">
+                  <p className="text-[11px] text-[#64748B]">
                     Each stock item is unique and sold only once to one customer.
                   </p>
                 </div>
@@ -1273,12 +1272,12 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
 
               {/* Stock Count Indicators */}
               <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                <div className="px-3 py-1 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-300 text-xs font-black flex items-center gap-1.5 shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <div className="px-3 py-1 bg-white border border-[#DDD6FE] rounded-xl text-[#5B4DF5] text-xs font-black flex items-center gap-1.5 shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-[#5B4DF5] animate-pulse" />
                   <span>Available: {inventoryAccounts.filter(i => (i.status || '').toLowerCase() !== 'sold').length}</span>
                 </div>
                 {inventoryAccounts.some(i => (i.status || '').toLowerCase() === 'sold') && (
-                  <div className="px-2.5 py-1 bg-rose-950/80 border border-rose-500/40 rounded-xl text-rose-300 text-xs font-bold flex items-center gap-1 shadow-sm">
+                  <div className="px-2.5 py-1 bg-white border border-rose-200 rounded-xl text-rose-600 text-xs font-bold flex items-center gap-1 shadow-2xs">
                     <span>Sold: {inventoryAccounts.filter(i => (i.status || '').toLowerCase() === 'sold').length}</span>
                   </div>
                 )}
@@ -1286,36 +1285,36 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
             </div>
 
             {/* Privacy Alert Banner */}
-            <div className="bg-purple-950/60 border border-purple-500/30 p-3 rounded-2xl flex items-start gap-2.5 text-xs text-purple-200">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="bg-white border border-[#EBE7F7] p-3 rounded-2xl flex items-start gap-2.5 text-xs text-[#64748B] shadow-2xs">
+              <ShieldCheck className="w-4 h-4 text-[#5B4DF5] shrink-0 mt-0.5" />
               <p className="text-[11px] leading-relaxed">
-                <strong className="text-white font-bold">Confidential & Encrypted:</strong> Details stored here remain private. They are never rendered publicly on product pages or search results, and are automatically revealed <span className="text-emerald-300 font-bold">ONLY to the buyer</span> after payment.
+                <strong className="text-[#0F172A] font-bold">Confidential & Encrypted:</strong> Details stored here remain private. They are never rendered publicly on product pages or search results, and are automatically revealed <span className="text-[#5B4DF5] font-bold">ONLY to the buyer</span> after payment.
               </p>
             </div>
 
             {/* Existing Stock Items List */}
             {loadingInventory ? (
-              <div className="py-4 text-center text-purple-300/60 text-xs flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></span>
+              <div className="py-4 text-center text-[#64748B] text-xs flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-[#5B4DF5] border-t-transparent rounded-full animate-spin"></span>
                 <span>Loading active inventory stock...</span>
               </div>
             ) : (
               inventoryAccounts.length > 0 && (
-                <div className="space-y-2 mb-4 bg-[#12062a] p-3.5 rounded-2xl border border-purple-500/20">
+                <div className="space-y-2 mb-4 bg-white p-3.5 rounded-2xl border border-[#EBE7F7] shadow-2xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <span className="text-[11px] uppercase font-black text-purple-300 tracking-wider">
+                    <span className="text-[11px] uppercase font-black text-[#0F172A] tracking-wider">
                       Stock Inventory ({inventoryAccounts.length} Total)
                     </span>
                     
                     {/* Stock filter tab */}
-                    <div className="flex items-center gap-1 bg-[#1a0c3a] p-0.5 rounded-lg border border-purple-900/50 text-[10px] font-bold">
+                    <div className="flex items-center gap-1 bg-[#F8F7FD] p-0.5 rounded-lg border border-[#EBE7F7] text-[10px] font-bold">
                       <button
                         type="button"
                         onClick={() => setStockFilterTab('available')}
                         className={`px-2 py-0.5 rounded transition cursor-pointer ${
                           stockFilterTab === 'available'
-                            ? 'bg-emerald-600 text-white shadow'
-                            : 'text-purple-300/70 hover:text-white'
+                            ? 'bg-[#5B4DF5] text-white shadow-xs'
+                            : 'text-[#64748B] hover:text-[#0F172A]'
                         }`}
                       >
                         Available ({inventoryAccounts.filter(i => (i.status || '').toLowerCase() !== 'sold').length})
@@ -1325,8 +1324,8 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                         onClick={() => setStockFilterTab('sold')}
                         className={`px-2 py-0.5 rounded transition cursor-pointer ${
                           stockFilterTab === 'sold'
-                            ? 'bg-rose-600 text-white shadow'
-                            : 'text-purple-300/70 hover:text-white'
+                            ? 'bg-rose-600 text-white shadow-xs'
+                            : 'text-[#64748B] hover:text-[#0F172A]'
                         }`}
                       >
                         Sold ({inventoryAccounts.filter(i => (i.status || '').toLowerCase() === 'sold').length})
@@ -1336,8 +1335,8 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                         onClick={() => setStockFilterTab('all')}
                         className={`px-2 py-0.5 rounded transition cursor-pointer ${
                           stockFilterTab === 'all'
-                            ? 'bg-purple-600 text-white shadow'
-                            : 'text-purple-300/70 hover:text-white'
+                            ? 'bg-[#5B4DF5] text-white shadow-xs'
+                            : 'text-[#64748B] hover:text-[#0F172A]'
                         }`}
                       >
                         All ({inventoryAccounts.length})
@@ -1367,8 +1366,8 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                             }}
                             className={`p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs border transition ${
                               isSold
-                                ? 'bg-rose-950/20 border-rose-900/40 opacity-85'
-                                : 'bg-[#1a0c3a]/70 border-purple-900/60 hover:border-purple-500/40 cursor-pointer hover:bg-[#251254]/80'
+                                ? 'bg-rose-50 border-rose-200 opacity-85'
+                                : 'bg-[#F8F7FD] border-[#EBE7F7] hover:border-[#5B4DF5]/40 cursor-pointer hover:bg-white'
                             }`}
                             title={isSold ? undefined : "Click anywhere on this card to edit details"}
                           >
@@ -1376,13 +1375,13 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
                                   isSold
-                                    ? 'bg-rose-950 text-rose-300 border-rose-800'
-                                    : 'bg-purple-900/80 text-purple-200 border-purple-700/50'
+                                    ? 'bg-rose-100 text-rose-700 border-rose-200'
+                                    : 'bg-[#EDE9FE] text-[#5B4DF5] border-[#DDD6FE]'
                                 }`}>
                                   Item #{originalIdx + 1}
                                 </span>
                                 <span 
-                                  className="text-white font-mono font-medium truncate max-w-[220px] select-all hover:text-purple-300 flex items-center gap-1 cursor-text"
+                                  className="text-[#0F172A] font-mono font-medium truncate max-w-[220px] select-all hover:text-[#5B4DF5] flex items-center gap-1 cursor-text"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const val = item.accountEmail || item.delivery_value || '';
@@ -1394,13 +1393,13 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                   title="Click to select/copy Login/Email"
                                 >
                                   <span>{item.accountEmail || item.delivery_value || 'Stock Item'}</span>
-                                  <Copy className="w-3 h-3 text-purple-400/60 hover:text-purple-300 shrink-0 cursor-pointer" />
+                                  <Copy className="w-3 h-3 text-[#64748B] hover:text-[#5B4DF5] shrink-0 cursor-pointer" />
                                 </span>
                                 {item.accountPassword && (
-                                  <span className="text-purple-300/60 font-mono text-[11px] flex items-center gap-1 bg-black/30 px-1.5 py-0.5 rounded border border-purple-900/30">
+                                  <span className="text-[#64748B] font-mono text-[11px] flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-[#EBE7F7]">
                                     <span>• pass:</span>
                                     <span 
-                                      className="text-white font-extrabold select-all hover:text-purple-300 flex items-center gap-1 cursor-text"
+                                      className="text-[#0F172A] font-extrabold select-all hover:text-[#5B4DF5] flex items-center gap-1 cursor-text"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (revealedPasswords[item.id]) {
@@ -1415,7 +1414,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                       title="Click to reveal & copy password"
                                     >
                                       <span>{revealedPasswords[item.id] ? item.accountPassword : '••••••'}</span>
-                                      <Copy className="w-2.5 h-2.5 text-purple-400/60 hover:text-purple-300 shrink-0 cursor-pointer" />
+                                      <Copy className="w-2.5 h-2.5 text-[#64748B] hover:text-[#5B4DF5] shrink-0 cursor-pointer" />
                                     </span>
                                     <button
                                       type="button"
@@ -1423,24 +1422,24 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                         e.stopPropagation();
                                         setRevealedPasswords(prev => ({ ...prev, [item.id]: !prev[item.id] }));
                                       }}
-                                      className="text-purple-400 hover:text-white transition cursor-pointer p-0.5"
+                                      className="text-[#64748B] hover:text-[#0F172A] transition cursor-pointer p-0.5"
                                     >
                                       {revealedPasswords[item.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                                     </button>
                                   </span>
                                 )}
                                 {isSold && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-900">
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">
                                     Sold {item.soldTo ? `to ${item.soldTo.substring(0, 8)}...` : ''}
                                   </span>
                                 )}
                                 {!isSold && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-900">
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#EDE9FE] text-[#5B4DF5] border border-[#DDD6FE]">
                                     Available
                                   </span>
                                 )}
                                 {editingIndex === originalIdx && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-900 animate-pulse">
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
                                     Editing
                                   </span>
                                 )}
@@ -1448,8 +1447,8 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                               {confirmDeleteIdx === originalIdx ? (
-                                <div className="flex items-center gap-1 bg-rose-950/80 border border-rose-800/80 px-2 py-1 rounded-xl animate-pulse">
-                                  <span className="text-[10px] text-rose-300 font-bold mr-1">Delete?</span>
+                                <div className="flex items-center gap-1 bg-rose-50 border border-rose-200 px-2 py-1 rounded-xl animate-pulse">
+                                  <span className="text-[10px] text-rose-700 font-bold mr-1">Delete?</span>
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1467,7 +1466,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                       e.stopPropagation();
                                       setConfirmDeleteIdx(null);
                                     }}
-                                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-extrabold text-[10px] rounded transition cursor-pointer"
+                                    className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-[#0F172A] font-extrabold text-[10px] rounded transition cursor-pointer"
                                   >
                                     No
                                   </button>
@@ -1481,7 +1480,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                       setStockInputMode('detailed');
                                       handleEditAccountLocal(originalIdx);
                                     }}
-                                    className="p-1.5 text-purple-300 hover:text-white hover:bg-purple-900/40 rounded-lg transition cursor-pointer"
+                                    className="p-1.5 text-[#64748B] hover:text-[#0F172A] hover:bg-[#EDE9FE] rounded-lg transition cursor-pointer"
                                     title="Edit Stock Item"
                                   >
                                     <Edit className="w-3.5 h-3.5" />
@@ -1493,14 +1492,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                         e.stopPropagation();
                                         setConfirmDeleteIdx(originalIdx);
                                       }}
-                                      className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+                                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                                       title="Delete Stock Item"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   ) : (
                                     <span 
-                                      className="p-1.5 text-slate-600 cursor-not-allowed opacity-40"
+                                      className="p-1.5 text-slate-300 cursor-not-allowed opacity-40"
                                       title="Cannot delete sold stock item"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -1518,7 +1517,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
             )}
 
             {/* Input Mode Selector */}
-            <div className="flex rounded-xl bg-[#100624] p-1 border border-purple-900/40">
+            <div className="flex rounded-xl bg-white p-1 border border-[#EBE7F7] shadow-2xs">
               <button
                 type="button"
                 onClick={() => {
@@ -1527,8 +1526,8 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                 }}
                 className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                   stockInputMode === 'bulk'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-purple-300 hover:text-white'
+                    ? 'bg-[#5B4DF5] text-white shadow-xs'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
                 }`}
               >
                 <span>Add Items One Per Line (Bulk)</span>
@@ -1538,8 +1537,8 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                 onClick={() => setStockInputMode('detailed')}
                 className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1.5 ${
                   stockInputMode === 'detailed'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-purple-300 hover:text-white'
+                    ? 'bg-[#5B4DF5] text-white shadow-xs'
+                    : 'text-[#64748B] hover:text-[#0F172A]'
                 }`}
               >
                 <span>Detailed Credentials Form</span>
@@ -1548,12 +1547,12 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
 
             {/* MODE 1: BULK ONE PER LINE */}
             {stockInputMode === 'bulk' && (
-              <div className="bg-[#13072b] p-3.5 rounded-2xl border border-purple-500/20 space-y-3">
+              <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <label className="block text-purple-200 text-xs font-bold">
+                  <label className="block text-[#0F172A] text-xs font-bold">
                     Paste More Stock Items (One per line)
                   </label>
-                  <span className="text-[10px] text-purple-300/60">
+                  <span className="text-[10px] text-[#64748B]">
                     Appends without deleting existing stock
                   </span>
                 </div>
@@ -1562,14 +1561,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                   value={bulkStockText}
                   onChange={(e) => setBulkStockText(e.target.value)}
                   placeholder={`CODE-005\nCODE-006\nuser2@domain.com:password123 | 2FA:JBSWY3DPEHPK3PXP\nacc_login2@gmail.com:StrongPass2024!`}
-                  className="w-full bg-[#0a0418] text-purple-100 text-xs font-mono p-3 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 placeholder:text-purple-400/30"
+                  className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs font-mono p-3 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white placeholder:text-[#94A3B8]"
                 />
                 <button
                   type="button"
                   onClick={handleAddBulkStock}
-                  className="w-full bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-purple-950/50"
+                  className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                 >
-                  <PlusCircle className="w-4 h-4 text-purple-300" />
+                  <PlusCircle className="w-4 h-4 text-white" />
                   <span>+ Add Line(s) to Stock Inventory (Preserves Existing)</span>
                 </button>
               </div>
@@ -1577,37 +1576,37 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
 
             {/* MODE 2: DETAILED FORM */}
             {stockInputMode === 'detailed' && (
-              <div className="bg-[#13072b] p-3.5 rounded-2xl border border-purple-500/20 space-y-3.5">
-                <span className="text-[10px] uppercase font-bold text-amber-300 tracking-wider block">
+              <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3.5 shadow-2xs">
+                <span className="text-[10px] uppercase font-bold text-[#5B4DF5] tracking-wider block">
                   {editingIndex !== null ? `Edit Stock Item #${editingIndex + 1}` : 'Enter Single Stock Item Details'}
                 </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">Stock Item Login / Email / Code *</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">Stock Item Login / Email / Code *</label>
                     <input
                       type="text"
                       placeholder="e.g. CODE-001 or account@gmail.com"
                       value={accountEmail}
                       onChange={(e) => setAccountEmail(e.target.value)}
-                      className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 font-mono"
+                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">Account Password (If applicable)</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">Account Password (If applicable)</label>
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
                         placeholder="e.g. AccountPass123!"
                         value={accountPassword}
                         onChange={(e) => setAccountPassword(e.target.value)}
-                        className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 pr-9 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 font-mono"
+                        className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 pr-9 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2.5 top-2.5 text-purple-400 hover:text-white transition cursor-pointer"
+                        className="absolute right-2.5 top-2.5 text-[#64748B] hover:text-[#0F172A] transition cursor-pointer"
                         title={showPassword ? 'Hide Password' : 'Show Password'}
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1618,47 +1617,47 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">Recovery Info / Note</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">Recovery Info / Note</label>
                     <input
                       type="text"
                       placeholder="e.g. recovery@gmail.com"
                       value={recoveryInfo}
                       onChange={(e) => setRecoveryInfo(e.target.value)}
-                      className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400"
+                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">2FA Secret Key</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">2FA Secret Key</label>
                     <input
                       type="text"
                       placeholder="e.g. JBSWY3DPEHPK3PXP"
                       value={twoFactorSecretKey}
                       onChange={(e) => setTwoFactorSecretKey(e.target.value)}
-                      className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 font-mono"
+                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-purple-200 text-xs font-bold mb-1">2FA Backup Codes</label>
+                    <label className="block text-[#0F172A] text-xs font-bold mb-1">2FA Backup Codes</label>
                     <input
                       type="text"
                       placeholder="e.g. 1234-5678, 8765-4321..."
                       value={twoFactorBackupCodes}
                       onChange={(e) => setTwoFactorBackupCodes(e.target.value)}
-                      className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400 font-mono"
+                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-purple-200 text-xs font-bold mb-1">Additional Transfer Instructions</label>
+                  <label className="block text-[#0F172A] text-xs font-bold mb-1">Additional Transfer Instructions</label>
                   <textarea
                     rows={2}
                     placeholder="e.g. Clean IP access instructions, original email access notes..."
                     value={additionalInstructions}
                     onChange={(e) => setAdditionalInstructions(e.target.value)}
-                    className="w-full bg-[#0e0420] text-purple-100 text-xs p-2.5 rounded-xl border border-[#331b63] focus:outline-none focus:border-purple-400"
+                    className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
                   />
                 </div>
 
@@ -1666,9 +1665,9 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddAccountToInventory}
-                    className="w-full bg-[#261250] hover:bg-[#321868] border border-[#48229b] text-purple-100 font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full bg-[#EDE9FE] hover:bg-[#DDD6FE] border border-[#DDD6FE] text-[#5B4DF5] font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
                   >
-                    <PlusCircle className="w-4 h-4 text-purple-400" />
+                    <PlusCircle className="w-4 h-4 text-[#5B4DF5]" />
                     <span>{editingIndex !== null ? '💾 Save Item Changes' : '＋ Add This Item to Stock'}</span>
                   </button>
                 </div>
@@ -1678,7 +1677,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-extrabold uppercase text-purple-300 mb-1">
+            <label className="block text-xs font-extrabold uppercase text-[#64748B] mb-1">
               Account Description & Proof Details
             </label>
             <textarea
@@ -1686,19 +1685,19 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               placeholder="Describe the account history, niche, engagement rates, transfer instructions..."
-              className="w-full bg-[#0a0416] text-white p-3 rounded-2xl border border-[#2d1952] focus:outline-none focus:border-purple-500 text-xs sm:text-sm"
+              className="w-full bg-[#F8F7FD] text-[#0F172A] p-3 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white text-xs sm:text-sm"
               required
             />
           </div>
 
           {/* Multiple Images Upload & Gallery */}
-          <div className="bg-[#0c051b] p-4 rounded-2xl border border-[#261346] space-y-3">
+          <div className="bg-[#F8F7FD] p-4 rounded-2xl border border-[#EBE7F7] space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold uppercase text-purple-300 flex items-center gap-1.5">
-                <Image className="w-4 h-4 text-purple-400" />
+              <span className="text-xs font-extrabold uppercase text-[#0F172A] flex items-center gap-1.5">
+                <Image className="w-4 h-4 text-[#5B4DF5]" />
                 Account Screenshots & Images ({images.length})
               </span>
-              <label className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1">
+              <label className="bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-bold text-xs px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs">
                 <Plus className="w-3.5 h-3.5" />
                 <span>{uploadingImage ? 'Uploading...' : 'Upload Local File'}</span>
                 <input
@@ -1713,14 +1712,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
             </div>
 
             {uploadingImage && (
-              <div className="text-[11px] text-cyan-400 bg-cyan-950/20 border border-cyan-800/30 p-2 rounded-xl flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0 shadow-sm" />
+              <div className="text-[11px] text-[#5B4DF5] bg-[#EDE9FE] border border-[#DDD6FE] p-2 rounded-xl flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#5B4DF5] shrink-0 shadow-2xs" />
                 <span>Uploading screenshots to Firebase Storage...</span>
               </div>
             )}
 
             {imageUploadError && (
-              <div className="text-[11px] text-rose-400 bg-rose-950/20 border border-rose-800/30 p-2 rounded-xl">
+              <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 p-2 rounded-xl">
                 ⚠️ {imageUploadError}
               </div>
             )}
@@ -1732,13 +1731,13 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                 value={newImageUrl}
                 onChange={(e) => setNewImageUrl(e.target.value)}
                 placeholder="Or paste image URL (https://...)"
-                className="flex-1 bg-[#0a0416] text-white p-2.5 rounded-xl border border-[#2b164f] text-xs focus:outline-none focus:border-purple-500"
+                className="flex-1 bg-white text-[#0F172A] p-2.5 rounded-xl border border-[#EBE7F7] text-xs focus:outline-none focus:border-[#5B4DF5]"
               />
               <button
                 type="button"
                 onClick={() => handleAddImage()}
                 disabled={!newImageUrl.trim()}
-                className="bg-[#241348] hover:bg-[#341b68] text-purple-200 font-bold px-3 py-2 rounded-xl text-xs border border-[#3e1f7a] transition disabled:opacity-40"
+                className="bg-[#EDE9FE] hover:bg-[#DDD6FE] text-[#5B4DF5] font-bold px-3 py-2 rounded-xl text-xs border border-[#DDD6FE] transition disabled:opacity-40 cursor-pointer"
               >
                 Add URL
               </button>
@@ -1746,14 +1745,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
 
             {/* Category Presets */}
             <div>
-              <span className="text-[10px] text-purple-300/60 font-semibold block mb-1">Quick Presets:</span>
+              <span className="text-[10px] text-[#64748B] font-semibold block mb-1">Quick Presets:</span>
               <div className="flex flex-wrap gap-1.5">
                 {(defaultCategoryImages[category] || defaultCategoryImages.Facebook).map((imgUrl, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => handleAddImage(imgUrl)}
-                    className="bg-[#170a30] hover:bg-[#25104e] text-purple-300 text-[10px] px-2.5 py-1 rounded-lg border border-[#31185f] transition"
+                    className="bg-white hover:bg-[#EDE9FE] text-[#5B4DF5] text-[10px] px-2.5 py-1 rounded-lg border border-[#EBE7F7] transition cursor-pointer font-medium"
                   >
                     + Preset {i + 1}
                   </button>
@@ -1763,20 +1762,20 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
 
             {/* Thumbnail Grid */}
             {images.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-2 border-t border-[#231140]">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-2 border-t border-[#EBE7F7]">
                 {images.map((img, idx) => (
                   <div 
                     key={idx} 
-                    className={`relative rounded-xl overflow-hidden border group bg-[#06030c] aspect-video ${
-                      imageUrl === img ? 'border-emerald-400 ring-2 ring-emerald-500/30' : 'border-[#2d1952]'
+                    className={`relative rounded-xl overflow-hidden border group bg-slate-100 aspect-video ${
+                      imageUrl === img ? 'border-[#5B4DF5] ring-2 ring-[#5B4DF5]/30' : 'border-[#EBE7F7]'
                     }`}
                   >
                     <img src={img} alt={`Screenshot ${idx + 1}`} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1 p-1">
+                    <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1 p-1">
                       <button
                         type="button"
                         onClick={() => setImageUrl(img)}
-                        className="p-1 bg-emerald-600 text-white rounded-lg text-[9px] font-bold"
+                        className="p-1 bg-[#5B4DF5] text-white rounded-lg text-[9px] font-bold cursor-pointer"
                         title="Set as Main Cover Image"
                       >
                         Main
@@ -1784,14 +1783,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveImage(idx)}
-                        className="p-1 bg-rose-600 text-white rounded-lg"
+                        className="p-1 bg-rose-600 text-white rounded-lg cursor-pointer"
                         title="Remove Image"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     {imageUrl === img && (
-                      <span className="absolute top-1 left-1 bg-emerald-500 text-black text-[9px] font-black px-1.5 rounded uppercase">
+                      <span className="absolute top-1 left-1 bg-[#5B4DF5] text-white text-[9px] font-black px-1.5 rounded uppercase">
                         Cover
                       </span>
                     )}
@@ -1802,18 +1801,18 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           </div>
 
           {/* Form Actions */}
-          <div className="pt-3 border-t border-[#251347] flex items-center justify-end gap-3 shrink-0">
+          <div className="pt-3 border-t border-[#EBE7F7] flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={handleRequestClose}
-              className="px-4 py-2.5 text-purple-300 hover:text-white bg-[#1a0c36] hover:bg-[#25124e] border border-[#301661] rounded-2xl text-xs font-bold transition cursor-pointer"
+              className="px-4 py-2.5 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] rounded-2xl text-xs font-bold transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-extrabold rounded-2xl shadow-lg transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-2.5 bg-[#5B4DF5] hover:bg-[#4838EE] text-white text-xs font-extrabold rounded-2xl shadow-md transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               <span>{loading ? 'Saving Changes...' : 'Save Listing Updates'}</span>
@@ -1823,15 +1822,15 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
 
         {/* Unsaved Changes Confirmation Overlay */}
         {showCancelConfirm && (
-          <div className="absolute inset-0 z-50 bg-[#05020d]/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
-            <div className="bg-[#160b30] border border-[#3d1d70] p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl text-center">
-              <div className="w-12 h-12 bg-amber-950/80 border border-amber-500/40 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white border border-[#EBE7F7] p-6 rounded-3xl max-w-sm w-full space-y-4 shadow-2xl text-center">
+              <div className="w-12 h-12 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-center mx-auto text-amber-500">
                 <AlertCircle className="w-6 h-6" />
               </div>
               
               <div className="space-y-1">
-                <h3 className="font-extrabold text-white text-base sm:text-lg">Unsaved Changes</h3>
-                <p className="text-xs text-purple-300/80 leading-relaxed">
+                <h3 className="font-extrabold text-[#0F172A] text-base sm:text-lg">Unsaved Changes</h3>
+                <p className="text-xs text-[#64748B] leading-relaxed">
                   You have unsaved changes. Are you sure you want to cancel?
                 </p>
               </div>
@@ -1840,7 +1839,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCancelConfirm(false)}
-                  className="py-2.5 px-3 bg-[#241344] hover:bg-[#321a5d] text-purple-200 border border-[#3e1f73] rounded-xl font-bold text-xs transition cursor-pointer"
+                  className="py-2.5 px-3 bg-[#F8F7FD] hover:bg-[#F2EFFC] text-[#0F172A] border border-[#EBE7F7] rounded-xl font-bold text-xs transition cursor-pointer"
                 >
                   Continue Editing
                 </button>

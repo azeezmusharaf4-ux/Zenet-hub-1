@@ -152,17 +152,44 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const cat = (p.category || '').toLowerCase();
     const type = (p.type || '').toLowerCase();
 
-    if (type.includes('number') || cat.includes('number') || title.includes('sms') || title.includes('number')) {
+    if (type.includes('number') || cat.includes('number') || title.includes('sms') || title.includes('number') || p.phoneNumber) {
       return <Phone className="w-5 h-5 text-[#5B4DF5]" />;
     }
     if (type.includes('boost') || cat.includes('boost') || title.includes('boost') || title.includes('followers')) {
       return <TrendingUp className="w-5 h-5 text-[#5B4DF5]" />;
     }
-    if (type.includes('update') || cat.includes('update') || title.includes('update')) {
-      return <Sparkles className="w-5 h-5 text-[#5B4DF5]" />;
-    }
     return <Users className="w-5 h-5 text-[#5B4DF5]" />;
   };
+
+  // 5. Filter qualifying activities ONLY (Log Accounts, Service Numbers, Social Boost)
+  // ZENET Update purchases MUST NOT appear in Recent Activities under any circumstance.
+  // 5-item limit maintained; newest replaces oldest without deleting old transactions.
+  const qualifyingActivities = useMemo(() => {
+    if (!purchases || purchases.length === 0) return [];
+
+    return purchases
+      .filter((p) => {
+        // Exclude ZENET Updates strictly
+        if (p.type === 'zenet_update') return false;
+        if (p.category === 'Zenet Update' || p.category === 'zenet_update') return false;
+        if ((p as any).transactionCategory === 'zenet_update') return false;
+        const titleLower = (p.listingTitle || '').toLowerCase();
+        if (titleLower.includes('zenet update') || titleLower.includes('update package')) return false;
+
+        // Qualifying types: Service Numbers, Social Boost, Log Accounts
+        const isNumber = p.type === 'virtual_number' || p.category === 'virtual_number' || (p as any).transactionCategory === 'virtual_number' || Boolean(p.phoneNumber);
+        const isBoost = p.type === 'social_boost' || p.category === 'social_boost' || (p as any).transactionCategory === 'social_boost';
+        const isLog = p.type === 'log' || (p as any).transactionCategory === 'log' || (!isNumber && !isBoost && (Boolean(p.digitalProductDetails) || Boolean(p.listingId) || Boolean(p.sellerId)));
+
+        return isNumber || isBoost || isLog;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.purchasedAt || (a as any).createdAt || 0).getTime();
+        const timeB = new Date(b.purchasedAt || (b as any).createdAt || 0).getTime();
+        return timeB - timeA;
+      })
+      .slice(0, 5);
+  }, [purchases]);
 
   return (
     <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto space-y-6 sm:space-y-7 animate-in fade-in duration-200 pb-24 md:pb-8 px-1 sm:px-2">
@@ -329,16 +356,25 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           </button>
         </div>
 
-        {purchases && purchases.length > 0 ? (
+        {qualifyingActivities && qualifyingActivities.length > 0 ? (
           <div className="space-y-2.5 sm:space-y-3">
-            {purchases.slice(0, 5).map((purchase) => {
+            {qualifyingActivities.map((purchase) => {
               const amount = purchase.paidAmount || purchase.price || 0;
               const isCompleted = purchase.status === 'completed';
+
+              const isNumber = purchase.type === 'virtual_number' || purchase.category === 'virtual_number' || Boolean(purchase.phoneNumber);
+              const isBoost = purchase.type === 'social_boost' || purchase.category === 'social_boost';
 
               return (
                 <div
                   key={purchase.id}
-                  onClick={() => onSelectPurchase(purchase)}
+                  onClick={() => {
+                    if (isNumber || isBoost) {
+                      onSelectView('history');
+                    } else {
+                      onSelectPurchase(purchase);
+                    }
+                  }}
                   className="w-full bg-white border border-[#EAE6F8] rounded-2xl sm:rounded-[20px] p-3.5 sm:p-4 flex items-center justify-between shadow-2xs hover:border-[#5B4DF5]/40 hover:shadow-xs transition-all cursor-pointer group active:scale-[0.99]"
                 >
                   <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 pr-2">
@@ -352,7 +388,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[11px] text-[#64748B] flex items-center gap-1 font-medium">
                           <Clock className="w-3 h-3 text-[#94A3B8]" />
-                          {formatActivityDate(purchase.purchasedAt)}
+                          {formatActivityDate(purchase.purchasedAt || (purchase as any).createdAt)}
                         </span>
                       </div>
                     </div>

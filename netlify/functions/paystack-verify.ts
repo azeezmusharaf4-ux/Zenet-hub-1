@@ -17,13 +17,26 @@ export const handler = async (event: any) => {
     const paystackSecretKey = rawSecretKey ? rawSecretKey.trim().replace(/^['"`]|['"`]$/g, '').trim() : '';
 
     // Extract reference from query or path
-    let reference = event.queryStringParameters?.reference || '';
+    let reference = event.queryStringParameters?.reference || event.queryStringParameters?.trxref || '';
     if (!reference && event.path) {
       const parts = event.path.split('/').filter(Boolean);
       const last = parts[parts.length - 1];
       if (last && last !== 'paystack-verify' && last !== 'verify') {
         reference = decodeURIComponent(last);
       }
+    }
+    if (!reference && event.headers?.['x-forwarded-uri']) {
+      const parts = event.headers['x-forwarded-uri'].split('?')[0].split('/').filter(Boolean);
+      const last = parts[parts.length - 1];
+      if (last && last !== 'verify' && last !== 'paystack-verify') {
+        reference = decodeURIComponent(last);
+      }
+    }
+    if (!reference && event.rawUrl) {
+      try {
+        const u = new URL(event.rawUrl);
+        reference = u.searchParams.get('reference') || u.searchParams.get('trxref') || '';
+      } catch {}
     }
     const queryUserId = event.queryStringParameters?.userId || '';
 
@@ -90,6 +103,7 @@ export const handler = async (event: any) => {
       }
 
       // Update Firestore user wallet & transaction ledger with idempotency
+      let finalVerifiedBalance: number | undefined;
       const db = getDb();
       if (db) {
         try {
@@ -145,30 +159,53 @@ export const handler = async (event: any) => {
 
           if (targetUid) {
             const uDocRef = doc(db, 'users', String(targetUid));
+            const walletDocRef = doc(db, 'wallets', String(targetUid));
             let newBalance = amountNaira;
 
             await runTransaction(db, async (transaction) => {
               const uDocSnap = await transaction.get(uDocRef);
-              const currentBal = uDocSnap.exists() ? (uDocSnap.data().walletBalance || 0) : 0;
+              const uData = uDocSnap.exists() ? uDocSnap.data() : {};
+              const rawBal = uData.walletBalance !== undefined ? uData.walletBalance : uData.balance;
+              const currentBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
               newBalance = currentBal + amountNaira;
 
               if (uDocSnap.exists()) {
-                transaction.update(uDocRef, { walletBalance: newBalance, updatedAt: new Date().toISOString() });
+                transaction.update(uDocRef, {
+                  walletBalance: newBalance,
+                  balance: newBalance,
+                  lastFundedAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                });
               } else {
                 transaction.set(uDocRef, {
                   id: String(targetUid),
+                  uid: String(targetUid),
                   email: customerEmail || '',
                   walletBalance: newBalance,
+                  balance: newBalance,
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString()
                 }, { merge: true });
               }
 
+              transaction.set(walletDocRef, {
+                userId: String(targetUid),
+                userEmail: customerEmail || '',
+                walletBalance: newBalance,
+                balance: newBalance,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+
               transaction.set(txDocRef, {
                 id: reference,
+                reference: reference,
                 userId: String(targetUid),
                 userEmail: customerEmail || '',
                 amount: amountNaira,
+                previousBalance: currentBal,
+                newBalance: newBalance,
+                walletBalance: newBalance,
+                balance: newBalance,
                 type: 'deposit',
                 method: 'paystack',
                 status: 'successful',
@@ -179,6 +216,7 @@ export const handler = async (event: any) => {
               });
             });
 
+            finalVerifiedBalance = newBalance;
             console.log(`[Netlify Paystack Verify] Credited ₦${amountNaira} to User ${targetUid}. New Bal: ₦${newBalance}`);
           }
         } catch (creditErr) {
@@ -194,6 +232,7 @@ export const handler = async (event: any) => {
           status: 'success',
           reference: pstData.reference,
           amount: amountNaira,
+          newBalance: typeof finalVerifiedBalance !== 'undefined' ? finalVerifiedBalance : amountNaira,
           currency: pstData.currency || 'NGN',
           paidAt: pstData.paid_at || pstData.paidAt,
           channel: pstData.channel,
