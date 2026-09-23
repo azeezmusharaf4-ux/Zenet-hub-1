@@ -1,4 +1,4 @@
-import { getDb, doc, getDoc, setDoc, updateDoc, collection, getDocs, parseAndVerifyToken } from './_firebase';
+import { getDb, ensureServerAuthenticated, doc, getDoc, setDoc, updateDoc, collection, getDocs, parseAndVerifyToken } from './_firebase';
 import { runTransaction } from 'firebase/firestore';
 
 export const handler = async (event: any) => {
@@ -32,6 +32,7 @@ export const handler = async (event: any) => {
       };
     }
 
+    await ensureServerAuthenticated();
     const db = getDb();
     if (!db) {
       return {
@@ -115,21 +116,44 @@ export const handler = async (event: any) => {
       let remainingStock = 0;
 
       if (hasInventorySubcollection && invSnap) {
-        let targetDocSnap = null;
+        let targetDocSnap: any = null;
         let targetDocId = null;
         let availableCount = 0;
 
-        for (const d of invSnap.docs) {
-          const liveItemRef = doc(db, 'listings', listingId, 'inventory', d.id);
-          const liveItemSnap = await t.get(liveItemRef);
-          if (liveItemSnap.exists()) {
-            const itemData = liveItemSnap.data() as any;
-            const itemStatus = (itemData.status || '').toLowerCase();
-            if (itemStatus === 'available' || itemData.status === 'Available') {
-              availableCount++;
-              if (!targetDocSnap) {
-                targetDocSnap = liveItemSnap;
-                targetDocId = d.id;
+        // If listing has an inventory array, follow that exact order first
+        if (Array.isArray(listingData.inventory) && listingData.inventory.length > 0) {
+          for (const invItem of listingData.inventory) {
+            const liveItemRef = doc(db, 'listings', listingId, 'inventory', invItem.id);
+            const liveItemSnap = await t.get(liveItemRef);
+            if (liveItemSnap.exists()) {
+              const itemData = liveItemSnap.data() as any;
+              const itemStatus = (itemData.status || '').toLowerCase();
+              if (itemStatus === 'available' || itemData.status === 'Available') {
+                availableCount++;
+                if (!targetDocSnap) {
+                  targetDocSnap = liveItemSnap;
+                  targetDocId = invItem.id;
+                }
+              }
+            }
+          }
+        }
+
+        // If not found via array order, check subcollection documents
+        if (!targetDocSnap) {
+          availableCount = 0;
+          for (const d of invSnap.docs) {
+            const liveItemRef = doc(db, 'listings', listingId, 'inventory', d.id);
+            const liveItemSnap = await t.get(liveItemRef);
+            if (liveItemSnap.exists()) {
+              const itemData = liveItemSnap.data() as any;
+              const itemStatus = (itemData.status || '').toLowerCase();
+              if (itemStatus === 'available' || itemData.status === 'Available') {
+                availableCount++;
+                if (!targetDocSnap) {
+                  targetDocSnap = liveItemSnap;
+                  targetDocId = d.id;
+                }
               }
             }
           }
@@ -149,15 +173,39 @@ export const handler = async (event: any) => {
           secData = targetDocSnap.data();
         }
 
+        // Merge array item (which has all form-configured fields), doc data, and secure details
+        const matchingArrayItem = Array.isArray(listingData.inventory)
+          ? listingData.inventory.find((i: any) => i && i.id === targetDocId)
+          : null;
+
+        const mergedRawItem: Record<string, any> = {
+          ...(matchingArrayItem || {}),
+          ...(targetDocSnap.data() || {}),
+          ...(secData || {})
+        };
+
+        const internalKeys = new Set([
+          'id', 'status', 'soldTo', 'soldToEmail', 'soldAt', 'orderId',
+          'updatedAt', 'createdAt', 'listingId', 'deleted', 'isSold'
+        ]);
+
+        const dynamicDeliveryFields: Record<string, any> = {};
+        for (const [k, v] of Object.entries(mergedRawItem)) {
+          if (!internalKeys.has(k) && v !== undefined && v !== null && String(v).trim() !== '') {
+            dynamicDeliveryFields[k] = v;
+          }
+        }
+
         secureDetails = {
+          ...dynamicDeliveryFields,
           inventoryId: targetDocId,
-          accountEmail: secData.accountEmail || '',
-          accountPassword: secData.accountPassword || '',
-          recoveryInfo: secData.recoveryInfo || secData.notes || '',
-          backupCodes: secData.backupCodes || secData.twoFactorBackupCodes || secData.twoFactorSecretKey || '',
-          twoFactorSecretKey: secData.twoFactorSecretKey || '',
-          twoFactorBackupCodes: secData.twoFactorBackupCodes || secData.backupCodes || '',
-          additionalInstructions: secData.additionalInstructions || ''
+          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
+          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
+          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
+          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
+          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
+          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
+          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
         };
 
         remainingStock = Math.max(0, availableCount - 1);
@@ -206,15 +254,28 @@ export const handler = async (event: any) => {
         }
 
         const targetAcc = listingData.inventory[availableIdx];
+        const internalKeys = new Set([
+          'id', 'status', 'soldTo', 'soldToEmail', 'soldAt', 'orderId',
+          'updatedAt', 'createdAt', 'listingId', 'deleted', 'isSold'
+        ]);
+
+        const dynamicDeliveryFields: Record<string, any> = {};
+        for (const [k, v] of Object.entries(targetAcc || {})) {
+          if (!internalKeys.has(k) && v !== undefined && v !== null && String(v).trim() !== '') {
+            dynamicDeliveryFields[k] = v;
+          }
+        }
+
         secureDetails = {
+          ...dynamicDeliveryFields,
           inventoryId: targetAcc.id || `inv_${availableIdx + 1}`,
-          accountEmail: targetAcc.accountEmail || '',
-          accountPassword: targetAcc.accountPassword || '',
-          recoveryInfo: targetAcc.recoveryInfo || targetAcc.notes || '',
-          backupCodes: targetAcc.backupCodes || targetAcc.twoFactorBackupCodes || targetAcc.twoFactorSecretKey || '',
-          twoFactorSecretKey: targetAcc.twoFactorSecretKey || '',
-          twoFactorBackupCodes: targetAcc.twoFactorBackupCodes || targetAcc.backupCodes || '',
-          additionalInstructions: targetAcc.additionalInstructions || ''
+          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
+          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
+          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
+          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
+          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
+          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
+          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
         };
 
         const updatedInventory = [...listingData.inventory];
@@ -268,6 +329,13 @@ export const handler = async (event: any) => {
         listingTitle: listingData.title,
         category: listingData.category,
         price: price,
+        paidAmount: price,
+        currency: 'NGN',
+        type: 'log',
+        transactionCategory: 'log',
+        paymentGateway: 'wallet',
+        transactionId: txId,
+        purchasedAt: new Date().toISOString(),
         status: 'escrow_holding',
         escrowStatus: 'held',
         disputeStatus: 'none',
@@ -283,7 +351,25 @@ export const handler = async (event: any) => {
       const purchaseDocRef = doc(db, 'purchases', purchaseId);
       t.set(purchaseDocRef, purchaseRecord);
 
-      // Create transaction log
+      // Create global wallet_transactions record
+      const globalTxRef = doc(db, 'wallet_transactions', txId);
+      t.set(globalTxRef, {
+        id: txId,
+        reference: txId,
+        orderId: purchaseId,
+        purchaseId: purchaseId,
+        userId: userId,
+        userEmail: buyerEmail || userData.email || '',
+        amount: price,
+        type: 'purchase',
+        method: 'wallet',
+        status: 'successful',
+        description: `Purchased: ${listingData.title}`,
+        date: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        createdAt: new Date().toISOString()
+      });
+
+      // Create user subcollection transaction log
       const userTxRef = doc(db, 'users', userId, 'transactions', txId);
       t.set(userTxRef, {
         id: txId,
@@ -299,11 +385,20 @@ export const handler = async (event: any) => {
         balanceAfter: newBal
       });
 
-      // Update buyer wallet balance
+      // Update buyer wallet balance in users and wallets
       t.update(userDocRef, {
         walletBalance: newBal,
+        balance: newBal,
+        totalPurchasesAmount: (userData.totalPurchasesAmount || 0) + price,
         updatedAt: new Date().toISOString()
       });
+
+      t.set(doc(db, 'wallets', userId), {
+        userId,
+        walletBalance: newBal,
+        balance: newBal,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
 
       purchaseResult = {
         success: true,

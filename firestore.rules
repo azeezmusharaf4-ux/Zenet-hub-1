@@ -14,7 +14,8 @@ service cloud.firestore {
         )) ||
         request.auth.uid == 'LAn8Lec9ccT6rGEiDdylF8FfPZZ2' ||
         request.auth.uid == '6nTqAgRTFkYoIUmlZwUN52rRmwt2' ||
-        request.auth.uid == 'SO3NblzYl2cQGoYtxuf58Wq1kOw1'
+        request.auth.uid == 'SO3NblzYl2cQGoYtxuf58Wq1kOw1' ||
+        request.auth.uid == '4Ro7kMiKr5bFZFHpMGT5OOzqv5N2'
       );
     }
 
@@ -41,8 +42,14 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) || isAdmin();
-      allow update: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isAdmin() || (
+        isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referralCount', 'totalReferralEarnings', 'walletBalance', 'balance', 'updatedAt'])
+      );
       allow delete: if isOwner(userId) || isAdmin();
+
+      match /transactions/{txId} {
+        allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      }
     }
 
     // Wallets Collection (Dual persistence with users/{userId})
@@ -138,6 +145,24 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         resource.data.buyerId == request.auth.uid || 
         resource.data.sellerId == request.auth.uid || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Orders Collection (Log accounts and marketplace orders)
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.buyerEmail == request.auth.token.email ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
         isAdmin()
       );
       allow delete: if isAdmin();

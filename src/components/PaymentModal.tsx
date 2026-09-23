@@ -198,10 +198,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               safeApiFetch(`/api/paystack/verify/${encodeURIComponent(actualRef)}?userId=${encodeURIComponent(user.uid)}&orderId=${encodeURIComponent(effectiveOrderId)}&listingId=${encodeURIComponent(listing.id)}`)
                 .then((verifyData) => {
                   if (verifyData.verified && verifyData.status === 'success') {
+                    const verifiedPaidAmount = Number(verifyData.amount ?? verifyData.purchaseRecord?.paidAmount ?? listing.price);
                     return onPaymentSuccess({
                       listing,
-                      paidAmount: listing.price,
-                      currency: currency || 'NGN',
+                      paidAmount: verifiedPaidAmount,
+                      currency: verifyData.currency || currency || 'NGN',
                       paymentGateway: 'paystack',
                       transactionId: actualRef,
                       transferCode: verifyData.purchaseRecord?.transferCode || `ZENET-ESCROW-${Math.floor(1000 + Math.random() * 9000)}-PST`,

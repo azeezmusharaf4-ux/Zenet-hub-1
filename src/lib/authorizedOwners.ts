@@ -9,13 +9,16 @@
 export const AUTHORIZED_OWNER_EMAILS: readonly string[] = [
   'azeezmusharaf4@gmail.com', // Original Owner
   'muzenteofficial001@gmail.com', // Authorized Owner (muzente Official)
-  'azeezmusharaf@gmail.com'
+  'azeezmusharaf@gmail.com',
+  'zenet-backend-service@zenetmarketplace.internal',
+  'system-backend@zenetmarketplace.app'
 ];
 
 export const AUTHORIZED_OWNER_UIDS: readonly string[] = [
   'LAn8Lec9ccT6rGEiDdylF8FfPZZ2', // Original Owner UID (owns 26 existing listings)
   '6nTqAgRTFkYoIUmlZwUN52rRmwt2', // Authorized Owner UID
   'SO3NblzYl2cQGoYtxuf58Wq1kOw1',
+  '4Ro7kMiKr5bFZFHpMGT5OOzqv5N2',
   'sim-owner-azeez'
 ];
 

@@ -953,13 +953,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           updatedAt: new Date().toISOString()
         }, { merge: true });
 
-        // Save secure item details
+        // Save secure item details preserving all configured dynamic fields
         await setDoc(secureRef, {
+          ...item,
           id: itemId,
           accountEmail: item.accountEmail || '',
           accountPassword: item.accountPassword || '',
-          notes: item.recoveryInfo || '',
-          recoveryInfo: item.recoveryInfo || '',
+          notes: item.recoveryInfo || item.notes || '',
+          recoveryInfo: item.recoveryInfo || item.notes || '',
           twoFactorSecretKey: item.twoFactorSecretKey || '',
           twoFactorBackupCodes: item.twoFactorBackupCodes || item.backupCodes || '',
           backupCodes: item.twoFactorBackupCodes || item.backupCodes || '',
@@ -968,12 +969,13 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
         }, { merge: true });
       }
 
-      // 3. Clean inventory array for parent listing doc
+      // 3. Clean inventory array for parent listing doc preserving all fields
       const inventoryForDoc = finalInventory.map(item => ({
+        ...item,
         id: item.id,
         status: item.status, // 'Available' or 'Sold'
         accountEmail: item.accountEmail || '',
-        recoveryInfo: item.recoveryInfo || '',
+        recoveryInfo: item.recoveryInfo || item.notes || '',
         additionalInstructions: item.additionalInstructions || '',
         twoFactorSecretKey: item.twoFactorSecretKey || '',
         twoFactorBackupCodes: item.twoFactorBackupCodes || item.backupCodes || '',

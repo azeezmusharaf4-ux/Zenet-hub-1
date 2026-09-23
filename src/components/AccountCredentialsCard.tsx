@@ -248,10 +248,13 @@ export default function AccountCredentialsCard({
       .replace(/([a-z])([A-Z])/g, '$1 $2')
       .replace(/\b\w/g, char => char.toUpperCase());
 
+    const isSecret = rawKey.toLowerCase().includes('password') || rawKey.toLowerCase().includes('pass') || rawKey.toLowerCase().includes('secret') || rawKey.toLowerCase().includes('pin');
+
     fields.push({
       key: rawKey,
       label: cleanLabel,
       value: strVal,
+      isPassword: isSecret,
       isMultiLine: strVal.length > 50 || strVal.includes('\n'),
       icon: <Key className="w-4 h-4 text-[#5B4DF5]" />
     });

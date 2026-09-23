@@ -39,6 +39,8 @@ import { SellerProfileModal } from './components/SellerProfileModal';
 import { PaymentModal } from './components/PaymentModal';
 import { InsufficientBalanceModal } from './components/InsufficientBalanceModal';
 import { PaymentSuccessModal } from './components/PaymentSuccessModal';
+import { BuyNowConfirmModal } from './components/BuyNowConfirmModal';
+import { PurchaseProcessingModal } from './components/PurchaseProcessingModal';
 import { NavigationDrawer } from './components/NavigationDrawer';
 import { PurchaseDetailsModal } from './components/PurchaseDetailsModal';
 import { WalletModal } from './components/WalletModal';
@@ -301,6 +303,9 @@ export default function App() {
   const [selectedListing, setSelectedListing] = useState<AccountListing | null>(null);
   const [contactListing, setContactListing] = useState<AccountListing | null>(null);
   const [buyingListing, setBuyingListing] = useState<AccountListing | null>(null);
+  const [confirmingBuyListing, setConfirmingBuyListing] = useState<AccountListing | null>(null);
+  const [isProcessingPurchase, setIsProcessingPurchase] = useState<boolean>(false);
+  const [processingListing, setProcessingListing] = useState<AccountListing | null>(null);
   const [insufficientBalanceListing, setInsufficientBalanceListing] = useState<AccountListing | null>(null);
   const [latestWalletBalance, setLatestWalletBalance] = useState<number>(0);
   const [completedOrder, setCompletedOrder] = useState<PurchaseRecord | null>(null);
@@ -1347,9 +1352,13 @@ export default function App() {
         setPurchases((prev) => [completedRecord, ...prev.filter((p) => p.id !== completedRecord.id)]);
         setSelectedListing(null);
         setBuyingListing(null);
+        setIsProcessingPurchase(false);
+        setProcessingListing(null);
         setCompletedOrder(completedRecord);
         return;
       } catch (err: any) {
+        setIsProcessingPurchase(false);
+        setProcessingListing(null);
         const msg = err?.message || 'Wallet purchase failed';
         if (msg.toLowerCase().includes('sold')) {
           setListings((prev) =>
@@ -1699,21 +1708,18 @@ export default function App() {
     }
 
     // Close checkout and show completed order modal with credentials
+    setIsProcessingPurchase(false);
+    setProcessingListing(null);
     setBuyingListing(null);
     setCompletedOrder(purchaseRecord);
     setPurchases((prev) => [purchaseRecord, ...prev.filter((p) => p.id !== purchaseRecord.id)]);
     handleSelectView('orders');
   };
 
-  // Handler: Secure and Streamlined Wallet Buy Now Flow
-  const handleBuyNow = async (listing: AccountListing) => {
+  // Step 1: Open centered Buy Now confirmation modal
+  const handleBuyNow = (listing: AccountListing) => {
     if (!user) {
       setAuthMode('login');
-      return;
-    }
-
-    // Prevent concurrent double-purchases
-    if (isPurchasingRef.current) {
       return;
     }
 
@@ -1724,49 +1730,33 @@ export default function App() {
     const docStock = listing.stockCount !== undefined ? listing.stockCount : (listing.stock !== undefined ? listing.stock : 1);
     const effectiveStock = inventoryAvailable !== undefined ? inventoryAvailable : docStock;
 
-    const isOwnerOrSeller = user.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' || 
-      userProfile?.role === 'owner' || 
-      userProfile?.role === 'admin' || 
-      listing.sellerId === user.uid;
-
     if (listing.status === 'sold' || effectiveStock <= 0) {
-      if (isOwnerOrSeller) {
-        // Auto-replenish stock for the owner/seller so testing and purchasing own accounts always works
-        try {
-          const listingRef = doc(db, 'listings', listing.id);
-          const snap = await getDoc(listingRef);
-          const liveData = snap.exists() ? snap.data() : null;
-          let updatedInv = liveData?.inventory;
-          if (Array.isArray(updatedInv) && updatedInv.length > 0) {
-            updatedInv = updatedInv.map((item: any, idx: number) => idx === 0 ? { ...item, status: 'Available' } : item);
-          }
-          await setDoc(listingRef, {
-            status: 'active',
-            stock: 1,
-            stockCount: 1,
-            ...(updatedInv ? { inventory: updatedInv } : {})
-          }, { merge: true });
-
-          listing = {
-            ...listing,
-            status: 'active',
-            stock: 1,
-            stockCount: 1,
-            ...(updatedInv ? { inventory: updatedInv } : {})
-          };
-          setListings((prev) => prev.map((l) => l.id === listing.id ? listing : l));
-        } catch (replenishErr) {
-          console.warn('Notice during auto-replenish:', replenishErr);
-        }
-      } else {
-        alert('This listing is currently sold out. Please explore our other available accounts.');
-        return;
-      }
+      alert('This listing is currently sold out. Please explore our other available accounts.');
+      return;
     }
 
+    setConfirmingBuyListing(listing);
+  };
+
+  // Step 2: Customer confirmed purchase in modal -> Show processing spinner and complete purchase
+  const handleConfirmPurchase = async (listing: AccountListing) => {
+    setConfirmingBuyListing(null);
+
+    if (!user) {
+      setAuthMode('login');
+      return;
+    }
+
+    if (isPurchasingRef.current) {
+      return;
+    }
+
+    setProcessingListing(listing);
+    setIsProcessingPurchase(true);
     isPurchasingRef.current = true;
+
     try {
-      // 1. First check the user's walletBalance in Firebase
+      // 1. Check user's live walletBalance in Firestore
       const userRef = doc(db, 'users', user.uid);
       const userSnap = await getDoc(userRef);
       let currentBalance = 0;
@@ -1781,22 +1771,31 @@ export default function App() {
         currentBalance = walletBalance;
       }
 
-      // 2. If walletBalance >= product price: Complete purchase automatically
-      if (currentBalance >= listing.price) {
-        await handlePaymentSuccess({
-          listing: listing,
-          paidAmount: listing.price,
-          currency: 'NGN',
-          paymentGateway: 'wallet',
-          transactionId: `WALLET_TX_${Date.now()}`,
-          transferCode: `ZENET-ESCROW-${Math.floor(1000 + Math.random() * 9000)}-WALLET`,
-          buyerEmail: user.email || '',
-          buyerName: user.displayName || user.email?.split('@')[0] || ''
-        });
-      } else {
-        // 3. If walletBalance < product price: Show insufficient balance message
+      // 2. If insufficient balance: dismiss processing modal and open wallet fund modal
+      if (currentBalance < listing.price) {
+        setIsProcessingPurchase(false);
+        setProcessingListing(null);
         setLatestWalletBalance(currentBalance);
         setInsufficientBalanceListing(listing);
+        return;
+      }
+
+      // 3. Complete purchase with a smooth minimum delay (1.2s) so loading state is clean and professional
+      const startMs = Date.now();
+      await handlePaymentSuccess({
+        listing: listing,
+        paidAmount: listing.price,
+        currency: 'NGN',
+        paymentGateway: 'wallet',
+        transactionId: `WALLET_TX_${Date.now()}`,
+        transferCode: `ZENET-ESCROW-${Math.floor(1000 + Math.random() * 9000)}-WALLET`,
+        buyerEmail: user.email || '',
+        buyerName: user.displayName || user.email?.split('@')[0] || ''
+      });
+
+      const elapsed = Date.now() - startMs;
+      if (elapsed < 1200) {
+        await new Promise((resolve) => setTimeout(resolve, 1200 - elapsed));
       }
     } catch (err: any) {
       const errMsg = err?.message || '';
@@ -1808,9 +1807,12 @@ export default function App() {
         );
         alert('This listing is already sold out. Please explore our other available accounts.');
       } else {
-        console.warn('Streamlined buy now notice:', errMsg);
+        console.warn('Purchase error:', errMsg);
+        alert(errMsg || 'Failed to complete purchase. Please try again.');
       }
     } finally {
+      setIsProcessingPurchase(false);
+      setProcessingListing(null);
       isPurchasingRef.current = false;
     }
   };
@@ -1875,6 +1877,7 @@ export default function App() {
         const secureDocRef = doc(db, 'listings', newDocRef.id, 'inventory', item.id, 'secure', 'details');
         
         await setDoc(itemDocRef, {
+          ...item,
           id: item.id,
           status: 'available',
           soldTo: null,
@@ -1882,12 +1885,10 @@ export default function App() {
           soldAt: null
         });
 
+        // Save all dynamic configured delivery fields without stripping
         await setDoc(secureDocRef, {
-          id: item.id,
-          accountEmail: item.accountEmail || '',
-          accountPassword: item.accountPassword || '',
-          additionalInstructions: item.additionalInstructions || '',
-          notes: item.notes || ''
+          ...item,
+          id: item.id
         });
       }
     } else {
@@ -1903,12 +1904,10 @@ export default function App() {
         soldAt: null
       });
 
+      // Save all dynamic configured delivery fields without stripping
       await setDoc(secureDocRef, {
-        id: defaultId,
-        accountEmail: listingData.digitalProductDetails?.accountEmail || '',
-        accountPassword: listingData.digitalProductDetails?.accountPassword || '',
-        additionalInstructions: listingData.digitalProductDetails?.additionalInstructions || '',
-        notes: listingData.digitalProductDetails?.recoveryInfo || ''
+        ...(listingData.digitalProductDetails || {}),
+        id: defaultId
       });
     }
   };
@@ -2842,6 +2841,23 @@ export default function App() {
             setInsufficientBalanceListing(null);
             setIsWalletModalOpen(true);
           }}
+        />
+      )}
+
+      {/* Buy Now Confirmation Modal */}
+      {confirmingBuyListing && (
+        <BuyNowConfirmModal
+          listing={confirmingBuyListing}
+          onCancel={() => setConfirmingBuyListing(null)}
+          onConfirm={() => handleConfirmPurchase(confirmingBuyListing)}
+        />
+      )}
+
+      {/* Buy Now Processing Loading State Modal */}
+      {isProcessingPurchase && (
+        <PurchaseProcessingModal
+          itemName={processingListing?.title}
+          price={processingListing?.price}
         />
       )}
 

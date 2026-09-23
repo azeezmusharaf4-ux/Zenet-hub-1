@@ -1,4 +1,4 @@
-import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
+import { getDb, ensureServerAuthenticated, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
 
 export const handler = async (event: any) => {
   const headers = {
@@ -39,6 +39,8 @@ export const handler = async (event: any) => {
       } catch {}
     }
     const queryUserId = event.queryStringParameters?.userId || '';
+    const queryListingId = event.queryStringParameters?.listingId || '';
+    const queryOrderId = event.queryStringParameters?.orderId || '';
 
     if (!reference) {
       return {
@@ -85,6 +87,10 @@ export const handler = async (event: any) => {
         }
       }
 
+      const targetListingId = metadata.listingId || queryListingId || '';
+      const targetOrderId = metadata.orderId || queryOrderId || '';
+      const isLogPurchase = metadata.type === 'log' || metadata.transactionCategory === 'log' || (metadata.isWalletFunding === false && targetListingId) || (Boolean(targetListingId) && !metadata.isWalletFunding);
+
       const expectedAmountNaira = metadata.expectedAmountNaira || metadata.priceNaira;
       if (expectedAmountNaira && Number(expectedAmountNaira) > 0) {
         const expectedKobo = Math.round(Number(expectedAmountNaira) * 100);
@@ -102,35 +108,12 @@ export const handler = async (event: any) => {
         }
       }
 
-      // Update Firestore user wallet & transaction ledger with idempotency
-      let finalVerifiedBalance: number | undefined;
+      await ensureServerAuthenticated();
       const db = getDb();
+      let finalVerifiedBalance: number | undefined;
+
       if (db) {
         try {
-          const txDocRef = doc(db, 'wallet_transactions', reference);
-          const txSnap = await getDoc(txDocRef);
-
-          if (txSnap.exists()) {
-            console.log(`[Netlify Paystack Verify] Reference ${reference} already processed in wallet_transactions.`);
-            return {
-              statusCode: 200,
-              headers,
-              body: JSON.stringify({
-                verified: true,
-                alreadyProcessed: true,
-                status: 'success',
-                reference: pstData.reference,
-                amount: txSnap.data()?.amount || amountNaira,
-                currency: pstData.currency || 'NGN',
-                paidAt: pstData.paid_at || pstData.paidAt,
-                channel: pstData.channel,
-                buyerEmail: customerEmail,
-                userId: targetUid || txSnap.data()?.userId,
-                gateway: 'paystack'
-              })
-            };
-          }
-
           // If targetUid is not resolved, search by customer code or email
           if (!targetUid && customerCode) {
             const custCodeQ = query(collection(db, 'users'), where('paystackCustomerCode', '==', customerCode));
@@ -145,18 +128,214 @@ export const handler = async (event: any) => {
             const usersSnap = await getDocs(usersQ);
             if (!usersSnap.empty) {
               targetUid = usersSnap.docs[0].id;
-            } else {
-              const allUsersSnap = await getDocs(collection(db, 'users'));
-              for (const uDoc of allUsersSnap.docs) {
-                const uEmail = (uDoc.data().email || '').toLowerCase().trim();
-                if (uEmail === customerEmail) {
-                  targetUid = uDoc.id;
-                  break;
-                }
-              }
             }
           }
 
+          // Check if transaction already processed
+          const txDocRef = doc(db, 'wallet_transactions', reference);
+          const txSnap = await getDoc(txDocRef);
+
+          if (txSnap.exists()) {
+            const existingTx = txSnap.data();
+            let existingPurchase: any = null;
+            if (existingTx.purchaseId) {
+              const pDoc = await getDoc(doc(db, 'purchases', existingTx.purchaseId));
+              if (pDoc.exists()) {
+                existingPurchase = { id: pDoc.id, ...pDoc.data() };
+              }
+            }
+
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                verified: true,
+                alreadyProcessed: true,
+                status: 'success',
+                delivered: Boolean(existingPurchase),
+                purchaseRecord: existingPurchase,
+                reference: pstData.reference,
+                amount: existingTx.amount || amountNaira,
+                currency: pstData.currency || 'NGN',
+                paidAt: pstData.paid_at || pstData.paidAt,
+                channel: pstData.channel,
+                buyerEmail: customerEmail,
+                userId: targetUid || existingTx.userId,
+                gateway: 'paystack'
+              })
+            };
+          }
+
+          // Case A: Direct LOG Account Purchase via Paystack
+          if (isLogPurchase && targetListingId && targetUid) {
+            const effectiveOrderId = targetOrderId || `ORD_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+            const purchaseId = `pur_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+            const transferCode = `ZENET-ESCROW-${Math.floor(1000 + Math.random() * 9000)}-PST`;
+            const listingDocRef = doc(db, 'listings', targetListingId);
+
+            let createdPurchaseRecord: any = null;
+
+            await runTransaction(db, async (t) => {
+              const uDocRef = doc(db, 'users', String(targetUid));
+              const uDocSnap = await t.get(uDocRef);
+              const uData = uDocSnap.exists() ? uDocSnap.data() : {};
+
+              const liveListingSnap = await t.get(listingDocRef);
+              if (!liveListingSnap.exists()) {
+                throw new Error('Listing does not exist');
+              }
+              const liveListingData = liveListingSnap.data();
+
+              let secureDetails: any = null;
+              let remainingStock = 0;
+
+              if (Array.isArray(liveListingData.inventory) && liveListingData.inventory.length > 0) {
+                const availableIdx = liveListingData.inventory.findIndex((acc: any) => (acc.status || '').toLowerCase() === 'available' || acc.status === 'Available');
+                if (availableIdx !== -1) {
+                  const targetAcc = liveListingData.inventory[availableIdx];
+                  secureDetails = {
+                    inventoryId: targetAcc.id || `inv_${availableIdx + 1}`,
+                    accountEmail: targetAcc.accountEmail || targetAcc.email || '',
+                    accountPassword: targetAcc.accountPassword || targetAcc.password || '',
+                    recoveryInfo: targetAcc.recoveryInfo || targetAcc.notes || '',
+                    backupCodes: targetAcc.backupCodes || targetAcc.twoFactorBackupCodes || targetAcc.twoFactorSecretKey || '',
+                    twoFactorSecretKey: targetAcc.twoFactorSecretKey || '',
+                    twoFactorBackupCodes: targetAcc.twoFactorBackupCodes || targetAcc.backupCodes || '',
+                    additionalInstructions: targetAcc.additionalInstructions || ''
+                  };
+
+                  const updatedInventory = [...liveListingData.inventory];
+                  updatedInventory[availableIdx] = {
+                    ...targetAcc,
+                    status: 'Sold',
+                    soldTo: String(targetUid),
+                    soldToEmail: customerEmail || uData.email || '',
+                    orderId: effectiveOrderId,
+                    soldAt: new Date().toISOString()
+                  };
+
+                  const remainingAvailable = updatedInventory.filter((acc: any) => (acc.status || '').toLowerCase() === 'available' || acc.status === 'Available').length;
+                  remainingStock = remainingAvailable;
+
+                  t.update(listingDocRef, {
+                    inventory: updatedInventory,
+                    stock: remainingAvailable,
+                    stockCount: remainingAvailable,
+                    status: remainingAvailable > 0 ? 'active' : 'sold'
+                  });
+                }
+              }
+
+              if (!secureDetails) {
+                secureDetails = liveListingData.digitalProductDetails ? {
+                  accountEmail: liveListingData.digitalProductDetails.accountEmail || liveListingData.digitalProductDetails.email || '',
+                  accountPassword: liveListingData.digitalProductDetails.accountPassword || liveListingData.digitalProductDetails.password || '',
+                  recoveryInfo: liveListingData.digitalProductDetails.recoveryInfo || '',
+                  backupCodes: liveListingData.digitalProductDetails.backupCodes || liveListingData.digitalProductDetails.twoFactorBackupCodes || '',
+                  twoFactorSecretKey: liveListingData.digitalProductDetails.twoFactorSecretKey || '',
+                  twoFactorBackupCodes: liveListingData.digitalProductDetails.twoFactorBackupCodes || '',
+                  additionalInstructions: liveListingData.digitalProductDetails.additionalInstructions || ''
+                } : undefined;
+
+                remainingStock = 0;
+                t.update(listingDocRef, { stock: 0, stockCount: 0, status: 'sold' });
+              }
+
+              createdPurchaseRecord = {
+                id: purchaseId,
+                orderId: effectiveOrderId,
+                listingId: targetListingId,
+                listingTitle: liveListingData.title,
+                price: liveListingData.price,
+                paidAmount: amountNaira,
+                currency: 'NGN',
+                type: 'log',
+                category: liveListingData.category || 'Other',
+                transactionCategory: 'log',
+                sellerId: liveListingData.sellerId || '',
+                sellerName: liveListingData.sellerName || 'Seller',
+                sellerEmail: liveListingData.sellerEmail || '',
+                buyerId: String(targetUid),
+                buyerName: metadata.buyerName || uData.displayName || (customerEmail ? customerEmail.split('@')[0] : 'Buyer'),
+                buyerEmail: customerEmail || uData.email || '',
+                paymentGateway: 'paystack',
+                transactionId: reference,
+                paystackReference: reference,
+                purchasedAt: new Date().toISOString(),
+                status: 'escrow_holding',
+                transferCode: transferCode,
+                imageUrl: liveListingData.imageUrl || '',
+                digitalProductDetails: secureDetails
+              };
+
+              t.set(doc(db, 'purchases', purchaseId), createdPurchaseRecord);
+
+              t.set(doc(db, 'orders', effectiveOrderId), {
+                id: effectiveOrderId,
+                orderId: effectiveOrderId,
+                type: 'log_account',
+                userId: String(targetUid),
+                buyerEmail: customerEmail || uData.email || '',
+                buyerName: metadata.buyerName || uData.displayName || '',
+                listingId: targetListingId,
+                listingTitle: liveListingData.title,
+                amount: amountNaira,
+                currency: 'NGN',
+                paymentGateway: 'paystack',
+                paystackReference: reference,
+                status: 'completed',
+                paymentStatus: 'success',
+                purchaseId: purchaseId,
+                deliveredAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+
+              t.set(doc(db, 'wallet_transactions', reference), {
+                id: reference,
+                reference: reference,
+                paystackReference: reference,
+                orderId: effectiveOrderId,
+                purchaseId: purchaseId,
+                userId: String(targetUid),
+                userEmail: customerEmail || uData.email || '',
+                amount: amountNaira,
+                type: 'purchase',
+                method: 'paystack_checkout',
+                status: 'successful',
+                description: `Purchased: ${liveListingData.title}`,
+                date: new Date().toISOString().replace('T', ' ').slice(0, 16),
+                createdAt: new Date().toISOString()
+              });
+
+              if (uDocSnap.exists()) {
+                t.update(uDocRef, {
+                  totalPurchasesAmount: (uData.totalPurchasesAmount || 0) + amountNaira,
+                  updatedAt: new Date().toISOString()
+                });
+              }
+            });
+
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                verified: true,
+                status: 'success',
+                delivered: true,
+                purchaseRecord: createdPurchaseRecord,
+                reference: pstData.reference || reference,
+                amount: amountNaira,
+                currency: pstData.currency || 'NGN',
+                paidAt: pstData.paid_at || pstData.paidAt,
+                channel: pstData.channel,
+                buyerEmail: customerEmail,
+                userId: String(targetUid),
+                gateway: 'paystack'
+              })
+            };
+          }
+
+          // Case B: Wallet Deposit
           if (targetUid) {
             const uDocRef = doc(db, 'users', String(targetUid));
             const walletDocRef = doc(db, 'wallets', String(targetUid));
@@ -211,7 +390,7 @@ export const handler = async (event: any) => {
                 status: 'successful',
                 paystackReference: reference,
                 description: metadata.listingTitle || 'Paystack Wallet Deposit',
-                date: new Date().toISOString(),
+                date: new Date().toISOString().replace('T', ' ').slice(0, 16),
                 createdAt: new Date().toISOString()
               });
             });

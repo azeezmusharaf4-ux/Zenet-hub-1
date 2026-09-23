@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, Auth } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -11,7 +12,40 @@ const firebaseConfig = {
   messagingSenderId: "547531748438",
 };
 
+const SERVER_SERVICE_EMAIL = 'zenet-backend-service@zenetmarketplace.internal';
+const SERVER_SERVICE_PASSWORD = 'ZenetSecureSystemBackend2026!#';
+
 let db: Firestore | null = null;
+let authInstance: Auth | null = null;
+
+export async function ensureServerAuthenticated(): Promise<boolean> {
+  try {
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    if (!authInstance) {
+      authInstance = getAuth(app);
+    }
+    if (authInstance.currentUser && authInstance.currentUser.email === SERVER_SERVICE_EMAIL) {
+      return true;
+    }
+    try {
+      await signInWithEmailAndPassword(authInstance, SERVER_SERVICE_EMAIL, SERVER_SERVICE_PASSWORD);
+      return true;
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        try {
+          await createUserWithEmailAndPassword(authInstance, SERVER_SERVICE_EMAIL, SERVER_SERVICE_PASSWORD);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    }
+  } catch (e) {
+    console.warn('[Netlify Firebase Auth] ensureServerAuthenticated notice:', e);
+    return false;
+  }
+}
 
 export function getDb(): Firestore | null {
   if (db) return db;
@@ -23,6 +57,11 @@ export function getDb(): Firestore | null {
     console.warn('[Netlify Firebase] Init notice:', err);
     return null;
   }
+}
+
+export async function getAuthenticatedDb(): Promise<Firestore | null> {
+  await ensureServerAuthenticated();
+  return getDb();
 }
 
 export interface DecodedAuthToken {

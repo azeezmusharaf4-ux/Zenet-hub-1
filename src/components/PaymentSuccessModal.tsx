@@ -1,259 +1,329 @@
 import React, { useState } from 'react';
-import { AccountListing, PurchaseRecord } from '../types';
-import AccountCredentialsCard from './AccountCredentialsCard';
+import { PurchaseRecord } from '../types';
 import { copyToClipboard } from '../utils/clipboard';
 import { 
   CheckCircle2, 
-  ShieldCheck, 
   Copy, 
   Check, 
-  ExternalLink, 
-  MessageSquare, 
+  X, 
+  Eye, 
+  EyeOff, 
   ShoppingBag, 
-  ArrowRight, 
-  Sparkles, 
-  Lock, 
-  Globe, 
-  X,
-  Key,
-  Eye,
-  EyeOff
+  Layers
 } from 'lucide-react';
 
 interface PaymentSuccessModalProps {
   order: PurchaseRecord | null;
   onClose: () => void;
   onOpenOrderHistory: () => void;
-  onContactSeller: (listing: AccountListing) => void;
+  onContactSeller?: (listing: any) => void;
+}
+
+// Internal fields that should never be shown as customer delivery fields
+const INTERNAL_METADATA_KEYS = new Set([
+  'id',
+  'inventoryid',
+  'listingid',
+  'orderid',
+  'status',
+  'issold',
+  'soldto',
+  'soldtoemail',
+  'soldat',
+  'createdat',
+  'updatedat',
+  'deleted',
+  'buyerid',
+  'sellerid',
+  'price',
+  'paidamount',
+  'currency',
+  'type',
+  'transactioncategory',
+  'paymentgateway',
+  'transactionid',
+  'transfercode',
+  '__v',
+  'propemail',
+  'proppassword',
+  'proprecoveryinfo',
+  'proptwofactorsecret',
+  'propbackupcodes',
+  'propinstructions'
+]);
+
+function formatDynamicLabel(key: string): string {
+  const lower = key.toLowerCase();
+  if (lower === 'accountemail' || lower === 'email' || lower === 'login') return 'Login / Email';
+  if (lower === 'accountpassword' || lower === 'password' || lower === 'pass') return 'Account Password';
+  if (lower === 'recoveryinfo' || lower === 'recovery' || lower === 'recoveryemail' || lower === 'recovery_email') return 'Recovery Info / Note';
+  if (lower === 'twofactorsecretkey' || lower === 'twofactorsecret' || lower === 'twofactor' || lower === 'totp' || lower === '2fa') return '2FA Secret Key';
+  if (lower === 'twofactorbackupcodes' || lower === 'backupcodes' || lower === 'backupcode') return '2FA Backup Codes';
+  if (lower === 'additionalinstructions' || lower === 'instructions') return 'Additional Transfer Instructions';
+  if (lower === 'phonenumber' || lower === 'phone') return 'Phone Number';
+  if (lower === 'delivery_value' || lower === 'deliveryvalue') return 'Stock Delivery Line';
+  if (lower === 'notes' || lower === 'note') return 'Account Notes';
+
+  // Any custom field: turn camelCase, snake_case or kebab-case into clean readable Title Case
+  return key
+    .replace(/[-_]/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function isSensitiveField(key: string): boolean {
+  const lower = key.toLowerCase();
+  return lower.includes('pass') || lower.includes('secret') || lower.includes('pin') || lower.includes('token') || lower.includes('key');
 }
 
 export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
   order,
   onClose,
-  onOpenOrderHistory,
-  onContactSeller
+  onOpenOrderHistory
 }) => {
   if (!order) return null;
 
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedEmail, setCopiedEmail] = useState(false);
-  const [copiedPassword, setCopiedPassword] = useState(false);
-  const [copiedSecretKey, setCopiedSecretKey] = useState(false);
-  const [copiedBackupCodes, setCopiedBackupCodes] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copiedAll, setCopiedAll] = useState(false);
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
 
-  const credentials = order.digitalProductDetails;
+  const credentials = order.digitalProductDetails || {};
 
-  const handleCopyCode = () => {
-    if (order.transferCode) {
-      copyToClipboard(order.transferCode);
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2500);
+  // Extract all configured delivery fields dynamically in the exact order received
+  const deliveryFields: { key: string; label: string; value: string; isSensitive: boolean }[] = [];
+  const seenValues = new Set<string>();
+
+  // Iterate over all keys of credentials
+  Object.entries(credentials).forEach(([key, val]) => {
+    if (!key || INTERNAL_METADATA_KEYS.has(key.toLowerCase())) return;
+    if (val === null || val === undefined) return;
+    const strVal = String(val).trim();
+    if (!strVal || strVal === 'null' || strVal === 'undefined') return;
+
+    // Check if delivery_value is a duplicate of login|pass or single value already shown
+    if (key.toLowerCase() === 'delivery_value') {
+      const email = credentials.accountEmail || credentials.email || '';
+      const pass = credentials.accountPassword || credentials.password || '';
+      if (email && (strVal === email || strVal === `${email} | ${pass}` || strVal === `${email}:${pass}`)) {
+        return;
+      }
     }
-  };
 
-  const handleCopyEmail = () => {
-    if (credentials?.accountEmail) {
-      copyToClipboard(credentials.accountEmail);
-      setCopiedEmail(true);
-      setTimeout(() => setCopiedEmail(false), 2000);
+    // Avoid duplicate notes if recoveryInfo and notes have identical values
+    if (key.toLowerCase() === 'notes' && credentials.recoveryInfo && credentials.recoveryInfo === val) {
+      return;
     }
+
+    deliveryFields.push({
+      key,
+      label: formatDynamicLabel(key),
+      value: strVal,
+      isSensitive: isSensitiveField(key)
+    });
+    seenValues.add(strVal.toLowerCase());
+  });
+
+  const handleCopySingle = (key: string, value: string) => {
+    copyToClipboard(value);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const handleCopyPassword = () => {
-    if (credentials?.accountPassword) {
-      copyToClipboard(credentials.accountPassword);
-      setCopiedPassword(true);
-      setTimeout(() => setCopiedPassword(false), 2000);
-    }
+  const handleCopyAll = () => {
+    const lines = deliveryFields.map(f => `${f.label}: ${f.value}`);
+    copyToClipboard(lines.join('\n'));
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
   };
 
-  const handleCopySecretKey = () => {
-    const key = credentials?.twoFactorSecretKey;
-    if (key) {
-      copyToClipboard(key);
-      setCopiedSecretKey(true);
-      setTimeout(() => setCopiedSecretKey(false), 2000);
-    }
+  const toggleReveal = (key: string) => {
+    setRevealedKeys(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleCopyBackupCodes = () => {
-    const codes = credentials?.twoFactorBackupCodes || credentials?.backupCodes;
-    if (codes) {
-      copyToClipboard(codes);
-      setCopiedBackupCodes(true);
-      setTimeout(() => setCopiedBackupCodes(false), 2000);
-    }
-  };
-
-  const orderListing: AccountListing = {
-    id: order.listingId,
-    title: order.listingTitle,
-    category: order.category,
-    price: order.price,
-    pva: true,
-    twoFactor: true,
-    warrantyDays: 7,
-    description: 'Purchased item',
-    sellerId: order.sellerId,
-    sellerName: order.sellerName,
-    sellerEmail: order.sellerEmail || '',
-    status: 'sold',
-    createdAt: new Date().toISOString()
-  };
+  const displayPrice = Number(
+    order.paidAmount !== undefined && order.paidAmount !== null && !isNaN(Number(order.paidAmount))
+      ? order.paidAmount
+      : order.price
+  ).toLocaleString();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div 
-        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh]"
+        className="bg-white border border-[#EBE7F7] rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative my-auto animate-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* Decorative Top Accent Bar */}
-        <div className="h-2 bg-[#5B4DF5]"></div>
+        {/* Accent Bar */}
+        <div className="h-2 bg-[#5B4DF5] w-full shrink-0" />
 
-        {/* Header Close */}
+        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F1F0FB] border border-[#EBE7F7] rounded-full transition cursor-pointer z-10"
+          aria-label="Close"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="p-6 sm:p-8 text-center space-y-6 overflow-y-auto">
-
-          {/* Animated Success Icon */}
-          <div className="relative inline-block">
-            <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200 shadow-sm shadow-emerald-500/10 animate-bounce">
-              <CheckCircle2 className="w-10 h-10 stroke-[2.5]" />
+        <div className="p-6 sm:p-7 overflow-y-auto space-y-5">
+          {/* Header */}
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200 shadow-sm animate-bounce">
+              <CheckCircle2 className="w-9 h-9 stroke-[2.5]" />
             </div>
-            <div className="absolute -top-1 -right-1 bg-[#5B4DF5] text-white p-1 rounded-full shadow-md">
-              <Sparkles className="w-4 h-4" />
-            </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-[11px] px-3.5 py-1 rounded-full uppercase tracking-wider inline-block">
-              Payment Authorized & Escrow Active
+            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold text-[10px] sm:text-[11px] px-3 py-0.5 rounded-full uppercase tracking-wider inline-block">
+              Payment Confirmed • Delivery Ready
             </span>
+
             <h2 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
-              Order Confirmed!
+              Purchase Successful!
             </h2>
-            <p className="text-xs sm:text-sm text-[#64748B] max-w-sm mx-auto">
-              Your payment was processed successfully. Funds are held in ZENET Escrow until account transfer is finalized.
+            <p className="text-xs sm:text-sm text-[#64748B]">
+              Your order has been completed and verified.
             </p>
           </div>
 
-          {/* Order Details Card */}
-          <div className="bg-[#F8F7FD] border border-[#EBE7F7] p-4 sm:p-5 rounded-3xl text-left space-y-3 shadow-xs">
-            
-            <div className="flex items-center justify-between pb-3 border-b border-[#EBE7F7] text-xs">
-              <div>
-                <span className="text-[10px] text-[#64748B] uppercase font-extrabold block">Transaction ID</span>
-                <span className="font-mono text-[#0F172A] font-bold">{order.transactionId || order.id}</span>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] text-[#64748B] uppercase font-extrabold block">Gateway</span>
-                <span className="font-extrabold text-[#5B4DF5] uppercase bg-purple-100 border border-purple-200 px-2.5 py-0.5 rounded-full text-[10px]">
-                  {order.paymentGateway || 'Paystack'}
-                </span>
-              </div>
+          {/* Clean Verified Purchase Price Card */}
+          <div className="bg-[#F8F7FD] border border-[#EBE7F7] p-4 rounded-2xl flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-[#64748B] uppercase font-black block tracking-wider">
+                Purchased Item
+              </span>
+              <p className="text-sm font-black text-[#0F172A] line-clamp-1">
+                {order.listingTitle || 'Product'}
+              </p>
             </div>
-
-            <div className="space-y-1">
-              <span className="text-[10px] text-[#64748B] uppercase font-extrabold block">Account Title</span>
-              <p className="font-bold text-[#0F172A] text-sm line-clamp-1">{order.listingTitle}</p>
-            </div>
-
-            <div className="flex items-center justify-between pt-1 text-xs">
-              <span className="text-[#64748B]">Amount Charged</span>
-              <span className="font-black text-lg text-[#0F172A]">
-                {order.currency || 'USD'} {Number(order.paidAmount || order.price).toLocaleString()}
+            <div className="text-right pl-3">
+              <span className="text-[10px] text-[#64748B] uppercase font-black block tracking-wider">
+                Purchase Price
+              </span>
+              <span className="text-lg sm:text-xl font-black text-[#5B4DF5]">
+                ₦{displayPrice}
               </span>
             </div>
-
-            {/* Delivered Account Credentials & 2FA Information */}
-            {credentials && (
-              <div className="pt-2">
-                <AccountCredentialsCard
-                  credentials={credentials}
-                  listingId={order.listingId}
-                  purchaseId={order.id}
-                  email={credentials.accountEmail || (credentials as any).email || ''}
-                  password={credentials.accountPassword || (credentials as any).password || ''}
-                  recoveryInfo={credentials.recoveryInfo || ''}
-                  twoFactorSecret={credentials.twoFactorSecretKey || credentials.twoFactorSecret || ''}
-                  backupCodes={credentials.twoFactorBackupCodes || credentials.backupCodes || ''}
-                  instructions={credentials.additionalInstructions || (credentials as any).instructions || ''}
-                />
-              </div>
-            )}
-
-            {/* Escrow Transfer Token */}
-            {order.transferCode && (
-              <div className="bg-white border border-[#EBE7F7] p-3.5 rounded-2xl space-y-1.5 mt-2">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-extrabold text-amber-700 flex items-center gap-1">
-                    <Lock className="w-3.5 h-3.5 text-amber-600" />
-                    Escrow Verification Release Token
-                  </span>
-                  <span className="text-[10px] text-[#64748B] font-semibold">Keep Private</span>
-                </div>
-                
-                <div className="flex items-center justify-between bg-[#F8F7FD] p-2.5 rounded-xl border border-[#EBE7F7]">
-                  <code className="text-sm font-mono font-black text-[#0F172A] tracking-wider">{order.transferCode}</code>
-                  <button
-                    onClick={handleCopyCode}
-                    className="flex items-center gap-1 bg-white hover:bg-[#F8F7FD] text-[#5B4DF5] text-xs font-bold px-2.5 py-1 rounded-lg border border-[#EBE7F7] transition cursor-pointer"
-                  >
-                    {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedCode ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Seller Contact Info */}
-            <div className="pt-2 border-t border-[#EBE7F7] text-xs space-y-1">
-              <span className="text-[#64748B] text-[10px] uppercase font-bold block">Seller Contact Details</span>
-              <div className="flex items-center justify-between">
-                <span className="font-extrabold text-[#0F172A]">{order.sellerName}</span>
-                {order.sellerEmail && (
-                  <span className="text-[#64748B] font-mono text-[11px]">{order.sellerEmail}</span>
-                )}
-              </div>
-            </div>
-
           </div>
 
-          {/* Primary Action Buttons */}
-          <div className="space-y-2.5 pt-2">
+          {/* Configured Delivery Information Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-[#5B4DF5]" />
+                <h3 className="text-xs font-black uppercase text-[#0F172A] tracking-wider">
+                  Delivered Account Information
+                </h3>
+              </div>
+              {deliveryFields.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleCopyAll}
+                  className="text-[11px] font-bold text-[#5B4DF5] hover:text-[#4838EE] flex items-center gap-1 cursor-pointer bg-[#EDE9FE] px-2.5 py-1 rounded-lg border border-[#DDD6FE] transition"
+                >
+                  {copiedAll ? <Check className="w-3 h-3 text-emerald-600 stroke-[3]" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedAll ? 'All Copied!' : 'Copy All'}</span>
+                </button>
+              )}
+            </div>
+
+            {deliveryFields.length === 0 ? (
+              <div className="bg-[#F8F7FD] border border-[#EBE7F7] p-4 rounded-2xl text-center text-xs text-[#64748B]">
+                Credentials delivered. Please check your buyer orders history for full details.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {deliveryFields.map((field) => {
+                  const isRevealed = revealedKeys[field.key] || !field.isSensitive;
+                  const isCopied = copiedKey === field.key;
+                  const isLong = field.value.length > 45 || field.value.includes('\n');
+
+                  return (
+                    <div 
+                      key={field.key} 
+                      className="bg-white border border-[#EBE7F7] p-3 rounded-2xl space-y-1.5 shadow-2xs hover:border-[#5B4DF5]/40 transition"
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-extrabold text-[#64748B] uppercase tracking-wider text-[10px]">
+                          {field.label}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {field.isSensitive && (
+                            <button
+                              type="button"
+                              onClick={() => toggleReveal(field.key)}
+                              className="text-[#64748B] hover:text-[#0F172A] transition cursor-pointer text-[10px] flex items-center gap-1 font-semibold"
+                            >
+                              {isRevealed ? (
+                                <>
+                                  <EyeOff className="w-3 h-3" />
+                                  <span>Hide</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="w-3 h-3" />
+                                  <span>Reveal</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleCopySingle(field.key, field.value)}
+                            className="text-[#5B4DF5] hover:text-[#4838EE] font-bold text-[10px] flex items-center gap-1 transition cursor-pointer"
+                          >
+                            {isCopied ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                                <span className="text-emerald-600">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#F8F7FD] p-2.5 rounded-xl border border-[#EBE7F7]">
+                        <div className={`font-mono text-xs text-[#0F172A] font-semibold break-all select-all ${isLong ? 'whitespace-pre-wrap' : ''}`}>
+                          {isRevealed ? field.value : '••••••••••••••••••••'}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
             <button
+              type="button"
+              onClick={onClose}
+              className="w-full bg-[#F1F0FB] hover:bg-[#EBE7F7] text-[#475569] font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm transition cursor-pointer border border-[#E2E8F0] order-2 sm:order-1"
+            >
+              Done
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 onClose();
                 onOpenOrderHistory();
               }}
-              className="w-full bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-black py-3.5 px-5 rounded-full shadow-lg shadow-[#5B4DF5]/30 transition cursor-pointer text-xs sm:text-sm flex items-center justify-center gap-2"
+              className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-black py-3 px-4 rounded-xl text-xs sm:text-sm shadow-md shadow-[#5B4DF5]/25 transition cursor-pointer flex items-center justify-center gap-2 order-1 sm:order-2"
             >
-              <ShoppingBag className="w-4.5 h-4.5" />
-              <span>View in Buyer Order History</span>
-            </button>
-
-            <button
-              onClick={() => {
-                onClose();
-                onContactSeller(orderListing);
-              }}
-              className="w-full bg-[#F8F7FD] hover:bg-[#F1F0FB] text-[#0F172A] border border-[#EBE7F7] font-bold py-3 px-5 rounded-full transition cursor-pointer text-xs flex items-center justify-center gap-2"
-            >
-              <MessageSquare className="w-4 h-4 text-[#5B4DF5]" />
-              <span>Send Message / Credentials Inquiry to Seller</span>
+              <ShoppingBag className="w-4 h-4" />
+              <span>View in Order History</span>
             </button>
           </div>
-
         </div>
-
       </div>
     </div>
   );
 };
+export default PaymentSuccessModal;

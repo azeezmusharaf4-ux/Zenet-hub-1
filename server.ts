@@ -1516,22 +1516,45 @@ app.post('/api/wallet/purchase', async (req, res) => {
       let remainingStock = 0;
 
       if (hasInventorySubcollection && invSnap) {
-        // Find the first AVAILABLE inventory item atomically inside transaction
+        // Find the first AVAILABLE inventory item strictly in existing stock order
         let targetDocSnap = null;
         let targetDocId = null;
         let availableCount = 0;
 
-        for (const d of invSnap.docs) {
-          const liveItemRef = doc(db, 'listings', listingId, 'inventory', d.id);
-          const liveItemSnap = await t.get(liveItemRef);
-          if (liveItemSnap.exists()) {
-            const itemData = liveItemSnap.data();
-            const itemStatus = (itemData.status || '').toLowerCase();
-            if (itemStatus === 'available' || itemData.status === 'Available') {
-              availableCount++;
-              if (!targetDocSnap) {
-                targetDocSnap = liveItemSnap;
-                targetDocId = d.id;
+        // If listing has an inventory array, follow that exact order first
+        if (Array.isArray(listingData.inventory) && listingData.inventory.length > 0) {
+          for (const invItem of listingData.inventory) {
+            const liveItemRef = doc(db, 'listings', listingId, 'inventory', invItem.id);
+            const liveItemSnap = await t.get(liveItemRef);
+            if (liveItemSnap.exists()) {
+              const itemData = liveItemSnap.data();
+              const itemStatus = (itemData.status || '').toLowerCase();
+              if (itemStatus === 'available' || itemData.status === 'Available') {
+                availableCount++;
+                if (!targetDocSnap) {
+                  targetDocSnap = liveItemSnap;
+                  targetDocId = invItem.id;
+                }
+              }
+            }
+          }
+        }
+
+        // If not found via array order, check remaining subcollection documents
+        if (!targetDocSnap) {
+          availableCount = 0;
+          for (const d of invSnap.docs) {
+            const liveItemRef = doc(db, 'listings', listingId, 'inventory', d.id);
+            const liveItemSnap = await t.get(liveItemRef);
+            if (liveItemSnap.exists()) {
+              const itemData = liveItemSnap.data();
+              const itemStatus = (itemData.status || '').toLowerCase();
+              if (itemStatus === 'available' || itemData.status === 'Available') {
+                availableCount++;
+                if (!targetDocSnap) {
+                  targetDocSnap = liveItemSnap;
+                  targetDocId = d.id;
+                }
               }
             }
           }
@@ -1562,15 +1585,39 @@ app.post('/api/wallet/purchase', async (req, res) => {
           secData = targetDocSnap.data();
         }
 
+        // Merge array item (which has all form-configured fields), doc data, and secure details
+        const matchingArrayItem = Array.isArray(listingData.inventory)
+          ? listingData.inventory.find((i: any) => i && i.id === targetDocId)
+          : null;
+
+        const mergedRawItem: Record<string, any> = {
+          ...(matchingArrayItem || {}),
+          ...(targetDocSnap.data() || {}),
+          ...(secData || {})
+        };
+
+        const internalKeys = new Set([
+          'id', 'status', 'soldTo', 'soldToEmail', 'soldAt', 'orderId',
+          'updatedAt', 'createdAt', 'listingId', 'deleted', 'isSold'
+        ]);
+
+        const dynamicDeliveryFields: Record<string, any> = {};
+        for (const [k, v] of Object.entries(mergedRawItem)) {
+          if (!internalKeys.has(k) && v !== undefined && v !== null && String(v).trim() !== '') {
+            dynamicDeliveryFields[k] = v;
+          }
+        }
+
         secureDetails = {
+          ...dynamicDeliveryFields,
           inventoryId: targetDocId,
-          accountEmail: secData.accountEmail || '',
-          accountPassword: secData.accountPassword || '',
-          recoveryInfo: secData.recoveryInfo || secData.notes || '',
-          backupCodes: secData.backupCodes || secData.twoFactorBackupCodes || secData.twoFactorSecretKey || '',
-          twoFactorSecretKey: secData.twoFactorSecretKey || '',
-          twoFactorBackupCodes: secData.twoFactorBackupCodes || secData.backupCodes || '',
-          additionalInstructions: secData.additionalInstructions || ''
+          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
+          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
+          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
+          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
+          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
+          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
+          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
         };
 
         remainingStock = Math.max(0, availableCount - 1);
@@ -1612,7 +1659,7 @@ app.post('/api/wallet/purchase', async (req, res) => {
         });
 
       } else if (Array.isArray(listingData.inventory) && listingData.inventory.length > 0) {
-        // Find first Available account in array
+        // Find first Available account in array following stock order
         let availableIdx = listingData.inventory.findIndex((acc: any) => (acc.status || '').toLowerCase() === 'available' || acc.status === 'Available');
         if (availableIdx === -1) {
           if (isOwnerOrSeller && listingData.inventory.length > 0) {
@@ -1624,15 +1671,28 @@ app.post('/api/wallet/purchase', async (req, res) => {
         }
 
         const targetAcc = listingData.inventory[availableIdx];
+        const internalKeys = new Set([
+          'id', 'status', 'soldTo', 'soldToEmail', 'soldAt', 'orderId',
+          'updatedAt', 'createdAt', 'listingId', 'deleted', 'isSold'
+        ]);
+
+        const dynamicDeliveryFields: Record<string, any> = {};
+        for (const [k, v] of Object.entries(targetAcc || {})) {
+          if (!internalKeys.has(k) && v !== undefined && v !== null && String(v).trim() !== '') {
+            dynamicDeliveryFields[k] = v;
+          }
+        }
+
         secureDetails = {
+          ...dynamicDeliveryFields,
           inventoryId: targetAcc.id || `inv_${availableIdx + 1}`,
-          accountEmail: targetAcc.accountEmail || '',
-          accountPassword: targetAcc.accountPassword || '',
-          recoveryInfo: targetAcc.recoveryInfo || targetAcc.notes || '',
-          backupCodes: targetAcc.backupCodes || targetAcc.twoFactorBackupCodes || targetAcc.twoFactorSecretKey || '',
-          twoFactorSecretKey: targetAcc.twoFactorSecretKey || '',
-          twoFactorBackupCodes: targetAcc.twoFactorBackupCodes || targetAcc.backupCodes || '',
-          additionalInstructions: targetAcc.additionalInstructions || ''
+          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
+          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
+          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
+          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
+          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
+          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
+          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
         };
 
         const updatedInventory = [...listingData.inventory];
@@ -1657,14 +1717,28 @@ app.post('/api/wallet/purchase', async (req, res) => {
 
       } else {
         // Fallback for legacy single-stock listings
-        secureDetails = listingData.digitalProductDetails ? {
-          accountEmail: listingData.digitalProductDetails.accountEmail || '',
-          accountPassword: listingData.digitalProductDetails.accountPassword || '',
-          recoveryInfo: listingData.digitalProductDetails.recoveryInfo || '',
-          backupCodes: listingData.digitalProductDetails.backupCodes || listingData.digitalProductDetails.twoFactorBackupCodes || '',
-          twoFactorSecretKey: listingData.digitalProductDetails.twoFactorSecretKey || '',
-          twoFactorBackupCodes: listingData.digitalProductDetails.twoFactorBackupCodes || listingData.digitalProductDetails.backupCodes || '',
-          additionalInstructions: listingData.digitalProductDetails.additionalInstructions || ''
+        const rawDig = listingData.digitalProductDetails || {};
+        const internalKeys = new Set([
+          'id', 'status', 'soldTo', 'soldToEmail', 'soldAt', 'orderId',
+          'updatedAt', 'createdAt', 'listingId', 'deleted', 'isSold'
+        ]);
+
+        const dynamicDeliveryFields: Record<string, any> = {};
+        for (const [k, v] of Object.entries(rawDig)) {
+          if (!internalKeys.has(k) && v !== undefined && v !== null && String(v).trim() !== '') {
+            dynamicDeliveryFields[k] = v;
+          }
+        }
+
+        secureDetails = Object.keys(dynamicDeliveryFields).length > 0 ? {
+          ...dynamicDeliveryFields,
+          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
+          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
+          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
+          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
+          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
+          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
+          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
         } : undefined;
 
         remainingStock = 0;
