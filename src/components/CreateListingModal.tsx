@@ -44,12 +44,30 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
   const [twoFactorBackupCodes, setTwoFactorBackupCodes] = useState('');
   const [additionalInstructions, setAdditionalInstructions] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [customFields, setCustomFields] = useState<{ id: string; label: string; value: string }[]>([]);
+
+  const handleAddCustomField = (presetLabel?: string) => {
+    setCustomFields(prev => [
+      ...prev,
+      {
+        id: 'cf_' + Math.random().toString(36).substr(2, 7),
+        label: presetLabel || '',
+        value: ''
+      }
+    ]);
+  };
+
+  const handleUpdateCustomField = (id: string, field: 'label' | 'value', text: string) => {
+    setCustomFields(prev => prev.map(cf => cf.id === id ? { ...cf, [field]: text } : cf));
+  };
+
+  const handleRemoveCustomField = (id: string) => {
+    setCustomFields(prev => prev.filter(cf => cf.id !== id));
+  };
 
   // Multi-stock inventory state
   const [inventoryAccounts, setInventoryAccounts] = useState<any[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [stockInputMode, setStockInputMode] = useState<'bulk' | 'detailed'>('bulk');
-  const [bulkStockText, setBulkStockText] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,9 +93,9 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
     setTwoFactorSecretKey('');
     setTwoFactorBackupCodes('');
     setAdditionalInstructions('');
+    setCustomFields([]);
     setInventoryAccounts([]);
     setEditingIndex(null);
-    setBulkStockText('');
     setError('');
   };
 
@@ -85,7 +103,6 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
   const hasUnsavedChanges = Boolean(
     title.trim() || 
     price !== '95000' || 
-    followers.trim() || 
     description.trim() || 
     accountEmail.trim() || 
     accountPassword.trim() || 
@@ -93,9 +110,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
     twoFactorSecretKey.trim() ||
     twoFactorBackupCodes.trim() || 
     additionalInstructions.trim() || 
-    bulkStockText.trim() ||
     imageUrl.trim() ||
-    monetized ||
     inventoryAccounts.length > 0
   );
 
@@ -106,89 +121,6 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
       resetAllFormState();
       onClose();
     }
-  };
-
-  // Handle adding bulk stock items (one per line) without replacing existing stock
-  const handleAddBulkStock = () => {
-    if (!bulkStockText.trim()) {
-      alert('Please enter at least one stock item line.');
-      return;
-    }
-    const lines = bulkStockText
-      .split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 0);
-
-    if (lines.length === 0) {
-      alert('No valid stock lines found.');
-      return;
-    }
-
-    // Filter out duplicates within the bulk text itself AND against the existing local inventoryAccounts!
-    const existingEmails = new Set(inventoryAccounts.map(item => (item.accountEmail || '').toLowerCase().trim()));
-    const uniqueLines: string[] = [];
-    const duplicateEmailsInBulk = new Set<string>();
-
-    for (const line of lines) {
-      let email = line;
-      if (line.includes('|')) {
-        email = line.split('|')[0].trim();
-      } else if (line.includes(':') && !line.startsWith('http')) {
-        email = line.split(':')[0].trim();
-      }
-      const emailLower = email.toLowerCase().trim();
-      if (existingEmails.has(emailLower)) {
-        duplicateEmailsInBulk.add(email);
-      } else {
-        existingEmails.add(emailLower);
-        uniqueLines.push(line);
-      }
-    }
-
-    if (duplicateEmailsInBulk.size > 0 && uniqueLines.length === 0) {
-      alert(`All accounts in your bulk list are already in the inventory list. Duplicates are not allowed.`);
-      return;
-    }
-
-    const newItems = uniqueLines.map(line => {
-      // Check if line is formatted as email:pass or email|pass
-      let email = line;
-      let password = '';
-      let notes = '';
-
-      if (line.includes('|')) {
-        const parts = line.split('|').map(p => p.trim());
-        email = parts[0] || line;
-        password = parts[1] || '';
-        notes = parts.slice(2).join(' | ');
-      } else if (line.includes(':') && !line.startsWith('http')) {
-        const parts = line.split(':').map(p => p.trim());
-        email = parts[0] || line;
-        password = parts[1] || '';
-        notes = parts.slice(2).join(':');
-      }
-
-      return {
-        id: 'inv_' + Math.random().toString(36).substr(2, 9),
-        accountEmail: email,
-        accountPassword: password,
-        recoveryInfo: notes,
-        delivery_value: line,
-        notes: notes,
-        twoFactorSecretKey: '',
-        twoFactorBackupCodes: '',
-        backupCodes: '',
-        additionalInstructions: line !== email ? `Original Line: ${line}` : '',
-        status: 'Available'
-      };
-    });
-
-    if (duplicateEmailsInBulk.size > 0) {
-      alert(`Ignored ${duplicateEmailsInBulk.size} duplicate account(s) that were already in your inventory list:\n${Array.from(duplicateEmailsInBulk).join(', ')}`);
-    }
-
-    setInventoryAccounts(prev => [...prev, ...newItems]);
-    setBulkStockText('');
   };
 
   const handleAddAccountToInventory = () => {
@@ -206,7 +138,20 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
       return;
     }
 
-    const currentAccount = {
+    const deliveryFields: { label: string; value: string }[] = [];
+    if (accountEmail.trim()) deliveryFields.push({ label: 'Gmail/Login', value: accountEmail.trim() });
+    if (accountPassword.trim()) deliveryFields.push({ label: 'Password', value: accountPassword.trim() });
+    if (recoveryInfo.trim()) deliveryFields.push({ label: 'Recovery Info', value: recoveryInfo.trim() });
+    if (twoFactorSecretKey.trim()) deliveryFields.push({ label: 'Two-Factor Authenticator', value: twoFactorSecretKey.trim() });
+    if (twoFactorBackupCodes.trim()) deliveryFields.push({ label: '2FA Backup Codes', value: twoFactorBackupCodes.trim() });
+    customFields.forEach(cf => {
+      if (cf.label.trim() && cf.value.trim()) {
+        deliveryFields.push({ label: cf.label.trim(), value: cf.value.trim() });
+      }
+    });
+    if (additionalInstructions.trim()) deliveryFields.push({ label: 'Additional Instructions', value: additionalInstructions.trim() });
+
+    const currentAccount: Record<string, any> = {
       id: editingIndex !== null ? inventoryAccounts[editingIndex].id : 'inv_' + Math.random().toString(36).substr(2, 9),
       accountEmail: accountEmail.trim(),
       accountPassword: accountPassword.trim(),
@@ -216,8 +161,16 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
       backupCodes: twoFactorBackupCodes.trim() || twoFactorSecretKey.trim(),
       additionalInstructions: additionalInstructions.trim(),
       delivery_value: accountEmail.trim() + (accountPassword.trim() ? ` | ${accountPassword.trim()}` : ''),
+      deliveryFields,
+      customFields,
       status: 'Available'
     };
+
+    customFields.forEach(cf => {
+      if (cf.label.trim() && cf.value.trim()) {
+        currentAccount[cf.label.trim()] = cf.value.trim();
+      }
+    });
 
     if (editingIndex !== null) {
       const updated = [...inventoryAccounts];
@@ -235,6 +188,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
     setTwoFactorSecretKey('');
     setTwoFactorBackupCodes('');
     setAdditionalInstructions('');
+    setCustomFields([]);
   };
 
   const handleEditAccountLocal = (index: number) => {
@@ -246,6 +200,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
     setTwoFactorSecretKey(acc.twoFactorSecretKey || '');
     setTwoFactorBackupCodes(acc.twoFactorBackupCodes || acc.backupCodes || '');
     setAdditionalInstructions(acc.additionalInstructions || '');
+    setCustomFields(Array.isArray(acc.customFields) ? acc.customFields : []);
   };
 
   const handleRemoveAccountLocal = (index: number) => {
@@ -259,6 +214,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
         setTwoFactorSecretKey('');
         setTwoFactorBackupCodes('');
         setAdditionalInstructions('');
+        setCustomFields([]);
       } else if (editingIndex !== null && editingIndex > index) {
         setEditingIndex(editingIndex - 1);
       }
@@ -308,71 +264,79 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
     try {
       // Auto-add current typed fields if email is populated but not added yet
       let finalInventory = [...inventoryAccounts];
-      if (accountEmail.trim()) {
-        const accountId = editingIndex !== null ? inventoryAccounts[editingIndex].id : 'inv_' + Math.random().toString(36).substr(2, 9);
-        const currentAccount = {
-          id: accountId,
-          accountEmail: accountEmail.trim(),
-          accountPassword: accountPassword.trim(),
-          recoveryInfo: recoveryInfo.trim(),
-          twoFactorSecretKey: twoFactorSecretKey.trim(),
-          twoFactorBackupCodes: twoFactorBackupCodes.trim(),
-          backupCodes: twoFactorBackupCodes.trim() || twoFactorSecretKey.trim(),
-          additionalInstructions: additionalInstructions.trim()
-        };
-        if (editingIndex !== null) {
-          finalInventory[editingIndex] = currentAccount;
-        } else {
-          finalInventory.push(currentAccount);
+      const deliveryFields: { label: string; value: string }[] = [];
+      if (accountEmail.trim()) deliveryFields.push({ label: 'Gmail/Login', value: accountEmail.trim() });
+      if (accountPassword.trim()) deliveryFields.push({ label: 'Password', value: accountPassword.trim() });
+      if (recoveryInfo.trim()) deliveryFields.push({ label: 'Recovery Info', value: recoveryInfo.trim() });
+      if (twoFactorSecretKey.trim()) deliveryFields.push({ label: 'Two-Factor Authenticator', value: twoFactorSecretKey.trim() });
+      if (twoFactorBackupCodes.trim()) deliveryFields.push({ label: '2FA Backup Codes', value: twoFactorBackupCodes.trim() });
+      customFields.forEach(cf => {
+        if (cf.label.trim() && cf.value.trim()) {
+          deliveryFields.push({ label: cf.label.trim(), value: cf.value.trim() });
         }
-      }
+      });
+      if (additionalInstructions.trim()) deliveryFields.push({ label: 'Additional Instructions', value: additionalInstructions.trim() });
 
-      const finalInventoryList = finalInventory.map(acc => ({
-        id: acc.id,
-        status: 'Available' as const,
-        accountEmail: acc.accountEmail,
-        accountPassword: acc.accountPassword,
-        notes: acc.recoveryInfo || '',
-        recoveryInfo: acc.recoveryInfo || '',
-        twoFactorSecretKey: acc.twoFactorSecretKey || '',
-        twoFactorBackupCodes: acc.twoFactorBackupCodes || acc.backupCodes || '',
-        backupCodes: acc.twoFactorBackupCodes || acc.backupCodes || '',
-        additionalInstructions: acc.additionalInstructions || ''
-      }));
-
-      const stockCount = finalInventoryList.filter(acc => acc.status === 'Available').length;
-
-      const inventoryForDoc = finalInventoryList.map(acc => ({
-        id: acc.id,
-        status: 'Available' as const,
-        accountEmail: acc.accountEmail,
-        recoveryInfo: acc.recoveryInfo || '',
-        additionalInstructions: acc.additionalInstructions || '',
-        twoFactorSecretKey: acc.twoFactorSecretKey || '',
-        twoFactorBackupCodes: acc.twoFactorBackupCodes || acc.backupCodes || '',
-        backupCodes: acc.backupCodes || acc.twoFactorBackupCodes || '',
-        soldTo: null,
-        orderId: null,
-        soldAt: null
-      }));
-
-      // Keep single-stock fallback details in digitalProductDetails
-      const mainDigitalDetails = finalInventoryList.length > 0 ? {
-        accountEmail: finalInventoryList[0].accountEmail,
-        accountPassword: finalInventoryList[0].accountPassword,
-        recoveryInfo: finalInventoryList[0].recoveryInfo,
-        twoFactorSecretKey: finalInventoryList[0].twoFactorSecretKey,
-        twoFactorBackupCodes: finalInventoryList[0].twoFactorBackupCodes,
-        backupCodes: finalInventoryList[0].backupCodes,
-        additionalInstructions: finalInventoryList[0].additionalInstructions
-      } : {
+      const currentFormAccount: Record<string, any> = {
+        id: editingIndex !== null ? inventoryAccounts[editingIndex].id : 'inv_' + Math.random().toString(36).substr(2, 9),
         accountEmail: accountEmail.trim(),
         accountPassword: accountPassword.trim(),
         recoveryInfo: recoveryInfo.trim(),
         twoFactorSecretKey: twoFactorSecretKey.trim(),
         twoFactorBackupCodes: twoFactorBackupCodes.trim(),
         backupCodes: twoFactorBackupCodes.trim() || twoFactorSecretKey.trim(),
-        additionalInstructions: additionalInstructions.trim()
+        additionalInstructions: additionalInstructions.trim(),
+        delivery_value: accountEmail.trim() + (accountPassword.trim() ? ` | ${accountPassword.trim()}` : ''),
+        deliveryFields,
+        customFields,
+        status: 'Available' as const
+      };
+
+      customFields.forEach(cf => {
+        if (cf.label.trim() && cf.value.trim()) {
+          currentFormAccount[cf.label.trim()] = cf.value.trim();
+        }
+      });
+
+      if (accountEmail.trim()) {
+        if (editingIndex !== null) {
+          finalInventory[editingIndex] = currentFormAccount;
+        } else {
+          finalInventory.push(currentFormAccount);
+        }
+      }
+
+      const finalInventoryList = finalInventory.map(acc => ({
+        ...acc,
+        id: acc.id,
+        status: 'Available' as const,
+        accountEmail: acc.accountEmail || '',
+        accountPassword: acc.accountPassword || '',
+        notes: acc.recoveryInfo || acc.notes || '',
+        recoveryInfo: acc.recoveryInfo || acc.notes || '',
+        twoFactorSecretKey: acc.twoFactorSecretKey || '',
+        twoFactorBackupCodes: acc.twoFactorBackupCodes || acc.backupCodes || '',
+        backupCodes: acc.twoFactorBackupCodes || acc.backupCodes || '',
+        additionalInstructions: acc.additionalInstructions || '',
+        deliveryFields: Array.isArray(acc.deliveryFields) && acc.deliveryFields.length > 0 ? acc.deliveryFields : undefined
+      }));
+
+      const stockCount = finalInventoryList.filter(acc => acc.status === 'Available').length;
+
+      const inventoryForDoc = finalInventoryList.map(acc => ({
+        ...acc,
+        id: acc.id,
+        status: 'Available' as const,
+        soldTo: null,
+        orderId: null,
+        soldAt: null
+      }));
+
+      // Keep single-stock fallback details in digitalProductDetails preserving all fields
+      const mainDigitalDetails = finalInventoryList.length > 0 ? {
+        ...finalInventoryList[0]
+      } : {
+        ...currentFormAccount
       };
 
       await onSubmit({
@@ -529,107 +493,6 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
             </div>
           </div>
 
-          {/* Followers / Audience & Account Age */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[#64748B] font-semibold mb-1">Followers / Audience / Batch Size</label>
-              <input
-                type="text"
-                placeholder="e.g., 50,000 Followers or 5 Aged Accounts"
-                value={followers}
-                onChange={(e) => setFollowers(e.target.value)}
-                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[#64748B] font-semibold mb-1">Account Age / Creation Year</label>
-              <input
-                type="text"
-                placeholder="e.g., 4 Years Old (2020)"
-                value={accountAge}
-                onChange={(e) => setAccountAge(e.target.value)}
-                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-              />
-            </div>
-          </div>
-
-          {/* Toggle Flags (PVA, 2FA, Monetized) */}
-          <div className="bg-[#F8F7FD] p-4 rounded-3xl border border-[#EBE7F7] space-y-3">
-            <span className="block text-xs font-bold text-[#64748B] uppercase">Verification & Security Features</span>
-            
-            <div className="flex flex-wrap items-center gap-4 text-xs">
-              <label className="flex items-center gap-2 cursor-pointer text-[#0F172A]">
-                <input
-                  type="checkbox"
-                  checked={pva}
-                  onChange={(e) => setPva(e.target.checked)}
-                  className="w-4 h-4 rounded bg-white border-[#EBE7F7] text-[#5B4DF5] focus:ring-0"
-                />
-                <span>Phone Verified (PVA)</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer text-[#0F172A]">
-                <input
-                  type="checkbox"
-                  checked={twoFactor}
-                  onChange={(e) => setTwoFactor(e.target.checked)}
-                  className="w-4 h-4 rounded bg-white border-[#EBE7F7] text-[#5B4DF5] focus:ring-0"
-                />
-                <span>2FA Enabled</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer text-[#0F172A]">
-                <input
-                  type="checkbox"
-                  checked={monetized}
-                  onChange={(e) => setMonetized(e.target.checked)}
-                  className="w-4 h-4 rounded bg-white border-[#EBE7F7] text-amber-500 focus:ring-0"
-                />
-                <span>Monetized / Ad Ready</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Country, Niche, Guarantee */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[#64748B] font-semibold mb-1">Target Country</label>
-              <input
-                type="text"
-                placeholder="Nigeria, United States, UK, Global"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[#64748B] font-semibold mb-1">Niche / Category</label>
-              <input
-                type="text"
-                placeholder="Gaming, Crypto, Fashion, E-commerce"
-                value={niche}
-                onChange={(e) => setNiche(e.target.value)}
-                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[#64748B] font-semibold mb-1">Warranty Days</label>
-              <select
-                value={warrantyDays}
-                onChange={(e) => setWarrantyDays(Number(e.target.value))}
-                className="w-full bg-[#F8F7FD] text-[#0F172A] p-2.5 rounded-2xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-              >
-                <option value={3}>3 Days Replacement</option>
-                <option value={7}>7 Days Replacement</option>
-                <option value={14}>14 Days Replacement</option>
-                <option value={30}>30 Days Replacement</option>
-              </select>
-            </div>
-          </div>
-
           {/* Description */}
           <div>
             <label className="block text-[#64748B] font-semibold mb-1">Account Description & Public Overview *</label>
@@ -719,10 +582,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
-                          onClick={() => {
-                            setStockInputMode('detailed');
-                            handleEditAccountLocal(idx);
-                          }}
+                          onClick={() => handleEditAccountLocal(idx)}
                           className="p-1.5 text-[#64748B] hover:text-[#0F172A] hover:bg-[#EDE9FE] rounded-lg transition cursor-pointer"
                           title="Edit Stock Item"
                         >
@@ -743,70 +603,11 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
               </div>
             )}
 
-            {/* Input Mode Selector */}
-            <div className="flex rounded-xl bg-white p-1 border border-[#EBE7F7] shadow-2xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setStockInputMode('bulk');
-                  setEditingIndex(null);
-                }}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                  stockInputMode === 'bulk'
-                    ? 'bg-[#5B4DF5] text-white shadow-xs'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                <span>Add Items One Per Line (Bulk)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setStockInputMode('detailed')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                  stockInputMode === 'detailed'
-                    ? 'bg-[#5B4DF5] text-white shadow-xs'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                <span>Detailed Credentials Form</span>
-              </button>
-            </div>
-
-            {/* MODE 1: BULK ONE PER LINE */}
-            {stockInputMode === 'bulk' && (
-              <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[#0F172A] text-xs font-bold">
-                    Paste Multiple Stock Items (One per line)
-                  </label>
-                  <span className="text-[10px] text-[#64748B]">
-                    Supports code, email:pass, or delivery lines
-                  </span>
-                </div>
-                <textarea
-                  rows={4}
-                  value={bulkStockText}
-                  onChange={(e) => setBulkStockText(e.target.value)}
-                  placeholder={`CODE-001\nCODE-002\nCODE-003\nuser@domain.com:password123 | 2FA:JBSWY3DPEHPK3PXP\nacc_login@gmail.com:StrongPass2024!`}
-                  className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs font-mono p-3 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white placeholder:text-[#94A3B8]"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddBulkStock}
-                  className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                >
-                  <PlusCircle className="w-4 h-4 text-white" />
-                  <span>+ Add Line(s) to Stock Inventory (Preserves Existing)</span>
-                </button>
-              </div>
-            )}
-
-            {/* MODE 2: DETAILED FORM */}
-            {stockInputMode === 'detailed' && (
-              <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3.5 shadow-2xs">
-                <span className="text-[10px] uppercase font-bold text-[#5B4DF5] tracking-wider block">
-                  {editingIndex !== null ? `Edit Stock Item #${editingIndex + 1}` : 'Enter Single Stock Item Details'}
-                </span>
+            {/* Stock Credentials Form */}
+            <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3.5 shadow-2xs">
+              <span className="text-[10px] uppercase font-bold text-[#5B4DF5] tracking-wider block">
+                {editingIndex !== null ? `Edit Stock Item #${editingIndex + 1}` : 'Enter Single Stock Item Details'}
+              </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -842,50 +643,71 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[#0F172A] text-xs font-bold mb-1">Recovery Info / Note</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. recovery@gmail.com"
-                      value={recoveryInfo}
-                      onChange={(e) => setRecoveryInfo(e.target.value)}
-                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-                    />
+                {/* Dynamic Custom Delivery Fields */}
+                <div className="space-y-2 pt-1 border-t border-[#EBE7F7]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-[#0F172A] text-xs font-bold flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#5B4DF5]" />
+                      <span>Custom Delivery Fields (Optional)</span>
+                    </label>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomField('Recovery Email')}
+                        className="text-[10px] font-bold bg-[#EDE9FE] text-[#5B4DF5] hover:bg-[#DDD6FE] px-2 py-0.5 rounded-lg transition cursor-pointer"
+                      >
+                        + Recovery Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomField('Gmail Recovery Password')}
+                        className="text-[10px] font-bold bg-[#EDE9FE] text-[#5B4DF5] hover:bg-[#DDD6FE] px-2 py-0.5 rounded-lg transition cursor-pointer"
+                      >
+                        + Recovery Password
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomField('Two-Factor Authenticator')}
+                        className="text-[10px] font-bold bg-[#EDE9FE] text-[#5B4DF5] hover:bg-[#DDD6FE] px-2 py-0.5 rounded-lg transition cursor-pointer"
+                      >
+                        + 2FA / TOTP
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomField()}
+                        className="text-[10px] font-bold bg-[#F1F0FB] text-[#475569] hover:bg-[#EBE7F7] px-2 py-0.5 rounded-lg transition cursor-pointer border border-[#E2E8F0]"
+                      >
+                        + Custom Field
+                      </button>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[#0F172A] text-xs font-bold mb-1">2FA Secret Key</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. JBSWY3DPEHPK3PXP"
-                      value={twoFactorSecretKey}
-                      onChange={(e) => setTwoFactorSecretKey(e.target.value)}
-                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[#0F172A] text-xs font-bold mb-1">2FA Backup Codes</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 1234-5678, 8765-4321..."
-                      value={twoFactorBackupCodes}
-                      onChange={(e) => setTwoFactorBackupCodes(e.target.value)}
-                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[#0F172A] text-xs font-bold mb-1">Additional Transfer Instructions</label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. Clean IP access instructions, original email access notes..."
-                    value={additionalInstructions}
-                    onChange={(e) => setAdditionalInstructions(e.target.value)}
-                    className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-                  />
+                  {customFields.map((cf) => (
+                    <div key={cf.id} className="flex items-center gap-2 bg-[#F8F7FD] p-2 rounded-xl border border-[#EBE7F7]">
+                      <input
+                        type="text"
+                        placeholder="Field Name (e.g. Recovery Email)"
+                        value={cf.label}
+                        onChange={(e) => handleUpdateCustomField(cf.id, 'label', e.target.value)}
+                        className="w-1/3 sm:w-2/5 bg-white text-[#0F172A] text-xs p-2 rounded-lg border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Delivery Value"
+                        value={cf.value}
+                        onChange={(e) => handleUpdateCustomField(cf.id, 'value', e.target.value)}
+                        className="flex-1 bg-white text-[#0F172A] text-xs p-2 rounded-lg border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCustomField(cf.id)}
+                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                        title="Remove Field"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="pt-2">
@@ -899,7 +721,6 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
                   </button>
                 </div>
               </div>
-            )}
           </div>
 
           {/* Direct Seller Contact Details */}

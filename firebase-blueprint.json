@@ -299,9 +299,30 @@
           "items": { "type": "string" }
         }
       }
+    },
+    "seller_revenues": {
+      "title": "Seller Revenues",
+      "description": "Live 70% seller / 30% platform owner revenue split tracking",
+      "type": "object",
+      "properties": {
+        "sellerId": { "type": "string" },
+        "sellerEmail": { "type": "string" },
+        "totalGrossSales": { "type": "number" },
+        "totalSellerRevenue": { "type": "number" },
+        "totalOwnerCommission": { "type": "number" },
+        "completedSalesCount": { "type": "number" },
+        "lastSaleAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "sales": { "type": "array" }
+      },
+      "required": ["sellerId", "totalGrossSales", "totalSellerRevenue", "totalOwnerCommission"]
     }
   },
   "firestore": {
+    "/seller_revenues/{sellerId}": {
+      "schema": "seller_revenues",
+      "description": "Live 70% seller earnings and 30% website owner commission split records"
+    },
     "/users/{userId}": {
       "schema": "users",
       "description": "Registered user accounts and profiles"

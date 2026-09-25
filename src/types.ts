@@ -187,6 +187,44 @@ export interface PurchaseRecord {
   smsCode?: string;
   orderStatus?: string;
   smsText?: string;
+  sellerShare?: number;
+  ownerShare?: number;
+  sellerPercent?: number;
+  ownerPercent?: number;
+  split?: {
+    grossAmount: number;
+    sellerAmount: number;
+    ownerAmount: number;
+    sellerPercent: number;
+    ownerPercent: number;
+    calculatedAt?: string;
+  };
+}
+
+export interface SellerRevenueRecord {
+  sellerId: string;
+  sellerEmail?: string;
+  totalGrossSales: number;
+  totalSellerRevenue: number;
+  totalOwnerCommission: number;
+  completedSalesCount: number;
+  lastSaleAt?: string;
+  updatedAt?: string;
+  sales?: Array<{
+    orderId?: string;
+    txId?: string;
+    listingId?: string;
+    listingTitle?: string;
+    grossAmount: number;
+    sellerShare: number;
+    ownerShare: number;
+    sellerPercent: number;
+    ownerPercent: number;
+    buyerId?: string;
+    buyerEmail?: string;
+    date: string;
+    paymentGateway?: string;
+  }>;
 }
 
 export interface Inquiry {

@@ -196,16 +196,14 @@ export const handler = async (event: any) => {
           }
         }
 
+        const deliveryFieldsArray = Array.isArray(mergedRawItem.deliveryFields)
+          ? mergedRawItem.deliveryFields
+          : (Array.isArray(secData?.deliveryFields) ? secData.deliveryFields : null);
+
         secureDetails = {
           ...dynamicDeliveryFields,
           inventoryId: targetDocId,
-          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
-          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
-          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
-          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
-          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
-          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
-          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
+          ...(deliveryFieldsArray ? { deliveryFields: deliveryFieldsArray } : {})
         };
 
         remainingStock = Math.max(0, availableCount - 1);
@@ -266,16 +264,14 @@ export const handler = async (event: any) => {
           }
         }
 
+        const deliveryFieldsArray = Array.isArray(targetAcc.deliveryFields)
+          ? targetAcc.deliveryFields
+          : null;
+
         secureDetails = {
           ...dynamicDeliveryFields,
           inventoryId: targetAcc.id || `inv_${availableIdx + 1}`,
-          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
-          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
-          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
-          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
-          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
-          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
-          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
+          ...(deliveryFieldsArray ? { deliveryFields: deliveryFieldsArray } : {})
         };
 
         const updatedInventory = [...listingData.inventory];
@@ -299,14 +295,26 @@ export const handler = async (event: any) => {
         });
 
       } else {
-        secureDetails = listingData.digitalProductDetails ? {
-          accountEmail: listingData.digitalProductDetails.accountEmail || '',
-          accountPassword: listingData.digitalProductDetails.accountPassword || '',
-          recoveryInfo: listingData.digitalProductDetails.recoveryInfo || '',
-          backupCodes: listingData.digitalProductDetails.backupCodes || listingData.digitalProductDetails.twoFactorBackupCodes || '',
-          twoFactorSecretKey: listingData.digitalProductDetails.twoFactorSecretKey || '',
-          twoFactorBackupCodes: listingData.digitalProductDetails.twoFactorBackupCodes || listingData.digitalProductDetails.backupCodes || '',
-          additionalInstructions: listingData.digitalProductDetails.additionalInstructions || ''
+        const rawDig = listingData.digitalProductDetails || {};
+        const internalKeys = new Set([
+          'id', 'status', 'soldTo', 'soldToEmail', 'soldAt', 'orderId',
+          'updatedAt', 'createdAt', 'listingId', 'deleted', 'isSold'
+        ]);
+
+        const dynamicDeliveryFields: Record<string, any> = {};
+        for (const [k, v] of Object.entries(rawDig)) {
+          if (!internalKeys.has(k) && v !== undefined && v !== null && String(v).trim() !== '') {
+            dynamicDeliveryFields[k] = v;
+          }
+        }
+
+        const deliveryFieldsArray = Array.isArray(rawDig.deliveryFields)
+          ? rawDig.deliveryFields
+          : null;
+
+        secureDetails = Object.keys(dynamicDeliveryFields).length > 0 ? {
+          ...dynamicDeliveryFields,
+          ...(deliveryFieldsArray ? { deliveryFields: deliveryFieldsArray } : {})
         } : undefined;
 
         remainingStock = 0;

@@ -82,9 +82,27 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [deletedAccountIds, setDeletedAccountIds] = useState<string[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
-  const [stockInputMode, setStockInputMode] = useState<'bulk' | 'detailed'>('bulk');
-  const [bulkStockText, setBulkStockText] = useState('');
   const [stockFilterTab, setStockFilterTab] = useState<'all' | 'available' | 'sold'>('available');
+  const [customFields, setCustomFields] = useState<{ id: string; label: string; value: string }[]>([]);
+
+  const handleAddCustomField = (presetLabel?: string) => {
+    setCustomFields(prev => [
+      ...prev,
+      {
+        id: 'cf_' + Math.random().toString(36).substr(2, 7),
+        label: presetLabel || '',
+        value: ''
+      }
+    ]);
+  };
+
+  const handleUpdateCustomField = (id: string, field: 'label' | 'value', text: string) => {
+    setCustomFields(prev => prev.map(cf => cf.id === id ? { ...cf, [field]: text } : cf));
+  };
+
+  const handleRemoveCustomField = (id: string) => {
+    setCustomFields(prev => prev.filter(cf => cf.id !== id));
+  };
 
   // Custom non-blocking iframe-safe notification and password reveal states
   const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
@@ -233,149 +251,6 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     loadInventory();
   }, [listing.id]);
 
-  // Handle adding bulk stock items (one per line) with duplicate prevention
-  const handleAddBulkStock = async () => {
-    if (!bulkStockText.trim()) {
-      triggerNotification('error', 'Please enter at least one stock item line.');
-      return;
-    }
-    const lines = bulkStockText
-      .split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 0);
-
-    if (lines.length === 0) {
-      triggerNotification('error', 'No valid stock lines found.');
-      return;
-    }
-
-    const existingIdents = new Set(inventoryAccounts.map(i => getAccountIdentifier(i)));
-    const seenInBatch = new Set<string>();
-    const validNewItems: any[] = [];
-    let skippedDuplicatesCount = 0;
-
-    for (const line of lines) {
-      let email = line;
-      let password = '';
-      let notes = '';
-
-      if (line.includes('|')) {
-        const parts = line.split('|').map(p => p.trim());
-        email = parts[0] || line;
-        password = parts[1] || '';
-        notes = parts.slice(2).join(' | ');
-      } else if (line.includes(':') && !line.startsWith('http')) {
-        const parts = line.split(':').map(p => p.trim());
-        email = parts[0] || line;
-        password = parts[1] || '';
-        notes = parts.slice(2).join(':');
-      }
-
-      const ident = getAccountIdentifier({ accountEmail: email, delivery_value: line });
-      if (!ident) continue;
-
-      if (existingIdents.has(ident) || seenInBatch.has(ident)) {
-        skippedDuplicatesCount++;
-        continue;
-      }
-
-      seenInBatch.add(ident);
-      existingIdents.add(ident);
-
-      validNewItems.push({
-        id: 'inv_' + Math.random().toString(36).substr(2, 9),
-        accountEmail: email,
-        accountPassword: password,
-        recoveryInfo: notes,
-        delivery_value: line,
-        notes: notes,
-        twoFactorSecretKey: '',
-        twoFactorBackupCodes: '',
-        backupCodes: '',
-        additionalInstructions: line !== email ? `Original Line: ${line}` : '',
-        status: 'Available',
-        soldTo: null,
-        orderId: null,
-        soldAt: null
-      });
-    }
-
-    if (validNewItems.length === 0) {
-      triggerNotification('warning', `Duplicate Warning: All ${lines.length} lines were duplicates of existing stock or appeared multiple times in your input. No duplicate items were added.`);
-      return;
-    }
-
-    const nextInventory = [...inventoryAccounts, ...validNewItems];
-    setInventoryAccounts(nextInventory);
-    setBulkStockText('');
-    setStockFilterTab('available');
-
-    // Instant real-time database sync
-    try {
-      const unusedCount = nextInventory.filter(acc => (acc.status || '').toLowerCase() !== 'sold').length;
-      for (const item of validNewItems) {
-        const itemRef = doc(db, 'listings', listing.id, 'inventory', item.id);
-        const secureRef = doc(db, 'listings', listing.id, 'inventory', item.id, 'secure', 'details');
-        await setDoc(itemRef, {
-          id: item.id,
-          status: 'Available',
-          soldTo: null,
-          orderId: null,
-          soldAt: null,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-        await setDoc(secureRef, {
-          id: item.id,
-          accountEmail: item.accountEmail || '',
-          accountPassword: item.accountPassword || '',
-          notes: item.recoveryInfo || '',
-          recoveryInfo: item.recoveryInfo || '',
-          twoFactorSecretKey: item.twoFactorSecretKey || '',
-          twoFactorBackupCodes: item.twoFactorBackupCodes || '',
-          additionalInstructions: item.additionalInstructions || '',
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      }
-
-      const cleanedInventoryForDoc = nextInventory.map(item => ({
-        id: item.id,
-        status: item.status || 'Available',
-        accountEmail: item.accountEmail || '',
-        recoveryInfo: item.recoveryInfo || '',
-        additionalInstructions: item.additionalInstructions || '',
-        twoFactorSecretKey: item.twoFactorSecretKey || '',
-        twoFactorBackupCodes: item.twoFactorBackupCodes || item.backupCodes || '',
-        backupCodes: item.backupCodes || item.twoFactorBackupCodes || '',
-        soldTo: item.soldTo || null,
-        orderId: item.orderId || null,
-        soldAt: item.soldAt || null
-      }));
-
-      await updateDoc(doc(db, 'listings', listing.id), {
-        stock: unusedCount,
-        stockCount: unusedCount,
-        status: unusedCount > 0 ? (status === 'reserved' ? 'reserved' : 'active') : 'sold',
-        inventory: cleanedInventoryForDoc
-      });
-
-      if (onSuccess) {
-        onSuccess({
-          stock: unusedCount,
-          stockCount: unusedCount,
-          status: unusedCount > 0 ? (status === 'reserved' ? 'reserved' : 'active') : 'sold',
-          inventory: cleanedInventoryForDoc
-        });
-      }
-    } catch (autoErr) {
-      console.warn('Auto-save bulk stock notice:', autoErr);
-    }
-
-    if (skippedDuplicatesCount > 0) {
-      triggerNotification('success', `Added & saved ${validNewItems.length} unique accounts (Total: ${nextInventory.filter(i => (i.status||'').toLowerCase() !== 'sold').length} in stock). ${skippedDuplicatesCount} duplicates skipped.`);
-    } else {
-      triggerNotification('success', `Added & saved ${validNewItems.length} new stock items! Total stock is now ${nextInventory.filter(i => (i.status||'').toLowerCase() !== 'sold').length}.`);
-    }
-  };
 
   const handleAddAccountToInventory = async () => {
     if (!accountEmail.trim()) {
@@ -396,7 +271,20 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
       return;
     }
 
-    const currentAccount = {
+    const deliveryFields: { label: string; value: string }[] = [];
+    if (accountEmail.trim()) deliveryFields.push({ label: 'Gmail/Login', value: accountEmail.trim() });
+    if (accountPassword.trim()) deliveryFields.push({ label: 'Password', value: accountPassword.trim() });
+    if (recoveryInfo.trim()) deliveryFields.push({ label: 'Recovery Info', value: recoveryInfo.trim() });
+    if (twoFactorSecretKey.trim()) deliveryFields.push({ label: 'Two-Factor Authenticator', value: twoFactorSecretKey.trim() });
+    if (twoFactorBackupCodes.trim()) deliveryFields.push({ label: '2FA Backup Codes', value: twoFactorBackupCodes.trim() });
+    customFields.forEach(cf => {
+      if (cf.label.trim() && cf.value.trim()) {
+        deliveryFields.push({ label: cf.label.trim(), value: cf.value.trim() });
+      }
+    });
+    if (additionalInstructions.trim()) deliveryFields.push({ label: 'Additional Instructions', value: additionalInstructions.trim() });
+
+    const currentAccount: Record<string, any> = {
       id: editingIndex !== null ? inventoryAccounts[editingIndex].id : 'inv_' + Math.random().toString(36).substr(2, 9),
       accountEmail: accountEmail.trim(),
       accountPassword: accountPassword.trim(),
@@ -406,11 +294,19 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
       backupCodes: twoFactorBackupCodes.trim() || twoFactorSecretKey.trim(),
       additionalInstructions: additionalInstructions.trim(),
       delivery_value: accountEmail.trim() + (accountPassword.trim() ? ` | ${accountPassword.trim()}` : ''),
+      deliveryFields,
+      customFields,
       status: editingIndex !== null ? (inventoryAccounts[editingIndex].status || 'Available') : 'Available',
       soldTo: editingIndex !== null ? inventoryAccounts[editingIndex].soldTo : null,
       orderId: editingIndex !== null ? inventoryAccounts[editingIndex].orderId : null,
       soldAt: editingIndex !== null ? inventoryAccounts[editingIndex].soldAt : null
     };
+
+    customFields.forEach(cf => {
+      if (cf.label.trim() && cf.value.trim()) {
+        currentAccount[cf.label.trim()] = cf.value.trim();
+      }
+    });
 
     let nextInventory: any[];
     if (editingIndex !== null) {
@@ -438,6 +334,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
       }, { merge: true });
 
       await setDoc(secureRef, {
+        ...currentAccount,
         id: currentAccount.id,
         accountEmail: currentAccount.accountEmail || '',
         accountPassword: currentAccount.accountPassword || '',
@@ -446,10 +343,12 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
         twoFactorSecretKey: currentAccount.twoFactorSecretKey || '',
         twoFactorBackupCodes: currentAccount.twoFactorBackupCodes || '',
         additionalInstructions: currentAccount.additionalInstructions || '',
+        deliveryFields: currentAccount.deliveryFields,
         updatedAt: new Date().toISOString()
       }, { merge: true });
 
       const cleanedInventoryForDoc = nextInventory.map(item => ({
+        ...item,
         id: item.id,
         status: item.status || 'Available',
         accountEmail: item.accountEmail || '',
@@ -458,6 +357,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
         twoFactorSecretKey: item.twoFactorSecretKey || '',
         twoFactorBackupCodes: item.twoFactorBackupCodes || item.backupCodes || '',
         backupCodes: item.backupCodes || item.twoFactorBackupCodes || '',
+        deliveryFields: item.deliveryFields,
         soldTo: item.soldTo || null,
         orderId: item.orderId || null,
         soldAt: item.soldAt || null
@@ -492,6 +392,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     setTwoFactorBackupCodes('');
     setBackupCodes('');
     setAdditionalInstructions('');
+    setCustomFields([]);
   };
 
   const handleEditAccountLocal = (index: number) => {
@@ -504,6 +405,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     setTwoFactorBackupCodes(acc.twoFactorBackupCodes || acc.backupCodes || '');
     setBackupCodes(acc.twoFactorBackupCodes || acc.backupCodes || '');
     setAdditionalInstructions(acc.additionalInstructions || '');
+    setCustomFields(Array.isArray(acc.customFields) ? acc.customFields : []);
   };
 
   const handleRemoveAccountLocal = async (index: number) => {
@@ -713,8 +615,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     country.trim() !== (listing.country || 'Nigeria').trim() ||
     niche.trim() !== (listing.niche || 'General').trim() ||
     description.trim() !== (listing.description || '').trim() ||
-    deletedAccountIds.length > 0 ||
-    bulkStockText.trim().length > 0
+    deletedAccountIds.length > 0
   );
 
   const handleRequestClose = () => {
@@ -875,8 +776,23 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
       // Build inventory list from current inventory state, applying editingIndex changes if user was editing an existing item
       let finalInventory = [...inventoryAccounts];
       if (editingIndex !== null && accountEmail.trim()) {
-        const accountId = inventoryAccounts[editingIndex].id;
-        finalInventory[editingIndex] = {
+        const existingItem = inventoryAccounts[editingIndex];
+        const accountId = existingItem.id;
+        const deliveryFields: { label: string; value: string }[] = [];
+        if (accountEmail.trim()) deliveryFields.push({ label: 'Gmail/Login', value: accountEmail.trim() });
+        if (accountPassword.trim()) deliveryFields.push({ label: 'Password', value: accountPassword.trim() });
+        if (recoveryInfo.trim()) deliveryFields.push({ label: 'Recovery Info', value: recoveryInfo.trim() });
+        if (twoFactorSecretKey.trim()) deliveryFields.push({ label: 'Two-Factor Authenticator', value: twoFactorSecretKey.trim() });
+        if (twoFactorBackupCodes.trim()) deliveryFields.push({ label: '2FA Backup Codes', value: twoFactorBackupCodes.trim() });
+        customFields.forEach(cf => {
+          if (cf.label.trim() && cf.value.trim()) {
+            deliveryFields.push({ label: cf.label.trim(), value: cf.value.trim() });
+          }
+        });
+        if (additionalInstructions.trim()) deliveryFields.push({ label: 'Additional Instructions', value: additionalInstructions.trim() });
+
+        const updatedAcc: Record<string, any> = {
+          ...existingItem,
           id: accountId,
           accountEmail: accountEmail.trim(),
           accountPassword: accountPassword.trim(),
@@ -885,11 +801,22 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           twoFactorBackupCodes: twoFactorBackupCodes.trim(),
           backupCodes: twoFactorBackupCodes.trim() || twoFactorSecretKey.trim(),
           additionalInstructions: additionalInstructions.trim(),
-          status: inventoryAccounts[editingIndex].status || 'Available',
-          soldTo: inventoryAccounts[editingIndex].soldTo || null,
-          orderId: inventoryAccounts[editingIndex].orderId || null,
-          soldAt: inventoryAccounts[editingIndex].soldAt || null
+          delivery_value: accountEmail.trim() + (accountPassword.trim() ? ` | ${accountPassword.trim()}` : ''),
+          deliveryFields,
+          customFields,
+          status: existingItem.status || 'Available',
+          soldTo: existingItem.soldTo || null,
+          orderId: existingItem.orderId || null,
+          soldAt: existingItem.soldAt || null
         };
+
+        customFields.forEach(cf => {
+          if (cf.label.trim() && cf.value.trim()) {
+            updatedAcc[cf.label.trim()] = cf.value.trim();
+          }
+        });
+
+        finalInventory[editingIndex] = updatedAcc;
       }
 
       // Normalize all statuses to strictly 'Available' or 'Sold'
@@ -965,6 +892,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           twoFactorBackupCodes: item.twoFactorBackupCodes || item.backupCodes || '',
           backupCodes: item.twoFactorBackupCodes || item.backupCodes || '',
           additionalInstructions: item.additionalInstructions || '',
+          deliveryFields: Array.isArray(item.deliveryFields) ? item.deliveryFields : undefined,
           updatedAt: new Date().toISOString()
         }, { merge: true });
       }
@@ -980,6 +908,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
         twoFactorSecretKey: item.twoFactorSecretKey || '',
         twoFactorBackupCodes: item.twoFactorBackupCodes || item.backupCodes || '',
         backupCodes: item.backupCodes || item.twoFactorBackupCodes || '',
+        deliveryFields: Array.isArray(item.deliveryFields) ? item.deliveryFields : undefined,
         soldTo: item.soldTo || null,
         orderId: item.orderId || null,
         soldAt: item.soldAt || null
@@ -990,13 +919,15 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
       // Fallback single-stock details for backwards compatibility
       const firstAvailable = finalInventory.find(acc => acc.status === 'Available') || finalInventory[0];
       const mainDigitalDetails = firstAvailable ? {
+        ...firstAvailable,
         accountEmail: firstAvailable.accountEmail || '',
         accountPassword: firstAvailable.accountPassword || '',
         recoveryInfo: firstAvailable.recoveryInfo || '',
         twoFactorSecretKey: firstAvailable.twoFactorSecretKey || '',
         twoFactorBackupCodes: firstAvailable.twoFactorBackupCodes || firstAvailable.backupCodes || '',
         backupCodes: firstAvailable.backupCodes || '',
-        additionalInstructions: firstAvailable.additionalInstructions || ''
+        additionalInstructions: firstAvailable.additionalInstructions || '',
+        deliveryFields: Array.isArray(firstAvailable.deliveryFields) ? firstAvailable.deliveryFields : undefined
       } : {
         accountEmail: '',
         accountPassword: '',
@@ -1362,7 +1293,6 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                             key={item.id}
                             onClick={() => {
                               if (!isSold) {
-                                setStockInputMode('detailed');
                                 handleEditAccountLocal(originalIdx);
                               }
                             }}
@@ -1479,7 +1409,6 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setStockInputMode('detailed');
                                       handleEditAccountLocal(originalIdx);
                                     }}
                                     className="p-1.5 text-[#64748B] hover:text-[#0F172A] hover:bg-[#EDE9FE] rounded-lg transition cursor-pointer"
@@ -1518,70 +1447,11 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
               )
             )}
 
-            {/* Input Mode Selector */}
-            <div className="flex rounded-xl bg-white p-1 border border-[#EBE7F7] shadow-2xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setStockInputMode('bulk');
-                  setEditingIndex(null);
-                }}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                  stockInputMode === 'bulk'
-                    ? 'bg-[#5B4DF5] text-white shadow-xs'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                <span>Add Items One Per Line (Bulk)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setStockInputMode('detailed')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                  stockInputMode === 'detailed'
-                    ? 'bg-[#5B4DF5] text-white shadow-xs'
-                    : 'text-[#64748B] hover:text-[#0F172A]'
-                }`}
-              >
-                <span>Detailed Credentials Form</span>
-              </button>
-            </div>
-
-            {/* MODE 1: BULK ONE PER LINE */}
-            {stockInputMode === 'bulk' && (
-              <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[#0F172A] text-xs font-bold">
-                    Paste More Stock Items (One per line)
-                  </label>
-                  <span className="text-[10px] text-[#64748B]">
-                    Appends without deleting existing stock
-                  </span>
-                </div>
-                <textarea
-                  rows={4}
-                  value={bulkStockText}
-                  onChange={(e) => setBulkStockText(e.target.value)}
-                  placeholder={`CODE-005\nCODE-006\nuser2@domain.com:password123 | 2FA:JBSWY3DPEHPK3PXP\nacc_login2@gmail.com:StrongPass2024!`}
-                  className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs font-mono p-3 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white placeholder:text-[#94A3B8]"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddBulkStock}
-                  className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-                >
-                  <PlusCircle className="w-4 h-4 text-white" />
-                  <span>+ Add Line(s) to Stock Inventory (Preserves Existing)</span>
-                </button>
-              </div>
-            )}
-
-            {/* MODE 2: DETAILED FORM */}
-            {stockInputMode === 'detailed' && (
-              <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3.5 shadow-2xs">
-                <span className="text-[10px] uppercase font-bold text-[#5B4DF5] tracking-wider block">
-                  {editingIndex !== null ? `Edit Stock Item #${editingIndex + 1}` : 'Enter Single Stock Item Details'}
-                </span>
+            {/* Stock Credentials Form */}
+            <div className="bg-white p-3.5 rounded-2xl border border-[#EBE7F7] space-y-3.5 shadow-2xs">
+              <span className="text-[10px] uppercase font-bold text-[#5B4DF5] tracking-wider block">
+                {editingIndex !== null ? `Edit Stock Item #${editingIndex + 1}` : 'Enter Single Stock Item Details'}
+              </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -1617,50 +1487,71 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[#0F172A] text-xs font-bold mb-1">Recovery Info / Note</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. recovery@gmail.com"
-                      value={recoveryInfo}
-                      onChange={(e) => setRecoveryInfo(e.target.value)}
-                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-                    />
+                {/* Dynamic Custom Delivery Fields */}
+                <div className="space-y-2 pt-1 border-t border-[#EBE7F7]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-[#0F172A] text-xs font-bold flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#5B4DF5]" />
+                      <span>Custom Delivery Fields (Optional)</span>
+                    </label>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomField('Recovery Email')}
+                        className="text-[10px] font-bold bg-[#EDE9FE] text-[#5B4DF5] hover:bg-[#DDD6FE] px-2 py-0.5 rounded-lg transition cursor-pointer"
+                      >
+                        + Recovery Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomField('Gmail Recovery Password')}
+                        className="text-[10px] font-bold bg-[#EDE9FE] text-[#5B4DF5] hover:bg-[#DDD6FE] px-2 py-0.5 rounded-lg transition cursor-pointer"
+                      >
+                        + Recovery Password
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomField('Two-Factor Authenticator')}
+                        className="text-[10px] font-bold bg-[#EDE9FE] text-[#5B4DF5] hover:bg-[#DDD6FE] px-2 py-0.5 rounded-lg transition cursor-pointer"
+                      >
+                        + 2FA / TOTP
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomField()}
+                        className="text-[10px] font-bold bg-[#F1F0FB] text-[#475569] hover:bg-[#EBE7F7] px-2 py-0.5 rounded-lg transition cursor-pointer border border-[#E2E8F0]"
+                      >
+                        + Custom Field
+                      </button>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[#0F172A] text-xs font-bold mb-1">2FA Secret Key</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. JBSWY3DPEHPK3PXP"
-                      value={twoFactorSecretKey}
-                      onChange={(e) => setTwoFactorSecretKey(e.target.value)}
-                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[#0F172A] text-xs font-bold mb-1">2FA Backup Codes</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 1234-5678, 8765-4321..."
-                      value={twoFactorBackupCodes}
-                      onChange={(e) => setTwoFactorBackupCodes(e.target.value)}
-                      className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[#0F172A] text-xs font-bold mb-1">Additional Transfer Instructions</label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. Clean IP access instructions, original email access notes..."
-                    value={additionalInstructions}
-                    onChange={(e) => setAdditionalInstructions(e.target.value)}
-                    className="w-full bg-[#F8F7FD] text-[#0F172A] text-xs p-2.5 rounded-xl border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] focus:bg-white"
-                  />
+                  {customFields.map((cf) => (
+                    <div key={cf.id} className="flex items-center gap-2 bg-[#F8F7FD] p-2 rounded-xl border border-[#EBE7F7]">
+                      <input
+                        type="text"
+                        placeholder="Field Name (e.g. Recovery Email)"
+                        value={cf.label}
+                        onChange={(e) => handleUpdateCustomField(cf.id, 'label', e.target.value)}
+                        className="w-1/3 sm:w-2/5 bg-white text-[#0F172A] text-xs p-2 rounded-lg border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5]"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Delivery Value"
+                        value={cf.value}
+                        onChange={(e) => handleUpdateCustomField(cf.id, 'value', e.target.value)}
+                        className="flex-1 bg-white text-[#0F172A] text-xs p-2 rounded-lg border border-[#EBE7F7] focus:outline-none focus:border-[#5B4DF5] font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCustomField(cf.id)}
+                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                        title="Remove Field"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="pt-2">
@@ -1674,7 +1565,6 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                   </button>
                 </div>
               </div>
-            )}
           </div>
 
           {/* Description */}

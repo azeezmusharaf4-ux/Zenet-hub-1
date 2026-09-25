@@ -43,13 +43,19 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) || isAdmin();
       allow update: if isOwner(userId) || isAdmin() || (
-        isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referralCount', 'totalReferralEarnings', 'walletBalance', 'balance', 'updatedAt'])
+        isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referralCount', 'totalReferralEarnings', 'walletBalance', 'balance', 'updatedAt', 'sellerTotalRevenue', 'sellerGrossSales', 'sellerOwnerFee', 'sellerCompletedSales'])
       );
       allow delete: if isOwner(userId) || isAdmin();
 
       match /transactions/{txId} {
         allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       }
+    }
+
+    // Seller Revenues Collection (Live 70% seller / 30% platform split tracking)
+    match /seller_revenues/{sellerId} {
+      allow read: if isAuthenticated() && (request.auth.uid == sellerId || isAdmin());
+      allow write: if isAuthenticated();
     }
 
     // Wallets Collection (Dual persistence with users/{userId})

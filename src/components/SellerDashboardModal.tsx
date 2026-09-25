@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User } from 'firebase/auth';
-import { AccountListing, Inquiry, UserProfile, PurchaseRecord, CategoryType } from '../types';
+import { AccountListing, Inquiry, UserProfile, PurchaseRecord, CategoryType, SellerRevenueRecord } from '../types';
 import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { 
   X, 
   Store, 
   MessageSquare, 
-  Trash2, 
   CheckCircle2, 
   User as UserIcon, 
   ShieldCheck, 
@@ -17,17 +16,19 @@ import {
   TrendingUp, 
   Check, 
   Send, 
-  Search, 
-  Image, 
   Sparkles,
-  Lock
+  PieChart,
+  Receipt,
+  ArrowUpRight,
+  Info
 } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { calculateRevenueSplit, syncHistoricalSellerRevenue } from '../lib/revenueSplit';
 
 const EditListingModal = React.lazy(() => import('./EditListingModal').then(m => ({ default: m.EditListingModal })));
 
-export type SellerDashboardTab = 'overview' | 'listings' | 'inquiries';
+export type SellerDashboardTab = 'overview' | 'inquiries';
 
 interface SellerDashboardModalProps {
   user: User | null;
@@ -61,14 +62,63 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   onUpdateListing
 }) => {
   const [activeTab, setActiveTab] = useState<SellerDashboardTab>('overview');
-  
-  // Filtering states in Listings tab
-  const [categoryFilter, setCategoryFilter] = useState<CategoryType | 'All'>('All');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'active' | 'sold'>('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [showAllListings, setShowAllListings] = useState(false);
 
   // Editing listing modal state
   const [editingListing, setEditingListing] = useState<AccountListing | null>(null);
+
+  // Live seller revenue state from Firestore
+  const [revenueRecord, setRevenueRecord] = useState<SellerRevenueRecord | null>(null);
+  const [sellerPurchases, setSellerPurchases] = useState<PurchaseRecord[]>([]);
+  const [showRevenueAnalysis, setShowRevenueAnalysis] = useState<boolean>(false);
+
+  // Live real-time listener for seller_revenues/{user.uid} and purchases
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // 1. Listen to seller_revenues doc
+    const revDocRef = doc(db, 'seller_revenues', user.uid);
+    const unsubRev = onSnapshot(revDocRef, (snap) => {
+      if (snap.exists()) {
+        setRevenueRecord(snap.data() as SellerRevenueRecord);
+      }
+    }, (err) => {
+      console.warn('Seller revenue snapshot notice:', err);
+    });
+
+    // 2. Listen to purchases where sellerId == user.uid
+    const purchasesRef = collection(db, 'purchases');
+    const qPurchases = query(purchasesRef, where('sellerId', '==', user.uid));
+    const unsubPurchases = onSnapshot(qPurchases, (snap) => {
+      const pDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as PurchaseRecord));
+      setSellerPurchases(pDocs);
+    }, (err) => {
+      console.warn('Seller purchases snapshot notice:', err);
+    });
+
+    return () => {
+      unsubRev();
+      unsubPurchases();
+    };
+  }, [user?.uid]);
+
+  // Ensure any existing sold listings or completed purchases are permanently saved in seller_revenues
+  useEffect(() => {
+    if (!user?.uid) return;
+    const soldListingsItems = myListings.filter((l) => l.status === 'sold');
+    if (soldListingsItems.length > 0 || sellerPurchases.length > 0) {
+      syncHistoricalSellerRevenue(
+        user.uid,
+        user.email || '',
+        soldListingsItems.map((l) => ({ id: l.id, title: l.title, price: Number(l.price) || 0, createdAt: l.createdAt })),
+        sellerPurchases
+      ).then((synced) => {
+        if (synced && !revenueRecord) {
+          setRevenueRecord(synced);
+        }
+      }).catch((e) => console.warn('Revenue sync check notice:', e));
+    }
+  }, [user?.uid, myListings, sellerPurchases]);
 
   // Store display name for header
   const displayName = userProfile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Zenet Store';
@@ -85,32 +135,131 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
     (inq) => isOwnerUser || inq.sellerId === user.uid || myListings.some((l) => l.id === inq.listingId)
   );
 
-  // Calculate Seller Sales Statistics
+  // 1. TOTAL LISTINGS = the total number of listings created by that seller, including Active and Sold
   const totalListings = myListings.length;
-  const activeListings = myListings.filter((l) => l.status === 'active').length;
-  const soldListings = myListings.filter((l) => l.status === 'sold').length;
 
-  // Total Revenue in NGN & USD
-  const totalRevenueNGN = myListings
-    .filter((l) => l.status === 'sold')
-    .reduce((sum, l) => sum + (Number(l.price) || 0), 0);
-  
+  // 2. ACTIVE INVENTORY = seller’s currently available listings
+  const activeListings = myListings.filter(
+    (l) => l.status === 'active' || (l.status !== 'sold' && (l.stockCount === undefined || l.stockCount > 0))
+  ).length;
+
+  // 3. COMPLETED SALES = seller’s successfully completed sales
+  const soldListingsFromListings = myListings.filter((l) => l.status === 'sold').length;
+  const completedSalesCount = Math.max(
+    soldListingsFromListings,
+    revenueRecord?.completedSalesCount || 0,
+    sellerPurchases.length
+  );
+
+  // 4. TOTAL REVENUE = LIVE 70% Seller earnings / 30% Website Owner share
+  const dbGross = Number(revenueRecord?.totalGrossSales) || 0;
+  const dbSeller = Number(revenueRecord?.totalSellerRevenue) || 0;
+
+  const purchasesGross = sellerPurchases.reduce((sum, p) => sum + (Number(p.paidAmount || p.price) || 0), 0);
+  const listingsSoldGross = myListings.filter((l) => l.status === 'sold').reduce((sum, l) => sum + (Number(l.price) || 0), 0);
+
+  const totalGrossSales = Math.max(dbGross, purchasesGross, listingsSoldGross);
+
+  // Seller's actual accumulated 70% earnings
+  const totalSellerRevenue = totalGrossSales > 0 
+    ? (dbSeller > 0 ? Math.max(dbSeller, Math.round(totalGrossSales * 0.70)) : Math.round(totalGrossSales * 0.70))
+    : 0;
+
+  // Website Owner's 30% share
+  const totalOwnerCommission = Math.max(0, totalGrossSales - totalSellerRevenue);
+
   // 1 NGN ~ 0.00067 USD approx for display reference (₦1,500 = $1)
-  const totalRevenueUSD = (totalRevenueNGN / 1500).toFixed(2);
-  const avgPriceNGN = soldListings > 0 ? Math.round(totalRevenueNGN / soldListings) : 0;
+  const totalRevenueUSD = (totalSellerRevenue / 1500).toFixed(2);
+  const avgPriceNGN = completedSalesCount > 0 ? Math.round(totalGrossSales / completedSalesCount) : 0;
 
-  // Filtered listings
-  const filteredListings = myListings.filter((listing) => {
-    if (categoryFilter !== 'All' && listing.category !== categoryFilter) return false;
-    if (statusFilter !== 'All' && listing.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = listing.title.toLowerCase().includes(q);
-      const matchDesc = listing.description?.toLowerCase().includes(q);
-      if (!matchTitle && !matchDesc) return false;
+  // Itemized sales list for revenue analysis modal
+  const allRecordedSales = useMemo(() => {
+    const list: Array<{
+      orderId: string;
+      txId?: string;
+      listingId?: string;
+      listingTitle?: string;
+      grossAmount: number;
+      sellerShare: number;
+      ownerShare: number;
+      sellerPercent: number;
+      ownerPercent: number;
+      date: string;
+    }> = [];
+
+    const seenIds = new Set<string>();
+
+    if (Array.isArray(revenueRecord?.sales)) {
+      revenueRecord.sales.forEach((s) => {
+        const id = s.orderId || s.txId || `s_${Math.random()}`;
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          const gross = Number(s.grossAmount) || 0;
+          const split = calculateRevenueSplit(gross);
+          list.push({
+            orderId: id,
+            txId: s.txId,
+            listingId: s.listingId,
+            listingTitle: s.listingTitle,
+            grossAmount: gross,
+            sellerShare: s.sellerShare !== undefined ? Number(s.sellerShare) : split.sellerShare,
+            ownerShare: s.ownerShare !== undefined ? Number(s.ownerShare) : split.ownerShare,
+            sellerPercent: 70,
+            ownerPercent: 30,
+            date: s.date || new Date().toISOString()
+          });
+        }
+      });
     }
-    return true;
-  });
+
+    sellerPurchases.forEach((p) => {
+      const id = p.id || p.transactionId || `p_${Math.random()}`;
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        const gross = Number(p.paidAmount || p.price || 0);
+        const split = calculateRevenueSplit(gross);
+        list.push({
+          orderId: id,
+          txId: p.transactionId || id,
+          listingId: p.listingId,
+          listingTitle: p.listingTitle,
+          grossAmount: split.grossAmount,
+          sellerShare: p.sellerShare !== undefined ? Number(p.sellerShare) : split.sellerShare,
+          ownerShare: p.ownerShare !== undefined ? Number(p.ownerShare) : split.ownerShare,
+          sellerPercent: 70,
+          ownerPercent: 30,
+          date: p.purchasedAt || new Date().toISOString()
+        });
+      }
+    });
+
+    myListings.filter((l) => l.status === 'sold').forEach((l) => {
+      if (!list.some((s) => s.listingId === l.id)) {
+        const id = `SOLD_${l.id}`;
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          const gross = Number(l.price || 0);
+          const split = calculateRevenueSplit(gross);
+          list.push({
+            orderId: id,
+            txId: `TX_${l.id}`,
+            listingId: l.id,
+            listingTitle: l.title,
+            grossAmount: split.grossAmount,
+            sellerShare: split.sellerShare,
+            ownerShare: split.ownerShare,
+            sellerPercent: 70,
+            ownerPercent: 30,
+            date: l.createdAt || new Date().toISOString()
+          });
+        }
+      }
+    });
+
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [revenueRecord?.sales, sellerPurchases, myListings]);
+
+  const displayedListings = showAllListings ? myListings : myListings.slice(0, 4);
 
   // Handle Inquiry Reply submission in Firestore
   const handleSendReply = async (inquiry: Inquiry) => {
@@ -204,18 +353,6 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('listings')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
-              activeTab === 'listings'
-                ? 'bg-purple-600 text-white shadow-sm font-bold'
-                : 'text-slate-600 hover:text-purple-600 hover:bg-white'
-            }`}
-          >
-            <Store className="w-4 h-4" />
-            <span>My Listed Accounts ({myListings.length})</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('inquiries')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
               activeTab === 'inquiries'
@@ -248,7 +385,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                   </div>
                   <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">{totalListings}</div>
                   <p className="text-[11px] text-slate-500 font-semibold">
-                    {activeListings} Active • {soldListings} Sold
+                    {activeListings} Active • {completedSalesCount} Sold
                   </p>
                 </div>
 
@@ -270,23 +407,39 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                     <span className="text-[11px] font-bold uppercase tracking-wider">Completed Sales</span>
                     <Tag className="w-5 h-5 text-purple-600" />
                   </div>
-                  <div className="text-2xl sm:text-3xl font-black text-purple-600 font-mono">{soldListings}</div>
+                  <div className="text-2xl sm:text-3xl font-black text-purple-600 font-mono">{completedSalesCount}</div>
                   <p className="text-[11px] text-purple-600/80 font-semibold">
                     Successfully delivered
                   </p>
                 </div>
 
                 {/* Total Escrow Revenue Card */}
-                <div className="bg-white border border-purple-100 p-4.5 rounded-2xl space-y-1 shadow-xs relative overflow-hidden">
+                <div 
+                  onClick={() => setShowRevenueAnalysis(true)}
+                  className="bg-white border border-purple-100 hover:border-purple-300 p-4.5 rounded-2xl space-y-1 shadow-xs hover:shadow-sm relative overflow-hidden cursor-pointer transition group"
+                  title="Click to view live 70% Seller / 30% Owner revenue analysis"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setShowRevenueAnalysis(true);
+                    }
+                  }}
+                >
                   <div className="flex items-center justify-between text-purple-700">
-                    <span className="text-[11px] font-bold uppercase tracking-wider">Total Revenue</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
+                      Total Revenue
+                      <ArrowUpRight className="w-3.5 h-3.5 text-purple-500 group-hover:text-purple-700 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+                    </span>
                     <DollarSign className="w-5 h-5 text-purple-600" />
                   </div>
                   <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
-                    ₦{totalRevenueNGN.toLocaleString()}
+                    ₦{totalSellerRevenue.toLocaleString()}
                   </div>
-                  <p className="text-[11px] text-purple-600/80 font-semibold">
-                    ≈ ${totalRevenueUSD} USD equivalent
+                  <p className="text-[11px] text-purple-600/80 font-semibold flex items-center justify-between">
+                    <span>≈ ${totalRevenueUSD} USD • 70% Share</span>
+                    <span className="text-[10px] text-purple-600 font-bold group-hover:underline">View Split →</span>
                   </p>
                 </div>
 
@@ -320,14 +473,16 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                 <div className="flex items-center justify-between">
                   <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
                     <Store className="w-4 h-4 text-purple-600" />
-                    Recent Listed Inventory ({myListings.slice(0, 4).length})
+                    Recent Listed Inventory ({displayedListings.length})
                   </h4>
-                  <button
-                    onClick={() => setActiveTab('listings')}
-                    className="text-xs text-purple-600 hover:text-purple-800 font-bold"
-                  >
-                    View All ({myListings.length}) →
-                  </button>
+                  {myListings.length > 4 && (
+                    <button
+                      onClick={() => setShowAllListings((prev) => !prev)}
+                      className="text-xs text-purple-600 hover:text-purple-800 font-bold transition cursor-pointer"
+                    >
+                      {showAllListings ? 'Show Recent (4) ↑' : `View All (${myListings.length}) →`}
+                    </button>
+                  )}
                 </div>
 
                 {myListings.length === 0 ? (
@@ -340,7 +495,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {myListings.slice(0, 4).map((listing) => (
+                    {displayedListings.map((listing) => (
                       <div key={listing.id} className="bg-white border border-purple-100 p-4 rounded-2xl space-y-2.5 shadow-xs hover:border-purple-300 transition">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
@@ -360,7 +515,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                           <span className="font-black text-purple-600 font-mono">₦{Number(listing.price).toLocaleString()}</span>
                           <button
                             onClick={() => setEditingListing(listing)}
-                            className="text-xs text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1"
+                            className="text-xs text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5 text-purple-600" />
                             <span>Edit Listing</span>
@@ -376,195 +531,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
           )}
 
           {/* ========================================================= */}
-          {/* TAB 2: MY LISTED ACCOUNTS (WITH FILTERS & FULL EDIT/DELETE/STATUS CONTROLS) */}
-          {/* ========================================================= */}
-          {activeTab === 'listings' && (
-            <div className="space-y-4 animate-in fade-in duration-150">
-              
-              {/* Header & Filter Toolbar */}
-              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-purple-100 shadow-xs">
-                
-                {/* Search input */}
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search my listings by title..."
-                    className="w-full bg-white text-slate-900 pl-9 pr-3 py-2 rounded-xl border border-purple-100 text-xs focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-
-                {/* Filter dropdowns */}
-                <div className="flex items-center gap-2 overflow-x-auto text-xs">
-                  <select
-                    value={categoryFilter}
-                    onChange={(e) => setCategoryFilter(e.target.value as any)}
-                    className="bg-white text-slate-700 border border-purple-100 px-3 py-2 rounded-xl focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="All">All Categories</option>
-                    <option value="Facebook">Facebook</option>
-                    <option value="TikTok">TikTok</option>
-                    <option value="Instagram">Instagram</option>
-                    <option value="Gmail">Gmail / Google</option>
-                    <option value="Other">Other</option>
-                  </select>
-
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as any)}
-                    className="bg-white text-slate-700 border border-purple-100 px-3 py-2 rounded-xl focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="All">All Statuses</option>
-                    <option value="active">Active Only</option>
-                    <option value="sold">Sold Only</option>
-                  </select>
-
-                  <button
-                    onClick={onOpenCreateListing}
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1 shrink-0"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    <span>+ New Listing</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Listings Container */}
-              {filteredListings.length === 0 ? (
-                <div className="text-center py-16 bg-purple-50/30 border border-dashed border-purple-200 rounded-2xl p-6 space-y-3">
-                  <Store className="w-12 h-12 text-slate-400 mx-auto opacity-50" />
-                  <h4 className="text-slate-900 font-extrabold text-sm">No Listings Found</h4>
-                  <p className="text-slate-500 text-xs max-w-sm mx-auto">
-                    {searchQuery || categoryFilter !== 'All' || statusFilter !== 'All'
-                      ? 'No listings match your filter criteria. Try clearing search filters.'
-                      : 'You have not created any account listings yet. Click "+ New Listing" to add your first account!'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {filteredListings.map((listing) => (
-                    <div 
-                      key={listing.id} 
-                      className="bg-white border border-purple-100 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs hover:border-purple-300 transition"
-                    >
-                      {/* Left info */}
-                      <div className="flex items-start gap-4">
-                        {/* Thumbnail Image */}
-                        <div className="w-20 h-16 sm:w-24 sm:h-20 rounded-xl overflow-hidden bg-purple-50/50 border border-purple-100 shrink-0 relative">
-                          <img
-                            src={listing.imageUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&q=80'}
-                            alt={listing.title}
-                            className="w-full h-full object-cover"
-                          />
-                          {listing.images && listing.images.length > 1 && (
-                            <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                              <Image className="w-2.5 h-2.5 text-purple-300" />
-                              {listing.images.length}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Title & Metadata */}
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="bg-purple-50 text-purple-700 text-[10px] font-black px-2 py-0.5 rounded-full border border-purple-200 uppercase">
-                              {listing.category}
-                            </span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                              listing.status === 'sold'
-                                ? 'bg-purple-50 text-slate-500 border border-purple-200'
-                                : 'bg-purple-50 text-purple-700 border border-purple-200'
-                            }`}>
-                              ● {listing.status}
-                            </span>
-                            {listing.pva && (
-                              <span className="bg-purple-50 text-purple-700 text-[9px] font-bold px-2 py-0.5 rounded-full border border-purple-200">
-                                PVA
-                              </span>
-                            )}
-                            {listing.twoFactor && (
-                              <span className="bg-purple-50 text-purple-700 text-[9px] font-bold px-2 py-0.5 rounded-full border border-purple-200">
-                                2FA
-                              </span>
-                            )}
-                          </div>
-
-                          <h4 
-                            onClick={() => { onClose(); onSelectListing(listing); }}
-                            className="font-extrabold text-slate-900 text-base hover:text-purple-600 transition cursor-pointer line-clamp-1"
-                          >
-                            {listing.title}
-                          </h4>
-
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                            <span>Price: <strong className="text-purple-600 font-black font-mono">₦{Number(listing.price).toLocaleString()}</strong></span>
-                            <span>• Followers: <strong className="text-slate-700">{listing.followers || 'N/A'}</strong></span>
-                            <span>• Age: <strong className="text-slate-700">{listing.accountAge || 'Aged'}</strong></span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right Action buttons */}
-                      <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                        {onBuyNow && (
-                          <button
-                            onClick={() => {
-                              onClose();
-                              onBuyNow(listing);
-                            }}
-                            className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-xs"
-                            title="Buy this account"
-                          >
-                            <Lock className="w-3.5 h-3.5 text-purple-200" />
-                            <span>Buy</span>
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => setEditingListing(listing)}
-                          className="bg-white hover:bg-purple-50/50 text-slate-700 border border-purple-100 text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5"
-                          title="Edit Listing Details"
-                        >
-                          <Edit3 className="w-4 h-4 text-purple-600" />
-                          <span>Edit</span>
-                        </button>
-
-                        {listing.status === 'active' ? (
-                          <button
-                            onClick={() => onUpdateListingStatus(listing.id, 'sold')}
-                            className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer"
-                          >
-                            Mark Sold
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => onUpdateListingStatus(listing.id, 'active')}
-                            className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer"
-                          >
-                            Re-list Active
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => onDeleteListing(listing.id)}
-                          className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl transition cursor-pointer"
-                          title="Delete Listing"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ========================================================= */}
-          {/* TAB 3: BUYER INQUIRIES & LEADS */}
+          {/* TAB 2: BUYER INQUIRIES & LEADS */}
           {/* ========================================================= */}
           {activeTab === 'inquiries' && (
             <div className="space-y-4 animate-in fade-in duration-150">
@@ -686,6 +653,228 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
             }}
           />
         </React.Suspense>
+      )}
+
+      {/* Clean Revenue Analysis Modal (70% Seller / 30% Website Owner Live Split) */}
+      {showRevenueAnalysis && (
+        <div 
+          className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setShowRevenueAnalysis(false)}
+        >
+          <div 
+            className="bg-white border border-purple-100 rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative my-auto animate-in zoom-in-95 duration-150 text-slate-800 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-white px-5 sm:px-6 py-4 border-b border-purple-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-600 text-white font-black flex items-center justify-center shadow-md">
+                  <PieChart className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-slate-900 text-base sm:text-lg leading-tight">
+                      Revenue & Commission Analysis
+                    </h3>
+                    <span className="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Live 70/30 Split
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Store: <strong className="text-slate-800 font-semibold">{displayName}</strong> • {completedSalesCount} Completed Sale{completedSalesCount === 1 ? '' : 's'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowRevenueAnalysis(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-full transition cursor-pointer"
+                title="Close Analysis"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-5 text-xs sm:text-sm">
+              {/* Top 3 Breakdown Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Total Gross Sales */}
+                <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-1">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Total Gross Sales</span>
+                    <Receipt className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
+                    ₦{totalGrossSales.toLocaleString()}
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    100% Total Sales Volume
+                  </p>
+                </div>
+
+                {/* 2. Seller's 70% Earnings */}
+                <div className="bg-purple-50/70 border-2 border-purple-300 p-4 rounded-2xl space-y-1 shadow-xs">
+                  <div className="flex items-center justify-between text-purple-700">
+                    <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                      Seller Revenue
+                      <span className="bg-purple-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">70%</span>
+                    </span>
+                    <DollarSign className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-purple-700 font-mono">
+                    ₦{totalSellerRevenue.toLocaleString()}
+                  </div>
+                  <p className="text-[11px] text-purple-600 font-semibold">
+                    Your Accumulated Earnings
+                  </p>
+                </div>
+
+                {/* 3. Owner's 30% Share */}
+                <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-1">
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                      Owner Share
+                      <span className="bg-slate-200 text-slate-700 text-[9px] font-bold px-1.5 py-0.2 rounded-full">30%</span>
+                    </span>
+                    <ShieldCheck className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-800 font-mono">
+                    ₦{totalOwnerCommission.toLocaleString()}
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Platform & Escrow Service
+                  </p>
+                </div>
+              </div>
+
+              {/* Visual 70/30 Split Bar */}
+              <div className="bg-purple-50/40 border border-purple-100 p-4 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span className="flex items-center gap-1.5 text-purple-700 font-extrabold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                    Seller Payout: 70% (₦{totalSellerRevenue.toLocaleString()})
+                  </span>
+                  <span className="flex items-center gap-1.5 text-slate-600 font-semibold">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                    Owner Share: 30% (₦{totalOwnerCommission.toLocaleString()})
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex shadow-inner">
+                  <div 
+                    className="h-full bg-purple-600 transition-all duration-300"
+                    style={{ width: `${totalGrossSales > 0 ? (totalSellerRevenue / totalGrossSales) * 100 : 70}%` }}
+                    title="Seller: 70%"
+                  />
+                  <div 
+                    className="h-full bg-slate-400 transition-all duration-300"
+                    style={{ width: `${totalGrossSales > 0 ? (totalOwnerCommission / totalGrossSales) * 100 : 30}%` }}
+                    title="Owner: 30%"
+                  />
+                </div>
+              </div>
+
+              {/* Live Automated Split Explanation Card */}
+              <div className="bg-purple-50/30 border border-purple-100 p-4 rounded-2xl flex items-start gap-3">
+                <Info className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 text-xs text-slate-600">
+                  <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm">
+                    Automated Revenue Split System
+                  </h4>
+                  <p className="leading-relaxed">
+                    Whenever a buyer purchases one of your account listings, the payment split is calculated automatically:
+                  </p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-slate-700 font-medium">
+                    <li><strong className="text-purple-700 font-extrabold">Seller receives 70%</strong> accumulated in Total Revenue</li>
+                    <li><strong className="text-slate-800 font-bold">Website Owner receives 30%</strong> platform service & escrow fee</li>
+                  </ul>
+                  <p className="text-[11px] text-purple-700 font-bold bg-white/80 border border-purple-100 px-2.5 py-1 rounded-lg inline-block mt-1">
+                    Example: ₦2,000 sale → Seller ₦1,400, Owner ₦600.
+                  </p>
+                </div>
+              </div>
+
+              {/* Completed Sales Itemized List */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-purple-600" />
+                    Completed Sales Breakdown ({allRecordedSales.length})
+                  </h4>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    All calculations saved in database
+                  </span>
+                </div>
+
+                {allRecordedSales.length === 0 ? (
+                  <div className="text-center py-8 bg-purple-50/20 border border-dashed border-purple-200 rounded-2xl p-5 space-y-2">
+                    <DollarSign className="w-7 h-7 text-slate-400 mx-auto opacity-40" />
+                    <p className="font-bold text-slate-800 text-xs">No Completed Sales Recorded Yet</p>
+                    <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                      When buyers purchase any of your listings, the 70/30 commission split is calculated automatically and saved here permanently.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {allRecordedSales.map((sale, idx) => (
+                      <div 
+                        key={sale.orderId || `sale-${idx}`}
+                        className="bg-white border border-purple-100 hover:border-purple-200 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs"
+                      >
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-slate-900 text-xs line-clamp-1">
+                            {sale.listingTitle || 'Account Listing'}
+                          </span>
+                          <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+                            <span>{new Date(sale.date).toLocaleDateString()}</span>
+                            <span>•</span>
+                            <span>Order #{String(sale.orderId || sale.txId || '').slice(-6).toUpperCase()}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-right">
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Total Sale</span>
+                            <span className="font-black text-slate-800 text-xs font-mono">
+                              ₦{sale.grossAmount.toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-purple-600 block">Seller 70%</span>
+                            <span className="font-black text-purple-600 text-xs font-mono">
+                              +₦{sale.sellerShare.toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Owner 30%</span>
+                            <span className="font-bold text-slate-500 text-xs font-mono">
+                              ₦{sale.ownerShare.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="bg-purple-50/30 px-5 sm:px-6 py-3 border-t border-purple-100 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-500 font-medium">
+                Live database synced with Firestore
+              </span>
+              <button
+                onClick={() => setShowRevenueAnalysis(false)}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-5 py-2 rounded-xl transition cursor-pointer"
+              >
+                Close Analysis
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

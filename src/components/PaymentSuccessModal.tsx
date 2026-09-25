@@ -53,20 +53,25 @@ const INTERNAL_METADATA_KEYS = new Set([
 ]);
 
 function formatDynamicLabel(key: string): string {
+  // If key already contains spaces, slashes, or dashes, preserve the exact label as entered
+  if (key.includes(' ') || key.includes('/') || key.includes('-')) {
+    return key;
+  }
   const lower = key.toLowerCase();
-  if (lower === 'accountemail' || lower === 'email' || lower === 'login') return 'Login / Email';
-  if (lower === 'accountpassword' || lower === 'password' || lower === 'pass') return 'Account Password';
-  if (lower === 'recoveryinfo' || lower === 'recovery' || lower === 'recoveryemail' || lower === 'recovery_email') return 'Recovery Info / Note';
-  if (lower === 'twofactorsecretkey' || lower === 'twofactorsecret' || lower === 'twofactor' || lower === 'totp' || lower === '2fa') return '2FA Secret Key';
+  if (lower === 'accountemail' || lower === 'email' || lower === 'login') return 'Gmail/Login';
+  if (lower === 'accountpassword' || lower === 'password' || lower === 'pass') return 'Password';
+  if (lower === 'recoveryemail' || lower === 'recovery_email') return 'Recovery Email';
+  if (lower === 'recoveryinfo' || lower === 'recovery') return 'Recovery Info';
+  if (lower === 'twofactorsecretkey' || lower === 'twofactorsecret' || lower === 'twofactor' || lower === 'totp' || lower === '2fa') return 'Two-Factor Authenticator';
   if (lower === 'twofactorbackupcodes' || lower === 'backupcodes' || lower === 'backupcode') return '2FA Backup Codes';
-  if (lower === 'additionalinstructions' || lower === 'instructions') return 'Additional Transfer Instructions';
+  if (lower === 'additionalinstructions' || lower === 'instructions') return 'Additional Instructions';
   if (lower === 'phonenumber' || lower === 'phone') return 'Phone Number';
-  if (lower === 'delivery_value' || lower === 'deliveryvalue') return 'Stock Delivery Line';
-  if (lower === 'notes' || lower === 'note') return 'Account Notes';
+  if (lower === 'delivery_value' || lower === 'deliveryvalue') return 'Delivery Line';
+  if (lower === 'notes' || lower === 'note') return 'Notes';
 
-  // Any custom field: turn camelCase, snake_case or kebab-case into clean readable Title Case
+  // Any custom field: turn camelCase, snake_case into clean readable Title Case
   return key
-    .replace(/[-_]/g, ' ')
+    .replace(/[_]/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/\b\w/g, char => char.toUpperCase());
 }
@@ -93,12 +98,32 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
   const deliveryFields: { key: string; label: string; value: string; isSensitive: boolean }[] = [];
   const seenValues = new Set<string>();
 
-  // Iterate over all keys of credentials
+  // 1. If explicit deliveryFields array was saved on the stock item, prioritize it to guarantee EXACT order and labels!
+  if (Array.isArray(credentials.deliveryFields) && credentials.deliveryFields.length > 0) {
+    credentials.deliveryFields.forEach((field: any, idx: number) => {
+      if (!field) return;
+      const label = (field.label || field.name || field.key || `Field ${idx + 1}`).trim();
+      const val = field.value !== undefined && field.value !== null ? String(field.value).trim() : '';
+      if (!val || val === 'null' || val === 'undefined') return;
+      deliveryFields.push({
+        key: field.key || `field_${idx}_${label}`,
+        label,
+        value: val,
+        isSensitive: isSensitiveField(label)
+      });
+      seenValues.add(val.toLowerCase());
+    });
+  }
+
+  // 2. Iterate over all keys of credentials for any remaining configured fields
   Object.entries(credentials).forEach(([key, val]) => {
-    if (!key || INTERNAL_METADATA_KEYS.has(key.toLowerCase())) return;
+    if (!key || INTERNAL_METADATA_KEYS.has(key.toLowerCase()) || key === 'deliveryFields') return;
     if (val === null || val === undefined) return;
     const strVal = String(val).trim();
     if (!strVal || strVal === 'null' || strVal === 'undefined') return;
+
+    // Skip if already included via deliveryFields array with exact same value
+    if (seenValues.has(strVal.toLowerCase())) return;
 
     // Check if delivery_value is a duplicate of login|pass or single value already shown
     if (key.toLowerCase() === 'delivery_value') {

@@ -127,6 +127,35 @@ export default function AccountCredentialsCard({
 
   const fields: CredentialField[] = [];
 
+  // If explicit ordered deliveryFields array is available, use it directly to display EVERY configured field in exact order!
+  if (Array.isArray(combined.deliveryFields) && combined.deliveryFields.length > 0) {
+    combined.deliveryFields.forEach((item: any, idx: number) => {
+      if (!item) return;
+      const label = (item.label || item.name || item.key || `Field ${idx + 1}`).trim();
+      const val = item.value !== undefined && item.value !== null ? String(item.value).trim() : '';
+      if (!val || val === 'null' || val === 'undefined') return;
+
+      const lowerLabel = label.toLowerCase();
+      const isSecret = lowerLabel.includes('password') || lowerLabel.includes('pass') || lowerLabel.includes('secret') || lowerLabel.includes('pin');
+      const isMulti = val.length > 50 || val.includes('\n');
+
+      let icon = <Key className="w-4 h-4 text-[#5B4DF5]" />;
+      if (lowerLabel.includes('mail') || lowerLabel.includes('login')) icon = <Mail className="w-4 h-4 text-[#5B4DF5]" />;
+      else if (isSecret) icon = <Lock className="w-4 h-4 text-[#5B4DF5]" />;
+      else if (lowerLabel.includes('2fa') || lowerLabel.includes('authenticator')) icon = <ShieldCheck className="w-4 h-4 text-purple-600" />;
+      else if (lowerLabel.includes('backup')) icon = <Layers className="w-4 h-4 text-amber-600" />;
+      else if (lowerLabel.includes('phone')) icon = <Smartphone className="w-4 h-4 text-sky-600" />;
+
+      fields.push({
+        key: item.key || `df_${idx}`,
+        label,
+        value: val,
+        isPassword: isSecret,
+        isMultiLine: isMulti,
+        icon
+      });
+    });
+  } else {
   // 1. Email
   if (emailVal) {
     fields.push({
@@ -259,6 +288,7 @@ export default function AccountCredentialsCard({
       icon: <Key className="w-4 h-4 text-[#5B4DF5]" />
     });
   });
+  }
 
   // Copy individual field
   const handleCopy = (text: string, fieldKey: string) => {

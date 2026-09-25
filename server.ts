@@ -552,6 +552,76 @@ app.post('/api/paystack/initialize', async (req, res) => {
   }
 });
 
+/**
+ * Permanently calculates and saves the 70% Seller / 30% Owner split in Firestore
+ * Updates seller_revenues/{sellerId} and users/{sellerId}
+ */
+const recordSellerRevenueSplit = async (purchaseRecord: any) => {
+  if (!purchaseRecord || !purchaseRecord.sellerId || !db) return;
+  try {
+    const targetSellerId = purchaseRecord.sellerId;
+    const grossAmount = Number(purchaseRecord.paidAmount || purchaseRecord.price || 0);
+    const sellerShare = purchaseRecord.sellerShare !== undefined
+      ? Number(purchaseRecord.sellerShare)
+      : Math.round(grossAmount * 0.70);
+    const ownerShare = purchaseRecord.ownerShare !== undefined
+      ? Number(purchaseRecord.ownerShare)
+      : (grossAmount - sellerShare);
+
+    const revDocRef = doc(db, 'seller_revenues', targetSellerId);
+    const revSnap = await getDoc(revDocRef);
+    const currentData = revSnap.exists() ? revSnap.data() : {};
+    const prevGross = Number(currentData.totalGrossSales) || 0;
+    const prevSellerRev = Number(currentData.totalSellerRevenue) || 0;
+    const prevOwnerComm = Number(currentData.totalOwnerCommission) || 0;
+    const prevCount = Number(currentData.completedSalesCount) || 0;
+    const existingSales = Array.isArray(currentData.sales) ? currentData.sales : [];
+
+    const saleEntry = {
+      orderId: purchaseRecord.id || purchaseRecord.orderId || `ORD_${Date.now()}`,
+      txId: purchaseRecord.transactionId || purchaseRecord.paystackReference || purchaseRecord.id,
+      listingId: purchaseRecord.listingId || '',
+      listingTitle: purchaseRecord.listingTitle || 'Account Listing',
+      grossAmount,
+      sellerShare,
+      ownerShare,
+      sellerPercent: 70,
+      ownerPercent: 30,
+      buyerId: purchaseRecord.buyerId || '',
+      buyerEmail: purchaseRecord.buyerEmail || '',
+      paymentGateway: purchaseRecord.paymentGateway || 'escrow',
+      date: purchaseRecord.purchasedAt || new Date().toISOString()
+    };
+
+    await setDoc(revDocRef, {
+      sellerId: targetSellerId,
+      sellerEmail: purchaseRecord.sellerEmail || '',
+      totalGrossSales: prevGross + grossAmount,
+      totalSellerRevenue: prevSellerRev + sellerShare,
+      totalOwnerCommission: prevOwnerComm + ownerShare,
+      completedSalesCount: prevCount + 1,
+      lastSaleAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      sales: [saleEntry, ...existingSales.filter(s => s.orderId !== saleEntry.orderId).slice(0, 99)]
+    }, { merge: true });
+
+    const sellerUserRef = doc(db, 'users', targetSellerId);
+    const sUserSnap = await getDoc(sellerUserRef);
+    if (sUserSnap.exists()) {
+      const sUserData = sUserSnap.data();
+      await updateDoc(sellerUserRef, {
+        sellerTotalRevenue: (Number(sUserData.sellerTotalRevenue) || 0) + sellerShare,
+        sellerGrossSales: (Number(sUserData.sellerGrossSales) || 0) + grossAmount,
+        sellerOwnerFee: (Number(sUserData.sellerOwnerFee) || 0) + ownerShare,
+        sellerCompletedSales: (Number(sUserData.sellerCompletedSales) || 0) + 1,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  } catch (err: any) {
+    console.warn('[recordSellerRevenueSplit notice]:', err?.message || err);
+  }
+};
+
 // Dedicated server-authoritative LOG order fulfillment function with duplicate prevention
 const fulfillLogOrderAndDeliver = async ({
   orderId,
@@ -861,6 +931,9 @@ const fulfillLogOrderAndDeliver = async ({
       }
 
       // c. Construct purchase record
+      const sellerShare = Math.round(paidAmount * 0.70);
+      const ownerShare = paidAmount - sellerShare;
+
       const purchaseRecord = {
         id: purchaseId,
         orderId: effectiveOrderId,
@@ -885,7 +958,19 @@ const fulfillLogOrderAndDeliver = async ({
         status: 'escrow_holding',
         transferCode: transferCode,
         imageUrl: liveListingData.imageUrl || '',
-        digitalProductDetails: secureDetails
+        digitalProductDetails: secureDetails,
+        sellerShare,
+        ownerShare,
+        sellerPercent: 70,
+        ownerPercent: 30,
+        split: {
+          grossAmount: paidAmount,
+          sellerAmount: sellerShare,
+          ownerAmount: ownerShare,
+          sellerPercent: 70,
+          ownerPercent: 30,
+          calculatedAt: new Date().toISOString()
+        }
       };
 
       // d. Create purchase record in purchases collection
@@ -1013,6 +1098,11 @@ const fulfillLogOrderAndDeliver = async ({
     }
   } catch (inqErr) {
     console.warn('[LOG Fulfillment] Seller inquiry notification notice:', inqErr);
+  }
+
+  // Record 70% Seller / 30% Owner split permanently in database
+  if (purchaseResult?.purchaseRecord) {
+    await recordSellerRevenueSplit(purchaseResult.purchaseRecord);
   }
 
   return {
@@ -1608,16 +1698,14 @@ app.post('/api/wallet/purchase', async (req, res) => {
           }
         }
 
+        const deliveryFieldsArray = Array.isArray(mergedRawItem.deliveryFields)
+          ? mergedRawItem.deliveryFields
+          : (Array.isArray(secData?.deliveryFields) ? secData.deliveryFields : null);
+
         secureDetails = {
           ...dynamicDeliveryFields,
           inventoryId: targetDocId,
-          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
-          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
-          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
-          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
-          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
-          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
-          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
+          ...(deliveryFieldsArray ? { deliveryFields: deliveryFieldsArray } : {})
         };
 
         remainingStock = Math.max(0, availableCount - 1);
@@ -1683,16 +1771,14 @@ app.post('/api/wallet/purchase', async (req, res) => {
           }
         }
 
+        const deliveryFieldsArray = Array.isArray(targetAcc.deliveryFields)
+          ? targetAcc.deliveryFields
+          : null;
+
         secureDetails = {
           ...dynamicDeliveryFields,
           inventoryId: targetAcc.id || `inv_${availableIdx + 1}`,
-          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
-          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
-          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
-          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
-          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
-          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
-          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
+          ...(deliveryFieldsArray ? { deliveryFields: deliveryFieldsArray } : {})
         };
 
         const updatedInventory = [...listingData.inventory];
@@ -1730,15 +1816,13 @@ app.post('/api/wallet/purchase', async (req, res) => {
           }
         }
 
+        const deliveryFieldsArray = Array.isArray(rawDig.deliveryFields)
+          ? rawDig.deliveryFields
+          : null;
+
         secureDetails = Object.keys(dynamicDeliveryFields).length > 0 ? {
           ...dynamicDeliveryFields,
-          accountEmail: dynamicDeliveryFields.accountEmail || dynamicDeliveryFields.email || '',
-          accountPassword: dynamicDeliveryFields.accountPassword || dynamicDeliveryFields.password || '',
-          recoveryInfo: dynamicDeliveryFields.recoveryInfo || dynamicDeliveryFields.notes || '',
-          backupCodes: dynamicDeliveryFields.backupCodes || dynamicDeliveryFields.twoFactorBackupCodes || '',
-          twoFactorSecretKey: dynamicDeliveryFields.twoFactorSecretKey || '',
-          twoFactorBackupCodes: dynamicDeliveryFields.twoFactorBackupCodes || '',
-          additionalInstructions: dynamicDeliveryFields.additionalInstructions || ''
+          ...(deliveryFieldsArray ? { deliveryFields: deliveryFieldsArray } : {})
         } : undefined;
 
         remainingStock = 0;
@@ -1748,6 +1832,9 @@ app.post('/api/wallet/purchase', async (req, res) => {
           status: 'sold'
         });
       }
+
+      const sellerShare = Math.round(price * 0.70);
+      const ownerShare = price - sellerShare;
 
       const purchaseRecord = {
         id: purchaseId,
@@ -1771,7 +1858,19 @@ app.post('/api/wallet/purchase', async (req, res) => {
         status: 'escrow_holding',
         transferCode: transferCode,
         imageUrl: listingData.imageUrl || '',
-        digitalProductDetails: secureDetails
+        digitalProductDetails: secureDetails,
+        sellerShare,
+        ownerShare,
+        sellerPercent: 70,
+        ownerPercent: 30,
+        split: {
+          grossAmount: price,
+          sellerAmount: sellerShare,
+          ownerAmount: ownerShare,
+          sellerPercent: 70,
+          ownerPercent: 30,
+          calculatedAt: new Date().toISOString()
+        }
       };
 
       // c. Deduct user wallet
@@ -1836,6 +1935,11 @@ app.post('/api/wallet/purchase', async (req, res) => {
       }
     } catch (inqErr) {
       console.warn('Seller inquiry notification notice:', inqErr);
+    }
+
+    // Record 70% Seller / 30% Owner split permanently in database
+    if (purchaseResult?.purchaseRecord) {
+      await recordSellerRevenueSplit(purchaseResult.purchaseRecord);
     }
 
     return res.json({

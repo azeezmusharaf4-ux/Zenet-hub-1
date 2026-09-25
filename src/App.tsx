@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, sanitizeFirestorePayload, getSafeIdToken } from './lib/firebase';
 import { isAuthorizedOwner, isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from './lib/authorizedOwners';
+import { recordSellerRevenueInDb } from './lib/revenueSplit';
 import { AccountListing, CategoryType, FilterState, Inquiry, UserProfile, PurchaseRecord, ActiveAppView, WalletTransaction } from './types';
 import { isCategoryMatch } from './utils/category';
 import { safeApiFetch } from './utils/api';
@@ -1350,6 +1351,10 @@ export default function App() {
         };
 
         setPurchases((prev) => [completedRecord, ...prev.filter((p) => p.id !== completedRecord.id)]);
+        // Record 70% Seller / 30% Owner split permanently in database
+        if (completedRecord.sellerId) {
+          recordSellerRevenueInDb(completedRecord).catch((e) => console.warn('Wallet revenue split notice:', e));
+        }
         setSelectedListing(null);
         setBuyingListing(null);
         setIsProcessingPurchase(false);
@@ -1582,6 +1587,9 @@ export default function App() {
       return;
     }
 
+    const sellerShare = Math.round(paidAmount * 0.70);
+    const ownerShare = paidAmount - sellerShare;
+
     const purchaseRecord: PurchaseRecord = {
       id: newPurchaseRef.id,
       listingId: listing.id,
@@ -1602,11 +1610,30 @@ export default function App() {
       status: 'escrow_holding',
       transferCode: transferCode,
       imageUrl: listing.imageUrl,
-      digitalProductDetails: secureDetails || undefined
+      digitalProductDetails: secureDetails || undefined,
+      sellerShare,
+      ownerShare,
+      sellerPercent: 70,
+      ownerPercent: 30,
+      split: {
+        grossAmount: paidAmount,
+        sellerAmount: sellerShare,
+        ownerAmount: ownerShare,
+        sellerPercent: 70,
+        ownerPercent: 30,
+        calculatedAt: new Date().toISOString()
+      }
     };
 
     // 1. Create Purchase doc in Firestore
     await setDoc(newPurchaseRef, purchaseRecord);
+
+    // 1b. Update seller_revenues permanently in database
+    if (listing.sellerId) {
+      recordSellerRevenueInDb(purchaseRecord).catch((revSyncErr) => {
+        console.warn('Seller revenue sync notice:', revSyncErr);
+      });
+    }
 
     // 2. Mark listing as 'sold' in Firestore if it was legacy single-stock
     if (!isMultiStock) {
@@ -2215,16 +2242,21 @@ export default function App() {
   const myListings = useMemo(() => {
     if (!user) return [];
     if (isOwner) {
-      // Verified Owner can view and manage all original owner listings (LAn8Lec9ccT6rGEiDdylF8FfPZZ2)
-      // plus any listings belonging to their own UID or any marketplace listings.
+      // Verified Owner can view and manage all owner listings (including legacy owner UID)
       return listings.filter((item) => 
-        isOwner ||
         item.sellerId === user.uid || 
+        item.createdBy === user.uid ||
+        item.creatorId === user.uid ||
         item.sellerId === 'LAn8Lec9ccT6rGEiDdylF8FfPZZ2' ||
-        isAuthorizedOwnerUid(item.sellerId)
+        isAuthorizedOwnerUid(item.sellerId) ||
+        isAuthorizedOwnerEmail(item.sellerEmail)
       );
     }
-    return listings.filter((item) => item.sellerId === user.uid);
+    return listings.filter((item) => 
+      item.sellerId === user.uid ||
+      item.createdBy === user.uid ||
+      item.creatorId === user.uid
+    );
   }, [listings, user, isOwner]);
 
   const savedListings = useMemo(() => {
