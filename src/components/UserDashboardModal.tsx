@@ -3,6 +3,7 @@ import { User } from 'firebase/auth';
 import { AccountListing, Inquiry, UserProfile, PurchaseRecord, ReferralRecord } from '../types';
 import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { copyToClipboard } from '../utils/clipboard';
+import { ZenetHeader } from './ZenetHeader';
 import { 
   X, 
   Store, 
@@ -44,7 +45,7 @@ import {
 } from 'lucide-react';
 import { db, sanitizeFirestorePayload } from '../lib/firebase';
 import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
-import { AdminWalletsView } from './AdminWalletsView';
+const AdminWalletsView = React.lazy(() => import('./AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
 import { generateUserReferralCode } from './ReferralsView';
 import { HistoryView } from './HistoryView';
 import { ActiveAppView } from '../types';
@@ -265,6 +266,12 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
         className="bg-[#120826] border border-[#2d1952] rounded-2xl sm:rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-purple-100 flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Sticky Global ZENET HUB Header */}
+        <ZenetHeader
+          isStickyInModal={true}
+          onGoHome={onClose}
+          onClose={onClose}
+        />
         
         {/* Top Header */}
         <div className="bg-[#0c051a] px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#251347] flex items-center justify-between shrink-0">
@@ -950,14 +957,6 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                             Re-list Active
                           </button>
                         )}
-
-                        <button
-                          onClick={() => onDeleteListing(listing.id)}
-                          className="p-2 bg-purple-950/60 hover:bg-purple-900 text-purple-300 border border-purple-800/80 rounded-xl transition cursor-pointer"
-                          title="Delete Listing"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -1297,11 +1296,13 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
           {/* ========================================================= */}
           {activeTab === 'wallets' && isOwner && (
             <div className="space-y-6 animate-in fade-in duration-150">
-              <AdminWalletsView
-                user={user}
-                userProfile={userProfile}
-                onBackToMarketplace={() => setActiveTab('profile')}
-              />
+              <React.Suspense fallback={<div className="p-8 text-center text-xs text-slate-400">Loading wallet manager...</div>}>
+                <AdminWalletsView
+                  user={user}
+                  userProfile={userProfile}
+                  onBackToMarketplace={() => setActiveTab('profile')}
+                />
+              </React.Suspense>
             </div>
           )}
 

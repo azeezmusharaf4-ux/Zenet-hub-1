@@ -68,11 +68,16 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
         if (snapshot.exists()) {
           const data = snapshot.data();
           const raw = data?.walletBalance !== undefined ? data?.walletBalance : data?.balance;
-          const parsed = typeof raw === 'number' ? raw : (raw ? Number(raw) : 0);
-          const safe = isNaN(parsed) ? 0 : parsed;
-          setLiveBalance(safe);
-          if (onBalanceChangeRef.current) {
-            onBalanceChangeRef.current(safe);
+          if (raw !== undefined && raw !== null) {
+            const parsed = typeof raw === 'number' ? raw : Number(raw);
+            const safe = isNaN(parsed) ? 0 : parsed;
+            // Never wipe or hide a confirmed balance with 0 if wallet has a positive balance
+            if (safe > 0) {
+              setLiveBalance(safe);
+              if (onBalanceChangeRef.current) {
+                onBalanceChangeRef.current(safe);
+              }
+            }
           }
         }
       },
@@ -87,11 +92,13 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
         if (snapshot.exists()) {
           const data = snapshot.data();
           const raw = data?.walletBalance !== undefined ? data?.walletBalance : data?.balance;
-          const parsed = typeof raw === 'number' ? raw : (raw ? Number(raw) : 0);
-          const safe = isNaN(parsed) ? 0 : parsed;
-          setLiveBalance((prev) => (prev === null ? safe : Math.max(prev, safe)));
-          if (onBalanceChangeRef.current) {
-            onBalanceChangeRef.current(safe);
+          if (raw !== undefined && raw !== null) {
+            const parsed = typeof raw === 'number' ? raw : Number(raw);
+            const safe = isNaN(parsed) ? 0 : parsed;
+            setLiveBalance(safe);
+            if (onBalanceChangeRef.current) {
+              onBalanceChangeRef.current(safe);
+            }
           }
         }
       },
@@ -106,8 +113,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     };
   }, [user?.uid]);
 
-  // Priority: live real-time listener balance > props.walletBalance > 0
-  const currentDisplayBalance = liveBalance !== null ? liveBalance : (walletBalance || 0);
+  // Priority: Authoritative props.walletBalance from App state > liveBalance > 0 (never hide or reset)
+  const currentDisplayBalance = typeof walletBalance === 'number' && !isNaN(walletBalance)
+    ? walletBalance
+    : (liveBalance !== null ? liveBalance : 0);
 
   // 1. Time-aware dynamic greeting
   const greeting = useMemo(() => {
@@ -307,18 +316,20 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
           {/* Service 3: Social Boost */}
           <button
+            type="button"
             id="quick-action-social-boost"
             onClick={() => onSelectView('social-boost')}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px]"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px] touch-manipulation select-none relative z-10"
+            aria-label="Social Boost - Followers, Views & Likes"
           >
-            <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
+            <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs pointer-events-none">
               <TrendingUp className="w-6 h-6" />
             </div>
-            <span className="font-extrabold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#5B4DF5] transition-colors leading-tight">
+            <span className="font-extrabold text-xs sm:text-sm text-[#0F172A] group-hover:text-[#5B4DF5] transition-colors leading-tight pointer-events-none">
               Social Boost
             </span>
-            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-1 leading-snug">
-              Followers & growth
+            <span className="text-[10px] sm:text-xs text-[#64748B] font-medium mt-1 leading-snug pointer-events-none">
+              Followers, Views & Likes
             </span>
           </button>
 

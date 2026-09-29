@@ -135,6 +135,7 @@ export interface UserProfile {
   referralRewardClaimed?: boolean;
   referralCount?: number;
   totalReferralEarnings?: number;
+  withdrawalId?: string;
 }
 
 export interface ReferralRecord {
@@ -444,6 +445,7 @@ export interface SocialBoostPricingSettings {
 export type ActiveAppView = 
   | 'landing'
   | 'marketplace' 
+  | 'tiktok-promotion'
   | 'server-tool'
   | 'virtual-numbers'
   | 'virtual-numbers-2'
@@ -466,7 +468,44 @@ export type ActiveAppView =
   | 'change-password'
   | 'settings' 
   | 'support'
-  | 'admin_wallets';
+  | 'admin_wallets'
+  | 'withdrawals';
+
+export type TikTokServiceType = 'followers' | 'views' | 'likes' | 'comments' | 'shares' | 'favorites';
+
+export interface TikTokServiceConfig {
+  id: TikTokServiceType;
+  name: string;
+  category: 'TikTok';
+  targetType: 'profile_url' | 'video_url';
+  requiresComments?: boolean;
+  pricePer1k: number; // in NGN (e.g. 3500)
+  minQuantity: number;
+  maxQuantity: number;
+  status: 'active' | 'paused';
+  description: string;
+  badge?: string;
+  deliverySpeed?: string;
+  updatedAt?: string;
+}
+
+export interface TikTokPromotionOrder {
+  id: string;
+  orderNumber: string;
+  serviceId: TikTokServiceType;
+  serviceName: string;
+  targetUrl: string;
+  comments?: string[];
+  quantity: number;
+  pricePer1k: number;
+  totalCost: number;
+  userId: string;
+  userEmail?: string;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  createdAt: string;
+  completedAt?: string;
+  notes?: string;
+}
 
 export interface FilterState {
   category: CategoryType;
@@ -479,4 +518,26 @@ export interface FilterState {
   countryFilter?: string; // e.g. "Nigeria", "All"
   sortBy: 'newest' | 'price-asc' | 'price-desc' | 'popular';
 }
+
+export interface WithdrawalRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  withdrawalId: string;
+  amount: number;
+  currency: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  createdAt: string;
+  createdDate: string;
+  createdTime: string;
+  reference: string;
+  notes?: string;
+  updatedAt?: string;
+  adminNotes?: string;
+}
+
 

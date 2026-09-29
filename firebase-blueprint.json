@@ -22,9 +22,36 @@
         "totalPurchasesAmount": { "type": "number" },
         "referralRewardClaimed": { "type": "boolean" },
         "referralCount": { "type": "number" },
-        "totalReferralEarnings": { "type": "number" }
+        "totalReferralEarnings": { "type": "number" },
+        "withdrawalId": { "type": "string" }
       },
       "required": ["uid", "email"]
+    },
+    "withdrawal_requests": {
+      "title": "Withdrawal Requests",
+      "description": "Payout withdrawal requests submitted by authorized website Owner and Administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "withdrawalId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "bankName": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "accountName": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdDate": { "type": "string" },
+        "createdTime": { "type": "string" },
+        "reference": { "type": "string" },
+        "notes": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "adminNotes": { "type": "string" }
+      },
+      "required": ["userId", "withdrawalId", "amount", "bankName", "accountNumber", "accountName", "status"]
     },
     "wallet_transactions": {
       "title": "Wallet Transactions",
@@ -45,7 +72,7 @@
     },
     "listings": {
       "title": "Account Listings",
-      "description": "Social media accounts listed for sale",
+      "description": "Social media accounts and products listed on ZENET HUB. Permanently stored; product deletion is permanently disabled.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -218,7 +245,7 @@
     },
     "zenedUpdateProducts": {
       "title": "ZENED U Update Products",
-      "description": "Products listed in the ZENED U Update marketplace with large visual cards and private delivery details",
+      "description": "Products listed in the ZENED U Update marketplace. Permanently stored; product deletion is permanently disabled.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -386,6 +413,10 @@
     "/listings/{listingId}/inventory/{itemId}/secure/{detailId}": {
       "schema": "listings",
       "description": "Sensitive credentials and backup codes for inventory accounts"
+    },
+    "/withdrawal_requests/{requestId}": {
+      "schema": "withdrawal_requests",
+      "description": "Payout withdrawal requests submitted by authorized website Owner and Administrators"
     }
   }
 }

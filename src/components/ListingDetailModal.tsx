@@ -83,18 +83,6 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
             <h2 className="text-xl font-black text-slate-900 tracking-tight leading-snug">{current.title}</h2>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {onDelete && canDelete && (
-              <button 
-                onClick={() => {
-                  onDelete(current.id);
-                  onClose();
-                }}
-                className="p-1.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition cursor-pointer"
-                title="Delete this listing"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
             <button 
               onClick={onClose}
               className="p-1.5 rounded-full hover:bg-purple-50 text-slate-400 hover:text-slate-900 transition cursor-pointer"
@@ -134,26 +122,13 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
 
          {/* Buttons Grid */}
         <div className="grid grid-cols-2 gap-3 mt-2">
-          {/* Action Button: Delete Stock if authorized, or Close */}
-          {onDelete && canDelete ? (
-            <button
-              onClick={() => {
-                onDelete(current.id);
-                onClose();
-              }}
-              className="w-full flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold text-xs py-3 px-4 rounded-2xl border border-purple-200 transition cursor-pointer shadow-xs active:scale-[0.98]"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete Stock</span>
-            </button>
-          ) : (
-            <button
-              onClick={onClose}
-              className="w-full flex items-center justify-center bg-purple-50 hover:bg-purple-100 text-purple-900 hover:text-purple-950 font-bold text-xs py-3 px-4 rounded-2xl border border-purple-200 transition cursor-pointer shadow-xs active:scale-[0.98]"
-            >
-              <span>Close</span>
-            </button>
-          )}
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="w-full flex items-center justify-center bg-purple-50 hover:bg-purple-100 text-purple-900 hover:text-purple-950 font-bold text-xs py-3 px-4 rounded-2xl border border-purple-200 transition cursor-pointer shadow-xs active:scale-[0.98]"
+          >
+            <span>Close</span>
+          </button>
 
           {/* Buy Button */}
           <button

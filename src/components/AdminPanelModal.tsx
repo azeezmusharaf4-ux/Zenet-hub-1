@@ -10,10 +10,12 @@ import {
   getDocs,
   getDoc
 } from 'firebase/firestore';
-import { db, sanitizeFirestorePayload } from '../lib/firebase';
+import { db, sanitizeFirestorePayload, getSafeIdToken } from '../lib/firebase';
 import { isAuthorizedOwner, isAuthorizedOwnerEmail } from '../lib/authorizedOwners';
 import { safeApiFetch } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
+import { ZenetHeader } from './ZenetHeader';
+import { DEFAULT_TIKTOK_SERVICES } from '../data/tiktokServices';
 import { 
   AccountListing, 
   UserProfile, 
@@ -22,7 +24,9 @@ import {
   ReportItem, 
   SellerReview, 
   CategoryType,
-  InventoryAccountItem
+  InventoryAccountItem,
+  TikTokServiceConfig,
+  WithdrawalRequest
 } from '../types';
 import {
   X,
@@ -61,20 +65,22 @@ import {
   Wallet,
   Plus,
   PlusCircle,
-  Copy
+  Copy,
+  ArrowDownToLine,
+  Building2,
+  Check
 } from 'lucide-react';
-import { AdminWalletsView } from './AdminWalletsView';
+const AdminWalletsView = React.lazy(() => import('./AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
 
 interface AdminPanelModalProps {
   listings: AccountListing[];
   user: User | null;
   userProfile: UserProfile | null;
   onClose: () => void;
-  initialTab?: 'listings' | 'users' | 'admins' | 'wallets' | 'orders' | 'inquiries_reports' | 'reviews' | 'analytics';
+  initialTab?: 'listings' | 'users' | 'admins' | 'wallets' | 'orders' | 'inquiries_reports' | 'reviews' | 'analytics' | 'tiktok_services' | 'withdrawals';
   onApproveListing?: (id: string) => void;
   onRejectListing?: (id: string) => void;
   onToggleFeatured?: (id: string, currentFeatured: boolean) => void;
-  onDeleteListing?: (id: string) => void;
   onUpdateUserProfile?: (profile: UserProfile) => void;
   onUpdateListing?: (updated: AccountListing) => void;
 }
@@ -993,7 +999,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   onApproveListing,
   onRejectListing,
   onToggleFeatured,
-  onDeleteListing,
   onUpdateUserProfile,
   onUpdateListing
 }) => {
@@ -1001,8 +1006,166 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<'listings' | 'users' | 'admins' | 'wallets' | 'orders' | 'inquiries_reports' | 'reviews' | 'analytics'>(initialTab || 'listings');
+  const [activeTab, setActiveTab] = useState<'listings' | 'users' | 'admins' | 'wallets' | 'orders' | 'inquiries_reports' | 'reviews' | 'analytics' | 'tiktok_services' | 'withdrawals'>(initialTab || 'listings');
   const [inquirySubTab, setInquirySubTab] = useState<'inquiries' | 'reports'>('inquiries');
+
+  // Owner/Admin Withdrawal Center State
+  const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
+  const [loadingWithdrawals, setLoadingWithdrawals] = useState(true);
+  const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'approved' | 'completed' | 'rejected'>('all');
+  const [withdrawalSearchId, setWithdrawalSearchId] = useState('');
+  const [verifiedWithdrawalUser, setVerifiedWithdrawalUser] = useState<{
+    user: any;
+    withdrawals: WithdrawalRequest[];
+  } | null>(null);
+  const [isVerifyingId, setIsVerifyingId] = useState(false);
+  const [verifyIdError, setVerifyIdError] = useState<string | null>(null);
+  const [updatingWithdrawalId, setUpdatingWithdrawalId] = useState<string | null>(null);
+
+  // Real-time live listener for all withdrawal requests
+  useEffect(() => {
+    if (!isAdmin) return;
+    setLoadingWithdrawals(true);
+    const colRef = collection(db, 'withdrawal_requests');
+    const unsub = onSnapshot(colRef, (snap) => {
+      const list: WithdrawalRequest[] = [];
+      snap.forEach((d) => {
+        list.push({ id: d.id, ...d.data() } as WithdrawalRequest);
+      });
+      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setWithdrawalRequests(list);
+      setLoadingWithdrawals(false);
+    }, (err) => {
+      console.warn('Error fetching withdrawal requests:', err);
+      setLoadingWithdrawals(false);
+    });
+    return () => unsub();
+  }, [isAdmin]);
+
+  // Verify user by permanent server-generated Withdrawal ID
+  const handleVerifyWithdrawalId = async (idToVerify: string) => {
+    if (!idToVerify || !idToVerify.trim()) {
+      setVerifyIdError('Please enter a Withdrawal ID to search.');
+      setVerifiedWithdrawalUser(null);
+      return;
+    }
+
+    setVerifyIdError(null);
+    setIsVerifyingId(true);
+    setVerifiedWithdrawalUser(null);
+
+    try {
+      const token = await getSafeIdToken(user);
+      const res = await safeApiFetch('/api/withdrawals/verify-id', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({ withdrawalId: idToVerify.trim() })
+      });
+
+      if (res && res.success && res.user) {
+        setVerifiedWithdrawalUser(res);
+      } else {
+        setVerifyIdError(res?.error || 'Invalid Withdrawal ID.');
+      }
+    } catch (err: any) {
+      console.error('Verify error:', err);
+      setVerifyIdError('Invalid Withdrawal ID.');
+    } finally {
+      setIsVerifyingId(false);
+    }
+  };
+
+  // Update withdrawal status (Approve, Complete, or Reject with automatic wallet refund)
+  const handleUpdateWithdrawalStatus = async (requestId: string, newStatus: 'approved' | 'completed' | 'rejected') => {
+    let adminNotes = '';
+    if (newStatus === 'rejected') {
+      const promptNote = prompt('Enter rejection reason (the requested funds will be atomically refunded back to the user wallet):');
+      if (promptNote === null) return; // user cancelled
+      adminNotes = promptNote;
+    }
+
+    setUpdatingWithdrawalId(requestId);
+    try {
+      const token = await getSafeIdToken(user);
+      const res = await safeApiFetch('/api/withdrawals/update-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({
+          requestId,
+          status: newStatus,
+          adminNotes
+        })
+      });
+
+      if (!res?.success) {
+        alert(res?.error || 'Failed to update withdrawal status.');
+      }
+    } catch (err: any) {
+      console.error('Update status error:', err);
+      alert('Error updating status: ' + (err.message || 'Network error'));
+    } finally {
+      setUpdatingWithdrawalId(null);
+    }
+  };
+
+  // TikTok Promotion Services Configuration State
+  const [tikTokServices, setTikTokServices] = useState<TikTokServiceConfig[]>(DEFAULT_TIKTOK_SERVICES);
+  const [isSavingTikTokServices, setIsSavingTikTokServices] = useState(false);
+  const [tikTokSaveSuccess, setTikTokSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    const colRef = collection(db, 'tiktok_promotion_services');
+    const unsub = onSnapshot(colRef, (snap) => {
+      if (!snap.empty) {
+        const map = new Map<string, any>();
+        snap.docs.forEach((d) => map.set(d.id, { id: d.id, ...d.data() }));
+        setTikTokServices((prev) =>
+          prev.map((def) => {
+            const saved = map.get(def.id);
+            return saved ? { ...def, ...saved } : def;
+          })
+        );
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSaveTikTokServices = async () => {
+    setIsSavingTikTokServices(true);
+    setTikTokSaveSuccess(false);
+    try {
+      for (const svc of tikTokServices) {
+        const docRef = doc(db, 'tiktok_promotion_services', svc.id);
+        await setDoc(docRef, {
+          pricePer1k: Number(svc.pricePer1k),
+          minQuantity: Number(svc.minQuantity),
+          maxQuantity: Number(svc.maxQuantity),
+          status: svc.status,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+
+      await safeApiFetch('/api/tiktok-promotion/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ services: tikTokServices })
+      });
+
+      setTikTokSaveSuccess(true);
+      setTimeout(() => setTikTokSaveSuccess(false), 4000);
+    } catch (err: any) {
+      console.error('Error saving TikTok promotion services:', err);
+      alert('Failed to save TikTok service rates: ' + (err?.message || 'Network error'));
+    } finally {
+      setIsSavingTikTokServices(false);
+    }
+  };
 
   // Owner Admin Management State
   const [adminSearch, setAdminSearch] = useState('');
@@ -1063,7 +1226,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [isSavingListing, setIsSavingListing] = useState(false);
   const [replyingInquiry, setReplyingInquiry] = useState<Inquiry | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
-  const [confirmProductDeleteId, setConfirmProductDeleteId] = useState<string | null>(null);
 
   // Role-Based Access Control Verification
   // Note: isOwner and isAdmin are declared at top of component
@@ -1274,25 +1436,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     const creatorEmail = (listingItem.creatorEmail || listingItem.sellerEmail || '').toLowerCase();
     const currentEmail = (user.email || '').toLowerCase();
     return creatorId === user.uid || (!!currentEmail && !!creatorEmail && creatorEmail === currentEmail);
-  };
-
-  const handleDeleteListingItem = async (id: string) => {
-    const targetItem = listings.find(l => l.id === id);
-    if (!targetItem) return;
-    if (!canManageListing(targetItem)) {
-      alert('Permission Denied: Admins can only delete products that they personally created.');
-      return;
-    }
-    if (onDeleteListing) {
-      onDeleteListing(id);
-    } else {
-      try {
-        const docRef = doc(db, 'listings', id);
-        await deleteDoc(docRef);
-      } catch (e) {
-        console.error('Delete listing failed:', e);
-      }
-    }
   };
 
   const handleSaveListingEdits = async (editingItem: AccountListing) => {
@@ -1705,6 +1848,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         className="relative w-full max-w-6xl bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh] text-[#0F172A]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Sticky Global ZENET HUB Header */}
+        <ZenetHeader
+          isStickyInModal={true}
+          onGoHome={onClose}
+          onClose={onClose}
+          isAdmin={true}
+        />
         
         {/* Top Header Bar */}
         <div className="bg-white px-5 py-3.5 border-b border-[#EBE7F7] flex items-center justify-between shrink-0 flex-wrap gap-2">
@@ -1839,6 +1989,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               </button>
 
               <button
+                id="admin-tab-withdrawals"
+                onClick={() => setActiveTab('withdrawals')}
+                className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
+                  activeTab === 'withdrawals'
+                    ? 'border-[#5B4DF5] text-[#5B4DF5] font-extrabold'
+                    : 'border-transparent text-slate-500 hover:text-[#5B4DF5]'
+                }`}
+              >
+                <ArrowDownToLine className="w-4 h-4 text-[#5B4DF5]" />
+                <span>Withdrawal Requests ({withdrawalRequests.length})</span>
+                {withdrawalRequests.filter(w => w.status === 'pending').length > 0 && (
+                  <span className="bg-[#5B4DF5] text-white font-black text-[10px] px-1.5 py-0.2 rounded-full">
+                    {withdrawalRequests.filter(w => w.status === 'pending').length}
+                  </span>
+                )}
+              </button>
+
+              <button
                 onClick={() => setActiveTab('inquiries_reports')}
                 className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   activeTab === 'inquiries_reports'
@@ -1877,6 +2045,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               >
                 <BarChart3 className="w-4 h-4" />
                 <span>Analytics</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('tiktok_services')}
+                className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
+                  activeTab === 'tiktok_services'
+                    ? 'border-purple-500 text-purple-400 font-extrabold'
+                    : 'border-transparent text-slate-500 hover:text-purple-400'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <span>Social Boost Rates</span>
               </button>
             </div>
 
@@ -2088,37 +2268,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                   title={item.featured ? 'Remove from Featured' : 'Feature on Homepage'}
                                 >
                                   <Flame className="w-4 h-4" />
-                                </button>
-                              )}
-
-                              {confirmProductDeleteId === item.id ? (
-                                <div className="flex items-center gap-1 bg-purple-50 border border-purple-300 px-2 py-1 rounded-xl">
-                                  <span className="text-[9px] text-purple-900 font-bold mr-1">Confirm?</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleDeleteListingItem(item.id);
-                                      setConfirmProductDeleteId(null);
-                                    }}
-                                    className="px-1.5 py-0.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-[9px] rounded transition cursor-pointer"
-                                  >
-                                    Yes
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmProductDeleteId(null)}
-                                    className="px-1.5 py-0.5 bg-white hover:bg-purple-50 text-slate-800 border border-purple-200 font-extrabold text-[9px] rounded transition cursor-pointer"
-                                  >
-                                    No
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => setConfirmProductDeleteId(item.id)}
-                                  className="p-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl border border-purple-200 transition cursor-pointer"
-                                  title="Delete Listing"
-                                >
-                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
                             </>
@@ -2442,11 +2591,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             {/* TAB: WALLET OVERRIDE (OWNER ONLY) */}
             {activeTab === 'wallets' && isOwner && (
               <div className="flex-1 overflow-y-auto p-5">
-                <AdminWalletsView
-                  user={user}
-                  userProfile={userProfile}
-                  onBackToMarketplace={() => setActiveTab('listings')}
-                />
+                <React.Suspense fallback={<div className="p-8 text-center text-xs text-slate-400">Loading wallet manager...</div>}>
+                  <AdminWalletsView
+                    user={user}
+                    userProfile={userProfile}
+                    onBackToMarketplace={() => setActiveTab('listings')}
+                  />
+                </React.Suspense>
               </div>
             )}
 
@@ -2608,6 +2759,389 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB: WITHDRAWAL REQUESTS CENTER (OWNER & ADMIN) */}
+            {activeTab === 'withdrawals' && (
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {/* Stats Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Requests</span>
+                    <p className="text-2xl font-black text-white">{withdrawalRequests.length}</p>
+                    <span className="text-[10px] text-slate-500 font-semibold">All submitted payouts</span>
+                  </div>
+
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Pending Payouts</span>
+                    <p className="text-2xl font-black text-amber-400">
+                      ₦{withdrawalRequests.filter(w => w.status === 'pending').reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0).toLocaleString()}
+                    </p>
+                    <span className="text-[10px] text-amber-500/80 font-semibold">
+                      {withdrawalRequests.filter(w => w.status === 'pending').length} requests awaiting review
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Completed Payouts</span>
+                    <p className="text-2xl font-black text-emerald-400">
+                      ₦{withdrawalRequests.filter(w => w.status === 'completed').reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0).toLocaleString()}
+                    </p>
+                    <span className="text-[10px] text-emerald-500/80 font-semibold">
+                      {withdrawalRequests.filter(w => w.status === 'completed').length} fulfilled transfers
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-[11px] font-bold text-[#A78BFA] uppercase tracking-wider">Total Volume</span>
+                    <p className="text-2xl font-black text-[#DDD6FE]">
+                      ₦{withdrawalRequests.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0).toLocaleString()}
+                    </p>
+                    <span className="text-[10px] text-slate-500 font-semibold">Lifetime withdrawal requests</span>
+                  </div>
+                </div>
+
+                {/* Section 1: Verify by Permanent Withdrawal ID */}
+                <div className="bg-slate-950 p-4.5 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-[#A78BFA]" />
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                      Verify User by Permanent Withdrawal ID
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Query user records and legitimate withdrawal history directly from the database using their unique permanent ID.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        value={withdrawalSearchId}
+                        onChange={(e) => {
+                          setWithdrawalSearchId(e.target.value);
+                          if (verifyIdError) setVerifyIdError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleVerifyWithdrawalId(withdrawalSearchId);
+                          }
+                        }}
+                        placeholder="Enter Withdrawal ID (e.g. ZN-WID-4A82F1)"
+                        className="w-full bg-slate-900 border border-slate-800 focus:border-[#7C3AED] text-white text-xs font-mono font-bold pl-9 pr-4 py-2.5 rounded-xl outline-none transition"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleVerifyWithdrawalId(withdrawalSearchId)}
+                      disabled={isVerifyingId || !withdrawalSearchId.trim()}
+                      className="px-4 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] disabled:bg-slate-800 disabled:text-slate-500 text-white font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      {isVerifyingId ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Verify ID</span>
+                        </>
+                      )}
+                    </button>
+                    {(verifiedWithdrawalUser || verifyIdError) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerifiedWithdrawalUser(null);
+                          setVerifyIdError(null);
+                          setWithdrawalSearchId('');
+                        }}
+                        className="px-3 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-bold rounded-xl border border-slate-800 transition cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Verification Error Notice */}
+                  {verifyIdError && (
+                    <div className="p-3 bg-rose-950/60 border border-rose-800 text-rose-300 text-xs font-bold rounded-xl flex items-center gap-2 animate-in fade-in duration-200">
+                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <span>{verifyIdError}</span>
+                    </div>
+                  )}
+
+                  {/* Verified User Details Card */}
+                  {verifiedWithdrawalUser && (
+                    <div className="p-4 bg-slate-900 border border-[#7C3AED]/40 rounded-xl space-y-3 animate-in zoom-in-95 duration-200">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold">
+                            <Check className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-extrabold text-white">
+                                {verifiedWithdrawalUser.user.displayName}
+                              </span>
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded font-black uppercase">
+                                VERIFIED IDENTITY
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 font-mono">
+                              {verifiedWithdrawalUser.user.email}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 uppercase font-bold block">Available Balance</span>
+                          <span className="text-sm font-black text-emerald-400">
+                            ₦{Number(verifiedWithdrawalUser.user.walletBalance || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex justify-between items-center">
+                          <span className="text-slate-400 font-semibold">Permanent Withdrawal ID:</span>
+                          <span className="font-mono font-black text-[#A78BFA]">{verifiedWithdrawalUser.user.withdrawalId}</span>
+                        </div>
+                        <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex justify-between items-center">
+                          <span className="text-slate-400 font-semibold">User Role:</span>
+                          <span className="font-black uppercase text-amber-400">{verifiedWithdrawalUser.user.role}</span>
+                        </div>
+                      </div>
+
+                      {/* User's Verified Withdrawal Records */}
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
+                          Verified Withdrawal Records ({verifiedWithdrawalUser.withdrawals.length})
+                        </span>
+                        {verifiedWithdrawalUser.withdrawals.length === 0 ? (
+                          <p className="text-xs text-slate-500 italic p-2 bg-slate-950 rounded-lg border border-slate-800">
+                            No past withdrawal requests associated with this account.
+                          </p>
+                        ) : (
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
+                            {verifiedWithdrawalUser.withdrawals.map((w) => (
+                              <div key={w.id} className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-xs flex items-center justify-between">
+                                <div>
+                                  <span className="font-mono font-bold text-white block">{w.id}</span>
+                                  <span className="text-[10px] text-slate-400">{w.createdDate} at {w.createdTime} • {w.bankName}</span>
+                                </div>
+                                <div className="text-right flex items-center gap-2">
+                                  <span className="font-black text-emerald-400">₦{w.amount.toLocaleString()}</span>
+                                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                    w.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300' :
+                                    w.status === 'approved' ? 'bg-blue-500/20 text-blue-300' :
+                                    w.status === 'rejected' ? 'bg-rose-500/20 text-rose-300' :
+                                    'bg-amber-500/20 text-amber-300'
+                                  }`}>
+                                    {w.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: Live Withdrawal Requests List */}
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <ArrowDownToLine className="w-4 h-4 text-[#A78BFA]" />
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                        Live Payout Requests ({withdrawalRequests.length})
+                      </h4>
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {(['all', 'pending', 'approved', 'completed', 'rejected'] as const).map((filterKey) => (
+                        <button
+                          key={filterKey}
+                          type="button"
+                          onClick={() => setWithdrawalFilter(filterKey)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold capitalize transition cursor-pointer ${
+                            withdrawalFilter === filterKey
+                              ? 'bg-[#7C3AED] text-white shadow-xs'
+                              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                          }`}
+                        >
+                          {filterKey} ({filterKey === 'all' ? withdrawalRequests.length : withdrawalRequests.filter(w => w.status === filterKey).length})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* List Container */}
+                  {loadingWithdrawals ? (
+                    <div className="py-12 text-center text-xs text-slate-400 font-semibold space-y-2">
+                      <div className="w-6 h-6 border-2 border-[#7C3AED]/30 border-t-[#7C3AED] rounded-full animate-spin mx-auto"></div>
+                      <p>Loading real-time withdrawal requests...</p>
+                    </div>
+                  ) : withdrawalRequests.filter(w => withdrawalFilter === 'all' || w.status === withdrawalFilter).length === 0 ? (
+                    <div className="py-12 text-center text-xs text-slate-500 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                      <p className="font-bold">No withdrawal requests found matching '{withdrawalFilter}'.</p>
+                      <p className="text-[11px] text-slate-600">New requests submitted by owners/admins will update live here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {withdrawalRequests
+                        .filter(w => withdrawalFilter === 'all' || w.status === withdrawalFilter)
+                        .map((w) => {
+                          const isProcessing = updatingWithdrawalId === w.id;
+                          return (
+                            <div
+                              key={w.id}
+                              className="p-4 bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-2xl space-y-3 transition"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-900 pb-2.5">
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-xs font-black text-white">{w.id}</span>
+                                    <span className="text-[10px] font-mono text-[#A78BFA] bg-purple-950/60 px-2 py-0.5 rounded border border-purple-900/60">
+                                      ID: {w.withdrawalId}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                                    <span className="font-bold text-slate-300">{w.userName}</span>
+                                    <span>•</span>
+                                    <span className="font-mono text-[11px]">{w.userEmail}</span>
+                                  </div>
+                                </div>
+
+                                <div className="text-right flex items-center gap-3">
+                                  <div className="text-right">
+                                    <span className="text-base font-black text-emerald-400 block">
+                                      ₦{w.amount.toLocaleString()}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                      {w.createdDate} at {w.createdTime}
+                                    </span>
+                                  </div>
+                                  <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
+                                    w.status === 'completed' ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800' :
+                                    w.status === 'approved' ? 'bg-blue-950/80 text-blue-400 border-blue-800' :
+                                    w.status === 'rejected' ? 'bg-rose-950/80 text-rose-400 border-rose-800' :
+                                    'bg-amber-950/80 text-amber-400 border-amber-800'
+                                  }`}>
+                                    {w.status}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Bank Destination Details */}
+                              <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                                <div>
+                                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Bank Name</span>
+                                  <span className="font-bold text-slate-200">{w.bankName}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Account Number</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono font-bold text-white">{w.accountNumber}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(w.accountNumber)}
+                                      className="text-slate-400 hover:text-white transition"
+                                      title="Copy Account Number"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Account Name</span>
+                                  <span className="font-bold text-slate-200">{w.accountName}</span>
+                                </div>
+                              </div>
+
+                              {w.notes && (
+                                <p className="text-[11px] text-slate-400 italic">
+                                  <span className="font-semibold text-slate-500">User note:</span> {w.notes}
+                                </p>
+                              )}
+
+                              {w.adminNotes && (
+                                <div className="p-2 bg-rose-950/40 border border-rose-900/50 rounded-lg text-[11px] text-rose-300">
+                                  <span className="font-bold">Rejection note:</span> {w.adminNotes}
+                                </div>
+                              )}
+
+                              {/* Action Buttons */}
+                              <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-slate-900">
+                                {w.status === 'pending' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={isProcessing}
+                                      onClick={() => handleUpdateWithdrawalStatus(w.id, 'approved')}
+                                      className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 text-xs font-bold rounded-xl transition cursor-pointer"
+                                    >
+                                      Approve Payout
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isProcessing}
+                                      onClick={() => handleUpdateWithdrawalStatus(w.id, 'completed')}
+                                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-black rounded-xl transition cursor-pointer shadow-sm"
+                                    >
+                                      Mark Completed
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isProcessing}
+                                      onClick={() => handleUpdateWithdrawalStatus(w.id, 'rejected')}
+                                      className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900/80 text-rose-400 border border-rose-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                                    >
+                                      Reject & Refund
+                                    </button>
+                                  </>
+                                )}
+
+                                {w.status === 'approved' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={isProcessing}
+                                      onClick={() => handleUpdateWithdrawalStatus(w.id, 'completed')}
+                                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-black rounded-xl transition cursor-pointer shadow-sm"
+                                    >
+                                      Mark Completed
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isProcessing}
+                                      onClick={() => handleUpdateWithdrawalStatus(w.id, 'rejected')}
+                                      className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900/80 text-rose-400 border border-rose-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                                    >
+                                      Reject & Refund
+                                    </button>
+                                  </>
+                                )}
+
+                                {(w.status === 'completed' || w.status === 'rejected') && (
+                                  <span className="text-[11px] text-slate-500 font-medium">
+                                    Processed on {w.updatedAt ? new Date(w.updatedAt).toLocaleDateString() : w.createdDate}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -3011,6 +3545,123 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                 </div>
 
+              </div>
+            )}
+
+            {/* TAB 7: TIKTOK PROMOTION RATES & LIMITS CONFIGURATION */}
+            {activeTab === 'tiktok_services' && (
+              <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                  <div>
+                    <h3 className="font-extrabold text-white text-base flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-purple-400" />
+                      <span>Social Boost Rates & Limits Controls</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Configure live price per 1,000 units, minimum & maximum order quantities, and active/paused service status for each TikTok service.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleSaveTikTokServices}
+                    disabled={isSavingTikTokServices}
+                    className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs px-5 py-2.5 rounded-xl transition cursor-pointer shadow-lg active:scale-95 disabled:opacity-50"
+                  >
+                    {isSavingTikTokServices ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    <span>{isSavingTikTokServices ? 'Saving...' : 'Save Service Rates'}</span>
+                  </button>
+                </div>
+
+                {tikTokSaveSuccess && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold p-3.5 rounded-2xl flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Social Boost service rates and limits updated successfully in database!</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {tikTokServices.map((svc, idx) => (
+                    <div key={`${svc.id}-${idx}`} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3.5 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-black text-white text-sm">{svc.name}</h4>
+                          <span className="text-[10px] text-purple-300 font-semibold uppercase tracking-wider block">
+                            Target: {svc.targetType === 'profile_url' ? 'Profile URL' : 'Video URL'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTikTokServices((prev) =>
+                              prev.map((s) => s.id === svc.id ? { ...s, status: s.status === 'active' ? 'paused' : 'active' } : s)
+                            );
+                          }}
+                          className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border transition cursor-pointer ${
+                            svc.status === 'active'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                          }`}
+                        >
+                          {svc.status}
+                        </button>
+                      </div>
+
+                      <div className="space-y-2.5 text-xs">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                            Price per 1,000 Units (₦)
+                          </label>
+                          <input
+                            type="number"
+                            value={svc.pricePer1k}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setTikTokServices((prev) =>
+                                prev.map((s) => s.id === svc.id ? { ...s, pricePer1k: val } : s)
+                              );
+                            }}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                              Min Quantity
+                            </label>
+                            <input
+                              type="number"
+                              value={svc.minQuantity}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setTikTokServices((prev) =>
+                                  prev.map((s) => s.id === svc.id ? { ...s, minQuantity: val } : s)
+                                );
+                              }}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                              Max Quantity
+                            </label>
+                            <input
+                              type="number"
+                              value={svc.maxQuantity}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setTikTokServices((prev) =>
+                                  prev.map((s) => s.id === svc.id ? { ...s, maxQuantity: val } : s)
+                                );
+                              }}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </>

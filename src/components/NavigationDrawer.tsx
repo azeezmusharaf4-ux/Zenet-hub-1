@@ -13,7 +13,8 @@ import {
   Wallet,
   Sparkles,
   Smartphone,
-  Download
+  Download,
+  TrendingUp
 } from 'lucide-react';
 import { UserProfile, ActiveAppView } from '../types';
 import { isAuthorizedOwner } from '../lib/authorizedOwners';
@@ -64,6 +65,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
 
   const menuItems = [
     { id: 'marketplace' as ActiveAppView, label: 'Marketplace', icon: ShoppingCart },
+    { id: 'social-boost' as ActiveAppView, label: 'Social Boost', icon: TrendingUp },
     { id: 'profile' as ActiveAppView, label: 'Dashboard', icon: Home },
     { id: 'orders' as ActiveAppView, label: 'History', icon: Scroll, badge: ordersCount > 0 ? String(ordersCount) : undefined },
     ...(isAdmin ? [{ id: 'messages' as ActiveAppView, label: 'Notifications & Messages', icon: MessageSquare, badge: unreadMessagesCount > 0 ? String(unreadMessagesCount) : undefined }] : []),

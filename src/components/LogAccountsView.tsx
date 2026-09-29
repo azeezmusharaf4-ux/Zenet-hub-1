@@ -250,7 +250,7 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
               onToggleSave={onToggleSave}
               onViewSellerProfile={onViewSellerProfile}
               onDelete={onDeleteListing}
-              canDelete={isAuthorizedOwner(null, userProfile) || userProfile?.role === 'owner' || userProfile?.role === 'admin' || (userProfile?.role === 'seller' && userProfile.uid === item.sellerId)}
+              canDelete={false}
             />
           ))}
         </div>

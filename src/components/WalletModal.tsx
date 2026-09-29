@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { WalletTransaction } from '../types';
 import { safeApiFetch, formatPaystackPublicKey } from '../utils/api';
+import { ZenetHeader } from './ZenetHeader';
 import { 
   X, 
   Wallet, 
@@ -20,7 +23,7 @@ interface WalletModalProps {
   onClose: () => void;
   user: User | null;
   walletBalance: number;
-  onAddFunds?: (amount: number, gateway: string, reference?: string) => void;
+  onAddFunds?: (amount: number, gateway: string, reference?: string, newBalance?: number) => void;
   transactions: WalletTransaction[];
   initialTab?: 'fund' | 'history';
 }
@@ -178,12 +181,36 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             
             // Strictly verify via backend endpoint before crediting
             safeApiFetch(`/api/paystack/verify/${encodeURIComponent(actualRef)}?reference=${encodeURIComponent(actualRef)}&userId=${encodeURIComponent(user.uid)}&isWalletFunding=true`)
-              .then((verifyData) => {
+              .then(async (verifyData) => {
                 if (verifyData && (verifyData.verified || verifyData.status === 'success' || verifyData.alreadyProcessed)) {
-                  const credited = verifyData.amount || amount;
-                  setSuccessMessage(`Success! ₦${Number(credited).toLocaleString()} NGN has been verified and credited to your wallet.`);
+                  const credited = Number(verifyData.amount) || amount;
+                  const newBalance = typeof verifyData.newBalance === 'number' ? verifyData.newBalance : (walletBalance + credited);
+
+                  // Immediately save the verified amount directly to user's wallet in the database
+                  if (db && user?.uid) {
+                    try {
+                      await Promise.all([
+                        setDoc(doc(db, 'wallets', user.uid), {
+                          userId: user.uid,
+                          userEmail: user.email || '',
+                          walletBalance: newBalance,
+                          balance: newBalance,
+                          updatedAt: new Date().toISOString()
+                        }, { merge: true }),
+                        setDoc(doc(db, 'users', user.uid), {
+                          walletBalance: newBalance,
+                          balance: newBalance,
+                          updatedAt: new Date().toISOString()
+                        }, { merge: true })
+                      ]);
+                    } catch (dbErr) {
+                      console.warn('[WalletModal] Client-side wallet persistence notice:', dbErr);
+                    }
+                  }
+
+                  setSuccessMessage(`Success! ₦${credited.toLocaleString()} NGN has been verified and credited to your wallet.`);
                   if (onAddFunds) {
-                    onAddFunds(Number(credited), 'paystack', actualRef);
+                    onAddFunds(credited, 'paystack', actualRef, newBalance);
                   }
                 } else {
                   setErrorMessage(verifyData?.error || verifyData?.message || 'Payment verification failed on Paystack.');
@@ -276,7 +303,14 @@ export const WalletModal: React.FC<WalletModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden w-full h-full min-h-[100dvh]">
+    <div className="fixed inset-0 z-40 bg-white flex flex-col overflow-hidden w-full h-full min-h-[100dvh]">
+      {/* Global Sticky ZENET HUB Header */}
+      <ZenetHeader
+        isStickyInModal={true}
+        onGoHome={onClose}
+        onClose={onClose}
+      />
+
       {/* Inner Container: Full width on mobile, centered and neatly bounded to max-w-xl on desktop so it never gets too big */}
       <div className="w-full max-w-xl mx-auto flex flex-col flex-1 h-full min-h-0 bg-white">
         
@@ -334,8 +368,8 @@ export const WalletModal: React.FC<WalletModalProps> = ({
           </button>
         </div>
 
-        {/* Main Body (Smooth Scrollable Area) */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs sm:text-sm">
+        {/* Main Body (Smooth Scrollable Area with pb-24 on mobile to accommodate fixed bottom nav) */}
+        <div className="p-4 sm:p-6 pb-24 md:pb-6 overflow-y-auto space-y-5 flex-1 text-xs sm:text-sm">
 
           {/* TAB 1: FUND WALLET VIA PAYSTACK CHECKOUT */}
           {activeTab === 'fund' && (

@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  UserCheck
+  UserCheck,
+  ArrowDownToLine
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { isAuthorizedOwner } from '../lib/authorizedOwners';
@@ -35,6 +36,7 @@ interface ProfileViewProps {
   onOpenAdmin?: () => void;
   onOpenSellerDashboard?: () => void;
   onOpenZenetUpdateGenerator?: () => void;
+  onOpenWithdraw?: () => void;
   onLogout: () => void;
   onOpenAuth: (mode: 'login' | 'signup') => void;
 }
@@ -52,6 +54,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenAdmin,
   onOpenSellerDashboard,
   onOpenZenetUpdateGenerator,
+  onOpenWithdraw,
   onLogout,
   onOpenAuth
 }) => {
@@ -204,6 +207,36 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
           </div>
         </button>
+
+        {/* Option: Withdraw (Exclusively Owner & Authorized Admins) */}
+        {isAdmin && (
+          <button
+            id="profile-opt-withdraw"
+            onClick={() => onOpenWithdraw ? onOpenWithdraw() : onSelectView('withdrawals')}
+            className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-[#FAF9FF] transition cursor-pointer active:bg-[#F3EEFF]"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-8 h-8 rounded-xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center">
+                <ArrowDownToLine className="w-4 h-4 stroke-[2.4]" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[#0F172A]">Withdraw</span>
+                  <span className="text-[10px] font-extrabold bg-[#EDE9FE] text-[#5B4DF5] px-1.5 py-0.2 rounded-md">
+                    ADMIN
+                  </span>
+                </div>
+                <span className="text-[11px] text-[#64748B] font-medium">Payout earnings to bank account</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-[#0F172A]">
+                ₦{walletBalance.toLocaleString()}
+              </span>
+              <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
+            </div>
+          </button>
+        )}
 
         {/* Option: Order History (moved from bottom nav) */}
         <button

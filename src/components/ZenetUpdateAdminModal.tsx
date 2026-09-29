@@ -64,7 +64,6 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
   const [activeTab, setActiveTab] = useState<'add' | 'manage'>('add');
   const [showSecretLink, setShowSecretLink] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Form states
   const [productName, setProductName] = useState('');
@@ -352,19 +351,6 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
       setStatusMessage({ type: 'error', text: err?.message || 'Failed to save product. Please try again.' });
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleDeleteProduct = async (id: string, name: string) => {
-    if (!isOwner && !isAdmin) return;
-
-    try {
-      await deleteDoc(doc(db, 'zenedUpdateProducts', id));
-      setDeleteConfirmId(null);
-      setStatusMessage({ type: 'success', text: `Product "${name}" deleted successfully.` });
-    } catch (err: any) {
-      console.error('Error deleting product:', err);
-      setStatusMessage({ type: 'error', text: 'Failed to delete product.' });
     }
   };
 
@@ -766,40 +752,15 @@ export const ZenetUpdateAdminModal: React.FC<ZenetUpdateAdminModalProps> = ({
                           )}
                         </div>
 
-                        {/* Actions */}
+                        {/* Actions: Edit only (Product deletion is permanently removed for all admins) */}
                         <div className="flex items-center space-x-2 pt-1 border-t border-slate-100">
                           <button
                             onClick={() => handleStartEdit(item)}
-                            className="flex-1 py-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-blue-600 border border-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                            className="w-full py-1.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-blue-600 border border-slate-200 text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
-                            <span>Edit</span>
+                            <span>Edit Product</span>
                           </button>
-
-                          {deleteConfirmId === item.id ? (
-                            <div className="flex items-center space-x-1">
-                              <button
-                                onClick={() => handleDeleteProduct(item.id, item.name)}
-                                className="py-1.5 px-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold transition cursor-pointer"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirmId(null)}
-                                className="py-1.5 px-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold cursor-pointer hover:bg-slate-200"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setDeleteConfirmId(item.id)}
-                              className="p-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-600 border border-pink-200 transition cursor-pointer"
-                              title="Delete Product"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>

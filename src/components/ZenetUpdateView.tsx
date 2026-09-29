@@ -359,20 +359,6 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
     }
   };
 
-  // Delete Product
-  const handleDeleteProduct = async (productId: string, productName: string) => {
-    if (!window.confirm(`Are you sure you want to permanently delete "${productName}"?`)) {
-      return;
-    }
-
-    try {
-      await deleteDoc(doc(db, 'zenedUpdateProducts', productId));
-    } catch (err: any) {
-      console.error('Error deleting product:', err);
-      alert('Failed to delete product: ' + (err?.message || 'Error occurred'));
-    }
-  };
-
   // Trigger Buy Flow
   const handleInitiateBuy = (prod: ZenedUpdateProduct) => {
     if (!user) {
@@ -795,16 +781,6 @@ export const ZenetUpdateView: React.FC<ZenetUpdateViewProps> = ({
                             title="Edit Product"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteProduct(product.id, product.name);
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-pink-50 text-slate-700 hover:text-pink-600 transition cursor-pointer"
-                            title="Delete Product"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )}

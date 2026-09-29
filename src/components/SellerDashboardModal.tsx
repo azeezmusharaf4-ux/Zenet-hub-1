@@ -25,6 +25,7 @@ import {
 import { db } from '../lib/firebase';
 import { doc, updateDoc, setDoc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { calculateRevenueSplit, syncHistoricalSellerRevenue } from '../lib/revenueSplit';
+import { ZenetHeader } from './ZenetHeader';
 
 const EditListingModal = React.lazy(() => import('./EditListingModal').then(m => ({ default: m.EditListingModal })));
 
@@ -62,7 +63,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   onUpdateListing
 }) => {
   const [activeTab, setActiveTab] = useState<SellerDashboardTab>('overview');
-  const [showAllListings, setShowAllListings] = useState(false);
+  const [inventoryTab, setInventoryTab] = useState<'active' | 'sold'>('active');
 
   // Editing listing modal state
   const [editingListing, setEditingListing] = useState<AccountListing | null>(null);
@@ -135,16 +136,48 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
     (inq) => isOwnerUser || inq.sellerId === user.uid || myListings.some((l) => l.id === inq.listingId)
   );
 
+  // Categorize listings permanently into ACTIVE LOGS (1) and SOLD ACCOUNTS (2)
+  // Status is stored persistently in the database so it remains correct after refresh, logout/login, and deployment
+  const isListingSold = (l: AccountListing) => {
+    const s = (l.status || '').toLowerCase().trim();
+    if (s === 'sold') return true;
+    if (sellerPurchases.some((p) => p.listingId === l.id)) return true;
+    if (s !== 'active' && l.stockCount === 0 && (l.stock === 0 || l.stock === undefined)) return true;
+    return false;
+  };
+
+  // 1. ACTIVE LOGS: Only listings whose status is ACTIVE. New unsold listings automatically appear here.
+  const activeListingsList = useMemo(() => {
+    return myListings.filter((l) => !isListingSold(l));
+  }, [myListings, sellerPurchases]);
+
+  // 2. SOLD ACCOUNTS: Only listings whose status is SOLD. Once a listing is sold, it automatically appears and remains here.
+  const soldListingsList = useMemo(() => {
+    return myListings.filter((l) => isListingSold(l));
+  }, [myListings, sellerPurchases]);
+
+  // Ensure persistent status storage in Firestore so it remains correct after refresh, logout/login, and deployment
+  useEffect(() => {
+    if (!myListings.length) return;
+    myListings.forEach((l) => {
+      const sold = (l.status || '').toLowerCase().trim() === 'sold' || sellerPurchases.some((p) => p.listingId === l.id);
+      if (sold && l.status !== 'sold') {
+        const listingRef = doc(db, 'listings', l.id);
+        setDoc(listingRef, { status: 'sold', stock: 0, stockCount: 0 }, { merge: true }).catch((err) => {
+          console.warn('Listing status persistence update notice:', err);
+        });
+      }
+    });
+  }, [myListings, sellerPurchases]);
+
   // 1. TOTAL LISTINGS = the total number of listings created by that seller, including Active and Sold
   const totalListings = myListings.length;
 
   // 2. ACTIVE INVENTORY = seller’s currently available listings
-  const activeListings = myListings.filter(
-    (l) => l.status === 'active' || (l.status !== 'sold' && (l.stockCount === undefined || l.stockCount > 0))
-  ).length;
+  const activeListings = activeListingsList.length;
 
   // 3. COMPLETED SALES = seller’s successfully completed sales
-  const soldListingsFromListings = myListings.filter((l) => l.status === 'sold').length;
+  const soldListingsFromListings = soldListingsList.length;
   const completedSalesCount = Math.max(
     soldListingsFromListings,
     revenueRecord?.completedSalesCount || 0,
@@ -156,7 +189,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   const dbSeller = Number(revenueRecord?.totalSellerRevenue) || 0;
 
   const purchasesGross = sellerPurchases.reduce((sum, p) => sum + (Number(p.paidAmount || p.price) || 0), 0);
-  const listingsSoldGross = myListings.filter((l) => l.status === 'sold').reduce((sum, l) => sum + (Number(l.price) || 0), 0);
+  const listingsSoldGross = soldListingsList.reduce((sum, l) => sum + (Number(l.price) || 0), 0);
 
   const totalGrossSales = Math.max(dbGross, purchasesGross, listingsSoldGross);
 
@@ -259,8 +292,6 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [revenueRecord?.sales, sellerPurchases, myListings]);
 
-  const displayedListings = showAllListings ? myListings : myListings.slice(0, 4);
-
   // Handle Inquiry Reply submission in Firestore
   const handleSendReply = async (inquiry: Inquiry) => {
     const text = replyTexts[inquiry.id];
@@ -293,6 +324,15 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
         className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-slate-800 flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Sticky Global ZENET HUB Header */}
+        <ZenetHeader
+          isStickyInModal={true}
+          onGoHome={onClose}
+          onClose={onClose}
+          isAdmin={true}
+          onOpenCreateListing={onOpenCreateListing}
+        />
+
         {/* Top Header */}
         <div className="bg-white px-4 sm:px-6 py-3.5 sm:py-4 border-b border-purple-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -468,63 +508,161 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                 </button>
               </div>
 
-              {/* Recent Account Inventory Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                    <Store className="w-4 h-4 text-purple-600" />
-                    Recent Listed Inventory ({displayedListings.length})
+              {/* Recent Account Inventory Section: Separated into ACTIVE LOGS and SOLD LOGS */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between border-b border-purple-100 pb-2.5">
+                  <h4 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                    <Store className="w-4.5 h-4.5 text-purple-600" />
+                    <span>Recent Listed Inventory</span>
                   </h4>
-                  {myListings.length > 4 && (
-                    <button
-                      onClick={() => setShowAllListings((prev) => !prev)}
-                      className="text-xs text-purple-600 hover:text-purple-800 font-bold transition cursor-pointer"
-                    >
-                      {showAllListings ? 'Show Recent (4) ↑' : `View All (${myListings.length}) →`}
-                    </button>
-                  )}
+                  <span className="text-xs text-slate-500 font-semibold">
+                    {activeListingsList.length} Active • {soldListingsList.length} Sold
+                  </span>
                 </div>
 
-                {myListings.length === 0 ? (
-                  <div className="text-center py-10 bg-purple-50/30 border border-dashed border-purple-200 rounded-2xl p-6 space-y-3">
-                    <Store className="w-8 h-8 text-slate-400 mx-auto opacity-50" />
-                    <h5 className="text-slate-900 font-extrabold text-sm">No accounts listed yet</h5>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      Click the "+ Create New Account Listing" button above to list your first account for sale!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {displayedListings.map((listing) => (
-                      <div key={listing.id} className="bg-white border border-purple-100 p-4 rounded-2xl space-y-2.5 shadow-xs hover:border-purple-300 transition">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                            {listing.category}
-                          </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                            listing.status === 'sold'
-                              ? 'bg-purple-50 text-slate-500 border border-purple-200'
-                              : 'bg-purple-50 text-purple-700 border border-purple-200'
-                          }`}>
-                            {listing.status}
-                          </span>
-                        </div>
+                {/* Status Tabs: ACTIVE LOGS & SOLD LOGS */}
+                <div className="flex items-center gap-2 p-1.5 bg-slate-100/90 border border-slate-200/80 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setInventoryTab('active')}
+                    className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
+                      inventoryTab === 'active'
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-purple-700 hover:bg-white/80'
+                    }`}
+                  >
+                    <CheckCircle2 className={`w-3.5 h-3.5 ${inventoryTab === 'active' ? 'text-white' : 'text-purple-600'}`} />
+                    <span>ACTIVE LOGS</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-black ${
+                      inventoryTab === 'active' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700'
+                    }`}>
+                      {activeListingsList.length}
+                    </span>
+                  </button>
 
-                        <h5 className="font-bold text-slate-900 text-sm line-clamp-1">{listing.title}</h5>
-                        <div className="flex items-center justify-between text-xs pt-2 border-t border-purple-50">
-                          <span className="font-black text-purple-600 font-mono">₦{Number(listing.price).toLocaleString()}</span>
-                          <button
-                            onClick={() => setEditingListing(listing)}
-                            className="text-xs text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-purple-600" />
-                            <span>Edit Listing</span>
-                          </button>
-                        </div>
+                  <button
+                    type="button"
+                    onClick={() => setInventoryTab('sold')}
+                    className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
+                      inventoryTab === 'sold'
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-purple-700 hover:bg-white/80'
+                    }`}
+                  >
+                    <Tag className={`w-3.5 h-3.5 ${inventoryTab === 'sold' ? 'text-white' : 'text-slate-500'}`} />
+                    <span>SOLD LOGS</span>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-black ${
+                      inventoryTab === 'sold' ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {soldListingsList.length}
+                    </span>
+                  </button>
+                </div>
+
+                {/* 1. ACTIVE LOGS TAB: Displays ALL active listings */}
+                {inventoryTab === 'active' && (
+                  <div className="space-y-3 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="tracking-wide">ACTIVE LOGS ({activeListingsList.length})</span>
+                      </h4>
+                      <span className="text-xs text-slate-500 font-semibold">
+                        {activeListingsList.length} {activeListingsList.length === 1 ? 'Listing' : 'Listings'}
+                      </span>
+                    </div>
+
+                    {activeListingsList.length === 0 ? (
+                      <div className="text-center py-8 bg-purple-50/30 border border-dashed border-purple-200 rounded-2xl p-6 space-y-2">
+                        <Store className="w-7 h-7 text-slate-400 mx-auto opacity-50" />
+                        <h5 className="text-slate-900 font-extrabold text-sm">No active listings</h5>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          New unsold listings automatically appear here. Click "+ Create New Account Listing" above to list an account!
+                        </p>
                       </div>
-                    ))}
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {activeListingsList.map((listing) => (
+                          <div key={listing.id} className="bg-white border border-purple-100 p-4 rounded-2xl space-y-2.5 shadow-xs hover:border-purple-300 transition">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                                {listing.category}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {listing.status || 'ACTIVE'}
+                              </span>
+                            </div>
+
+                            <h5 className="font-bold text-slate-900 text-sm line-clamp-1">{listing.title}</h5>
+                            <div className="flex items-center justify-between text-xs pt-2 border-t border-purple-50">
+                              <span className="font-black text-purple-600 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                              <button
+                                onClick={() => setEditingListing(listing)}
+                                className="text-xs text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-purple-600" />
+                                <span>Edit Listing</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
+
+                {/* 2. SOLD LOGS TAB: Displays ALL sold listings */}
+                {inventoryTab === 'sold' && (
+                  <div className="space-y-3 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                        <span className="tracking-wide">SOLD LOGS ({soldListingsList.length})</span>
+                      </h4>
+                      <span className="text-xs text-slate-500 font-semibold">
+                        {soldListingsList.length} {soldListingsList.length === 1 ? 'Listing' : 'Listings'}
+                      </span>
+                    </div>
+
+                    {soldListingsList.length === 0 ? (
+                      <div className="text-center py-8 bg-slate-50/70 border border-dashed border-slate-200 rounded-2xl p-6 space-y-2">
+                        <Tag className="w-7 h-7 text-slate-400 mx-auto opacity-50" />
+                        <h5 className="text-slate-900 font-extrabold text-sm">No sold logs yet</h5>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          Once an account listing is sold, it automatically appears here and remains permanently recorded.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {soldListingsList.map((listing) => (
+                          <div key={listing.id} className="bg-white border border-purple-100 p-4 rounded-2xl space-y-2.5 shadow-xs hover:border-purple-300 transition">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                                {listing.category}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-600 border border-slate-200">
+                                {listing.status || 'SOLD'}
+                              </span>
+                            </div>
+
+                            <h5 className="font-bold text-slate-900 text-sm line-clamp-1">{listing.title}</h5>
+                            <div className="flex items-center justify-between text-xs pt-2 border-t border-purple-50">
+                              <span className="font-black text-purple-600 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                              <button
+                                onClick={() => setEditingListing(listing)}
+                                className="text-xs text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-purple-600" />
+                                <span>Edit Listing</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
 
             </div>

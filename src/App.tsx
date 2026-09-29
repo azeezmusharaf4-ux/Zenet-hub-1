@@ -30,21 +30,7 @@ import { SafetyBanner } from './components/SafetyBanner';
 import { CategoryFilter } from './components/CategoryFilter';
 import { FeaturedListings } from './components/FeaturedListings';
 import { ListingCard } from './components/ListingCard';
-import { ListingDetailModal } from './components/ListingDetailModal';
-import { CreateListingModal } from './components/CreateListingModal';
-import { AuthModal } from './components/AuthModal';
-import { ContactSellerModal } from './components/ContactSellerModal';
-import { UserDashboardModal, DashboardTab } from './components/UserDashboardModal';
-import { SellerDashboardModal } from './components/SellerDashboardModal';
-import { SellerProfileModal } from './components/SellerProfileModal';
-import { PaymentModal } from './components/PaymentModal';
-import { InsufficientBalanceModal } from './components/InsufficientBalanceModal';
-import { PaymentSuccessModal } from './components/PaymentSuccessModal';
-import { BuyNowConfirmModal } from './components/BuyNowConfirmModal';
-import { PurchaseProcessingModal } from './components/PurchaseProcessingModal';
 import { NavigationDrawer } from './components/NavigationDrawer';
-import { PurchaseDetailsModal } from './components/PurchaseDetailsModal';
-import { WalletModal } from './components/WalletModal';
 import { CategoriesView } from './components/CategoriesView';
 import { SupportView } from './components/SupportView';
 import { LandingPage } from './components/LandingPage';
@@ -57,11 +43,26 @@ import { ProfileView } from './components/ProfileView';
 import { EditProfileView } from './components/EditProfileView';
 import { ReferralsView, generateUserReferralCode } from './components/ReferralsView';
 import { ChangePasswordView } from './components/ChangePasswordView';
-import { LogoutConfirmModal } from './components/LogoutConfirmModal';
 import { safeLocalStorage } from './utils/storage';
 import { ServiceUnavailableView } from './components/ServiceUnavailableView';
+import type { DashboardTab } from './components/UserDashboardModal';
 
-// Code-split heavy views & modals for lighter initial bundle
+// Code-split heavy views & modals for lighter initial bundle and fast mobile load
+const ListingDetailModal = React.lazy(() => import('./components/ListingDetailModal').then(m => ({ default: m.ListingDetailModal })));
+const CreateListingModal = React.lazy(() => import('./components/CreateListingModal').then(m => ({ default: m.CreateListingModal })));
+const AuthModal = React.lazy(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })));
+const ContactSellerModal = React.lazy(() => import('./components/ContactSellerModal').then(m => ({ default: m.ContactSellerModal })));
+const UserDashboardModal = React.lazy(() => import('./components/UserDashboardModal').then(m => ({ default: m.UserDashboardModal })));
+const SellerDashboardModal = React.lazy(() => import('./components/SellerDashboardModal').then(m => ({ default: m.SellerDashboardModal })));
+const SellerProfileModal = React.lazy(() => import('./components/SellerProfileModal').then(m => ({ default: m.SellerProfileModal })));
+const PaymentModal = React.lazy(() => import('./components/PaymentModal').then(m => ({ default: m.PaymentModal })));
+const InsufficientBalanceModal = React.lazy(() => import('./components/InsufficientBalanceModal').then(m => ({ default: m.InsufficientBalanceModal })));
+const PaymentSuccessModal = React.lazy(() => import('./components/PaymentSuccessModal').then(m => ({ default: m.PaymentSuccessModal })));
+const BuyNowConfirmModal = React.lazy(() => import('./components/BuyNowConfirmModal').then(m => ({ default: m.BuyNowConfirmModal })));
+const PurchaseProcessingModal = React.lazy(() => import('./components/PurchaseProcessingModal').then(m => ({ default: m.PurchaseProcessingModal })));
+const PurchaseDetailsModal = React.lazy(() => import('./components/PurchaseDetailsModal').then(m => ({ default: m.PurchaseDetailsModal })));
+const WalletModal = React.lazy(() => import('./components/WalletModal').then(m => ({ default: m.WalletModal })));
+const LogoutConfirmModal = React.lazy(() => import('./components/LogoutConfirmModal').then(m => ({ default: m.LogoutConfirmModal })));
 const AdminPanelModal = React.lazy(() => import('./components/AdminPanelModal').then(m => ({ default: m.AdminPanelModal })));
 const VirtualNumbersView = React.lazy(() => import('./components/VirtualNumbersView').then(m => ({ default: m.VirtualNumbersView })));
 const SocialBoostView = React.lazy(() => import('./components/SocialBoostView').then(m => ({ default: m.SocialBoostView })));
@@ -71,6 +72,7 @@ const SocialBoost2View = React.lazy(() => import('./components/SocialBoost2View'
 const AdminWalletsView = React.lazy(() => import('./components/AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
 const ZenetUpdateModal = React.lazy(() => import('./components/ZenetUpdateModal').then(m => ({ default: m.ZenetUpdateModal })));
 const ZenetUpdateAdminModal = React.lazy(() => import('./components/ZenetUpdateAdminModal').then(m => ({ default: m.ZenetUpdateAdminModal })));
+const WithdrawModal = React.lazy(() => import('./components/WithdrawModal').then(m => ({ default: m.WithdrawModal })));
 
 const LazyViewFallback: React.FC = () => (
   <div className="w-full min-h-[360px] flex flex-col items-center justify-center p-8 text-center text-[#5B4DF5] animate-in fade-in duration-200">
@@ -218,6 +220,44 @@ const ListingSkeleton = React.memo(() => (
   </div>
 ));
 
+// Helper to read cached wallet balance safely
+const getCachedWalletBalance = (targetUid?: string): number => {
+  try {
+    const cachedUid = safeLocalStorage.getItem('zenet_wallet_user_id');
+    const cachedProfile = safeLocalStorage.getItem('zenet_cached_user_profile');
+    let profileUid = '';
+    if (cachedProfile) {
+      try {
+        const p = JSON.parse(cachedProfile);
+        profileUid = p?.uid || '';
+      } catch {}
+    }
+
+    const effectiveUid = targetUid || cachedUid || profileUid;
+    if (targetUid && cachedUid && cachedUid !== targetUid) {
+      return 0; // different user
+    }
+
+    const cachedBalStr = safeLocalStorage.getItem('zenet_cached_wallet_balance');
+    if (cachedBalStr !== null && cachedBalStr !== undefined && cachedBalStr !== '') {
+      const num = Number(cachedBalStr);
+      if (!isNaN(num) && num >= 0) return num;
+    }
+
+    if (cachedProfile) {
+      try {
+        const p = JSON.parse(cachedProfile);
+        if (!targetUid || p.uid === effectiveUid) {
+          const raw = p.walletBalance !== undefined ? p.walletBalance : p.balance;
+          const pBal = Number(raw ?? 0);
+          if (!isNaN(pBal) && pBal >= 0) return pBal;
+        }
+      } catch {}
+    }
+  } catch {}
+  return 0;
+};
+
 export default function App() {
   // Auth state with instant cache hydration
   const [user, setUser] = useState<User | null>(null);
@@ -243,6 +283,11 @@ export default function App() {
     try {
       if (profile) {
         safeLocalStorage.setItem('zenet_cached_user_profile', JSON.stringify(profile));
+        const pBal = Number(profile.walletBalance ?? (profile as any).balance ?? 0);
+        if (!isNaN(pBal) && pBal > 0) {
+          safeLocalStorage.setItem('zenet_cached_wallet_balance', String(pBal));
+          safeLocalStorage.setItem('zenet_wallet_user_id', profile.uid);
+        }
       } else {
         safeLocalStorage.removeItem('zenet_cached_user_profile');
       }
@@ -296,6 +341,7 @@ export default function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeView, setActiveView] = useState<ActiveAppView>('marketplace');
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isZenetUpdateModalOpen, setIsZenetUpdateModalOpen] = useState(false);
   const [isZenetUpdateAdminModalOpen, setIsZenetUpdateAdminModalOpen] = useState(false);
   const [selectedPurchaseDetails, setSelectedPurchaseDetails] = useState<PurchaseRecord | null>(null);
@@ -334,6 +380,8 @@ export default function App() {
   const executeLogout = async () => {
     safeLocalStorage.removeItem('zenet_last_seen_timestamp');
     safeLocalStorage.removeItem('zenet_cached_user_profile');
+    safeLocalStorage.removeItem('zenet_cached_wallet_balance');
+    safeLocalStorage.removeItem('zenet_wallet_user_id');
     setSessionExpiredNotice('');
     try {
       await signOut(auth);
@@ -342,6 +390,8 @@ export default function App() {
     }
     setUser(null);
     setAndCacheUserProfile(null);
+    setWalletBalance(0);
+    setLatestWalletBalance(0);
     setActiveView('marketplace');
     setIsLogoutConfirmOpen(false);
   };
@@ -355,16 +405,9 @@ export default function App() {
   const [selectedSeller, setSelectedSeller] = useState<{ id: string; name: string } | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
 
-  // Wallet State
+  // Wallet State with immediate persistent cache hydration
   const [walletBalance, setWalletBalance] = useState<number>(() => {
-    try {
-      const cached = safeLocalStorage.getItem('zenet_cached_user_profile');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return typeof parsed.walletBalance === 'number' ? parsed.walletBalance : 0;
-      }
-    } catch {}
-    return 0;
+    return getCachedWalletBalance();
   });
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [unreadTicketsCount, setUnreadTicketsCount] = useState<number>(0);
@@ -418,9 +461,9 @@ export default function App() {
     };
   }, [user?.uid]);
 
-  // Sync walletBalance with userProfile stably without triggering re-render loops
+  // Sync walletBalance with userProfile stably without resetting to 0 or causing re-render loops
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile && user) {
       const raw = (userProfile as any).walletBalance !== undefined 
         ? (userProfile as any).walletBalance 
         : (userProfile as any).balance;
@@ -428,9 +471,11 @@ export default function App() {
         ? raw 
         : (raw ? Number(raw) : 0);
       const safeBalance = isNaN(balance) ? 0 : balance;
-      setWalletBalance((prev) => (prev !== safeBalance ? safeBalance : prev));
-    } else if (!user) {
-      setWalletBalance((prev) => (prev !== 0 ? 0 : prev));
+      if (safeBalance > 0) {
+        setWalletBalance((prev) => (prev !== safeBalance ? Math.max(prev, safeBalance) : prev));
+        safeLocalStorage.setItem('zenet_cached_wallet_balance', String(safeBalance));
+        safeLocalStorage.setItem('zenet_wallet_user_id', user.uid);
+      }
     }
   }, [userProfile?.walletBalance, (userProfile as any)?.balance, user?.uid]);
 
@@ -455,52 +500,65 @@ export default function App() {
 
       let confirmedBal: number | null = null;
 
-      if (uSnap && uSnap.exists()) {
-        const data = uSnap.data() as UserProfile;
-        setAndCacheUserProfile(data);
-        const rawBal = (data as any)?.walletBalance !== undefined ? (data as any)?.walletBalance : (data as any)?.balance;
-        const numBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
-        confirmedBal = isNaN(numBal) ? 0 : numBal;
-      }
-
       if (wSnap && wSnap.exists()) {
         const wData = wSnap.data();
         const rawWBal = wData?.walletBalance !== undefined ? wData?.walletBalance : wData?.balance;
-        const numWBal = typeof rawWBal === 'number' ? rawWBal : (rawWBal ? Number(rawWBal) : 0);
-        const safeWBal = isNaN(numWBal) ? 0 : numWBal;
-        confirmedBal = confirmedBal !== null ? Math.max(confirmedBal, safeWBal) : safeWBal;
+        const numWBal = typeof rawWBal === 'number' ? rawWBal : (rawWBal !== undefined ? Number(rawWBal) : null);
+        if (numWBal !== null && !isNaN(numWBal)) {
+          confirmedBal = numWBal;
+        }
       }
 
-      if (confirmedBal !== null) {
+      if (uSnap && uSnap.exists()) {
+        const data = uSnap.data() as UserProfile;
+        const rawBal = (data as any)?.walletBalance !== undefined ? (data as any)?.walletBalance : (data as any)?.balance;
+        const numBal = typeof rawBal === 'number' ? rawBal : (rawBal !== undefined ? Number(rawBal) : null);
+        if (numBal !== null && !isNaN(numBal)) {
+          confirmedBal = confirmedBal !== null ? Math.max(confirmedBal, numBal) : numBal;
+        }
+        setAndCacheUserProfile({
+          ...data,
+          ...(confirmedBal !== null ? { walletBalance: confirmedBal, balance: confirmedBal } : {})
+        });
+      }
+
+      if (confirmedBal !== null && !isNaN(confirmedBal)) {
         setWalletBalance(confirmedBal);
         setLatestWalletBalance(confirmedBal);
+        safeLocalStorage.setItem('zenet_cached_wallet_balance', String(confirmedBal));
+        safeLocalStorage.setItem('zenet_wallet_user_id', user.uid);
+
+        // Keep both database records strictly in sync with the authoritative balance
+        const uCurrent = uSnap?.exists() ? Number((uSnap.data() as any).walletBalance ?? (uSnap.data() as any).balance) : null;
+        const wCurrent = wSnap?.exists() ? Number(wSnap.data().walletBalance ?? wSnap.data().balance) : null;
+        if (uCurrent !== confirmedBal && uSnap?.exists()) {
+          setDoc(userRef, { walletBalance: confirmedBal, balance: confirmedBal, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+        }
+        if (wCurrent !== confirmedBal) {
+          setDoc(walletRef, { userId: user.uid, walletBalance: confirmedBal, balance: confirmedBal, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+        }
       }
     } catch (err) {
       console.warn('Error refreshing profile and balance:', err);
     }
   }, [user?.uid]);
 
-  const handleAddWalletFunds = async (amount: number, gateway: string, reference?: string) => {
+  const handleAddWalletFunds = async (amount: number, gateway: string, reference?: string, verifiedNewBalance?: number) => {
     if (!user) return;
     const numAmount = typeof amount === 'number' ? amount : Number(amount) || 0;
 
-    // Verification and crediting are authoritatively executed by server Paystack verify endpoint (single source of truth)
+    let targetBalance: number | null = typeof verifiedNewBalance === 'number' ? verifiedNewBalance : null;
+    let credited = numAmount;
+
+    // Verification and crediting are authoritatively executed by server Paystack verify endpoint
     if (reference) {
       try {
         const verifyRes = await safeApiFetch(`/api/paystack/verify/${encodeURIComponent(reference)}?reference=${encodeURIComponent(reference)}&userId=${encodeURIComponent(user.uid)}&isWalletFunding=true`);
         if (verifyRes && (verifyRes.verified || verifyRes.status === 'success' || verifyRes.alreadyProcessed)) {
           console.log('[Wallet Funding] Verified and balance synced from server.');
-          const credited = verifyRes.amount || numAmount;
+          credited = Number(verifyRes.amount) || numAmount;
           if (typeof verifyRes.newBalance === 'number') {
-            setWalletBalance(verifyRes.newBalance);
-            setLatestWalletBalance(verifyRes.newBalance);
-          }
-          if (credited > 0) {
-            setPaymentSuccessToast({
-              amount: credited,
-              newBalance: verifyRes.newBalance,
-              reference
-            });
+            targetBalance = verifyRes.newBalance;
           }
         }
       } catch (vErr) {
@@ -508,7 +566,43 @@ export default function App() {
       }
     }
 
-    // Authoritative Firestore refresh - single source of truth, no duplicate client writes
+    const newB = targetBalance !== null ? targetBalance : (walletBalance + credited);
+
+    setWalletBalance(newB);
+    setLatestWalletBalance(newB);
+    safeLocalStorage.setItem('zenet_cached_wallet_balance', String(newB));
+    safeLocalStorage.setItem('zenet_wallet_user_id', user.uid);
+    setUserProfile((prev) => prev ? { ...prev, walletBalance: newB, balance: newB } : prev);
+
+    // Immediately persist to both Firestore collections from client
+    try {
+      await Promise.all([
+        setDoc(doc(db, 'wallets', user.uid), {
+          userId: user.uid,
+          userEmail: user.email || '',
+          walletBalance: newB,
+          balance: newB,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }),
+        setDoc(doc(db, 'users', user.uid), {
+          walletBalance: newB,
+          balance: newB,
+          updatedAt: new Date().toISOString()
+        }, { merge: true })
+      ]);
+    } catch (dbErr) {
+      console.warn('[Wallet Funding] Direct Firestore write notice:', dbErr);
+    }
+
+    if (credited > 0) {
+      setPaymentSuccessToast({
+        amount: credited,
+        newBalance: newB,
+        reference: reference || `REF_${Date.now()}`
+      });
+    }
+
+    // Authoritative Firestore refresh to guarantee perfect sync
     await refreshUserProfileAndBalance();
   };
 
@@ -542,8 +636,9 @@ export default function App() {
       'history'
     ];
 
-    const targetView = opts.view 
-      ? (VALID_PAGE_VIEWS.includes(opts.view) ? opts.view : 'marketplace')
+    const requestedView: ActiveAppView | undefined = (opts.view as any) === 'tiktok-promotion' ? 'social-boost' : opts.view;
+    const targetView = requestedView 
+      ? (VALID_PAGE_VIEWS.includes(requestedView) ? requestedView : 'marketplace')
       : (VALID_PAGE_VIEWS.includes(activeView) ? activeView : 'marketplace');
 
     const targetCategory = opts.category !== undefined ? opts.category : filters.category;
@@ -632,11 +727,20 @@ export default function App() {
   }, [activeView]);
 
   // Select Drawer View action
-  const handleSelectView = (view: ActiveAppView) => {
+  const handleSelectView = (rawView: ActiveAppView) => {
     setIsDrawerOpen(false);
+
+    const view: ActiveAppView = (rawView as any) === 'tiktok-promotion' ? 'social-boost' : rawView;
 
     if (view === 'marketplace') {
       handleBackToMarketplace();
+      return;
+    }
+
+    if (view === 'withdrawals') {
+      if (isAdmin) {
+        setIsWithdrawModalOpen(true);
+      }
       return;
     }
 
@@ -727,7 +831,8 @@ export default function App() {
     const handlePopState = () => {
       const url = new URL(window.location.href);
 
-      const vParam = url.searchParams.get('view') as ActiveAppView;
+      const rawVParam = url.searchParams.get('view') as any;
+      const vParam: ActiveAppView = rawVParam === 'tiktok-promotion' ? 'social-boost' : rawVParam;
       const isWalletsUrl = url.pathname === '/admin/wallets' || url.pathname === '/admin/wallet' || url.searchParams.get('tab') === 'wallets';
       const validViews: ActiveAppView[] = [
         'marketplace',
@@ -820,7 +925,8 @@ export default function App() {
       if (paramRef) {
         safeLocalStorage.setItem('pending_referral_code', paramRef.trim().toUpperCase());
       }
-      const vParam = urlParams.get('view') as ActiveAppView;
+      const rawVParam = urlParams.get('view') as any;
+      const vParam: ActiveAppView = rawVParam === 'tiktok-promotion' ? 'social-boost' : rawVParam;
       const validViews: ActiveAppView[] = [
         'marketplace',
         'social-boost',
@@ -852,6 +958,7 @@ export default function App() {
         // Immediately hydrate fallback profile if empty so user is never stuck on synchronization screen
         setUserProfile((prev) => {
           if (prev && prev.uid === currentUser.uid) return prev;
+          const cachedBal = getCachedWalletBalance(currentUser.uid);
           const fallbackProfile: UserProfile = {
             uid: currentUser.uid,
             email: currentUser.email || '',
@@ -860,13 +967,15 @@ export default function App() {
             role: (isAuthorizedOwnerEmail(currentUser.email) || isAuthorizedOwnerUid(currentUser.uid)) ? 'owner' : 'buyer',
             status: 'active',
             createdAt: new Date().toISOString(),
-            walletBalance: 0
+            walletBalance: cachedBal,
+            balance: cachedBal
           };
           return fallbackProfile;
         });
 
         // Sync user profile to Firestore & fetch role asynchronously in background
         const userRef = doc(db, 'users', currentUser.uid);
+        const walletRef = doc(db, 'wallets', currentUser.uid);
         let verifiedDepositBal: number | undefined;
 
         // Check for return from Paystack checkout redirect
@@ -917,6 +1026,29 @@ export default function App() {
                   verifiedDepositBal = newBal;
                   setWalletBalance(newBal);
                   setLatestWalletBalance(newBal);
+                  safeLocalStorage.setItem('zenet_cached_wallet_balance', String(newBal));
+                  safeLocalStorage.setItem('zenet_wallet_user_id', currentUser.uid);
+                  setUserProfile((prev) => prev ? { ...prev, walletBalance: newBal, balance: newBal } : prev);
+
+                  // Immediately persist verified balance directly to user's wallet in the database
+                  try {
+                    await Promise.all([
+                      setDoc(doc(db, 'wallets', currentUser.uid), {
+                        userId: currentUser.uid,
+                        userEmail: currentUser.email || '',
+                        walletBalance: newBal,
+                        balance: newBal,
+                        updatedAt: new Date().toISOString()
+                      }, { merge: true }),
+                      setDoc(doc(db, 'users', currentUser.uid), {
+                        walletBalance: newBal,
+                        balance: newBal,
+                        updatedAt: new Date().toISOString()
+                      }, { merge: true })
+                    ]);
+                  } catch (pSaveErr) {
+                    console.warn('[Paystack Auto-Verify] Database persistence notice:', pSaveErr);
+                  }
                 }
 
                 if (creditedAmount > 0) {
@@ -974,7 +1106,12 @@ export default function App() {
         }
 
         try {
-          const docSnap = await getDoc(userRef).catch(() => null);
+          // Always load from user's actual database/wallet record
+          const [docSnap, walletSnap] = await Promise.all([
+            getDoc(userRef).catch(() => null),
+            getDoc(walletRef).catch(() => null)
+          ]);
+
           let assignedRole: 'owner' | 'admin' | 'seller' | 'buyer' = 'buyer';
           let existingData: Partial<UserProfile> = {};
 
@@ -1039,14 +1176,31 @@ export default function App() {
             }
           }
 
+          // Load authoritative database wallet record: check dedicated wallets collection, user doc, or verified deposit
+          let dbWalletBal: number | null = null;
+          if (walletSnap && walletSnap.exists()) {
+            const wData = walletSnap.data();
+            const rawW = wData?.walletBalance !== undefined ? wData?.walletBalance : wData?.balance;
+            const numW = typeof rawW === 'number' ? rawW : (rawW !== undefined ? Number(rawW) : null);
+            if (numW !== null && !isNaN(numW)) dbWalletBal = numW;
+          }
+
+          let dbUserBal: number | null = null;
           const rawExistingBal = (existingData as any)?.walletBalance !== undefined 
             ? (existingData as any)?.walletBalance 
             : (existingData as any)?.balance;
-          const numExistingBal = typeof rawExistingBal === 'number' ? rawExistingBal : (rawExistingBal ? Number(rawExistingBal) : 0);
-          const safeExistingBal = Math.max(
-            isNaN(numExistingBal) ? 0 : numExistingBal,
-            typeof verifiedDepositBal === 'number' ? verifiedDepositBal : 0
-          );
+          const numExistingBal = typeof rawExistingBal === 'number' ? rawExistingBal : (rawExistingBal !== undefined ? Number(rawExistingBal) : null);
+          if (numExistingBal !== null && !isNaN(numExistingBal)) dbUserBal = numExistingBal;
+
+          const candidateBals = [
+            typeof verifiedDepositBal === 'number' ? verifiedDepositBal : null,
+            dbWalletBal,
+            dbUserBal
+          ].filter((b): b is number => b !== null && !isNaN(b));
+
+          const safeExistingBal = candidateBals.length > 0
+            ? Math.max(...candidateBals)
+            : getCachedWalletBalance(currentUser.uid);
 
           const profileData: UserProfile = {
             uid: currentUser.uid,
@@ -1073,10 +1227,28 @@ export default function App() {
           setAndCacheUserProfile(profileData);
           setWalletBalance(safeExistingBal);
           setLatestWalletBalance(safeExistingBal);
+          safeLocalStorage.setItem('zenet_cached_wallet_balance', String(safeExistingBal));
+          safeLocalStorage.setItem('zenet_wallet_user_id', currentUser.uid);
+
+          // Synchronize database records so neither document is ever missing or stale
+          const uCurrent = docSnap?.exists() ? Number((docSnap.data() as any).walletBalance ?? (docSnap.data() as any).balance) : null;
+          const wCurrent = walletSnap?.exists() ? Number(walletSnap.data().walletBalance ?? walletSnap.data().balance) : null;
+
+          if (wCurrent !== safeExistingBal || !walletSnap?.exists()) {
+            setDoc(walletRef, {
+              userId: currentUser.uid,
+              userEmail: currentUser.email || '',
+              walletBalance: safeExistingBal,
+              balance: safeExistingBal,
+              updatedAt: new Date().toISOString()
+            }, { merge: true }).catch(() => {});
+          }
+
           setAuthMode(null);
           setSessionExpiredNotice('');
           const urlParams = new URLSearchParams(window.location.search);
-          const vParam = urlParams.get('view') as ActiveAppView;
+          const rawVParam = urlParams.get('view') as any;
+          const vParam: ActiveAppView = rawVParam === 'tiktok-promotion' ? 'social-boost' : rawVParam;
           const validViews: ActiveAppView[] = [
             'marketplace',
             'social-boost',
@@ -1091,10 +1263,11 @@ export default function App() {
           } else {
             setActiveView('marketplace');
           }
+
           const profilePayload = { ...profileData };
-          // CRITICAL: NEVER overwrite walletBalance or balance during auth profile background sync
-          delete (profilePayload as any).walletBalance;
-          delete (profilePayload as any).balance;
+          // Preserve the verified wallet balance on the user record in Firestore
+          profilePayload.walletBalance = safeExistingBal;
+          profilePayload.balance = safeExistingBal;
           await setDoc(userRef, sanitizeFirestorePayload(profilePayload), { merge: true }).catch((docErr) => {
             console.warn('User profile background sync notice:', docErr);
           });
@@ -1129,15 +1302,37 @@ export default function App() {
     const userRef = doc(db, 'users', user.uid);
     const walletRef = doc(db, 'wallets', user.uid);
 
+    let activeBal = getCachedWalletBalance(user.uid);
+
+    const applyVerifiedBalance = (newBal: number) => {
+      if (isNaN(newBal) || newBal < 0) return;
+      activeBal = newBal;
+      setWalletBalance(newBal);
+      setLatestWalletBalance(newBal);
+      safeLocalStorage.setItem('zenet_cached_wallet_balance', String(newBal));
+      safeLocalStorage.setItem('zenet_wallet_user_id', user.uid);
+      setUserProfile((prev) => (prev ? { ...prev, walletBalance: newBal, balance: newBal } : prev));
+    };
+
     const unsubscribeUser = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as UserProfile;
-        setAndCacheUserProfile(data);
         const rawBal = (data as any)?.walletBalance !== undefined ? (data as any)?.walletBalance : (data as any)?.balance;
-        const numBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
-        const safeBal = isNaN(numBal) ? 0 : numBal;
-        setWalletBalance(safeBal);
-        setLatestWalletBalance(safeBal);
+        if (rawBal !== undefined && rawBal !== null) {
+          const numBal = typeof rawBal === 'number' ? rawBal : Number(rawBal);
+          if (!isNaN(numBal)) {
+            // Never downgrade or hide an existing confirmed balance if user record emits 0 while wallet is positive
+            const effective = (numBal === 0 && activeBal > 0) ? activeBal : numBal;
+            applyVerifiedBalance(effective);
+            setAndCacheUserProfile({
+              ...data,
+              walletBalance: effective,
+              balance: effective
+            });
+            return;
+          }
+        }
+        setAndCacheUserProfile(data);
       }
     }, (err) => {
       console.warn('User profile listener notice:', err);
@@ -1147,10 +1342,12 @@ export default function App() {
       if (snapshot.exists()) {
         const data = snapshot.data();
         const rawBal = data?.walletBalance !== undefined ? data?.walletBalance : data?.balance;
-        const numBal = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
-        const safeBal = isNaN(numBal) ? 0 : numBal;
-        setWalletBalance((prev) => Math.max(prev, safeBal));
-        setLatestWalletBalance((prev) => Math.max(prev, safeBal));
+        if (rawBal !== undefined && rawBal !== null) {
+          const numBal = typeof rawBal === 'number' ? rawBal : Number(rawBal);
+          if (!isNaN(numBal)) {
+            applyVerifiedBalance(numBal);
+          }
+        }
       }
     }, () => {});
 
@@ -2022,6 +2219,13 @@ export default function App() {
 
   const handleConfirmDeleteListing = async () => {
     if (!deletingListingId) return;
+    // Admins are strictly prohibited from deleting products from ZENET HUB
+    const isAdminUser = isOwner || userProfile?.role === 'admin' || userProfile?.role === 'owner';
+    if (isAdminUser) {
+      console.warn('Action denied: Admin product deletion is permanently disabled.');
+      setDeletingListingId(null);
+      return;
+    }
     setIsDeleting(true);
     try {
       const listingRef = doc(db, 'listings', deletingListingId);
@@ -2522,11 +2726,20 @@ export default function App() {
             />
           )}
 
-          {/* VIEW: SOCIAL BOOST (UNAVAILABLE) */}
-          {(activeView === 'social-boost' || activeView === 'social-boost-2' || activeView === 'server-tool') && (
-            <ServiceUnavailableView
-              serviceType="social-boost"
+          {/* VIEW: SOCIAL BOOST (TIKTOK) */}
+          {(activeView === 'social-boost' || activeView === 'social-boost-2' || activeView === 'server-tool' || (activeView as any) === 'tiktok-promotion') && (
+            <SocialBoostView
+              user={user}
+              userProfile={userProfile}
+              walletBalance={walletBalance}
               onBackToMarketplace={handleBackToMarketplace}
+              onOpenWallet={() => handleSelectView('wallet')}
+              onOpenAuth={(mode) => setAuthMode(mode)}
+              onBalanceUpdated={(newBal) => {
+                setWalletBalance(newBal);
+                setLatestWalletBalance(newBal);
+                setUserProfile((prev) => prev ? { ...prev, walletBalance: newBal, balance: newBal } : prev);
+              }}
             />
           )}
 
@@ -2564,6 +2777,7 @@ export default function App() {
               onOpenAdmin={isOwner ? () => setAdminOpen(true) : undefined}
               onOpenSellerDashboard={isAdmin ? () => setIsSellerDashboardOpen(true) : undefined}
               onOpenZenetUpdateGenerator={isOwner ? () => setIsZenetUpdateAdminModalOpen(true) : undefined}
+              onOpenWithdraw={isAdmin ? () => setIsWithdrawModalOpen(true) : undefined}
               onLogout={handleLogout}
               onOpenAuth={(mode) => setAuthMode(mode)}
             />
@@ -2643,6 +2857,7 @@ export default function App() {
       </div> {/* Close main right area container */}
 
       {/* MODALS */}
+      <React.Suspense fallback={null}>
 
       {/* Wallet Modal */}
       <WalletModal
@@ -2675,7 +2890,7 @@ export default function App() {
           onToggleSave={handleToggleSave}
           onViewSellerProfile={(sellerId, sellerName) => navigateRoute({ seller: { id: sellerId, name: sellerName } })}
           onDelete={handleRequestDeleteListing}
-          canDelete={isOwner || userProfile?.role === 'owner' || user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.role === 'admin' || (userProfile?.role === 'seller' && user?.uid === selectedListing.sellerId)}
+          canDelete={false}
         />
       )}
 
@@ -2820,7 +3035,6 @@ export default function App() {
               const listingRef = doc(db, 'listings', id);
               await setDoc(listingRef, { featured: !featured }, { merge: true });
             }}
-            onDeleteListing={handleRequestDeleteListing}
             onUpdateUserProfile={(profile) => setUserProfile(profile)}
             onUpdateListing={(updated) => {
               setListings((prev) =>
@@ -3020,6 +3234,23 @@ export default function App() {
         onClose={() => setIsLogoutConfirmOpen(false)}
         onConfirmLogout={executeLogout}
       />
+
+      {/* 16. Owner & Admin Withdrawal Modal */}
+      {isWithdrawModalOpen && user && isAdmin && (
+        <WithdrawModal
+          isOpen={isWithdrawModalOpen}
+          onClose={() => setIsWithdrawModalOpen(false)}
+          user={user}
+          userProfile={userProfile}
+          walletBalance={walletBalance}
+          onBalanceChange={(newBal) => {
+            setWalletBalance(newBal);
+            setLatestWalletBalance(newBal);
+            setUserProfile((prev) => prev ? { ...prev, walletBalance: newBal, balance: newBal } : prev);
+          }}
+        />
+      )}
+      </React.Suspense>
 
     </div>
   );

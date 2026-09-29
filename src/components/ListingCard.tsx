@@ -127,7 +127,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
             </div>
           </div>
 
-          {/* Save / Bookmark Button & Admin Delete */}
+          {/* Save / Bookmark Button */}
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={(e) => {
@@ -143,20 +143,6 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
             >
               <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-[#5B4DF5] text-[#5B4DF5]' : ''}`} />
             </button>
-
-            {onDelete && canDelete && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(listing.id);
-                }}
-                className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
-                title="Delete Product"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
 

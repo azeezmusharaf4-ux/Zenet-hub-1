@@ -1966,6 +1966,785 @@ app.post('/api/wallet/purchase', async (req, res) => {
   }
 });
 
+// ==========================================
+// SECURE OWNER & ADMIN WITHDRAWAL ENGINE
+// ==========================================
+
+/**
+ * Generates a permanent, cryptographically-unique Withdrawal ID for an authorized user.
+ * Format: ZN-WID-<UPPERCASE_ALPHANUMERIC>
+ */
+function generatePermanentWithdrawalId(): string {
+  const bytes = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `ZN-WID-${bytes}`;
+}
+
+// 1. Get or initialize user's permanent server-generated Withdrawal ID
+app.get('/api/withdrawals/my-id', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized. Please sign in.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const userDocRef = doc(db, 'users', verifiedUser.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (!userDoc.exists()) {
+      return res.status(404).json({ success: false, error: 'User record not found.' });
+    }
+
+    const userData = userDoc.data();
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid) || isAuthorizedOwnerEmail(userData.email);
+    const isAdmin = isOwner || verifiedUser.isAdmin || userData.role === 'admin' || userData.role === 'owner';
+
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Withdrawals are exclusively accessible to website Owner and authorized Admins.' });
+    }
+
+    let withdrawalId = userData.withdrawalId;
+    if (!withdrawalId || typeof withdrawalId !== 'string' || !withdrawalId.trim()) {
+      withdrawalId = generatePermanentWithdrawalId();
+      await setDoc(userDocRef, { withdrawalId, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+
+    const currentBalance = typeof userData.walletBalance === 'number'
+      ? userData.walletBalance
+      : Number(userData.walletBalance || userData.balance || 0);
+
+    return res.json({
+      success: true,
+      withdrawalId,
+      walletBalance: currentBalance,
+      role: userData.role || (isOwner ? 'owner' : 'admin')
+    });
+  } catch (err: any) {
+    console.error('Error in /api/withdrawals/my-id:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to retrieve withdrawal identity.' });
+  }
+});
+
+// 2. Submit a Withdrawal Request (Atomic transaction, double-spend prevention)
+app.post('/api/withdrawals/request', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized. Please sign in.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const { amount: rawAmount, bankName, accountNumber, accountName, notes } = req.body;
+    const amount = Number(rawAmount);
+
+    if (isNaN(amount) || !isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid withdrawal amount specified.' });
+    }
+
+    const MIN_WITHDRAWAL = 5000;
+    const MAX_WITHDRAWAL = 100000;
+
+    if (amount < MIN_WITHDRAWAL) {
+      return res.status(400).json({ success: false, error: `Minimum withdrawal is ₦${MIN_WITHDRAWAL.toLocaleString()}.` });
+    }
+
+    if (amount > MAX_WITHDRAWAL) {
+      return res.status(400).json({ success: false, error: `Maximum withdrawal per request is ₦${MAX_WITHDRAWAL.toLocaleString()}.` });
+    }
+
+    if (!bankName || typeof bankName !== 'string' || !bankName.trim()) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid bank name.' });
+    }
+
+    if (!accountNumber || typeof accountNumber !== 'string' || accountNumber.trim().length < 8) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid account number (minimum 8-10 digits).' });
+    }
+
+    if (!accountName || typeof accountName !== 'string' || !accountName.trim()) {
+      return res.status(400).json({ success: false, error: 'Please enter the registered account holder name.' });
+    }
+
+    const userDocRef = doc(db, 'users', verifiedUser.uid);
+    const walletDocRef = doc(db, 'wallets', verifiedUser.uid);
+
+    const now = new Date();
+    const isoDate = now.toISOString();
+    const dateStr = isoDate.split('T')[0];
+    const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+    const reference = `WREQ-${now.getTime().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const requestDocRef = doc(db, 'withdrawal_requests', reference);
+    const txDocRef = doc(db, 'wallet_transactions', `tx_${reference}`);
+
+    let createdWithdrawalRecord: any = null;
+    let finalNewBalance = 0;
+
+    // Execute atomic transaction to prevent double spending and ensure database consistency
+    await runTransaction(db, async (transaction) => {
+      const uSnap = await transaction.get(userDocRef);
+      if (!uSnap.exists()) {
+        throw new Error('User record not found.');
+      }
+
+      const uData = uSnap.data();
+      const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid) || isAuthorizedOwnerEmail(uData.email);
+      const isAdmin = isOwner || verifiedUser.isAdmin || uData.role === 'admin' || uData.role === 'owner';
+
+      if (!isAdmin) {
+        throw new Error('Forbidden: Withdrawals are exclusively accessible to website Owner and authorized Admins.');
+      }
+
+      const currentBalance = typeof uData.walletBalance === 'number'
+        ? uData.walletBalance
+        : Number(uData.walletBalance || uData.balance || 0);
+
+      if (currentBalance < amount) {
+        throw new Error(`Insufficient withdrawable balance. Your available balance is ₦${currentBalance.toLocaleString()}, but you requested ₦${amount.toLocaleString()}.`);
+      }
+
+      let withdrawalId = uData.withdrawalId;
+      if (!withdrawalId || typeof withdrawalId !== 'string' || !withdrawalId.trim()) {
+        withdrawalId = generatePermanentWithdrawalId();
+      }
+
+      finalNewBalance = Math.round((currentBalance - amount) * 100) / 100;
+
+      // Update users collection
+      transaction.set(userDocRef, {
+        walletBalance: finalNewBalance,
+        balance: finalNewBalance,
+        withdrawalId,
+        updatedAt: isoDate
+      }, { merge: true });
+
+      // Update wallets mirror collection
+      transaction.set(walletDocRef, {
+        userId: verifiedUser.uid,
+        walletBalance: finalNewBalance,
+        balance: finalNewBalance,
+        updatedAt: isoDate
+      }, { merge: true });
+
+      createdWithdrawalRecord = {
+        id: reference,
+        userId: verifiedUser.uid,
+        userName: uData.displayName || uData.username || uData.fullName || verifiedUser.email.split('@')[0],
+        userEmail: verifiedUser.email,
+        withdrawalId,
+        amount,
+        currency: 'NGN',
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        accountName: accountName.trim(),
+        status: 'pending',
+        createdAt: isoDate,
+        createdDate: dateStr,
+        createdTime: timeStr,
+        reference,
+        notes: (notes || '').trim(),
+      };
+
+      // Record in withdrawal_requests
+      transaction.set(requestDocRef, createdWithdrawalRecord);
+
+      // Record in wallet_transactions ledger
+      transaction.set(txDocRef, {
+        id: `tx_${reference}`,
+        userId: verifiedUser.uid,
+        type: 'withdrawal',
+        amount,
+        description: `Withdrawal payout requested: ₦${amount.toLocaleString()} to ${bankName.trim()} (${accountNumber.trim()})`,
+        date: isoDate,
+        status: 'pending',
+        reference,
+        channel: 'bank_transfer'
+      });
+    });
+
+    return res.json({
+      success: true,
+      message: `Withdrawal request for ₦${amount.toLocaleString()} created successfully.`,
+      reference,
+      newBalance: finalNewBalance,
+      withdrawal: createdWithdrawalRecord
+    });
+  } catch (err: any) {
+    console.error('Error in /api/withdrawals/request:', err);
+    return res.status(400).json({ success: false, error: err.message || 'Withdrawal request failed.' });
+  }
+});
+
+// 3. Verify User & Legitimate Withdrawal Records by Withdrawal ID
+app.post('/api/withdrawals/verify-id', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized. Please sign in.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const { withdrawalId: rawId } = req.body;
+    if (!rawId || typeof rawId !== 'string' || !rawId.trim()) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid Withdrawal ID.' });
+    }
+
+    const queryId = rawId.trim();
+
+    // Query users collection for permanent matching withdrawalId
+    const usersQuery = query(collection(db, 'users'), where('withdrawalId', '==', queryId));
+    const userQuerySnap = await getDocs(usersQuery);
+
+    if (userQuerySnap.empty) {
+      return res.status(404).json({ success: false, error: 'Invalid Withdrawal ID.' });
+    }
+
+    const targetUserDoc = userQuerySnap.docs[0];
+    const targetUserData = targetUserDoc.data();
+
+    // Fetch legitimate withdrawal requests linked to this user or withdrawal ID
+    const withdrawalsQuery = query(
+      collection(db, 'withdrawal_requests'),
+      where('withdrawalId', '==', queryId)
+    );
+    const withSnap = await getDocs(withdrawalsQuery);
+    const withdrawals = withSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Sort descending by createdAt
+    withdrawals.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+    return res.json({
+      success: true,
+      user: {
+        uid: targetUserDoc.id,
+        email: targetUserData.email,
+        displayName: targetUserData.displayName || targetUserData.username || 'Authorized User',
+        role: targetUserData.role || 'user',
+        withdrawalId: targetUserData.withdrawalId,
+        walletBalance: targetUserData.walletBalance || targetUserData.balance || 0,
+        createdAt: targetUserData.createdAt || ''
+      },
+      withdrawals
+    });
+  } catch (err: any) {
+    console.error('Error in /api/withdrawals/verify-id:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to verify Withdrawal ID.' });
+  }
+});
+
+// 4. Update Withdrawal Request Status (Approve / Complete / Reject with refund)
+app.post('/api/withdrawals/update-status', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser || !verifiedUser.isAdmin) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Access restricted to authorized website administrators.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const { requestId, status: newStatus, adminNotes } = req.body;
+    if (!requestId || !['approved', 'completed', 'rejected'].includes(newStatus)) {
+      return res.status(400).json({ success: false, error: 'Invalid request parameters or status.' });
+    }
+
+    const reqDocRef = doc(db, 'withdrawal_requests', requestId);
+    const reqSnap = await getDoc(reqDocRef);
+
+    if (!reqSnap.exists()) {
+      return res.status(404).json({ success: false, error: 'Withdrawal request not found.' });
+    }
+
+    const reqData = reqSnap.data();
+    const previousStatus = reqData.status;
+
+    if (previousStatus === newStatus) {
+      return res.json({ success: true, status: newStatus });
+    }
+
+    const isoDate = new Date().toISOString();
+
+    // If rejecting a pending or approved request, atomically refund money to user wallet
+    if (newStatus === 'rejected' && previousStatus !== 'rejected') {
+      const targetUid = reqData.userId;
+      const refundAmount = Number(reqData.amount);
+
+      await runTransaction(db, async (transaction) => {
+        const uRef = doc(db, 'users', targetUid);
+        const wRef = doc(db, 'wallets', targetUid);
+        const uSnap = await transaction.get(uRef);
+
+        if (uSnap.exists()) {
+          const curBal = Number(uSnap.data().walletBalance ?? uSnap.data().balance ?? 0);
+          const newBal = Math.round((curBal + refundAmount) * 100) / 100;
+          transaction.set(uRef, { walletBalance: newBal, balance: newBal, updatedAt: isoDate }, { merge: true });
+          transaction.set(wRef, { walletBalance: newBal, balance: newBal, updatedAt: isoDate }, { merge: true });
+        }
+
+        // Record refund in wallet_transactions
+        const refundTxRef = doc(db, 'wallet_transactions', `tx_ref_${requestId}`);
+        transaction.set(refundTxRef, {
+          id: `tx_ref_${requestId}`,
+          userId: targetUid,
+          type: 'deposit',
+          amount: refundAmount,
+          description: `Refund for rejected withdrawal request ${requestId}${adminNotes ? `: ${adminNotes}` : ''}`,
+          date: isoDate,
+          status: 'completed',
+          reference: `REF-${requestId}`,
+          channel: 'system_refund'
+        });
+
+        // Update withdrawal request status
+        transaction.update(reqDocRef, {
+          status: 'rejected',
+          adminNotes: (adminNotes || '').trim(),
+          updatedAt: isoDate,
+          updatedBy: verifiedUser.email
+        });
+      });
+    } else {
+      await updateDoc(reqDocRef, {
+        status: newStatus,
+        adminNotes: (adminNotes || '').trim(),
+        updatedAt: isoDate,
+        updatedBy: verifiedUser.email
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Withdrawal request status updated to ${newStatus}.`,
+      status: newStatus
+    });
+  } catch (err: any) {
+    console.error('Error in /api/withdrawals/update-status:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to update withdrawal status.' });
+  }
+});
+
+// ==========================================
+// TIKTOK PROMOTION SERVICES & ORDERS API
+// ==========================================
+
+const DEFAULT_SERVER_TIKTOK_SERVICES = [
+  {
+    id: 'followers',
+    name: 'TikTok Followers',
+    category: 'TikTok',
+    targetType: 'profile_url',
+    pricePer1k: 3500,
+    minQuantity: 100,
+    maxQuantity: 50000,
+    status: 'active',
+    description: 'Real audience follower growth for creator profiles & business accounts.',
+    badge: 'Profile Growth',
+    deliverySpeed: 'Organic delivery within 1-24 hours'
+  },
+  {
+    id: 'views',
+    name: 'TikTok Views',
+    category: 'TikTok',
+    targetType: 'video_url',
+    pricePer1k: 450,
+    minQuantity: 500,
+    maxQuantity: 500000,
+    status: 'active',
+    description: 'Expand your video reach and algorithmic discovery across the For You page.',
+    badge: 'Viral Reach',
+    deliverySpeed: 'Starts in 5-15 minutes'
+  },
+  {
+    id: 'likes',
+    name: 'TikTok Likes',
+    category: 'TikTok',
+    targetType: 'video_url',
+    pricePer1k: 1800,
+    minQuantity: 50,
+    maxQuantity: 25000,
+    status: 'active',
+    description: 'Genuine viewer heart likes to boost content engagement signals.',
+    badge: 'High Engagement',
+    deliverySpeed: 'Steady natural pace'
+  },
+  {
+    id: 'comments',
+    name: 'TikTok Comments',
+    category: 'TikTok',
+    targetType: 'video_url',
+    requiresComments: true,
+    pricePer1k: 6500,
+    minQuantity: 10,
+    maxQuantity: 2000,
+    status: 'active',
+    description: 'Custom relevant discussion comments submitted for your specific video.',
+    badge: 'Custom Discussion',
+    deliverySpeed: 'Gradual natural delivery'
+  },
+  {
+    id: 'shares',
+    name: 'TikTok Shares',
+    category: 'TikTok',
+    targetType: 'video_url',
+    pricePer1k: 2200,
+    minQuantity: 50,
+    maxQuantity: 20000,
+    status: 'active',
+    description: 'Authentic share counts to trigger TikTok recommendation and distribution algorithms.',
+    badge: 'Algorithm Boost',
+    deliverySpeed: 'Fast distribution'
+  }
+];
+
+// GET /api/tiktok-promotion/services
+app.get('/api/tiktok-promotion/services', async (_req, res) => {
+  try {
+    if (!db) {
+      return res.json({ success: true, services: DEFAULT_SERVER_TIKTOK_SERVICES });
+    }
+    await ensureServerAuthenticated();
+    const colRef = collection(db, 'tiktok_promotion_services');
+    const snap = await getDocs(colRef);
+    if (snap.empty) {
+      return res.json({ success: true, services: DEFAULT_SERVER_TIKTOK_SERVICES });
+    }
+    const map = new Map<string, any>();
+    snap.docs.forEach((d) => {
+      map.set(d.id, { id: d.id, ...d.data() });
+    });
+    const services = DEFAULT_SERVER_TIKTOK_SERVICES.map((def) => {
+      const saved = map.get(def.id);
+      return saved ? { ...def, ...saved } : def;
+    });
+    return res.json({ success: true, services });
+  } catch (err: any) {
+    console.warn('[TikTok Promotion] Services fetch notice:', err?.message);
+    return res.json({ success: true, services: DEFAULT_SERVER_TIKTOK_SERVICES });
+  }
+});
+
+// POST /api/tiktok-promotion/services: Admin updates
+app.post('/api/tiktok-promotion/services', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser || !verifiedUser.isAdmin) {
+      return res.status(403).json({ success: false, error: 'Administrative authorization required.' });
+    }
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database unavailable.' });
+    }
+    await ensureServerAuthenticated();
+    const { services } = req.body;
+    if (!Array.isArray(services)) {
+      return res.status(400).json({ success: false, error: 'Services array is required.' });
+    }
+    for (const s of services) {
+      if (s && s.id) {
+        const docRef = doc(db, 'tiktok_promotion_services', s.id);
+        await setDoc(docRef, {
+          pricePer1k: Number(s.pricePer1k) || 0,
+          minQuantity: Number(s.minQuantity) || 10,
+          maxQuantity: Number(s.maxQuantity) || 100000,
+          status: s.status === 'paused' ? 'paused' : 'active',
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    }
+    return res.json({ success: true, message: 'TikTok promotion services updated successfully.' });
+  } catch (err: any) {
+    console.error('Error updating TikTok promotion services:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to update services' });
+  }
+});
+
+// GET /api/tiktok-services/settings: Get configured rates and limits for TikTok services
+app.get('/api/tiktok-services/settings', async (_req, res) => {
+  try {
+    if (db) {
+      await ensureServerAuthenticated();
+      const docSnap = await getDoc(doc(db, 'system_settings', 'tiktok_services_config'));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && data.services) {
+          return res.json({ success: true, services: data.services, updatedAt: data.updatedAt });
+        }
+      }
+    }
+    return res.json({
+      success: true,
+      services: {
+        'tt-followers': { id: 'tt-followers', name: 'TikTok Followers', minQuantity: 10, maxQuantity: 1000000, pricePer1k: 2400 },
+        'tt-likes': { id: 'tt-likes', name: 'TikTok Likes', minQuantity: 50, maxQuantity: 500000, pricePer1k: 850 },
+        'tt-comments': { id: 'tt-comments', name: 'TikTok Comments', minQuantity: 10, maxQuantity: 10000, pricePer1k: 4500 },
+        'tt-shares': { id: 'tt-shares', name: 'TikTok Shares', minQuantity: 50, maxQuantity: 200000, pricePer1k: 650 },
+        'tt-views': { id: 'tt-views', name: 'TikTok Views', minQuantity: 500, maxQuantity: 2000000, pricePer1k: 250 },
+        'tt-favorites': { id: 'tt-favorites', name: 'TikTok Favorites', minQuantity: 50, maxQuantity: 200000, pricePer1k: 750 }
+      }
+    });
+  } catch (err: any) {
+    console.warn('[TikTok Services Settings] Fetch notice:', err.message);
+    return res.json({
+      success: true,
+      services: {
+        'tt-followers': { id: 'tt-followers', name: 'TikTok Followers', minQuantity: 10, maxQuantity: 1000000, pricePer1k: 2400 },
+        'tt-likes': { id: 'tt-likes', name: 'TikTok Likes', minQuantity: 50, maxQuantity: 500000, pricePer1k: 850 },
+        'tt-comments': { id: 'tt-comments', name: 'TikTok Comments', minQuantity: 10, maxQuantity: 10000, pricePer1k: 4500 },
+        'tt-shares': { id: 'tt-shares', name: 'TikTok Shares', minQuantity: 50, maxQuantity: 200000, pricePer1k: 650 },
+        'tt-views': { id: 'tt-views', name: 'TikTok Views', minQuantity: 500, maxQuantity: 2000000, pricePer1k: 250 },
+        'tt-favorites': { id: 'tt-favorites', name: 'TikTok Favorites', minQuantity: 50, maxQuantity: 200000, pricePer1k: 750 }
+      }
+    });
+  }
+});
+
+// POST /api/tiktok-services/settings: Save configured rates and limits for TikTok services (Admin Only)
+app.post('/api/tiktok-services/settings', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser || (!verifiedUser.isAdmin && !isAuthorizedOwnerEmail(verifiedUser.email))) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: Admin access required to update TikTok settings.' });
+    }
+    const { services } = req.body;
+    if (!services || typeof services !== 'object') {
+      return res.status(400).json({ success: false, error: 'Valid services configuration object is required.' });
+    }
+
+    if (db) {
+      await ensureServerAuthenticated();
+      await setDoc(doc(db, 'system_settings', 'tiktok_services_config'), {
+        services,
+        updatedAt: new Date().toISOString(),
+        updatedBy: verifiedUser.email
+      }, { merge: true });
+    }
+
+    return res.json({ success: true, message: 'TikTok services settings saved successfully.', services });
+  } catch (err: any) {
+    console.error('Error saving TikTok services settings:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to save settings' });
+  }
+});
+
+// POST /api/tiktok-promotion/order: Place a TikTok promotion order using wallet balance
+app.post('/api/tiktok-promotion/order', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Authentication required. Please log in to order TikTok promotion.' });
+    }
+    const { serviceId, targetUrl, quantity, comments, userEmail } = req.body;
+    if (!serviceId || !targetUrl || !quantity) {
+      return res.status(400).json({ success: false, error: 'Service ID, target URL, and quantity are required.' });
+    }
+    const numQty = Number(quantity);
+    if (isNaN(numQty) || numQty <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid positive quantity is required.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database unavailable.' });
+    }
+    await ensureServerAuthenticated();
+
+    // Fetch service configuration
+    let svc = DEFAULT_SERVER_TIKTOK_SERVICES.find((s) => s.id === serviceId);
+    try {
+      const svcDoc = await getDoc(doc(db, 'tiktok_promotion_services', serviceId));
+      if (svcDoc.exists()) {
+        svc = { ...svc, ...(svcDoc.data() as any) };
+      }
+    } catch {}
+
+    if (!svc) {
+      return res.status(400).json({ success: false, error: 'Invalid TikTok service selected.' });
+    }
+    if (svc.status === 'paused') {
+      return res.status(400).json({ success: false, error: 'This TikTok service is temporarily paused by administration.' });
+    }
+    if (numQty < svc.minQuantity || numQty > svc.maxQuantity) {
+      return res.status(400).json({
+        success: false,
+        error: `Quantity must be between ${svc.minQuantity.toLocaleString()} and ${svc.maxQuantity.toLocaleString()} for ${svc.name}.`
+      });
+    }
+
+    if (svc.requiresComments) {
+      if (!comments || !Array.isArray(comments) || comments.filter((c: string) => c && c.trim()).length === 0) {
+        return res.status(400).json({ success: false, error: 'Please provide at least one custom comment for this order.' });
+      }
+    }
+
+    const totalCost = Math.max(1, Math.round((numQty / 1000) * svc.pricePer1k));
+    const userId = verifiedUser.uid;
+    const orderNumber = `TT-${Math.floor(100000 + Math.random() * 900000)}`;
+    const orderId = `tt_order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const txId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    const userDocRef = doc(db, 'users', userId);
+    const walletDocRef = doc(db, 'wallets', userId);
+
+    let finalNewBal = 0;
+    let orderRecord: any = null;
+
+    await runTransaction(db, async (t) => {
+      const userSnap = await t.get(userDocRef);
+      const walletSnap = await t.get(walletDocRef);
+
+      const uData = userSnap.exists() ? userSnap.data() : {};
+      const wData = walletSnap.exists() ? walletSnap.data() : {};
+
+      const uBal = Number(uData.walletBalance ?? uData.balance ?? 0);
+      const wBal = Number(wData.walletBalance ?? wData.balance ?? 0);
+      const currentBal = Math.max(uBal, wBal);
+
+      if (currentBal < totalCost) {
+        throw new Error(`Insufficient wallet balance. Total cost: ₦${totalCost.toLocaleString()}, Available balance: ₦${currentBal.toLocaleString()}. Please fund your wallet.`);
+      }
+
+      finalNewBal = currentBal - totalCost;
+
+      // Update user doc
+      t.set(userDocRef, {
+        walletBalance: finalNewBal,
+        balance: finalNewBal,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Update wallet doc
+      t.set(walletDocRef, {
+        userId,
+        userEmail: userEmail || verifiedUser.email || uData.email || '',
+        walletBalance: finalNewBal,
+        balance: finalNewBal,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Record wallet debit transaction
+      const txDocRef = doc(db, 'wallet_transactions', txId);
+      t.set(txDocRef, {
+        id: txId,
+        reference: txId,
+        userId,
+        userEmail: userEmail || verifiedUser.email || uData.email || '',
+        amount: totalCost,
+        type: 'debit',
+        category: 'promotion',
+        status: 'successful',
+        description: `TikTok Promotion: ${svc.name} (${numQty.toLocaleString()})`,
+        date: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        createdAt: new Date().toISOString()
+      });
+
+      orderRecord = {
+        id: orderId,
+        orderNumber,
+        serviceId: svc.id,
+        serviceName: svc.name,
+        targetUrl: targetUrl.trim(),
+        comments: svc.requiresComments ? comments : undefined,
+        quantity: numQty,
+        pricePer1k: svc.pricePer1k,
+        totalCost,
+        userId,
+        userEmail: userEmail || verifiedUser.email || uData.email || '',
+        status: 'pending',
+        platform: 'TikTok',
+        category: 'TikTok Promotion',
+        complianceNotice: '100% Policy Compliant & Safe Promotion via real creator networks.',
+        createdAt: new Date().toISOString()
+      };
+
+      // Save order in tiktok_promotion_orders
+      const orderDocRef = doc(db, 'tiktok_promotion_orders', orderId);
+      t.set(orderDocRef, orderRecord);
+
+      // Also record in purchases collection for unified user order history
+      const purchaseDocRef = doc(db, 'purchases', orderId);
+      t.set(purchaseDocRef, {
+        id: orderId,
+        listingId: svc.id,
+        listingTitle: `${svc.name} (${numQty.toLocaleString()})`,
+        category: 'TikTok Promotion',
+        price: totalCost,
+        paidAmount: totalCost,
+        sellerId: 'zenet-official-promotion',
+        sellerName: 'ZENET Promotion Hub',
+        buyerId: userId,
+        buyerEmail: userEmail || verifiedUser.email || uData.email || '',
+        status: 'completed',
+        purchasedAt: new Date().toISOString(),
+        orderStatus: 'Processing Promotion',
+        type: 'promotion',
+        digitalProductDetails: {
+          service: svc.name,
+          targetUrl: targetUrl.trim(),
+          quantity: String(numQty),
+          orderNumber
+        }
+      });
+    });
+
+    return res.json({
+      success: true,
+      orderId,
+      orderNumber,
+      newBalance: finalNewBal,
+      order: orderRecord
+    });
+  } catch (err: any) {
+    console.error('Error placing TikTok promotion order:', err);
+    return res.status(400).json({
+      success: false,
+      error: err.message || 'Failed to place TikTok promotion order.'
+    });
+  }
+});
+
+// GET /api/tiktok-promotion/orders: User's or admin's orders
+app.get('/api/tiktok-promotion/orders', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Authentication required.' });
+    }
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database unavailable.' });
+    }
+    await ensureServerAuthenticated();
+    const colRef = collection(db, 'tiktok_promotion_orders');
+    let q;
+    if (verifiedUser.isAdmin && req.query.all === 'true') {
+      q = query(colRef);
+    } else {
+      q = query(colRef, where('userId', '==', verifiedUser.uid));
+    }
+    const snap = await getDocs(q);
+    const orders = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+    // Sort descending by createdAt
+    orders.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    return res.json({ success: true, orders });
+  } catch (err: any) {
+    console.error('Error fetching TikTok promotion orders:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to fetch orders' });
+  }
+});
+
 app.get(['/api/paystack/verify/:reference', '/api/paystack/verify'], async (req, res) => {
   try {
     const reference = req.params.reference || (req.query.reference as string) || (req.query.trxref as string);
@@ -2144,6 +2923,214 @@ app.post('/api/admin/manage-role', async (req, res) => {
   } catch (err: any) {
     console.error('Error in /api/admin/manage-role:', err);
     res.status(500).json({ error: err.message || 'Failed to update user role' });
+  }
+});
+
+// Secure Admin Stock Management: Delete stock item (including Sold items)
+app.delete('/api/admin/listings/:listingId/inventory/:itemId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+
+    const isAuthorized = Boolean(
+      verifiedUser && (
+        verifiedUser.isAdmin ||
+        isAuthorizedOwnerEmail(verifiedUser.email) ||
+        isAuthorizedOwnerUid(verifiedUser.uid) ||
+        verifiedUser.email?.toLowerCase() === 'azeezmusharaf4@gmail.com'
+      )
+    );
+
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Only authorized Admins can delete stock.' });
+    }
+
+    const { listingId, itemId } = req.params;
+    if (!listingId || !itemId) {
+      return res.status(400).json({ success: false, error: 'Listing ID and Item ID are required.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database not initialized.' });
+    }
+
+    // 1. Delete secure details subcollection doc
+    try {
+      const secureRef = doc(db, 'listings', listingId, 'inventory', itemId, 'secure', 'details');
+      await deleteDoc(secureRef);
+    } catch (e) {
+      console.warn('Direct delete secure details doc notice:', e);
+    }
+
+    // 2. Delete inventory subcollection doc
+    try {
+      const itemRef = doc(db, 'listings', listingId, 'inventory', itemId);
+      await deleteDoc(itemRef);
+    } catch (e) {
+      console.warn('Direct delete inventory doc notice:', e);
+    }
+
+    // 3. Update parent listing document
+    const listingRef = doc(db, 'listings', listingId);
+    const listingSnap = await getDoc(listingRef);
+    let unusedCount = 0;
+    if (listingSnap.exists()) {
+      const listingData = listingSnap.data();
+      const currentInventory = Array.isArray(listingData.inventory) ? listingData.inventory : [];
+      const updatedInventory = currentInventory.filter((item: any) => item.id !== itemId);
+      unusedCount = updatedInventory.filter((item: any) => (item.status || '').toLowerCase() !== 'sold').length;
+
+      await updateDoc(listingRef, {
+        stock: unusedCount,
+        stockCount: unusedCount,
+        status: unusedCount > 0 ? (listingData.status === 'reserved' ? 'reserved' : 'active') : 'sold',
+        inventory: updatedInventory
+      });
+    }
+
+    console.log(`[Admin Stock Delete] Admin ${verifiedUser.email} deleted stock item ${itemId} from listing ${listingId}`);
+
+    return res.json({
+      success: true,
+      message: 'Stock item deleted successfully',
+      remainingStock: unusedCount
+    });
+  } catch (err: any) {
+    console.error('Error in DELETE /api/admin/listings/:listingId/inventory/:itemId:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to delete stock item' });
+  }
+});
+
+// Secure Admin Stock Management: Update/Save stock item (including Sold/Release state)
+app.post('/api/admin/listings/:listingId/inventory/:itemId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+
+    const isAuthorized = Boolean(
+      verifiedUser && (
+        verifiedUser.isAdmin ||
+        isAuthorizedOwnerEmail(verifiedUser.email) ||
+        isAuthorizedOwnerUid(verifiedUser.uid) ||
+        verifiedUser.email?.toLowerCase() === 'azeezmusharaf4@gmail.com'
+      )
+    );
+
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Only authorized Admins can edit stock.' });
+    }
+
+    const { listingId, itemId } = req.params;
+    if (!listingId || !itemId) {
+      return res.status(400).json({ success: false, error: 'Listing ID and Item ID are required.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database not initialized.' });
+    }
+
+    const body = req.body || {};
+    const {
+      accountEmail,
+      accountPassword,
+      recoveryInfo,
+      twoFactorSecretKey,
+      twoFactorBackupCodes,
+      additionalInstructions,
+      customFields,
+      deliveryFields,
+      status: targetStatus
+    } = body;
+
+    const normalizedStatus = (targetStatus === 'Sold' || targetStatus === 'sold') ? 'Sold' : 'Available';
+    const isNowAvailable = normalizedStatus === 'Available';
+
+    // 1. Update inventory subcollection doc
+    const itemRef = doc(db, 'listings', listingId, 'inventory', itemId);
+    const itemSnap = await getDoc(itemRef);
+    const existingItemData = itemSnap.exists() ? itemSnap.data() : {};
+
+    const updatedItemData: any = {
+      ...existingItemData,
+      id: itemId,
+      status: normalizedStatus,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (isNowAvailable) {
+      updatedItemData.soldTo = null;
+      updatedItemData.orderId = null;
+      updatedItemData.soldAt = null;
+    }
+
+    await setDoc(itemRef, updatedItemData, { merge: true });
+
+    // 2. Update secure subcollection doc
+    const secureRef = doc(db, 'listings', listingId, 'inventory', itemId, 'secure', 'details');
+    await setDoc(secureRef, {
+      id: itemId,
+      accountEmail: accountEmail || '',
+      accountPassword: accountPassword || '',
+      notes: recoveryInfo || '',
+      recoveryInfo: recoveryInfo || '',
+      twoFactorSecretKey: twoFactorSecretKey || '',
+      twoFactorBackupCodes: twoFactorBackupCodes || '',
+      additionalInstructions: additionalInstructions || '',
+      customFields: Array.isArray(customFields) ? customFields : [],
+      deliveryFields: Array.isArray(deliveryFields) ? deliveryFields : [],
+      status: normalizedStatus,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    // 3. Update parent listing doc
+    const listingRef = doc(db, 'listings', listingId);
+    const listingSnap = await getDoc(listingRef);
+    let unusedCount = 0;
+    if (listingSnap.exists()) {
+      const listingData = listingSnap.data();
+      const currentInventory = Array.isArray(listingData.inventory) ? listingData.inventory : [];
+      const updatedInventory = currentInventory.map((it: any) => {
+        if (it.id === itemId) {
+          return {
+            ...it,
+            ...updatedItemData,
+            accountEmail: accountEmail || it.accountEmail || '',
+            recoveryInfo: recoveryInfo || it.recoveryInfo || '',
+            additionalInstructions: additionalInstructions || it.additionalInstructions || '',
+            twoFactorSecretKey: twoFactorSecretKey || it.twoFactorSecretKey || '',
+            twoFactorBackupCodes: twoFactorBackupCodes || it.twoFactorBackupCodes || '',
+            customFields: Array.isArray(customFields) ? customFields : it.customFields,
+            deliveryFields: Array.isArray(deliveryFields) ? deliveryFields : it.deliveryFields,
+            status: normalizedStatus,
+            soldTo: isNowAvailable ? null : (it.soldTo || null),
+            orderId: isNowAvailable ? null : (it.orderId || null),
+            soldAt: isNowAvailable ? null : (it.soldAt || null)
+          };
+        }
+        return it;
+      });
+
+      unusedCount = updatedInventory.filter((it: any) => (it.status || '').toLowerCase() !== 'sold').length;
+
+      await updateDoc(listingRef, {
+        stock: unusedCount,
+        stockCount: unusedCount,
+        status: unusedCount > 0 ? (listingData.status === 'reserved' ? 'reserved' : 'active') : 'sold',
+        inventory: updatedInventory
+      });
+    }
+
+    console.log(`[Admin Stock Edit] Admin ${verifiedUser.email} updated stock item ${itemId} on listing ${listingId} (status: ${normalizedStatus})`);
+
+    return res.json({
+      success: true,
+      message: 'Stock item updated successfully',
+      status: normalizedStatus,
+      remainingStock: unusedCount
+    });
+  } catch (err: any) {
+    console.error('Error in POST /api/admin/listings/:listingId/inventory/:itemId:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to update stock item' });
   }
 });
 
@@ -6030,6 +7017,14 @@ app.get('/api/social-boost/services', async (req, res) => {
       }));
     }
 
+    // Ensure unique IDs in visibleServices
+    const seenSvcIds = new Set<string>();
+    visibleServices = visibleServices.filter(s => {
+      if (!s.id || seenSvcIds.has(s.id)) return false;
+      seenSvcIds.add(s.id);
+      return true;
+    });
+
     // Extract dynamic list of Level 1 platforms (ordered by priority)
     const dynamicPlatforms = Array.from(new Set(visibleServices.map(s => s.platform || 'Other Services'))).sort((a, b) => {
       const pA = getPlatformPriorityIndex(a);
@@ -6276,7 +7271,16 @@ app.post('/api/social-boost/order', async (req, res) => {
         }
       }
     }
-    const baseService = servicePool.find(s => s.id === serviceId);
+    const baseService = servicePool.find(s => 
+      s.id === serviceId || 
+      (s as any).providerServiceId === serviceId ||
+      (serviceId === 'tt-followers' && (s.id === 'tt-followers-hq' || s.id === 'tt-followers' || (s.platform === 'TikTok' && s.type === 'Followers'))) ||
+      (serviceId === 'tt-likes' && (s.id === 'tt-likes-fast' || s.id === 'tt-likes' || (s.platform === 'TikTok' && s.type === 'Likes'))) ||
+      (serviceId === 'tt-views' && (s.id === 'tt-views-viral' || s.id === 'tt-views' || s.id === 'tt-views-retention' || (s.platform === 'TikTok' && s.type === 'Views'))) ||
+      (serviceId === 'tt-comments' && (s.id === 'tt-comments-custom' || s.id === 'tt-comments' || (s.platform === 'TikTok' && s.type === 'Comments'))) ||
+      (serviceId === 'tt-shares' && (s.id === 'tt-shares-reposts' || s.id === 'tt-shares' || s.id === 'tt-shares-viral' || (s.platform === 'TikTok' && s.type === 'Shares'))) ||
+      (serviceId === 'tt-favorites' && (s.id === 'tt-favorites' || (s.platform === 'TikTok' && (s.type === 'Favorites' || s.category?.toLowerCase().includes('favorite')))))
+    );
     if (!baseService) {
       return res.status(404).json({ success: false, error: 'Selected boosting service not found.' });
     }

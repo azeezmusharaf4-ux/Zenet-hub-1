@@ -8,6 +8,7 @@ import { doc, setDoc, updateDoc, collection, getDocs, getDoc, deleteDoc } from '
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { processAndCompressImage } from '../lib/imageUtils';
 import { copyToClipboard } from '../utils/clipboard';
+import { safeApiFetch } from '../utils/api';
 
 interface EditListingModalProps {
   listing: AccountListing;
@@ -33,11 +34,16 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
   userProfile,
   isOwner
 }) => {
-  // Determine if active user is website Owner or authorized manager
-  const isUserOwner = Boolean(
+  // Determine if active user is authorized Admin or website Owner
+  const isAuthorizedAdmin = Boolean(
     isOwner ||
+    userProfile?.role === 'owner' ||
+    userProfile?.role === 'admin' ||
+    user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' ||
     isAuthorizedOwner(user, userProfile)
   );
+
+  const isUserOwner = isAuthorizedAdmin;
 
   const creatorId = listing.creatorId || listing.createdBy || listing.sellerId || listing.owner_id;
   const creatorEmail = (listing.creatorEmail || listing.sellerEmail || '').toLowerCase();
@@ -45,7 +51,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
   const isProductCreator = Boolean(user && (creatorId === user.uid || (!!currentEmail && !!creatorEmail && creatorEmail === currentEmail)));
 
   const canManageStock = Boolean(
-    isUserOwner || isProductCreator
+    isAuthorizedAdmin || isProductCreator
   );
 
   const [title, setTitle] = useState(listing.title);
@@ -53,14 +59,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
   const [price, setPrice] = useState<string>(String(listing.price));
   const [followers, setFollowers] = useState(listing.followers || '');
   const [accountAge, setAccountAge] = useState(listing.accountAge || '');
-  const [pva, setPva] = useState(listing.pva);
-  const [twoFactor, setTwoFactor] = useState(listing.twoFactor);
-  const [monetized, setMonetized] = useState(listing.monetized || false);
+  const pva = Boolean(listing.pva);
+  const twoFactor = Boolean(listing.twoFactor);
+  const monetized = Boolean(listing.monetized);
   const [warrantyDays, setWarrantyDays] = useState<number>(listing.warrantyDays || 7);
   const [country, setCountry] = useState(listing.country || 'Nigeria');
   const [niche, setNiche] = useState(listing.niche || 'General');
   const [description, setDescription] = useState(listing.description);
-  const [status, setStatus] = useState<'active' | 'sold' | 'reserved'>(listing.status || 'active');
+  const status = listing.status || 'active';
   const [imageUrl, setImageUrl] = useState(listing.imageUrl || '');
   const [images, setImages] = useState<string[]>(
     listing.images && listing.images.length > 0 ? listing.images : (listing.imageUrl ? [listing.imageUrl] : [])
@@ -80,6 +86,9 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
   // Multi-stock inventory state
   const [inventoryAccounts, setInventoryAccounts] = useState<any[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [stockItemStatus, setStockItemStatus] = useState<'Available' | 'Sold'>('Available');
+  const [stockItemToDelete, setStockItemToDelete] = useState<{ item: any; index: number } | null>(null);
+  const [isDeletingStockItem, setIsDeletingStockItem] = useState(false);
   const [deletedAccountIds, setDeletedAccountIds] = useState<string[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [stockFilterTab, setStockFilterTab] = useState<'all' | 'available' | 'sold'>('available');
@@ -284,8 +293,13 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     });
     if (additionalInstructions.trim()) deliveryFields.push({ label: 'Additional Instructions', value: additionalInstructions.trim() });
 
+    const targetStatus = editingIndex !== null ? (stockItemStatus === 'Sold' ? 'Sold' : 'Available') : 'Available';
+    const isReleasedToAvailable = targetStatus === 'Available';
+    const existingAcc = editingIndex !== null ? inventoryAccounts[editingIndex] : null;
+
     const currentAccount: Record<string, any> = {
-      id: editingIndex !== null ? inventoryAccounts[editingIndex].id : 'inv_' + Math.random().toString(36).substr(2, 9),
+      ...(existingAcc || {}),
+      id: existingAcc?.id || ('inv_' + Math.random().toString(36).substr(2, 9)),
       accountEmail: accountEmail.trim(),
       accountPassword: accountPassword.trim(),
       recoveryInfo: recoveryInfo.trim(),
@@ -296,10 +310,10 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
       delivery_value: accountEmail.trim() + (accountPassword.trim() ? ` | ${accountPassword.trim()}` : ''),
       deliveryFields,
       customFields,
-      status: editingIndex !== null ? (inventoryAccounts[editingIndex].status || 'Available') : 'Available',
-      soldTo: editingIndex !== null ? inventoryAccounts[editingIndex].soldTo : null,
-      orderId: editingIndex !== null ? inventoryAccounts[editingIndex].orderId : null,
-      soldAt: editingIndex !== null ? inventoryAccounts[editingIndex].soldAt : null
+      status: targetStatus,
+      soldTo: isReleasedToAvailable ? null : (existingAcc?.soldTo || null),
+      orderId: isReleasedToAvailable ? null : (existingAcc?.orderId || null),
+      soldAt: isReleasedToAvailable ? null : (existingAcc?.soldAt || null)
     };
 
     customFields.forEach(cf => {
@@ -312,15 +326,34 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     if (editingIndex !== null) {
       nextInventory = [...inventoryAccounts];
       nextInventory[editingIndex] = currentAccount;
-      setEditingIndex(null);
+      handleCancelStockEdit();
     } else {
       nextInventory = [...inventoryAccounts, currentAccount];
+      handleCancelStockEdit();
     }
     setInventoryAccounts(nextInventory);
 
-    // Instant real-time database sync
+    // Instant real-time database sync via server-side authorization and Firestore
     try {
       const unusedCount = nextInventory.filter(acc => (acc.status || '').toLowerCase() !== 'sold').length;
+
+      // Server-side call for security & role authorization
+      try {
+        const token = user ? await user.getIdToken() : '';
+        await safeApiFetch(`/api/admin/listings/${listing.id}/inventory/${currentAccount.id}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            ...currentAccount,
+            status: targetStatus
+          })
+        });
+      } catch (serverErr) {
+        console.warn('Server stock update call notice:', serverErr);
+      }
+
       const itemRef = doc(db, 'listings', listing.id, 'inventory', currentAccount.id);
       const secureRef = doc(db, 'listings', listing.id, 'inventory', currentAccount.id, 'secure', 'details');
 
@@ -383,8 +416,10 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     }
 
     triggerNotification('success', `Saved stock item to database! (Total stock: ${nextInventory.filter(i => (i.status||'').toLowerCase() !== 'sold').length})`);
+  };
 
-    // Reset inputs
+  const handleCancelStockEdit = () => {
+    setEditingIndex(null);
     setAccountEmail('');
     setAccountPassword('');
     setRecoveryInfo('');
@@ -393,12 +428,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     setBackupCodes('');
     setAdditionalInstructions('');
     setCustomFields([]);
+    setStockItemStatus('Available');
   };
 
   const handleEditAccountLocal = (index: number) => {
     const acc = inventoryAccounts[index];
+    if (!acc) return;
     setEditingIndex(index);
-    setAccountEmail(acc.accountEmail || '');
+    setAccountEmail(acc.accountEmail || acc.delivery_value || '');
     setAccountPassword(acc.accountPassword || '');
     setRecoveryInfo(acc.recoveryInfo || '');
     setTwoFactorSecretKey(acc.twoFactorSecretKey || '');
@@ -406,66 +443,53 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     setBackupCodes(acc.twoFactorBackupCodes || acc.backupCodes || '');
     setAdditionalInstructions(acc.additionalInstructions || '');
     setCustomFields(Array.isArray(acc.customFields) ? acc.customFields : []);
+
+    // Explicitly set the stockItemStatus from database without automatically releasing sold items
+    const isItemSold = (acc.status || '').toLowerCase() === 'sold';
+    setStockItemStatus(isItemSold ? 'Sold' : 'Available');
   };
 
-  const handleRemoveAccountLocal = async (index: number) => {
-    const acc = inventoryAccounts[index];
+  const handleConfirmDeleteStockItem = async (acc: any, index: number) => {
     if (!acc) return;
-
-    // Check manager / owner permissions
-    if (!canManageStock) {
-      triggerNotification('error', 'Access Denied: You do not have permission to delete stock accounts from this listing.');
+    if (!isAuthorizedAdmin && !canManageStock) {
+      triggerNotification('error', 'Access Denied: Only authorized Admins can delete stock.');
+      setStockItemToDelete(null);
       return;
     }
 
-    const isSold = (acc.status || '').toLowerCase() === 'sold';
-    if (isSold) {
-      triggerNotification('error', 'Cannot delete this stock item because it has already been sold to a customer.');
-      return;
-    }
-    const itemLabel = acc.accountEmail || acc.delivery_value || `Stock Item #${index + 1}`;
-
+    setIsDeletingStockItem(true);
     const itemId = acc.id;
     const remaining = inventoryAccounts.filter((_, idx) => idx !== index);
-    setInventoryAccounts(remaining);
-    if (itemId) {
-      setDeletedAccountIds(prev => [...prev, itemId]);
-    }
-    if (editingIndex === index) {
-      setEditingIndex(null);
-      setAccountEmail('');
-      setAccountPassword('');
-      setRecoveryInfo('');
-      setTwoFactorSecretKey('');
-      setTwoFactorBackupCodes('');
-      setBackupCodes('');
-      setAdditionalInstructions('');
-    } else if (editingIndex !== null && editingIndex > index) {
-      setEditingIndex(editingIndex - 1);
-    }
 
-    // Direct, immediate, permanent database deletion from Firestore
     try {
+      // 1. Call server-side API with authentication token
+      const token = user ? await user.getIdToken() : '';
       if (listing.id && itemId) {
-        // 1. Delete secure details subcollection doc
+        try {
+          await safeApiFetch(`/api/admin/listings/${listing.id}/inventory/${itemId}`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+        } catch (serverErr) {
+          console.warn('Server delete call notice, falling back to direct db delete:', serverErr);
+        }
+
+        // 2. Direct Firestore fallback/sync to ensure instantaneous zero-latency UI update
         try {
           const secureRef = doc(db, 'listings', listing.id, 'inventory', itemId, 'secure', 'details');
           await deleteDoc(secureRef);
-        } catch (e) {
-          console.warn('Direct delete secure doc notice:', e);
-        }
+        } catch {}
 
-        // 2. Delete inventory subcollection doc
         try {
           const itemRef = doc(db, 'listings', listing.id, 'inventory', itemId);
           await deleteDoc(itemRef);
-        } catch (e) {
-          console.warn('Direct delete inventory doc notice:', e);
-        }
+        } catch {}
 
-        // 3. Update parent listing doc in Firestore (stock, stockCount, status, and clean inventory array)
         const unusedCount = remaining.filter(item => (item.status || '').toLowerCase() !== 'sold').length;
         const cleanedInventoryForDoc = remaining.map(item => ({
+          ...item,
           id: item.id,
           status: item.status || 'Available',
           accountEmail: item.accountEmail || '',
@@ -474,6 +498,7 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           twoFactorSecretKey: item.twoFactorSecretKey || '',
           twoFactorBackupCodes: item.twoFactorBackupCodes || item.backupCodes || '',
           backupCodes: item.backupCodes || item.twoFactorBackupCodes || '',
+          deliveryFields: item.deliveryFields,
           soldTo: item.soldTo || null,
           orderId: item.orderId || null,
           soldAt: item.soldAt || null
@@ -495,8 +520,24 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
           });
         }
       }
-    } catch (dbErr) {
-      console.error('Error during immediate database deletion of stock item:', dbErr);
+
+      setInventoryAccounts(remaining);
+      if (itemId) {
+        setDeletedAccountIds(prev => [...prev, itemId]);
+      }
+      if (editingIndex === index) {
+        handleCancelStockEdit();
+      } else if (editingIndex !== null && editingIndex > index) {
+        setEditingIndex(editingIndex - 1);
+      }
+
+      triggerNotification('success', 'Stock item deleted successfully.');
+    } catch (err: any) {
+      console.error('Failed to delete stock item:', err);
+      triggerNotification('error', `Failed to delete stock item: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsDeletingStockItem(false);
+      setStockItemToDelete(null);
     }
   };
 
@@ -608,9 +649,6 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
     price !== String(listing.price) ||
     followers.trim() !== (listing.followers || '').trim() ||
     accountAge.trim() !== (listing.accountAge || '').trim() ||
-    pva !== listing.pva ||
-    twoFactor !== listing.twoFactor ||
-    monetized !== (listing.monetized || false) ||
     warrantyDays !== (listing.warrantyDays || 7) ||
     country.trim() !== (listing.country || 'Nigeria').trim() ||
     niche.trim() !== (listing.niche || 'General').trim() ||
@@ -1120,69 +1158,6 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
             </div>
           </div>
 
-          {/* Status Select */}
-          <div>
-            <label className="block text-xs font-extrabold uppercase text-[#64748B] mb-1">
-              Listing Status
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { key: 'active', label: '🟢 Active', color: 'border-[#5B4DF5] bg-[#EDE9FE] text-[#5B4DF5]' },
-                { key: 'sold', label: '🔴 Sold', color: 'border-rose-300 bg-rose-50 text-rose-700' },
-                { key: 'reserved', label: '🟡 Reserved', color: 'border-amber-300 bg-amber-50 text-amber-800' }
-              ].map((st) => (
-                <button
-                  key={st.key}
-                  type="button"
-                  onClick={() => setStatus(st.key as any)}
-                  className={`p-2.5 rounded-2xl border font-bold text-xs transition cursor-pointer text-center ${
-                    status === st.key
-                      ? st.color
-                      : 'bg-white border-[#EBE7F7] text-[#64748B] hover:text-[#0F172A]'
-                  }`}
-                >
-                  {st.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Security Features Checkboxes */}
-          <div className="bg-[#F8F7FD] p-4 rounded-2xl border border-[#EBE7F7] space-y-3">
-            <span className="text-xs font-extrabold uppercase text-[#0F172A] block">Verification & Security Badges</span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-xl border border-[#EBE7F7]">
-                <input
-                  type="checkbox"
-                  checked={pva}
-                  onChange={(e) => setPva(e.target.checked)}
-                  className="w-4 h-4 accent-[#5B4DF5] rounded"
-                />
-                <span className="text-xs font-bold text-[#0F172A]">Phone Verified (PVA)</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-xl border border-[#EBE7F7]">
-                <input
-                  type="checkbox"
-                  checked={twoFactor}
-                  onChange={(e) => setTwoFactor(e.target.checked)}
-                  className="w-4 h-4 accent-[#5B4DF5] rounded"
-                />
-                <span className="text-xs font-bold text-[#0F172A]">2FA Included</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-xl border border-[#EBE7F7]">
-                <input
-                  type="checkbox"
-                  checked={monetized}
-                  onChange={(e) => setMonetized(e.target.checked)}
-                  className="w-4 h-4 accent-[#5B4DF5] rounded"
-                />
-                <span className="text-xs font-bold text-[#0F172A]">Monetization Active</span>
-              </label>
-            </div>
-          </div>
-
           {/* Secure Digital Product Details Section (Multi-Stock Inventory Manager) */}
           <div className="bg-[#F8F7FD] border border-[#EBE7F7] p-4 sm:p-5 rounded-3xl space-y-4 shadow-xs relative overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#EBE7F7] pb-3">
@@ -1292,16 +1267,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                           <div 
                             key={item.id}
                             onClick={() => {
-                              if (!isSold) {
-                                handleEditAccountLocal(originalIdx);
-                              }
+                              handleEditAccountLocal(originalIdx);
                             }}
                             className={`p-2.5 rounded-xl flex items-center justify-between gap-3 text-xs border transition ${
                               isSold
-                                ? 'bg-rose-50 border-rose-200 opacity-85'
+                                ? 'bg-rose-50 border-rose-200 opacity-90'
                                 : 'bg-[#F8F7FD] border-[#EBE7F7] hover:border-[#5B4DF5]/40 cursor-pointer hover:bg-white'
                             }`}
-                            title={isSold ? undefined : "Click anywhere on this card to edit details"}
+                            title="Click to edit details"
                           >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1378,66 +1351,28 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              {confirmDeleteIdx === originalIdx ? (
-                                <div className="flex items-center gap-1 bg-rose-50 border border-rose-200 px-2 py-1 rounded-xl animate-pulse">
-                                  <span className="text-[10px] text-rose-700 font-bold mr-1">Delete?</span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleRemoveAccountLocal(originalIdx);
-                                      setConfirmDeleteIdx(null);
-                                    }}
-                                    className="px-2 py-0.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] rounded transition cursor-pointer"
-                                  >
-                                    Yes
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setConfirmDeleteIdx(null);
-                                    }}
-                                    className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-[#0F172A] font-extrabold text-[10px] rounded transition cursor-pointer"
-                                  >
-                                    No
-                                  </button>
-                                </div>
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleEditAccountLocal(originalIdx);
-                                    }}
-                                    className="p-1.5 text-[#64748B] hover:text-[#0F172A] hover:bg-[#EDE9FE] rounded-lg transition cursor-pointer"
-                                    title="Edit Stock Item"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                  {!isSold ? (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setConfirmDeleteIdx(originalIdx);
-                                      }}
-                                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                      title="Delete Stock Item"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  ) : (
-                                    <span 
-                                      className="p-1.5 text-slate-300 cursor-not-allowed opacity-40"
-                                      title="Cannot delete sold stock item"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </span>
-                                  )}
-                                </>
-                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditAccountLocal(originalIdx);
+                                }}
+                                className="p-1.5 text-[#64748B] hover:text-[#0F172A] hover:bg-[#EDE9FE] rounded-lg transition cursor-pointer"
+                                title="Edit Stock Item"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setStockItemToDelete({ item, index: originalIdx });
+                                }}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                title="Delete Stock Item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
                         );
@@ -1554,11 +1489,72 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                   ))}
                 </div>
 
-                <div className="pt-2">
+                {/* Availability / Release State Selector when editing */}
+                {editingIndex !== null && (
+                  <div className="bg-[#F8F7FD] p-3 rounded-xl border border-[#EBE7F7] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[#0F172A] text-xs font-bold">
+                        Stock Availability / Status
+                      </label>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                        stockItemStatus === 'Sold'
+                          ? 'bg-rose-100 text-rose-700 border-rose-200'
+                          : 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                      }`}>
+                        Current: {stockItemStatus}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStockItemStatus('Available')}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                          stockItemStatus === 'Available'
+                            ? 'bg-emerald-50 border-emerald-400 text-emerald-700 shadow-2xs font-black'
+                            : 'bg-white border-[#EBE7F7] text-[#64748B] hover:text-[#0F172A]'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span>Available (In Stock)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setStockItemStatus('Sold')}
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                          stockItemStatus === 'Sold'
+                            ? 'bg-rose-50 border-rose-400 text-rose-700 shadow-2xs font-black'
+                            : 'bg-white border-[#EBE7F7] text-[#64748B] hover:text-[#0F172A]'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-rose-500" />
+                        <span>Sold</span>
+                      </button>
+                    </div>
+
+                    {inventoryAccounts[editingIndex] && (inventoryAccounts[editingIndex].status || '').toLowerCase() === 'sold' && stockItemStatus === 'Available' && (
+                      <p className="text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200 font-semibold leading-relaxed">
+                        ⚠️ Releasing this sold item back to stock will make it available for purchase and clear old order tags upon Save.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="pt-2 flex items-center gap-2">
+                  {editingIndex !== null && (
+                    <button
+                      type="button"
+                      onClick={handleCancelStockEdit}
+                      className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleAddAccountToInventory}
-                    className="w-full bg-[#EDE9FE] hover:bg-[#DDD6FE] border border-[#DDD6FE] text-[#5B4DF5] font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+                    className="flex-1 bg-[#EDE9FE] hover:bg-[#DDD6FE] border border-[#DDD6FE] text-[#5B4DF5] font-extrabold text-xs py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
                   >
                     <PlusCircle className="w-4 h-4 text-[#5B4DF5]" />
                     <span>{editingIndex !== null ? '💾 Save Item Changes' : '＋ Add This Item to Stock'}</span>
@@ -1744,6 +1740,65 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
                   className="py-2.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-extrabold text-xs shadow-md transition cursor-pointer"
                 >
                   Discard Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stock Item Delete Confirmation Dialog */}
+        {stockItemToDelete && (
+          <div 
+            className="fixed inset-0 z-70 bg-black/60 backdrop-blur-2xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+            onClick={() => !isDeletingStockItem && setStockItemToDelete(null)}
+          >
+            <div 
+              className="bg-white rounded-2xl p-5 max-w-xs sm:max-w-sm w-full shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-rose-600" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-extrabold text-slate-900">Delete Stock Item</h4>
+                  <p className="text-[11px] text-slate-500 font-mono truncate">
+                    {stockItemToDelete.item.accountEmail || stockItemToDelete.item.delivery_value || `Item #${stockItemToDelete.index + 1}`}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600 font-medium">
+                Are you sure you want to delete this stock item?
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isDeletingStockItem}
+                  onClick={() => setStockItemToDelete(null)}
+                  className="px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isDeletingStockItem}
+                  onClick={() => handleConfirmDeleteStockItem(stockItemToDelete.item, stockItemToDelete.index)}
+                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                >
+                  {isDeletingStockItem ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3 h-3" />
+                      <span>Delete</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
