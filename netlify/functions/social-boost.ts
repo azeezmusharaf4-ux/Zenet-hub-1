@@ -1,48 +1,11 @@
 import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
 import { BASE_SOCIAL_SERVICES } from './_social_services';
 
-// Helper to resolve SMM API Key from all environment variable aliases
-const getSmmApiKey = (): string => {
-  const candidates = [
-    process.env.ONEGRIDHUB_SMM_API_KEY,
-    process.env.ONEGRIDHUB_API_KEY,
-    process.env.ONEGRID_API_KEY,
-    process.env.VITE_ONEGRID_API_KEY,
-    process.env.VITE_ONEGRIDHUB_API_KEY,
-    process.env.VITE_ONEGRIDHUB_SMM_API_KEY,
-    process.env.ONEGRIDHUB_KEY,
-    process.env.ONEGRIDHUB_SMM_KEY,
-    process.env.ONE_GRID_HUB_API_KEY,
-    process.env.SMM_API_KEY,
-    process.env.VITE_SMM_API_KEY,
-    process.env.OGH_API_KEY,
-    process.env.ONEGRIDHUB_TOKEN
-  ];
-  for (const c of candidates) {
-    if (c && typeof c === 'string') {
-      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
-      if (clean && clean !== 'undefined' && clean !== 'null' && clean !== 'your_api_key_here') {
-        return clean;
-      }
-    }
-  }
-  return '';
-};
+// Helper to resolve SMM API Key (Voiker Boosting Provider)
+const getSmmApiKey = (): string => (process.env.VOIKER_API_KEY || '').trim();
 
-// Helper to resolve OneGridHub Base URL
-const getBaseUrl = (): string => {
-  let raw = (process.env.ONEGRIDHUB_BASE_URL || 'https://onegridhub.com/api/v1/index.php')
-    .trim()
-    .replace(/^['"`]|['"`]$/g, '')
-    .replace(/\/+$/, '');
-
-  if (!raw.includes('/api/v1')) {
-    raw = `${raw}/api/v1/index.php`;
-  } else if (!raw.endsWith('.php')) {
-    raw = `${raw}/index.php`;
-  }
-  return raw;
-};
+// Helper to resolve Base URL
+const getBaseUrl = (): string => (process.env.VOIKER_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');
 
 // Category normalization helper
 const normalizeCategory = (cat: string, name: string): { platform: string; category: string; type: string } => {
@@ -282,33 +245,45 @@ export const handler = async (event: any) => {
         }
       }
 
-      // If cache is empty or minimal, auto-fetch dynamic services from OneGridHub if key is present
-      if ((!serviceList || serviceList.length < 20) && apiKey) {
+      // If cache is empty or minimal, auto-fetch dynamic services from Voiker
+      if (!serviceList || serviceList.length < 20) {
         try {
-          const q = new URLSearchParams({
-            action: 'services',
-            endpoint: 'smm_services',
-            key: apiKey,
-            api_key: apiKey
-          }).toString();
-          const pUrl = `${getBaseUrl()}?${q}`;
-          const pRes = await fetch(pUrl, {
-            headers: {
-              'Accept': 'application/json, text/plain, */*',
-              'Authorization': `Bearer ${apiKey}`,
-              'User-Agent': 'ZENET-Hub/1.0'
-            },
-            signal: AbortSignal.timeout(10000)
-          });
-          const pData: any = await pRes.json();
-
           let rawServices: any[] = [];
-          if (Array.isArray(pData)) {
-            rawServices = pData;
-          } else if (pData && Array.isArray(pData.services)) {
-            rawServices = pData.services;
-          } else if (pData && Array.isArray(pData.data)) {
-            rawServices = pData.data;
+
+          if (apiKey) {
+            try {
+              const pRes = await fetch(getBaseUrl(), {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  'Accept': 'application/json',
+                  'User-Agent': 'ZENET-Hub/1.0'
+                },
+                body: new URLSearchParams({ key: apiKey, action: 'services' }).toString(),
+                signal: AbortSignal.timeout(10000)
+              });
+              const pData: any = await pRes.json();
+              if (Array.isArray(pData)) rawServices = pData;
+            } catch (e: any) {
+              console.warn('[Netlify SocialBoost] Voiker auth fetch note:', e.message);
+            }
+          }
+
+          if (rawServices.length === 0) {
+            try {
+              const qsRes = await fetch('https://voiker.com/api/services/quickSearch', {
+                headers: { 'Accept': 'application/json', 'User-Agent': 'ZENET-Hub/1.0' },
+                signal: AbortSignal.timeout(8000)
+              });
+              if (qsRes.ok) {
+                const qsData: any = await qsRes.json();
+                if (qsData?.services && Array.isArray(qsData.services)) {
+                  rawServices = qsData.services;
+                }
+              }
+            } catch (qsErr: any) {
+              console.warn('[Netlify SocialBoost] Voiker quickSearch fetch note:', qsErr.message);
+            }
           }
 
           if (rawServices.length > 0) {

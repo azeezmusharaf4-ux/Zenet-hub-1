@@ -85,16 +85,54 @@
   status = 200
   force = true
 
-# OneGridHub endpoints
+# VirtualSMSNumbers Webhook endpoints
+[[redirects]]
+  from = "/hooks/virtualsmsnumbers"
+  to = "/.netlify/functions/virtualsmsnumbers-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/hooks/virtualsmsnumbers/*"
+  to = "/.netlify/functions/virtualsmsnumbers-webhook"
+  status = 200
+  force = true
+
+# Virtual Numbers / SMS Boost endpoints
 [[redirects]]
   from = "/api/onegridhub/*"
-  to = "/.netlify/functions/onegridhub"
+  to = "/.netlify/functions/api"
   status = 200
   force = true
 
 [[redirects]]
   from = "/api/onegridhub"
-  to = "/.netlify/functions/onegridhub"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/virtual-numbers/*"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/virtual-numbers"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
+# Voiker Boosting Provider endpoints
+[[redirects]]
+  from = "/api/voiker/*"
+  to = "/.netlify/functions/voiker"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/voiker"
+  to = "/.netlify/functions/voiker"
   status = 200
   force = true
 

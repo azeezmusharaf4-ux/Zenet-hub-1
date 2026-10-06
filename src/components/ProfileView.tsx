@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, sendPasswordResetEmail } from 'firebase/auth';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { 
   User as UserIcon, 
   Users, 
@@ -16,12 +17,15 @@ import {
   AlertCircle,
   X,
   UserCheck,
-  ArrowDownToLine
+  ArrowDownToLine,
+  Bell
 } from 'lucide-react';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { ActiveAppView, UserProfile } from '../types';
 import { DashboardTab } from './UserDashboardModal';
+import { PaymentNotificationsModal } from './PaymentNotificationsModal';
+import { NotificationsModal } from './NotificationsModal';
 
 interface ProfileViewProps {
   user: User | null;
@@ -60,11 +64,63 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 }) => {
   // Modal states for embedded actions
   const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
+  const [isPaymentNotificationsOpen, setIsPaymentNotificationsOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingStockCount, setPendingStockCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
+
+  // Listen to pending withdrawal notifications count in real-time
+  useEffect(() => {
+    if (!user || !isAdmin || !db) return;
+    const q = query(
+      collection(db, 'withdrawal_requests'),
+      where('status', '==', 'pending')
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      setPendingCount(snapshot.size);
+    }, (err) => {
+      console.warn('Notice loading pending withdrawals count:', err);
+    });
+    return () => unsub();
+  }, [user?.uid, isAdmin]);
+
+  // Listen to pending stock submissions count for Owner in real-time
+  useEffect(() => {
+    if (!user || !isOwner || !db) return;
+    const q = query(
+      collection(db, 'listings'),
+      where('approvalStatus', '==', 'pending')
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      setPendingStockCount(snapshot.size);
+    }, (err) => {
+      console.warn('Notice loading pending stock count:', err);
+    });
+    return () => unsub();
+  }, [user?.uid, isOwner]);
+
+  // Listen to unread user notifications count in real-time
+  useEffect(() => {
+    if (!user || !db) return;
+    const targetUids = isOwner ? [user.uid, 'owner'] : [user.uid];
+    const q = query(
+      collection(db, 'user_notifications'),
+      where('userId', 'in', targetUids),
+      where('read', '==', false)
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      setUnreadNotificationsCount(snapshot.size);
+    }, (err) => {
+      console.warn('Notice loading unread notifications count:', err);
+    });
+    return () => unsub();
+  }, [user?.uid, isOwner]);
 
   // Display Name
   const displayName = userProfile?.username || userProfile?.fullName || user?.displayName || user?.email?.split('@')[0] || 'User';
@@ -175,6 +231,108 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {/* 3. Main Options Card: Clean list with subtle dividers */}
       <div className="bg-white rounded-3xl border border-[#EAE6F8] shadow-sm divide-y divide-[#F1EEF9] overflow-hidden">
         
+        {/* Option: Payment Notifications (Owner & Admin) */}
+        {isAdmin && (
+          <button
+            id="profile-opt-payment-notifications"
+            onClick={() => setIsPaymentNotificationsOpen(true)}
+            className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-[#FAF9FF] transition cursor-pointer active:bg-[#F3EEFF] bg-purple-50/40"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="relative w-8 h-8 rounded-xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center shrink-0">
+                <Bell className="w-4 h-4 stroke-[2.4]" />
+                {pendingCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse ring-2 ring-white"></span>
+                )}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[#0F172A]">🔔 Payment Notifications</span>
+                  {pendingCount > 0 && (
+                    <span className="text-[10px] font-extrabold bg-rose-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                      {pendingCount} pending
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-[#64748B] font-medium">Review customer withdrawals & confirm payment</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
+          </button>
+        )}
+
+        {/* Option: Log Approve (Exclusively Owner Stock Approval Center) */}
+        {isOwner && (
+          <button
+            id="profile-opt-log-approve"
+            onClick={() => onSelectView('log-approve')}
+            className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-[#FAF9FF] transition cursor-pointer active:bg-[#F3EEFF] bg-amber-50/30"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="relative w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-4 h-4 stroke-[2.4]" />
+                {pendingStockCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse ring-2 ring-white"></span>
+                )}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[#0F172A]">Log Approve</span>
+                  {pendingStockCount > 0 && (
+                    <span className="text-[10px] font-extrabold bg-rose-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                      {pendingStockCount} pending
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-[#64748B] font-medium">Stock approval center & security review</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full uppercase">
+                OWNER
+              </span>
+              <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
+            </div>
+          </button>
+        )}
+
+        {/* Option: Notifications (Permanent notification center for all authenticated users) */}
+        {user && (
+          <button
+            id="profile-opt-notifications"
+            onClick={() => setIsNotificationsOpen(true)}
+            className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-[#FAF9FF] transition cursor-pointer active:bg-[#F3EEFF]"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="relative w-8 h-8 rounded-xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center shrink-0">
+                <Bell className="w-4 h-4 stroke-[2.4]" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse ring-2 ring-white"></span>
+                )}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[#0F172A]">Notifications</span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="text-[10px] font-extrabold bg-[#5B4DF5] text-white px-2 py-0.5 rounded-full">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-[#64748B] font-medium">Stock submissions, approvals & audit updates</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {unreadNotificationsCount > 0 && (
+                <span className="text-xs font-bold text-[#5B4DF5]">
+                  [{unreadNotificationsCount}]
+                </span>
+              )}
+              <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
+            </div>
+          </button>
+        )}
+
         {/* Option: Edit Profile */}
         <button
           id="profile-opt-edit"
@@ -410,6 +568,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* MODAL: Payment Notifications for Admin & Owner */}
+      {isPaymentNotificationsOpen && (
+        <PaymentNotificationsModal
+          isOpen={isPaymentNotificationsOpen}
+          onClose={() => setIsPaymentNotificationsOpen(false)}
+          user={user}
+        />
+      )}
+
+      {/* MODAL: Notifications Center */}
+      {isNotificationsOpen && (
+        <NotificationsModal
+          isOpen={isNotificationsOpen}
+          onClose={() => setIsNotificationsOpen(false)}
+          user={user}
+          userProfile={userProfile}
+          onOpenLogApprove={() => {
+            setIsNotificationsOpen(false);
+            onSelectView('log-approve');
+          }}
+          onOpenSellerDashboard={onOpenSellerDashboard}
+        />
       )}
 
     </div>

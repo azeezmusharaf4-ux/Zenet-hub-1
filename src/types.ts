@@ -97,6 +97,13 @@ export interface AccountListing {
   deliveryTime?: string; // e.g. "Instant (1-5 mins)"
   isVerified?: boolean; // Verified badge
   approvalStatus?: 'approved' | 'pending' | 'rejected';
+  rejectionReason?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  originalPrice?: number;
+  approvedPrice?: number;
   featured?: boolean;
   imageUrl?: string;
   images?: string[];
@@ -105,6 +112,41 @@ export interface AccountListing {
   country?: string;
   niche?: string;
   digitalProductDetails?: DigitalProductDetails;
+}
+
+export interface StockApprovalRecord {
+  id: string;
+  listingId: string;
+  title: string;
+  category: string;
+  submitterId: string;
+  submitterName: string;
+  submitterEmail?: string;
+  status: 'approved' | 'rejected' | 'pending';
+  rejectionReason?: string;
+  originalPrice: number;
+  approvedPrice?: number;
+  quantity: number;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewedByUid?: string;
+  notes?: string;
+}
+
+export interface UserNotification {
+  id: string;
+  userId: string;
+  userEmail?: string;
+  title: string;
+  message: string;
+  type: 'stock_pending' | 'stock_pending_approval' | 'stock_submitted' | 'stock_approved' | 'stock_rejected' | 'payment' | 'order' | 'system' | string;
+  relatedId?: string;
+  rejectionReason?: string;
+  read: boolean;
+  readAt?: string;
+  createdAt: string;
+  metadata?: Record<string, any>;
 }
 
 export interface UserProfile {
@@ -374,6 +416,7 @@ export interface ZenedUpdateOrder {
 
 export interface SocialBoostService {
   id: string;
+  provider?: string;
   service?: string | number; // Upstream service ID alias
   rate?: number; // Upstream rate alias
   pricePerThousandNgn?: number; // Selling price per 1,000 NGN alias
@@ -382,6 +425,7 @@ export interface SocialBoostService {
   name: string;
   type?: 'Followers' | 'Likes' | 'Views' | 'Comments' | 'Shares' | 'Subscribers' | 'Members' | 'Watch Hours' | 'Plays' | 'Reactions' | 'Other' | string;
   ratePer1000?: number; // Customer selling price per 1,000 in NGN
+  rateUsd?: number; // Upstream rate in USD
   providerRatePer1000?: number; // Upstream provider cost per 1,000 (Owner only)
   markupPer1000?: number; // Margin per 1,000 (Owner only)
   providerServiceId?: string | number; // Provider upstream service ID (Owner only)
@@ -390,6 +434,7 @@ export interface SocialBoostService {
   description?: string;
   deliverySpeed?: string;
   refill?: boolean;
+  cancel?: boolean;
   quality?: string;
   isActive?: boolean;
   isBestValue?: boolean;
@@ -469,6 +514,7 @@ export type ActiveAppView =
   | 'settings' 
   | 'support'
   | 'admin_wallets'
+  | 'log-approve'
   | 'withdrawals';
 
 export type TikTokServiceType = 'followers' | 'views' | 'likes' | 'comments' | 'shares' | 'favorites';
@@ -525,12 +571,16 @@ export interface WithdrawalRequest {
   userName: string;
   userEmail: string;
   withdrawalId: string;
+  transactionId?: string;
+  category?: 'withdrawal';
+  month?: string;
   amount: number;
   currency: string;
   bankName: string;
+  bankCode?: string;
   accountNumber: string;
   accountName: string;
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  status: 'pending' | 'approved' | 'rejected' | 'completed' | 'confirmed' | 'failed';
   createdAt: string;
   createdDate: string;
   createdTime: string;

@@ -1506,20 +1506,34 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
     setIsProcessingRole(true);
     try {
-      // 1. Update in Firestore
-      const userRef = doc(db, 'users', targetUser.uid);
-      await updateDoc(userRef, { role: newRole });
+      const token = user ? await getSafeIdToken(user) : null;
 
-      // 2. Sync with backend endpoint
-      await safeApiFetch('/api/admin/manage-role', {
+      // 1. Authoritative backend role update
+      const apiRes = await safeApiFetch('/api/admin/manage-role', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
-          callerEmail: user?.email || 'azeezmusharaf4@gmail.com',
+          callerEmail: user?.email || userProfile?.email || 'azeezmusharaf4@gmail.com',
           targetUid: targetUser.uid,
           newRole
         })
-      }).catch(e => console.warn('Backend manage-role endpoint notice:', e));
+      });
+
+      if (!apiRes || !apiRes.success) {
+        console.warn('Backend manage-role notice:', apiRes?.error);
+      }
+
+      // 2. Direct Firestore update to persist immediately in client cache
+      const userRef = doc(db, 'users', targetUser.uid);
+      await setDoc(userRef, { 
+        role: newRole,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch((fsErr) => {
+        console.warn('Direct Firestore role write note (backend handled):', fsErr);
+      });
 
       // 3. Update local state
       setUsers((prev) => prev.map((u) => (u.uid === targetUser.uid ? { ...u, role: newRole } : u)));
@@ -1544,19 +1558,34 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       return;
     }
     try {
-      const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, { role: newRole });
+      const token = user ? await getSafeIdToken(user) : null;
 
-      // Sync with backend API
-      await safeApiFetch('/api/admin/manage-role', {
+      // 1. Authoritative backend role update
+      const apiRes = await safeApiFetch('/api/admin/manage-role', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
-          callerEmail: user?.email || 'azeezmusharaf4@gmail.com',
+          callerEmail: user?.email || userProfile?.email || 'azeezmusharaf4@gmail.com',
           targetUid: uid,
-          newRole: newRole === 'admin' ? 'admin' : 'buyer'
+          newRole: newRole === 'admin' ? 'admin' : (newRole === 'seller' ? 'seller' : 'buyer')
         })
-      }).catch(e => console.warn('Backend manage-role notice:', e));
+      });
+
+      if (!apiRes || !apiRes.success) {
+        console.warn('Backend manage-role notice:', apiRes?.error);
+      }
+
+      // 2. Direct Firestore update to persist in client cache
+      const userRef = doc(db, 'users', uid);
+      await setDoc(userRef, { 
+        role: newRole,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch((fsErr) => {
+        console.warn('Direct Firestore role write note (backend handled):', fsErr);
+      });
 
       setUsers((prev) => prev.map((u) => (u.uid === uid ? { ...u, role: newRole } : u)));
     } catch (err: any) {

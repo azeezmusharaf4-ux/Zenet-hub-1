@@ -20,7 +20,10 @@ import {
   PieChart,
   Receipt,
   ArrowUpRight,
-  Info
+  Info,
+  Clock,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, setDoc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -63,7 +66,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   onUpdateListing
 }) => {
   const [activeTab, setActiveTab] = useState<SellerDashboardTab>('overview');
-  const [inventoryTab, setInventoryTab] = useState<'active' | 'sold'>('active');
+  const [inventoryTab, setInventoryTab] = useState<'active' | 'pending' | 'sold'>('active');
 
   // Editing listing modal state
   const [editingListing, setEditingListing] = useState<AccountListing | null>(null);
@@ -146,12 +149,22 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
     return false;
   };
 
-  // 1. ACTIVE LOGS: Only listings whose status is ACTIVE. New unsold listings automatically appear here.
+  // 1. ACTIVE LOGS: Only listings whose status is ACTIVE and approved. New unsold listings automatically appear here.
   const activeListingsList = useMemo(() => {
-    return myListings.filter((l) => !isListingSold(l));
+    return myListings.filter((l) => !isListingSold(l) && l.approvalStatus !== 'pending' && l.approvalStatus !== 'rejected');
   }, [myListings, sellerPurchases]);
 
-  // 2. SOLD ACCOUNTS: Only listings whose status is SOLD. Once a listing is sold, it automatically appears and remains here.
+  // 2. PENDING APPROVAL: Listings submitted and awaiting Owner review
+  const pendingListingsList = useMemo(() => {
+    return myListings.filter((l) => l.approvalStatus === 'pending');
+  }, [myListings]);
+
+  // 3. REJECTED: Listings rejected by Owner with feedback reason
+  const rejectedListingsList = useMemo(() => {
+    return myListings.filter((l) => l.approvalStatus === 'rejected');
+  }, [myListings]);
+
+  // 4. SOLD ACCOUNTS: Only listings whose status is SOLD. Once a listing is sold, it automatically appears and remains here.
   const soldListingsList = useMemo(() => {
     return myListings.filter((l) => isListingSold(l));
   }, [myListings, sellerPurchases]);
@@ -520,20 +533,20 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                   </span>
                 </div>
 
-                {/* Status Tabs: ACTIVE LOGS & SOLD LOGS */}
-                <div className="flex items-center gap-2 p-1.5 bg-slate-100/90 border border-slate-200/80 rounded-2xl">
+                {/* Status Tabs: ACTIVE LOGS, PENDING APPROVAL, & SOLD LOGS */}
+                <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-slate-100/90 border border-slate-200/80 rounded-2xl">
                   <button
                     type="button"
                     onClick={() => setInventoryTab('active')}
-                    className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
+                    className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
                       inventoryTab === 'active'
                         ? 'bg-purple-600 text-white shadow-xs'
                         : 'text-slate-600 hover:text-purple-700 hover:bg-white/80'
                     }`}
                   >
                     <CheckCircle2 className={`w-3.5 h-3.5 ${inventoryTab === 'active' ? 'text-white' : 'text-purple-600'}`} />
-                    <span>ACTIVE LOGS</span>
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-black ${
+                    <span className="truncate">ACTIVE</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
                       inventoryTab === 'active' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700'
                     }`}>
                       {activeListingsList.length}
@@ -542,16 +555,34 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
 
                   <button
                     type="button"
+                    onClick={() => setInventoryTab('pending')}
+                    className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      inventoryTab === 'pending'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-amber-700 hover:bg-white/80'
+                    }`}
+                  >
+                    <Clock className={`w-3.5 h-3.5 ${inventoryTab === 'pending' ? 'text-white' : 'text-amber-600'}`} />
+                    <span className="truncate">PENDING</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
+                      inventoryTab === 'pending' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {pendingListingsList.length}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setInventoryTab('sold')}
-                    className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer flex items-center justify-center gap-2 ${
+                    className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 ${
                       inventoryTab === 'sold'
                         ? 'bg-purple-600 text-white shadow-xs'
                         : 'text-slate-600 hover:text-purple-700 hover:bg-white/80'
                     }`}
                   >
                     <Tag className={`w-3.5 h-3.5 ${inventoryTab === 'sold' ? 'text-white' : 'text-slate-500'}`} />
-                    <span>SOLD LOGS</span>
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-black ${
+                    <span className="truncate">SOLD</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
                       inventoryTab === 'sold' ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-700'
                     }`}>
                       {soldListingsList.length}
@@ -577,7 +608,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                         <Store className="w-7 h-7 text-slate-400 mx-auto opacity-50" />
                         <h5 className="text-slate-900 font-extrabold text-sm">No active listings</h5>
                         <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                          New unsold listings automatically appear here. Click "+ Create New Account Listing" above to list an account!
+                          New unsold listings automatically appear here once approved by Owner. Click "+ Create New Account Listing" above to list an account!
                         </p>
                       </div>
                     ) : (
@@ -588,8 +619,9 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                               <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
                                 {listing.category}
                               </span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                {listing.status || 'ACTIVE'}
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Approved / Active</span>
                               </span>
                             </div>
 
@@ -606,6 +638,109 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                             </div>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. PENDING APPROVAL TAB: Displays listings awaiting Owner review */}
+                {inventoryTab === 'pending' && (
+                  <div className="space-y-3 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        <span className="tracking-wide">PENDING APPROVAL ({pendingListingsList.length})</span>
+                      </h4>
+                      <span className="text-xs text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                        Under Owner Review
+                      </span>
+                    </div>
+
+                    {pendingListingsList.length === 0 ? (
+                      <div className="text-center py-8 bg-amber-50/40 border border-dashed border-amber-200 rounded-2xl p-6 space-y-2">
+                        <Clock className="w-7 h-7 text-amber-500 mx-auto opacity-70" />
+                        <h5 className="text-slate-900 font-extrabold text-sm">No pending approvals</h5>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          When you submit new stock, it will automatically enter this queue until reviewed and approved by the Owner.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {pendingListingsList.map((listing) => (
+                          <div key={listing.id} className="bg-white border border-amber-200 p-4 rounded-2xl space-y-2.5 shadow-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                {listing.category}
+                              </span>
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span>Pending Approval</span>
+                              </span>
+                            </div>
+
+                            <h5 className="font-bold text-slate-900 text-sm line-clamp-1">{listing.title}</h5>
+                            <p className="text-[11px] text-amber-700 bg-amber-50/70 p-2 rounded-xl border border-amber-200">
+                              ⏳ Submitted for Owner review. Will become active once approved.
+                            </p>
+                            <div className="flex items-center justify-between text-xs pt-2 border-t border-amber-100">
+                              <span className="font-black text-amber-700 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                              <button
+                                onClick={() => setEditingListing(listing)}
+                                className="text-xs text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-amber-700" />
+                                <span>Edit Details</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Rejected Listings Section if any */}
+                    {rejectedListingsList.length > 0 && (
+                      <div className="pt-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-extrabold text-rose-900 text-sm flex items-center gap-2">
+                            <XCircle className="w-4 h-4 text-rose-600" />
+                            <span className="tracking-wide">REJECTED STOCK ({rejectedListingsList.length})</span>
+                          </h4>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {rejectedListingsList.map((listing) => (
+                            <div key={listing.id} className="bg-rose-50/30 border border-rose-200 p-4 rounded-2xl space-y-2.5 shadow-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                  {listing.category}
+                                </span>
+                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded uppercase bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                                  <XCircle className="w-3 h-3" />
+                                  <span>Rejected</span>
+                                </span>
+                              </div>
+
+                              <h5 className="font-bold text-slate-900 text-sm line-clamp-1">{listing.title}</h5>
+
+                              {listing.rejectionReason && (
+                                <div className="p-2.5 rounded-xl bg-rose-100/70 border border-rose-300 text-xs text-rose-900 space-y-0.5">
+                                  <span className="font-black block text-[10px] uppercase text-rose-800">Owner's Rejection Reason:</span>
+                                  <p className="font-semibold text-rose-950">{listing.rejectionReason}</p>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between text-xs pt-2 border-t border-rose-100">
+                                <span className="font-black text-rose-700 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                                <button
+                                  onClick={() => setEditingListing(listing)}
+                                  className="text-xs text-rose-700 hover:text-rose-900 font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5 text-rose-700" />
+                                  <span>Edit & Resubmit</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

@@ -15,9 +15,11 @@ When you connect your GitHub repository to Netlify:
    - **Functions directory**: `netlify/functions` (auto-detected via `netlify.toml`)
 
 2. **Environment Variables** (Netlify Site Configuration → Environment variables):
+   - `VOIKER_API_KEY`: Your Voiker API key (obtain from https://voiker.com/account/api or your Voiker account dashboard under API settings)
+   - `VOIKER_BASE_URL`: `https://voiker.com/api/v2` (defaults to https://voiker.com/api/v2 if omitted)
+   - `USD_TO_NGN_RATE`: `1650` (or your preferred exchange rate for converting Voiker USD rates to NGN)
+   - `VSN_API_KEY`: Your VirtualSMSNumbers API key
    - `PAYSTACK_SECRET_KEY`: Your live Paystack secret key (`sk_live_...`)
-   - `ONEGRIDHUB_API_KEY`: Your OneGridHub API key for Service Numbers & Social Boost
-   - `ONEGRIDHUB_BASE_URL`: (Optional, defaults to `https://onegridhub.com/api/v1/index.php`)
    - `VITE_FIREBASE_PROJECT_ID`: Your Firebase project ID (`ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9`)
    - `VITE_FIREBASE_API_KEY`: Your Firebase web API key
    - `VITE_FIREBASE_AUTH_DOMAIN`: `ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9.firebaseapp.com`
@@ -50,6 +52,6 @@ Add your Netlify production domain:
 
 ## ⚡ Built-in Resilient Systems
 
-- **Social Boost (SMM)**: Real-time catalogue synchronization with OneGridHub, automatic fallback with 4,300+ services, customizable markup, order placement, and live status checking.
-- **Service Numbers (Virtual SIM)**: Multi-server routing (`all1`, `all2`, `usa1`, etc.), real-time pricing and country resolution, instant purchasing, SMS code reception, and cancellation/refunds.
+- **Social Boost (SMM - Voiker Provider)**: Direct integration with Voiker (https://voiker.com/api/v2), live automated catalogue synchronization, categorized social platforms (TikTok, Instagram, YouTube, Facebook, Twitter/X, Telegram, WhatsApp, Spotify, Discord, etc.), custom NGN markup rules, atomic wallet deduction, real-time order placement, status tracking, and optional refill/cancel where supported.
+- **Service Numbers (Virtual SMS Numbers)**: Multi-server routing via VirtualSMSNumbers integration, real-time pricing and country resolution, instant purchasing, SMS code reception, and cancellation/refunds.
 - **Wallet & Transactions**: Real-time balance updates, Paystack deposit verification, idempotent webhook processing, and atomic deductions.

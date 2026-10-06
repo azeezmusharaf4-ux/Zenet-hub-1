@@ -47,32 +47,57 @@ import { safeLocalStorage } from './utils/storage';
 import { ServiceUnavailableView } from './components/ServiceUnavailableView';
 import type { DashboardTab } from './components/UserDashboardModal';
 
-// Code-split heavy views & modals for lighter initial bundle and fast mobile load
-const ListingDetailModal = React.lazy(() => import('./components/ListingDetailModal').then(m => ({ default: m.ListingDetailModal })));
-const CreateListingModal = React.lazy(() => import('./components/CreateListingModal').then(m => ({ default: m.CreateListingModal })));
-const AuthModal = React.lazy(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })));
-const ContactSellerModal = React.lazy(() => import('./components/ContactSellerModal').then(m => ({ default: m.ContactSellerModal })));
-const UserDashboardModal = React.lazy(() => import('./components/UserDashboardModal').then(m => ({ default: m.UserDashboardModal })));
-const SellerDashboardModal = React.lazy(() => import('./components/SellerDashboardModal').then(m => ({ default: m.SellerDashboardModal })));
-const SellerProfileModal = React.lazy(() => import('./components/SellerProfileModal').then(m => ({ default: m.SellerProfileModal })));
-const PaymentModal = React.lazy(() => import('./components/PaymentModal').then(m => ({ default: m.PaymentModal })));
-const InsufficientBalanceModal = React.lazy(() => import('./components/InsufficientBalanceModal').then(m => ({ default: m.InsufficientBalanceModal })));
-const PaymentSuccessModal = React.lazy(() => import('./components/PaymentSuccessModal').then(m => ({ default: m.PaymentSuccessModal })));
-const BuyNowConfirmModal = React.lazy(() => import('./components/BuyNowConfirmModal').then(m => ({ default: m.BuyNowConfirmModal })));
-const PurchaseProcessingModal = React.lazy(() => import('./components/PurchaseProcessingModal').then(m => ({ default: m.PurchaseProcessingModal })));
-const PurchaseDetailsModal = React.lazy(() => import('./components/PurchaseDetailsModal').then(m => ({ default: m.PurchaseDetailsModal })));
-const WalletModal = React.lazy(() => import('./components/WalletModal').then(m => ({ default: m.WalletModal })));
-const LogoutConfirmModal = React.lazy(() => import('./components/LogoutConfirmModal').then(m => ({ default: m.LogoutConfirmModal })));
-const AdminPanelModal = React.lazy(() => import('./components/AdminPanelModal').then(m => ({ default: m.AdminPanelModal })));
-const VirtualNumbersView = React.lazy(() => import('./components/VirtualNumbersView').then(m => ({ default: m.VirtualNumbersView })));
-const SocialBoostView = React.lazy(() => import('./components/SocialBoostView').then(m => ({ default: m.SocialBoostView })));
-const Server2View = React.lazy(() => import('./components/Server2View').then(m => ({ default: m.Server2View })));
-const VirtualNumbers2View = React.lazy(() => import('./components/VirtualNumbers2View').then(m => ({ default: m.VirtualNumbers2View })));
-const SocialBoost2View = React.lazy(() => import('./components/SocialBoost2View').then(m => ({ default: m.SocialBoost2View })));
-const AdminWalletsView = React.lazy(() => import('./components/AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
-const ZenetUpdateModal = React.lazy(() => import('./components/ZenetUpdateModal').then(m => ({ default: m.ZenetUpdateModal })));
-const ZenetUpdateAdminModal = React.lazy(() => import('./components/ZenetUpdateAdminModal').then(m => ({ default: m.ZenetUpdateAdminModal })));
-const WithdrawModal = React.lazy(() => import('./components/WithdrawModal').then(m => ({ default: m.WithdrawModal })));
+// Direct imports for core product views to guarantee instant load and eliminate chunk MIME errors
+import { SocialBoostView } from './components/SocialBoostView';
+import { VirtualNumbersView } from './components/VirtualNumbersView';
+
+// Robust dynamic import with automatic retry on network or chunk MIME mismatch for secondary modals
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  importFn: () => Promise<{ default: T } | any>
+): React.LazyExoticComponent<T> {
+  return React.lazy(async () => {
+    try {
+      const mod = await importFn();
+      return mod?.default ? mod : { default: mod };
+    } catch (firstErr: any) {
+      console.warn('[ZENET LazyLoad retry]', firstErr?.message || firstErr);
+      await new Promise(r => setTimeout(r, 250));
+      try {
+        const mod = await importFn();
+        return mod?.default ? mod : { default: mod };
+      } catch (secondErr) {
+        console.error('[ZENET LazyLoad error]', secondErr);
+        throw secondErr;
+      }
+    }
+  });
+}
+
+// Code-split heavy secondary modals for lighter bundle
+const ListingDetailModal = lazyWithRetry(() => import('./components/ListingDetailModal').then(m => ({ default: m.ListingDetailModal })));
+const CreateListingModal = lazyWithRetry(() => import('./components/CreateListingModal').then(m => ({ default: m.CreateListingModal })));
+const AuthModal = lazyWithRetry(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })));
+const ContactSellerModal = lazyWithRetry(() => import('./components/ContactSellerModal').then(m => ({ default: m.ContactSellerModal })));
+const UserDashboardModal = lazyWithRetry(() => import('./components/UserDashboardModal').then(m => ({ default: m.UserDashboardModal })));
+const SellerDashboardModal = lazyWithRetry(() => import('./components/SellerDashboardModal').then(m => ({ default: m.SellerDashboardModal })));
+const SellerProfileModal = lazyWithRetry(() => import('./components/SellerProfileModal').then(m => ({ default: m.SellerProfileModal })));
+const PaymentModal = lazyWithRetry(() => import('./components/PaymentModal').then(m => ({ default: m.PaymentModal })));
+const InsufficientBalanceModal = lazyWithRetry(() => import('./components/InsufficientBalanceModal').then(m => ({ default: m.InsufficientBalanceModal })));
+const PaymentSuccessModal = lazyWithRetry(() => import('./components/PaymentSuccessModal').then(m => ({ default: m.PaymentSuccessModal })));
+const BuyNowConfirmModal = lazyWithRetry(() => import('./components/BuyNowConfirmModal').then(m => ({ default: m.BuyNowConfirmModal })));
+const PurchaseProcessingModal = lazyWithRetry(() => import('./components/PurchaseProcessingModal').then(m => ({ default: m.PurchaseProcessingModal })));
+const PurchaseDetailsModal = lazyWithRetry(() => import('./components/PurchaseDetailsModal').then(m => ({ default: m.PurchaseDetailsModal })));
+const WalletModal = lazyWithRetry(() => import('./components/WalletModal').then(m => ({ default: m.WalletModal })));
+const LogoutConfirmModal = lazyWithRetry(() => import('./components/LogoutConfirmModal').then(m => ({ default: m.LogoutConfirmModal })));
+const AdminPanelModal = lazyWithRetry(() => import('./components/AdminPanelModal').then(m => ({ default: m.AdminPanelModal })));
+const Server2View = lazyWithRetry(() => import('./components/Server2View').then(m => ({ default: m.Server2View })));
+const VirtualNumbers2View = lazyWithRetry(() => import('./components/VirtualNumbers2View').then(m => ({ default: m.VirtualNumbers2View })));
+const SocialBoost2View = lazyWithRetry(() => import('./components/SocialBoost2View').then(m => ({ default: m.SocialBoost2View })));
+const AdminWalletsView = lazyWithRetry(() => import('./components/AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
+const ZenetUpdateModal = lazyWithRetry(() => import('./components/ZenetUpdateModal').then(m => ({ default: m.ZenetUpdateModal })));
+const ZenetUpdateAdminModal = lazyWithRetry(() => import('./components/ZenetUpdateAdminModal').then(m => ({ default: m.ZenetUpdateAdminModal })));
+const WithdrawModal = lazyWithRetry(() => import('./components/WithdrawModal').then(m => ({ default: m.WithdrawModal })));
+const LogApproveView = lazyWithRetry(() => import('./components/LogApproveView').then(m => ({ default: m.LogApproveView })));
 
 const LazyViewFallback: React.FC = () => (
   <div className="w-full min-h-[360px] flex flex-col items-center justify-center p-8 text-center text-[#5B4DF5] animate-in fade-in duration-200">
@@ -628,6 +653,7 @@ export default function App() {
       'categories',
       'support',
       'admin_wallets',
+      'log-approve',
       'profile',
       'edit-profile',
       'change-password',
@@ -748,6 +774,7 @@ export default function App() {
       view === 'categories' ||
       view === 'support' ||
       view === 'admin_wallets' ||
+      view === 'log-approve' ||
       view === 'social-boost' ||
       view === 'social-boost-2' ||
       view === 'virtual-numbers' ||
@@ -845,6 +872,11 @@ export default function App() {
         'categories',
         'support',
         'admin_wallets',
+        'log-approve',
+        'profile',
+        'edit-profile',
+        'change-password',
+        'referrals',
         'orders',
         'history'
       ];
@@ -958,13 +990,27 @@ export default function App() {
         // Immediately hydrate fallback profile if empty so user is never stuck on synchronization screen
         setUserProfile((prev) => {
           if (prev && prev.uid === currentUser.uid) return prev;
+          let initialRole: 'owner' | 'admin' | 'seller' | 'buyer' = 'buyer';
+          if (isAuthorizedOwnerEmail(currentUser.email) || isAuthorizedOwnerUid(currentUser.uid)) {
+            initialRole = 'owner';
+          } else {
+            try {
+              const cachedRaw = safeLocalStorage.getItem('zenet_cached_user_profile');
+              if (cachedRaw) {
+                const parsed = JSON.parse(cachedRaw);
+                if (parsed.uid === currentUser.uid && parsed.role) {
+                  initialRole = parsed.role;
+                }
+              }
+            } catch {}
+          }
           const cachedBal = getCachedWalletBalance(currentUser.uid);
           const fallbackProfile: UserProfile = {
             uid: currentUser.uid,
             email: currentUser.email || '',
             username: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
             displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
-            role: (isAuthorizedOwnerEmail(currentUser.email) || isAuthorizedOwnerUid(currentUser.uid)) ? 'owner' : 'buyer',
+            role: initialRole,
             status: 'active',
             createdAt: new Date().toISOString(),
             walletBalance: cachedBal,
@@ -1106,7 +1152,7 @@ export default function App() {
         }
 
         try {
-          // Always load from user's actual database/wallet record
+          // Always load from user's actual database record as the single source of truth
           const [docSnap, walletSnap] = await Promise.all([
             getDoc(userRef).catch(() => null),
             getDoc(walletRef).catch(() => null)
@@ -1122,10 +1168,38 @@ export default function App() {
               else if ((existingData.role as string) === 'manager') assignedRole = 'seller';
               else assignedRole = existingData.role as 'owner' | 'admin' | 'seller' | 'buyer';
             }
+          } else {
+            // Fallback: If client getDoc was blocked or null, fetch authoritative profile from backend API
+            try {
+              const token = await getSafeIdToken(currentUser);
+              if (token) {
+                const apiRes = await safeApiFetch('/api/user/profile', {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                if (apiRes && apiRes.success && apiRes.role) {
+                  assignedRole = apiRes.role;
+                  if (apiRes.profile) {
+                    existingData = apiRes.profile;
+                  }
+                }
+              }
+            } catch (apiErr) {
+              console.warn('Backend profile fallback notice:', apiErr);
+            }
+          }
+
+          // Check admins collection explicitly as secondary verification
+          if (assignedRole !== 'admin' && assignedRole !== 'owner') {
+            try {
+              const adminDocSnap = await getDoc(doc(db, 'admins', currentUser.uid)).catch(() => null);
+              if (adminDocSnap && adminDocSnap.exists()) {
+                assignedRole = 'admin';
+              }
+            } catch {}
           }
 
           // Bootstrap owner account
-          if (isAuthorizedOwnerEmail(currentUser.email) || isAuthorizedOwnerUid(currentUser.uid)) {
+          if (isAuthorizedOwnerEmail(currentUser.email) || isAuthorizedOwnerUid(currentUser.uid) || isAuthorizedOwnerEmail(existingData.email)) {
             assignedRole = 'owner';
           }
 
@@ -1268,6 +1342,15 @@ export default function App() {
           // Preserve the verified wallet balance on the user record in Firestore
           profilePayload.walletBalance = safeExistingBal;
           profilePayload.balance = safeExistingBal;
+
+          // CRITICAL: NEVER downgrade or overwrite an existing database role on login sync!
+          if (docSnap && docSnap.exists()) {
+            const currentDbRole = docSnap.data().role;
+            if (currentDbRole === 'admin' || currentDbRole === 'owner') {
+              profilePayload.role = currentDbRole;
+            }
+          }
+
           await setDoc(userRef, sanitizeFirestorePayload(profilePayload), { merge: true }).catch((docErr) => {
             console.warn('User profile background sync notice:', docErr);
           });
@@ -2069,30 +2152,57 @@ export default function App() {
       creatorRole: userProfile?.role || 'admin',
       sellerId: user.uid,
       owner_id: user.uid,
-      approvalStatus: listingData.approvalStatus || 'approved',
-      status: listingData.status || 'active',
+      approvalStatus: 'pending',
+      status: 'reserved', // Stock is reserved pending owner review
       featured: listingData.featured || false,
       createdAt: new Date().toISOString()
     };
 
-    // Optimistically update local state immediately
+    // Optimistically update local state
     setListings((prev) => [fullListing, ...prev.filter((item) => item.id !== fullListing.id)]);
-
-    // Reset filters so the newly published listing is immediately visible on top of homepage
-    setFilters({
-      category: 'All',
-      searchQuery: '',
-      minPrice: 0,
-      maxPrice: 100000000,
-      pvaOnly: false,
-      monetizedOnly: false,
-      twoFactorOnly: false,
-      countryFilter: 'All',
-      sortBy: 'newest'
-    });
 
     // Save document to Firestore 'listings' collection
     await setDoc(newDocRef, sanitizeFirestorePayload(fullListing));
+
+    // Create permanent notifications for Owner and Submitter
+    const nowIso = new Date().toISOString();
+    const submitterName = fullListing.sellerName || user.email?.split('@')[0] || 'Seller';
+
+    // 1. Permanent Notification for Owner (Immediate live notification)
+    try {
+      const ownerNotifId = `notif_owner_${newDocRef.id}_${Date.now()}`;
+      await setDoc(doc(db, 'user_notifications', ownerNotifId), {
+        id: ownerNotifId,
+        userId: 'owner',
+        userEmail: 'azeezmusharaf4@gmail.com',
+        title: 'New Stock Pending Approval',
+        message: `New stock submitted by ${submitterName} requires your approval.`,
+        type: 'stock_pending',
+        relatedId: newDocRef.id,
+        read: false,
+        createdAt: nowIso
+      });
+    } catch (e) {
+      console.warn('Owner notification creation notice:', e);
+    }
+
+    // 2. Permanent Notification for Submitter
+    try {
+      const subNotifId = `notif_sub_${newDocRef.id}_${Date.now()}`;
+      await setDoc(doc(db, 'user_notifications', subNotifId), {
+        id: subNotifId,
+        userId: user.uid,
+        userEmail: user.email || '',
+        title: 'Stock Submitted Successfully',
+        message: `Your stock submission "${fullListing.title}" has been submitted and is pending Owner approval.`,
+        type: 'stock_submitted',
+        relatedId: newDocRef.id,
+        read: false,
+        createdAt: nowIso
+      });
+    } catch (e) {
+      console.warn('Submitter notification creation notice:', e);
+    }
 
     // Save multi-stock inventory subcollection if provided
     if (inventoryList && inventoryList.length > 0) {
@@ -2323,7 +2433,7 @@ export default function App() {
 
   // Category counts computation
   const categoryCounts = useMemo(() => {
-    const activeListings = listings.filter((item) => item.status !== 'sold');
+    const activeListings = listings.filter((item) => item.status === 'active' && item.approvalStatus !== 'pending' && item.approvalStatus !== 'rejected');
     const counts: Record<CategoryType, number> = {
       All: activeListings.length,
       Facebook: 0,
@@ -2380,7 +2490,7 @@ export default function App() {
         : undefined;
       const stockVal = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
       const effStock = invAvail !== undefined ? invAvail : stockVal;
-      if (item.status === 'sold' || effStock <= 0) return false;
+      if (item.status === 'sold' || item.status !== 'active' || item.approvalStatus === 'pending' || item.approvalStatus === 'rejected' || effStock <= 0) return false;
 
       // 1. Category Filter (ALWAYS applied when filters.category !== 'All')
       if (filters.category !== 'All' && !isCategoryMatch(item.category, filters.category)) {
@@ -2655,11 +2765,15 @@ export default function App() {
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-12 overflow-x-hidden">
           <React.Suspense fallback={<LazyViewFallback />}>
 
-          {/* VIEW: SERVICE NUMBER (UNAVAILABLE) */}
+          {/* VIEW: SERVICE NUMBER / VIRTUAL NUMBERS (WITH QUICK BUY) */}
           {(activeView === 'virtual-numbers' || activeView === 'virtual-numbers-2') && (
-            <ServiceUnavailableView
-              serviceType="service-number"
+            <VirtualNumbersView
+              userProfile={userProfile || ({ uid: user?.uid || '', email: user?.email || '', username: user?.displayName || 'Guest', role: 'customer', walletBalance } as any)}
+              walletBalance={walletBalance}
+              onRefreshProfile={refreshUserProfileAndBalance}
               onBackToMarketplace={handleBackToMarketplace}
+              onOpenWallet={() => handleSelectView('wallet')}
+              initialServer={activeView === 'virtual-numbers-2' ? 'usa1' : 'all1'}
             />
           )}
 
@@ -2815,6 +2929,18 @@ export default function App() {
               user={user}
               onBack={() => handleSelectView('profile')}
               onOpenAuth={(mode) => setAuthMode(mode)}
+            />
+          )}
+
+          {/* VIEW: LOG APPROVE (DEDICATED FULL-SCREEN OWNER STOCK APPROVAL CENTER) */}
+          {activeView === 'log-approve' && (
+            <LogApproveView
+              user={user}
+              userProfile={userProfile}
+              onBack={() => handleSelectView('profile')}
+              onListingUpdated={(updatedListing) => {
+                setListings((prev) => prev.map((l) => l.id === updatedListing.id ? { ...l, ...updatedListing } : l));
+              }}
             />
           )}
 

@@ -585,23 +585,56 @@ export const Server2View: React.FC<Server2ViewProps> = ({
         }));
         setSmmServices(mapped);
       } else {
-        // High quality fallback services for all 12 platforms
+        // Complete set of real Voiker boosting services with exact rates and real Voiker service IDs
         setSmmServices([
-          { id: '101', platform: 'Telegram', category: 'Telegram Members', name: 'Telegram Channel/Group Members [Non-Drop - High Quality]', min: 100, max: 50000, pricePerThousandNgn: 1450, rate: 1450 },
-          { id: '102', platform: 'Telegram', category: 'Telegram Post Views', name: 'Telegram Post Views [Instant Fast - Lifetime Guarantee]', min: 500, max: 100000, pricePerThousandNgn: 450, rate: 450 },
-          { id: '103', platform: 'Instagram', category: 'Instagram Followers', name: 'Instagram Real Followers [Instant Start - 30 Days Refill]', min: 100, max: 20000, pricePerThousandNgn: 1950, rate: 1950 },
-          { id: '104', platform: 'Instagram', category: 'Instagram Likes', name: 'Instagram HQ Likes [Fast Delivery]', min: 100, max: 50000, pricePerThousandNgn: 750, rate: 750 },
-          { id: '105', platform: 'Facebook', category: 'Facebook Page Likes', name: 'Facebook Page Likes + Followers [Real Global]', min: 100, max: 10000, pricePerThousandNgn: 2200, rate: 2200 },
-          { id: '106', platform: 'TikTok', category: 'TikTok Followers', name: 'TikTok Active Followers [Organic Quality]', min: 100, max: 50000, pricePerThousandNgn: 2400, rate: 2400 },
-          { id: '107', platform: 'TikTok', category: 'TikTok Likes & Views', name: 'TikTok FYP Likes [Instant Fast]', min: 200, max: 100000, pricePerThousandNgn: 650, rate: 650 },
-          { id: '108', platform: 'YouTube', category: 'YouTube Subscribers', name: 'YouTube Channel Subscribers [Monetizable]', min: 50, max: 5000, pricePerThousandNgn: 6800, rate: 6800 },
-          { id: '109', platform: 'Twitter', category: 'Twitter Followers', name: 'Twitter / X High Quality Followers', min: 100, max: 10000, pricePerThousandNgn: 3200, rate: 3200 },
-          { id: '110', platform: 'Discord', category: 'Discord Members', name: 'Discord Server Members [Online Active]', min: 100, max: 10000, pricePerThousandNgn: 3500, rate: 3500 },
-          { id: '111', platform: 'LinkedIn', category: 'LinkedIn Connections', name: 'LinkedIn Connections & Followers', min: 50, max: 5000, pricePerThousandNgn: 5400, rate: 5400 },
-          { id: '112', platform: 'Spotify', category: 'Spotify Plays', name: 'Spotify Track Plays [Royalty Eligible]', min: 500, max: 50000, pricePerThousandNgn: 950, rate: 950 },
-          { id: '113', platform: 'Snapchat', category: 'Snapchat Followers', name: 'Snapchat Public Profile Followers', min: 100, max: 10000, pricePerThousandNgn: 3800, rate: 3800 },
-          { id: '114', platform: 'Website', category: 'Website Traffic', name: 'Global Website Visitors [Organic Direct]', min: 1000, max: 500000, pricePerThousandNgn: 850, rate: 850 },
-          { id: '115', platform: 'Other', category: 'Special Growth', name: 'Multi-Network Social Growth & Engagement Boost', min: 100, max: 20000, pricePerThousandNgn: 2100, rate: 2100 },
+          // TikTok
+          { id: '3', service: '3', platform: 'TikTok', category: 'TikTok - Views', name: 'TikTok Views Real 💎', min: 1000, max: 50000000, pricePerThousandNgn: 206, rate: 206, description: 'Directly routed through Voiker network for instant video impressions.' },
+          { id: '6', service: '6', platform: 'TikTok', category: 'TikTok - Likes', name: 'TikTok Likes | 💖', min: 10, max: 100000, pricePerThousandNgn: 936, rate: 936, description: 'High-speed genuine heart likes to trigger TikTok engagement metrics.' },
+          { id: '834', service: '834', platform: 'TikTok', category: 'TikTok - Followers', name: 'TikTok Followers 🌍 | ✅Quality: ₕQ', min: 50, max: 5000000, pricePerThousandNgn: 4529, rate: 4529, description: 'Grow your profile audience with authentic global followers.' },
+          { id: '44', service: '44', platform: 'TikTok', category: 'TikTok - Comments', name: 'TikTok Comments ~ Custom ~ 𝐇𝐐 🚀', min: 10, max: 100000, pricePerThousandNgn: 13946, rate: 13946, description: 'Custom relevant comments written by you posted directly to your video.' },
+          { id: '841', service: '841', platform: 'TikTok', category: 'TikTok - Shares', name: 'TikTok Shares 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️', min: 10, max: 217545811, pricePerThousandNgn: 265, rate: 265, description: 'Boost video redistribute signals and content recommendation.' },
+          { id: '10', service: '10', platform: 'TikTok', category: 'TikTok - Saves', name: 'TikTok Video Saves [Refill: 30 Days] 🔥♻️', min: 10, max: 100000, pricePerThousandNgn: 279, rate: 279, description: 'Authentic TikTok bookmark favorites with 30-day automated refill.' },
+
+          // Instagram
+          { id: '7', service: '7', platform: 'Instagram', category: 'Instagram - Likes', name: 'Instagram - Likes + Impressions Real Profiles 💖 🌎 🔥', min: 100, max: 100000, pricePerThousandNgn: 141, rate: 141, description: 'Post and Reels likes with real profile impressions.' },
+          { id: '711', service: '711', platform: 'Instagram', category: 'Instagram - Followers', name: 'Instagram Followers | 𝐎𝐥𝐝 𝐀𝐜𝐜𝐨𝐮𝐧𝐭 [R365 ♻️] ❌', min: 10, max: 217545811, pricePerThousandNgn: 5272, rate: 5272, description: 'High retention Instagram followers with 365-day warranty.' },
+          { id: '43', service: '43', platform: 'Instagram', category: 'Instagram - Views', name: 'Instagram Views 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️', min: 100, max: 2147483647, pricePerThousandNgn: 4, rate: 4, description: 'Ultra fast video and reels impressions.' },
+          { id: '151', service: '151', platform: 'Instagram', category: 'Instagram - Comments', name: 'Instagram Mix Positive Emoji Comments', min: 10, max: 200000, pricePerThousandNgn: 7506, rate: 7506, description: 'Positive emoji comments to drive engagement.' },
+          { id: '19', service: '19', platform: 'Instagram', category: 'Instagram - Saves', name: 'Instagram Saves + Impressions 🚀', min: 10, max: 400000, pricePerThousandNgn: 224, rate: 224, description: 'Post saves and discovery reach impressions.' },
+
+          // Facebook
+          { id: '42', service: '42', platform: 'Facebook', category: 'Facebook - Followers', name: 'Facebook Page & Profile Followers 🔴', min: 10, max: 50000, pricePerThousandNgn: 389, rate: 389, description: 'Page followers and profile subscriber growth.' },
+          { id: '177', service: '177', platform: 'Facebook', category: 'Facebook - Post Likes', name: 'Facebook Post Likes', min: 10, max: 50000, pricePerThousandNgn: 412, rate: 412, description: 'Likes for photos, videos, and status updates.' },
+          { id: '698', service: '698', platform: 'Facebook', category: 'Facebook - Video Views', name: 'Facebook Views ~ 10 Seconds', min: 500, max: 10000000, pricePerThousandNgn: 732, rate: 732, description: '10-second video views for Facebook Watch videos.' },
+
+          // YouTube
+          { id: '264', service: '264', platform: 'YouTube', category: 'YouTube - Views', name: 'Youtube Views | Monetizable | Best For SEO', min: 100, max: 100000000, pricePerThousandNgn: 6022, rate: 6022, description: 'Monetizable views with suggested video sources.' },
+          { id: '298', service: '298', platform: 'YouTube', category: 'YouTube - Subscribers', name: 'YouTube Subscribers ℍ𝕚𝕘𝕙 𝔻𝕣𝕠𝕡 ℕ𝕠 ℝ𝕖𝕗𝕚𝕝𝕝', min: 10, max: 500000, pricePerThousandNgn: 152, rate: 152, description: 'Rapid channel subscriber base expansion.' },
+          { id: '282', service: '282', platform: 'YouTube', category: 'YouTube - Likes', name: 'YouTube Likes 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️', min: 10, max: 5000, pricePerThousandNgn: 329, rate: 329, description: 'Instant likes for YouTube videos.' },
+
+          // Twitter / X
+          { id: '810', service: '810', platform: 'Twitter', category: 'Twitter - Followers', name: 'Twitter / X Followers | Real Profile Base', min: 100, max: 10000, pricePerThousandNgn: 2405, rate: 2405, description: 'Profile audience and follower growth.' },
+          { id: '751', service: '751', platform: 'Twitter', category: 'Twitter - Likes', name: 'Twitter / X Likes | HQ | R30', min: 10, max: 10000, pricePerThousandNgn: 3944, rate: 3944, description: 'Likes on tweets to increase reach.' },
+          { id: '831', service: '831', platform: 'Twitter', category: 'Twitter - Retweets', name: 'Twitter / X Retweets', min: 20, max: 5000, pricePerThousandNgn: 2148, rate: 2148, description: 'Direct retweets to amplify reach.' },
+
+          // Telegram
+          { id: '513', service: '513', platform: 'Telegram', category: 'Telegram - Members', name: 'Telegram Members | Max 100K | 0-15 Minutes', min: 10, max: 100000, pricePerThousandNgn: 585, rate: 585, description: 'Rapid member growth for channels and groups.' },
+          { id: '968', service: '968', platform: 'Telegram', category: 'Telegram - Views', name: 'Telegram Post Views ⚡ 🔥', min: 10, max: 500000, pricePerThousandNgn: 14, rate: 14, description: 'Post views for Telegram channel posts.' },
+
+          // WhatsApp
+          { id: '776', service: '776', platform: 'WhatsApp', category: 'Whatsapp - Members', name: 'Whatsapp Channel Members 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️', min: 10, max: 10000, pricePerThousandNgn: 4674, rate: 4674, description: 'Followers for WhatsApp Public Channels.' },
+
+          // Spotify
+          { id: '432', service: '432', platform: 'Spotify', category: 'Spotify - Plays', name: 'Spotify Free Plays [Lifetime Guaranteed] ♻️', min: 1000, max: 1000000000, pricePerThousandNgn: 756, rate: 756, description: 'Stream plays to boost artist algorithmic ranking.' },
+
+          // Discord
+          { id: '1040', service: '1040', platform: 'Discord', category: 'Discord', name: 'Discord Offline Members | ✅Quality: Real With Avatar', min: 50, max: 1500, pricePerThousandNgn: 4678, rate: 4678, description: 'Server members with real profile avatars.' },
+
+          // LinkedIn
+          { id: '4631', service: '4631', platform: 'LinkedIn', category: 'LinkedIn', name: 'Linkedin Followers | Page or Profile | 30 Days Refill ♻️', min: 10, max: 100000000, pricePerThousandNgn: 22523, rate: 22523, description: 'Company page or personal profile connections.' },
+
+          // Website
+          { id: '560', service: '560', platform: 'Website', category: 'Website Traffic', name: 'Website Traffic [WW - Direct Visits] 💧', min: 100, max: 1000000, pricePerThousandNgn: 883, rate: 883, description: 'Direct organic browser visits.' },
         ]);
       }
     } catch {

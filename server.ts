@@ -14,11 +14,58 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
 import { isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from './src/lib/authorizedOwners';
+import { handleVirtualSMSNumbersGateway, handleVirtualSMSNumbersWebhook } from './src/server/virtualSmsNumbers';
+import { handleVoikerGateway } from './src/server/voikerBoosting';
 
 const app = express();
 const PORT = 3000;
 
 app.disable('x-powered-by');
+
+// Completely clear out any deprecated OneGridHub / XtraLogsTools / Provider 2 API keys, tokens, and URLs
+const DEPRECATED_PROVIDER_ENV_KEYS = [
+  'ESTRALOG_API_KEY',
+  'ESTRALOGS_API_KEY',
+  'ESTRALOG_BASE_URL',
+  'ESTRALOGS_BASE_URL',
+  'ESTRALOG_TOOLS_API_KEY',
+  'ESTRALOGS_TOOLS_API_KEY',
+  'ESTRALOG_TOOLS_BASE_URL',
+  'EXTRA_LOG_API_KEY',
+  'EXTRA_LOGS_API_KEY',
+  'EXTRA_LOG_BASE_URL',
+  'EXTRA_LOGS_BASE_URL',
+  'EXTRA_LOG_TOOLS_API_KEY',
+  'EXTRA_LOGS_TOOLS_API_KEY',
+  'EXTRA_LOG_TOOLS_BASE_URL',
+  'EXTRA_LOGS_TOOLS_BASE_URL',
+  'XTRALOGSTOOLS_API_KEY',
+  'XTRALOGS_API_KEY',
+  'XTRALOGS_TOOLS_API_KEY',
+  'XTRALOGSTOOLS_BASE_URL',
+  'ONEGRIDHUB_API_KEY',
+  'ONEGRID_API_KEY',
+  'ONEGRIDHUB_KEY',
+  'ONE_GRID_HUB_API_KEY',
+  'OGH_API_KEY',
+  'ONEGRIDHUB_TOKEN',
+  'ONEGRIDHUB_SECRET',
+  'ONEGRIDHUB_BASE_URL',
+  'ONEGRIDHUB_SMM_API_KEY',
+  'ONEGRIDHUB_SMM_KEY',
+  'PROVIDER2_NUMBERS_API_KEY',
+  'PROVIDER2_NUMBERS_BASE_URL',
+  'PROVIDER2_SOCIAL_BOOST_API_KEY',
+  'PROVIDER2_SOCIAL_BOOST_BASE_URL',
+  'PROVIDER2_SMM_API_KEY',
+  'PROVIDER2_API_KEY',
+  'ER2_SOCIAL_BOOST_API_KEY',
+  'ER2_SOCIAL_BOOST_BASE_URL',
+  'SOCIAL_BOOST_2_API_KEY'
+];
+for (const k of DEPRECATED_PROVIDER_ENV_KEYS) {
+  delete process.env[k];
+}
 
 // --- ARCC & OWASP SECURITY HEADERS ---
 app.use((_req, res, next) => {
@@ -37,7 +84,7 @@ app.use((_req, res, next) => {
 // Enable CORS for all API requests
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-paystack-signature');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-paystack-signature, x-vsn-signature, X-VSN-Signature, x-vsn-timestamp, X-VSN-Timestamp');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -55,7 +102,7 @@ app.use(express.json({
 app.use((req, res, next) => {
   if (req.path.startsWith('/api') && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
     // External Webhooks are validated cryptographically by secret HMAC signatures
-    if (req.path.includes('/paystack/webhook') || req.path.includes('/webhook')) {
+    if (req.path.includes('/paystack/webhook') || req.path.includes('/webhook') || req.path.includes('/hooks/')) {
       return next();
     }
     const hasRequestedWith = req.headers['x-requested-with'] === 'XMLHttpRequest';
@@ -79,6 +126,9 @@ app.use((req, _res, next) => {
     req.url = req.url.replace('/VITE_API_URL', '');
   } else if (req.url.startsWith('/undefined/')) {
     req.url = req.url.replace('/undefined', '');
+  } else if (req.url.startsWith('/.netlify/functions/api')) {
+    req.url = req.url.replace('/.netlify/functions/api', '') || '/';
+    if (!req.url.startsWith('/')) req.url = '/' + req.url;
   }
   next();
 });
@@ -549,6 +599,154 @@ app.post('/api/paystack/initialize', async (req, res) => {
   } catch (err: any) {
     console.error('Error in /api/paystack/initialize:', err);
     res.status(500).json({ error: err.message || 'Paystack initialization failed' });
+  }
+});
+
+/**
+ * Universal Unique Transaction ID Generator
+ * Enforces category separation:
+ * - Withdrawals: ZN-WTH-TXN-...
+ * - Purchases: ZN-PUR-TXN-...
+ * - Social Boosts: ZN-BST-TXN-...
+ * - Zenet Updates: ZN-UPD-TXN-...
+ * - Wallet Top-ups: ZN-TOP-TXN-...
+ */
+export function generateUniqueTransactionId(category: 'withdrawal' | 'purchase' | 'log' | 'boost' | 'social_boost' | 'update' | 'virtual_number' | 'topup' | 'deposit' | string = 'purchase'): string {
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0].replace(/-/g, '').slice(0, 6);
+  const timeBase36 = now.getTime().toString(36).toUpperCase();
+  const rand = crypto.randomBytes(4).toString('hex').toUpperCase();
+
+  switch (category) {
+    case 'withdrawal':
+      return `ZN-WTH-TXN-${dateStr}-${timeBase36}-${rand}`;
+    case 'purchase':
+    case 'log':
+      return `ZN-LOG-TXN-${dateStr}-${timeBase36}-${rand}`;
+    case 'boost':
+    case 'social_boost':
+      return `ZN-BST-TXN-${dateStr}-${timeBase36}-${rand}`;
+    case 'update':
+    case 'virtual_number':
+      return `ZN-UPD-TXN-${dateStr}-${timeBase36}-${rand}`;
+    case 'topup':
+    case 'deposit':
+      return `ZN-DEP-TXN-${dateStr}-${timeBase36}-${rand}`;
+    default:
+      return `ZN-TXN-${dateStr}-${timeBase36}-${rand}`;
+  }
+}
+
+// In-memory cache for Paystack supported banks
+let cachedPaystackBanks: any[] | null = null;
+let lastBanksFetchTime = 0;
+
+// 1. Fetch Verified Banks List via connected Paystack API
+app.get('/api/paystack/banks', async (req, res) => {
+  try {
+    const now = Date.now();
+    // Cache for 1 hour
+    if (cachedPaystackBanks && cachedPaystackBanks.length > 0 && now - lastBanksFetchTime < 3600000) {
+      return res.json({ success: true, banks: cachedPaystackBanks });
+    }
+
+    const paystackSecretKey = getPaystackSecretKey();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (paystackSecretKey) {
+      headers['Authorization'] = `Bearer ${paystackSecretKey}`;
+    }
+
+    const resp = await fetch('https://api.paystack.co/bank?country=nigeria&currency=NGN&perPage=100', {
+      headers
+    });
+    const data: any = await resp.json();
+
+    if (data && data.status && Array.isArray(data.data)) {
+      cachedPaystackBanks = data.data
+        .filter((b: any) => b.active !== false)
+        .map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          code: b.code,
+          slug: b.slug
+        }));
+      lastBanksFetchTime = now;
+      return res.json({ success: true, banks: cachedPaystackBanks });
+    }
+
+    // Fallback if paystack returns rate-limit or network issue
+    return res.json({
+      success: true,
+      banks: [
+        { id: 1, name: 'OPay (PayCom)', code: '999992', slug: 'paycom' },
+        { id: 2, name: 'PalmPay', code: '999991', slug: 'palmpay' },
+        { id: 3, name: 'Moniepoint MFB', code: '50515', slug: 'moniepoint-mfb' },
+        { id: 4, name: 'Kuda Bank', code: '50211', slug: 'kuda-bank' },
+        { id: 5, name: 'Access Bank', code: '044', slug: 'access-bank' },
+        { id: 6, name: 'GTBank (Guaranty Trust Bank)', code: '058', slug: 'guaranty-trust-bank' },
+        { id: 7, name: 'Zenith Bank', code: '057', slug: 'zenith-bank' },
+        { id: 8, name: 'United Bank for Africa (UBA)', code: '033', slug: 'united-bank-for-africa' },
+        { id: 9, name: 'First Bank of Nigeria', code: '011', slug: 'first-bank-of-nigeria' },
+        { id: 10, name: 'Fidelity Bank', code: '070', slug: 'fidelity-bank' },
+        { id: 11, name: 'Stanbic IBTC Bank', code: '221', slug: 'stanbic-ibtc-bank' },
+        { id: 12, name: 'Union Bank of Nigeria', code: '032', slug: 'union-bank-of-nigeria' },
+        { id: 13, name: 'Sterling Bank', code: '232', slug: 'sterling-bank' },
+        { id: 14, name: 'Wema Bank / ALAT', code: '035', slug: 'wema-bank' }
+      ]
+    });
+  } catch (err: any) {
+    console.error('Error in /api/paystack/banks:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Error fetching Paystack banks' });
+  }
+});
+
+// 2. Resolve & Verify Bank Account Details using connected Paystack API
+app.get('/api/paystack/resolve-account', async (req, res) => {
+  try {
+    const { account_number, bank_code } = req.query;
+    if (!account_number || !bank_code) {
+      return res.status(400).json({ success: false, error: 'Account number and bank code are required.' });
+    }
+
+    const paystackSecretKey = getPaystackSecretKey();
+    if (!paystackSecretKey) {
+      return res.status(500).json({ success: false, error: 'Paystack secret key is not configured.' });
+    }
+
+    const cleanAcc = String(account_number).trim().replace(/\D/g, '');
+    const cleanCode = String(bank_code).trim();
+
+    if (cleanAcc.length !== 10) {
+      return res.status(400).json({ success: false, error: 'Account number must be exactly 10 digits.' });
+    }
+
+    const url = `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(cleanAcc)}&bank_code=${encodeURIComponent(cleanCode)}`;
+    const resp = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${paystackSecretKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data: any = await resp.json();
+    if (data && data.status && data.data && data.data.account_name) {
+      return res.json({
+        success: true,
+        account_name: data.data.account_name,
+        account_number: data.data.account_number,
+        bank_id: data.data.bank_id
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      error: data?.message || 'Could not verify account name with Paystack. Please check the account number and bank.'
+    });
+  } catch (err: any) {
+    console.error('Error in /api/paystack/resolve-account:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to verify account details with Paystack.' });
   }
 });
 
@@ -1451,6 +1649,7 @@ const verifyAndCreditTransaction = async (
         transaction.set(txDocRef, {
           id: reference,
           reference: reference,
+          transactionId: generateUniqueTransactionId('deposit'),
           userId: String(targetUid),
           userEmail: customerEmail || '',
           amount: amountNaira,
@@ -1597,7 +1796,7 @@ app.post('/api/wallet/purchase', async (req, res) => {
         throw new Error(`Insufficient wallet balance. You have ₦${currentBalance.toLocaleString()}, but this listing costs ₦${price.toLocaleString()}.`);
       }
 
-      const txId = `WALLET_TX_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const txId = generateUniqueTransactionId('log');
       const transferCode = `ZENET-ESCROW-${Math.floor(1000 + Math.random() * 9000)}-WALLET`;
       const purchaseId = `pur_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
       const newBal = currentBalance - price;
@@ -2042,7 +2241,7 @@ app.post('/api/withdrawals/request', async (req, res) => {
       return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
     }
 
-    const { amount: rawAmount, bankName, accountNumber, accountName, notes } = req.body;
+    const { amount: rawAmount, bankName, bankCode, accountNumber, accountName, notes } = req.body;
     const amount = Number(rawAmount);
 
     if (isNaN(amount) || !isFinite(amount) || amount <= 0) {
@@ -2061,15 +2260,15 @@ app.post('/api/withdrawals/request', async (req, res) => {
     }
 
     if (!bankName || typeof bankName !== 'string' || !bankName.trim()) {
-      return res.status(400).json({ success: false, error: 'Please enter a valid bank name.' });
+      return res.status(400).json({ success: false, error: 'Please select a valid bank.' });
     }
 
-    if (!accountNumber || typeof accountNumber !== 'string' || accountNumber.trim().length < 8) {
-      return res.status(400).json({ success: false, error: 'Please enter a valid account number (minimum 8-10 digits).' });
+    if (!accountNumber || typeof accountNumber !== 'string' || accountNumber.trim().length !== 10) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid 10-digit account number.' });
     }
 
     if (!accountName || typeof accountName !== 'string' || !accountName.trim()) {
-      return res.status(400).json({ success: false, error: 'Please enter the registered account holder name.' });
+      return res.status(400).json({ success: false, error: 'Account verification required: Paystack verified account name is missing.' });
     }
 
     const userDocRef = doc(db, 'users', verifiedUser.uid);
@@ -2079,28 +2278,35 @@ app.post('/api/withdrawals/request', async (req, res) => {
     const isoDate = now.toISOString();
     const dateStr = isoDate.split('T')[0];
     const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+    const monthStr = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
     const reference = `WREQ-${now.getTime().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    
+    // Dedicated transaction ID for WITHDRAWAL TRANSACTIONS category
+    // Format: ZN-WTH-TXN-<YYYYMM>-<TIMESTAMP_BASE36>-<RANDOM_HEX>
+    const txnRand = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const transactionId = `ZN-WTH-TXN-${dateStr.replace(/-/g, '').slice(0, 6)}-${now.getTime().toString(36).toUpperCase()}-${txnRand}`;
+    
     const requestDocRef = doc(db, 'withdrawal_requests', reference);
     const txDocRef = doc(db, 'wallet_transactions', `tx_${reference}`);
+    const txnIdDocRef = doc(db, 'withdrawal_transaction_ids', transactionId);
 
     let createdWithdrawalRecord: any = null;
     let finalNewBalance = 0;
 
-    // Execute atomic transaction to prevent double spending and ensure database consistency
+    // Execute atomic transaction to prevent double spending and ensure database consistency & ID uniqueness
     await runTransaction(db, async (transaction) => {
+      // Enforce uniqueness at the database level
+      const existingTxnSnap = await transaction.get(txnIdDocRef);
+      if (existingTxnSnap.exists()) {
+        throw new Error(`Conflict: Withdrawal Transaction ID ${transactionId} already exists in database.`);
+      }
+
       const uSnap = await transaction.get(userDocRef);
       if (!uSnap.exists()) {
         throw new Error('User record not found.');
       }
 
       const uData = uSnap.data();
-      const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid) || isAuthorizedOwnerEmail(uData.email);
-      const isAdmin = isOwner || verifiedUser.isAdmin || uData.role === 'admin' || uData.role === 'owner';
-
-      if (!isAdmin) {
-        throw new Error('Forbidden: Withdrawals are exclusively accessible to website Owner and authorized Admins.');
-      }
-
       const currentBalance = typeof uData.walletBalance === 'number'
         ? uData.walletBalance
         : Number(uData.walletBalance || uData.balance || 0);
@@ -2132,8 +2338,24 @@ app.post('/api/withdrawals/request', async (req, res) => {
         updatedAt: isoDate
       }, { merge: true });
 
+      // Reserve unique withdrawal transaction ID in the database-level registry
+      transaction.set(txnIdDocRef, {
+        transactionId,
+        category: 'withdrawal',
+        reference,
+        userId: verifiedUser.uid,
+        userEmail: verifiedUser.email,
+        amount,
+        createdAt: isoDate,
+        createdDate: dateStr,
+        createdTime: timeStr,
+        month: monthStr
+      });
+
       createdWithdrawalRecord = {
         id: reference,
+        transactionId,
+        category: 'withdrawal',
         userId: verifiedUser.uid,
         userName: uData.displayName || uData.username || uData.fullName || verifiedUser.email.split('@')[0],
         userEmail: verifiedUser.email,
@@ -2141,12 +2363,14 @@ app.post('/api/withdrawals/request', async (req, res) => {
         amount,
         currency: 'NGN',
         bankName: bankName.trim(),
+        bankCode: (bankCode || '').trim(),
         accountNumber: accountNumber.trim(),
         accountName: accountName.trim(),
         status: 'pending',
         createdAt: isoDate,
         createdDate: dateStr,
         createdTime: timeStr,
+        month: monthStr,
         reference,
         notes: (notes || '').trim(),
       };
@@ -2157,8 +2381,10 @@ app.post('/api/withdrawals/request', async (req, res) => {
       // Record in wallet_transactions ledger
       transaction.set(txDocRef, {
         id: `tx_${reference}`,
+        transactionId,
         userId: verifiedUser.uid,
         type: 'withdrawal',
+        category: 'withdrawal',
         amount,
         description: `Withdrawal payout requested: ₦${amount.toLocaleString()} to ${bankName.trim()} (${accountNumber.trim()})`,
         date: isoDate,
@@ -2172,12 +2398,168 @@ app.post('/api/withdrawals/request', async (req, res) => {
       success: true,
       message: `Withdrawal request for ₦${amount.toLocaleString()} created successfully.`,
       reference,
+      transactionId,
       newBalance: finalNewBalance,
       withdrawal: createdWithdrawalRecord
     });
   } catch (err: any) {
     console.error('Error in /api/withdrawals/request:', err);
     return res.status(400).json({ success: false, error: err.message || 'Withdrawal request failed.' });
+  }
+});
+
+// 2b. Get Complete Real Withdrawal Transaction History (Owner / Admin only)
+app.get('/api/withdrawals/all-history', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized. Please sign in.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const userDocRef = doc(db, 'users', verifiedUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    const userData = userDoc.exists() ? userDoc.data() : {};
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid) || isAuthorizedOwnerEmail(userData.email);
+    const isAdmin = isOwner || verifiedUser.isAdmin || userData.role === 'admin' || userData.role === 'owner';
+
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Access restricted to authorized website Owner & Admins only.' });
+    }
+
+    const wCol = collection(db, 'withdrawal_requests');
+    const wSnap = await getDocs(wCol);
+    const withdrawals = wSnap.docs.map(d => {
+      const data = d.data();
+      const created = data.createdAt ? new Date(data.createdAt) : new Date(0);
+      const dateStr = data.createdDate || (data.createdAt ? data.createdAt.split('T')[0] : '');
+      const timeStr = data.createdTime || (data.createdAt ? new Date(data.createdAt).toLocaleTimeString('en-US', { hour12: false }) : '');
+      const monthStr = data.month || (created.getTime() > 0 ? created.toLocaleString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown');
+      const transactionId = data.transactionId || data.reference || data.id;
+      return {
+        id: d.id,
+        ...data,
+        transactionId,
+        category: 'withdrawal',
+        createdDate: dateStr,
+        createdTime: timeStr,
+        month: monthStr
+      };
+    });
+
+    // Sort descending by creation date
+    withdrawals.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+    return res.json({
+      success: true,
+      count: withdrawals.length,
+      withdrawals
+    });
+  } catch (err: any) {
+    console.error('Error in /api/withdrawals/all-history:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to retrieve withdrawal transaction history.' });
+  }
+});
+
+// 2c. Confirm & Search Transaction ID (Owner / Admin only)
+app.post('/api/withdrawals/search-transaction', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized. Please sign in.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const userDocRef = doc(db, 'users', verifiedUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    const userData = userDoc.exists() ? userDoc.data() : {};
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid) || isAuthorizedOwnerEmail(userData.email);
+    const isAdmin = isOwner || verifiedUser.isAdmin || userData.role === 'admin' || userData.role === 'owner';
+
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Access restricted to authorized website Owner & Admins only.' });
+    }
+
+    const { transactionId: rawId } = req.body;
+    if (!rawId || typeof rawId !== 'string' || !rawId.trim()) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid Transaction ID to search.' });
+    }
+
+    const cleanId = rawId.trim();
+
+    // 1. Direct query by transactionId
+    let matchedDoc: any = null;
+    const q1 = query(collection(db, 'withdrawal_requests'), where('transactionId', '==', cleanId));
+    const s1 = await getDocs(q1);
+    if (!s1.empty) {
+      matchedDoc = { id: s1.docs[0].id, ...s1.docs[0].data() };
+    }
+
+    // 2. Query by document id
+    if (!matchedDoc) {
+      const docSnap = await getDoc(doc(db, 'withdrawal_requests', cleanId));
+      if (docSnap.exists()) {
+        matchedDoc = { id: docSnap.id, ...docSnap.data() };
+      }
+    }
+
+    // 3. Query by reference
+    if (!matchedDoc) {
+      const q2 = query(collection(db, 'withdrawal_requests'), where('reference', '==', cleanId));
+      const s2 = await getDocs(q2);
+      if (!s2.empty) {
+        matchedDoc = { id: s2.docs[0].id, ...s2.docs[0].data() };
+      }
+    }
+
+    // 4. Query registry if needed to locate reference
+    if (!matchedDoc) {
+      const regSnap = await getDoc(doc(db, 'withdrawal_transaction_ids', cleanId));
+      if (regSnap.exists()) {
+        const regData = regSnap.data();
+        if (regData.reference) {
+          const refDoc = await getDoc(doc(db, 'withdrawal_requests', regData.reference));
+          if (refDoc.exists()) {
+            matchedDoc = { id: refDoc.id, ...refDoc.data() };
+          }
+        }
+      }
+    }
+
+    if (!matchedDoc) {
+      return res.status(404).json({ success: false, error: 'Transaction ID not found.' });
+    }
+
+    const created = matchedDoc.createdAt ? new Date(matchedDoc.createdAt) : new Date(0);
+    const dateStr = matchedDoc.createdDate || (matchedDoc.createdAt ? matchedDoc.createdAt.split('T')[0] : '');
+    const timeStr = matchedDoc.createdTime || (matchedDoc.createdAt ? new Date(matchedDoc.createdAt).toLocaleTimeString('en-US', { hour12: false }) : '');
+    const monthStr = matchedDoc.month || (created.getTime() > 0 ? created.toLocaleString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown');
+
+    const formatted = {
+      id: matchedDoc.id,
+      ...matchedDoc,
+      transactionId: matchedDoc.transactionId || matchedDoc.reference || matchedDoc.id,
+      category: 'withdrawal',
+      createdDate: dateStr,
+      createdTime: timeStr,
+      month: monthStr
+    };
+
+    return res.json({
+      success: true,
+      transaction: formatted
+    });
+  } catch (err: any) {
+    console.error('Error in /api/withdrawals/search-transaction:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to search transaction ID.' });
   }
 });
 
@@ -2247,21 +2629,41 @@ app.post('/api/withdrawals/update-status', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const verifiedUser = await getVerifiedAuthUser(authHeader);
-    if (!verifiedUser || !verifiedUser.isAdmin) {
-      return res.status(403).json({ success: false, error: 'Forbidden: Access restricted to authorized website administrators.' });
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized. Please sign in.' });
     }
 
     if (!db) {
       return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
     }
 
+    const userDocRef = doc(db, 'users', verifiedUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    const userData = userDoc.exists() ? userDoc.data() : {};
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid) || isAuthorizedOwnerEmail(userData.email);
+    const isAdmin = isOwner || verifiedUser.isAdmin || userData.role === 'admin' || userData.role === 'owner';
+
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Access restricted to authorized website Owner & Admins only.' });
+    }
+
     const { requestId, status: newStatus, adminNotes } = req.body;
-    if (!requestId || !['approved', 'completed', 'rejected'].includes(newStatus)) {
+    if (!requestId || !['confirmed', 'approved', 'completed', 'rejected', 'failed'].includes(newStatus)) {
       return res.status(400).json({ success: false, error: 'Invalid request parameters or status.' });
     }
 
-    const reqDocRef = doc(db, 'withdrawal_requests', requestId);
-    const reqSnap = await getDoc(reqDocRef);
+    let reqDocRef = doc(db, 'withdrawal_requests', requestId);
+    let reqSnap = await getDoc(reqDocRef);
+
+    if (!reqSnap.exists()) {
+      // Try finding by transactionId
+      const q = query(collection(db, 'withdrawal_requests'), where('transactionId', '==', requestId));
+      const s = await getDocs(q);
+      if (!s.empty) {
+        reqDocRef = doc(db, 'withdrawal_requests', s.docs[0].id);
+        reqSnap = s.docs[0];
+      }
+    }
 
     if (!reqSnap.exists()) {
       return res.status(404).json({ success: false, error: 'Withdrawal request not found.' });
@@ -2276,8 +2678,8 @@ app.post('/api/withdrawals/update-status', async (req, res) => {
 
     const isoDate = new Date().toISOString();
 
-    // If rejecting a pending or approved request, atomically refund money to user wallet
-    if (newStatus === 'rejected' && previousStatus !== 'rejected') {
+    // If rejecting or failing a pending or approved request, atomically refund money to user wallet
+    if (['rejected', 'failed'].includes(newStatus) && !['rejected', 'failed'].includes(previousStatus)) {
       const targetUid = reqData.userId;
       const refundAmount = Number(reqData.amount);
 
@@ -2332,6 +2734,80 @@ app.post('/api/withdrawals/update-status', async (req, res) => {
   } catch (err: any) {
     console.error('Error in /api/withdrawals/update-status:', err);
     return res.status(500).json({ success: false, error: err.message || 'Failed to update withdrawal status.' });
+  }
+});
+
+// 5. Admin Manual Payment Confirmation (Pending -> Confirmed)
+app.post('/api/withdrawals/confirm-payment', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    const userDocRef = doc(db, 'users', verifiedUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    const userData = userDoc.exists() ? userDoc.data() : {};
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid) || isAuthorizedOwnerEmail(userData.email);
+    const isAdmin = isOwner || verifiedUser.isAdmin || userData.role === 'admin' || userData.role === 'owner';
+
+    if (!isAdmin) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Access restricted to authorized website Owner & Admins only.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is currently unavailable.' });
+    }
+
+    const { requestId, adminNotes } = req.body;
+    if (!requestId) {
+      return res.status(400).json({ success: false, error: 'Missing requestId parameter.' });
+    }
+
+    let reqDocRef = doc(db, 'withdrawal_requests', requestId);
+    let reqSnap = await getDoc(reqDocRef);
+
+    if (!reqSnap.exists()) {
+      const q = query(collection(db, 'withdrawal_requests'), where('transactionId', '==', requestId));
+      const s = await getDocs(q);
+      if (!s.empty) {
+        reqDocRef = doc(db, 'withdrawal_requests', s.docs[0].id);
+        reqSnap = s.docs[0];
+      }
+    }
+
+    if (!reqSnap.exists()) {
+      return res.status(404).json({ success: false, error: 'Withdrawal request not found.' });
+    }
+
+    const reqData = reqSnap.data();
+    const isoDate = new Date().toISOString();
+    await updateDoc(reqDocRef, {
+      status: 'confirmed',
+      confirmedAt: isoDate,
+      confirmedBy: verifiedUser.email,
+      confirmedByUid: verifiedUser.uid,
+      adminNotes: (adminNotes || '').trim(),
+      updatedAt: isoDate
+    });
+
+    const refKey = reqData.reference || reqSnap.id;
+    const txDocRef = doc(db, 'wallet_transactions', refKey.startsWith('tx_') ? refKey : `tx_${refKey}`);
+    try {
+      await updateDoc(txDocRef, {
+        status: 'confirmed',
+        updatedAt: isoDate
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    return res.json({
+      success: true,
+      message: 'Withdrawal payment confirmed.',
+      status: 'confirmed',
+      confirmedAt: isoDate
+    });
+  } catch (err: any) {
+    console.error('Error in /api/withdrawals/confirm-payment:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to confirm withdrawal payment.' });
   }
 });
 
@@ -2593,7 +3069,8 @@ app.post('/api/tiktok-promotion/order', async (req, res) => {
     const userId = verifiedUser.uid;
     const orderNumber = `TT-${Math.floor(100000 + Math.random() * 900000)}`;
     const orderId = `tt_order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const txId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const transactionId = generateUniqueTransactionId('boost');
+    const txId = transactionId;
 
     const userDocRef = doc(db, 'users', userId);
     const walletDocRef = doc(db, 'wallets', userId);
@@ -2639,6 +3116,7 @@ app.post('/api/tiktok-promotion/order', async (req, res) => {
       t.set(txDocRef, {
         id: txId,
         reference: txId,
+        transactionId,
         userId,
         userEmail: userEmail || verifiedUser.email || uData.email || '',
         amount: totalCost,
@@ -2652,6 +3130,8 @@ app.post('/api/tiktok-promotion/order', async (req, res) => {
 
       orderRecord = {
         id: orderId,
+        orderId,
+        transactionId,
         orderNumber,
         serviceId: svc.id,
         serviceName: svc.name,
@@ -2886,14 +3366,74 @@ app.post('/api/payment/create-checkout', async (req, res) => {
   }
 });
 
-// Secure Admin/Role Management API
-app.post('/api/admin/manage-role', async (req, res) => {
+// Secure User Profile Verification API (Single Source of Truth)
+app.get('/api/user/profile', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: valid token required' });
+    }
 
-    const isVerifiedOwner = verifiedUser && (isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid));
-    if (!isVerifiedOwner) {
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service unavailable' });
+    }
+
+    const userDocSnap = await getDoc(doc(db, 'users', verifiedUser.uid));
+    let role = 'buyer';
+    let profileData: any = {};
+
+    if (userDocSnap.exists()) {
+      profileData = userDocSnap.data();
+      role = profileData.role || 'buyer';
+    }
+
+    if (isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid) || isAuthorizedOwnerEmail(profileData.email)) {
+      role = 'owner';
+    }
+
+    return res.json({
+      success: true,
+      uid: verifiedUser.uid,
+      email: verifiedUser.email,
+      role,
+      profile: profileData
+    });
+  } catch (err: any) {
+    console.error('Error in /api/user/profile:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to fetch user profile' });
+  }
+});
+
+// Secure Admin/Role Management API (Owner Authority with Permanent Database Persistence)
+app.post('/api/admin/manage-role', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    let verifiedUser = await getVerifiedAuthUser(authHeader);
+
+    // Verify owner status from token or caller email fallback
+    let isOwner = false;
+    if (verifiedUser) {
+      isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid);
+      if (!isOwner && db) {
+        try {
+          const uSnap = await getDoc(doc(db, 'users', verifiedUser.uid));
+          if (uSnap.exists()) {
+            const uData = uSnap.data();
+            if (uData.role === 'owner' || isAuthorizedOwnerEmail(uData.email)) {
+              isOwner = true;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    const callerEmail = (req.body.callerEmail || verifiedUser?.email || '').trim().toLowerCase();
+    if (!isOwner && callerEmail && isAuthorizedOwnerEmail(callerEmail)) {
+      isOwner = true;
+    }
+
+    if (!isOwner) {
       return res.status(403).json({ error: 'Forbidden: Access Denied. Only authenticated Owners are authorized to manage administrator roles' });
     }
 
@@ -2903,26 +3443,409 @@ app.post('/api/admin/manage-role', async (req, res) => {
       return res.status(400).json({ error: 'Target user ID and new role are required' });
     }
 
-    if (newRole !== 'admin' && newRole !== 'buyer') {
-      return res.status(400).json({ error: 'Invalid role requested. Roles must be "admin" or "buyer"' });
-    }
+    // Standardize role value: 'admin' for administrators, 'buyer' for customers, 'seller' for sellers
+    const standardizedRole = (newRole === 'admin') ? 'admin' : (newRole === 'seller' ? 'seller' : 'buyer');
 
     if (db) {
+      const nowIso = new Date().toISOString();
       const userRef = doc(db, 'users', targetUid);
-      await updateDoc(userRef, { role: newRole });
+      
+      // Update role permanently in users collection
+      await setDoc(userRef, { 
+        role: standardizedRole,
+        roleUpdatedAt: nowIso,
+        roleUpdatedBy: verifiedUser?.email || callerEmail || 'owner',
+        updatedAt: nowIso
+      }, { merge: true });
+
+      // Dual-sync to admins collection for fast rules/service checks
+      try {
+        const adminRef = doc(db, 'admins', targetUid);
+        if (standardizedRole === 'admin') {
+          await setDoc(adminRef, {
+            uid: targetUid,
+            role: 'admin',
+            grantedAt: nowIso,
+            grantedBy: verifiedUser?.email || callerEmail || 'owner'
+          }, { merge: true });
+        } else {
+          await deleteDoc(adminRef).catch(() => {});
+        }
+      } catch (adminCollErr) {
+        console.warn('[Manage Role API] Admins collection sync notice:', adminCollErr);
+      }
     }
 
-    console.log(`[Manage Role API] Owner ${verifiedUser.email} updated user ${targetUid} to role ${newRole}`);
+    console.log(`[Manage Role API] Owner ${verifiedUser?.email || callerEmail} permanently updated user ${targetUid} to role ${standardizedRole}`);
 
     return res.json({
       success: true,
-      message: `User role updated successfully to ${newRole}`,
+      message: `User role permanently updated to ${standardizedRole}`,
       targetUid,
-      newRole
+      newRole: standardizedRole
     });
   } catch (err: any) {
     console.error('Error in /api/admin/manage-role:', err);
     res.status(500).json({ error: err.message || 'Failed to update user role' });
+  }
+});
+
+// ============================================================================
+// OWNER STOCK APPROVAL CENTER & USER NOTIFICATIONS SERVER APIS
+// ============================================================================
+
+// 1. Owner Approve Stock Submission
+app.post('/api/stock/approve', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: valid token required' });
+    }
+
+    // Strict server-side Owner check
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Access restricted strictly to the website Owner.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service unavailable' });
+    }
+
+    const { listingId, approvedPrice } = req.body;
+    if (!listingId) {
+      return res.status(400).json({ success: false, error: 'Missing listingId parameter' });
+    }
+
+    const listingRef = doc(db, 'listings', listingId);
+    const listingSnap = await getDoc(listingRef);
+    if (!listingSnap.exists()) {
+      return res.status(404).json({ success: false, error: 'Listing not found in database' });
+    }
+
+    const listingData = listingSnap.data();
+    const nowIso = new Date().toISOString();
+    const originalPrice = Number(listingData.originalPrice || listingData.price || 0);
+    const finalPrice = approvedPrice !== undefined && !isNaN(Number(approvedPrice)) 
+      ? Number(approvedPrice) 
+      : Number(listingData.price || 0);
+    const quantity = Number(listingData.stockCount || listingData.stock || (Array.isArray(listingData.inventory) ? listingData.inventory.length : 1));
+
+    // A. Update listing status to Approved and Active
+    await setDoc(listingRef, {
+      approvalStatus: 'approved',
+      status: 'active',
+      price: finalPrice,
+      approvedPrice: finalPrice,
+      approvedBy: verifiedUser.email,
+      approvedAt: nowIso,
+      updatedAt: nowIso
+    }, { merge: true });
+
+    // B. Save permanent audit record in stock_approvals
+    const approvalId = `appr_${listingId}_${Date.now()}`;
+    await setDoc(doc(db, 'stock_approvals', approvalId), {
+      id: approvalId,
+      listingId,
+      title: listingData.title || 'Account Stock',
+      category: listingData.category || 'General',
+      submitterId: listingData.sellerId || listingData.creatorId || '',
+      submitterName: listingData.sellerName || 'Seller',
+      submitterEmail: listingData.sellerEmail || '',
+      status: 'approved',
+      originalPrice,
+      approvedPrice: finalPrice,
+      quantity,
+      submittedAt: listingData.createdAt || nowIso,
+      reviewedAt: nowIso,
+      reviewedBy: verifiedUser.email,
+      reviewedByUid: verifiedUser.uid
+    });
+
+    // C. Create permanent notification for the submitter
+    const sellerUid = listingData.sellerId || listingData.creatorId;
+    if (sellerUid) {
+      const notifId = `notif_appr_${listingId}_${Date.now()}`;
+      await setDoc(doc(db, 'user_notifications', notifId), {
+        id: notifId,
+        userId: sellerUid,
+        userEmail: listingData.sellerEmail || '',
+        title: 'Stock Approved',
+        message: `Your stock submission "${listingData.title}" has been approved by the Owner and is now active on the marketplace for ₦${finalPrice.toLocaleString()}.`,
+        type: 'stock_approved',
+        relatedId: listingId,
+        read: false,
+        createdAt: nowIso
+      });
+    }
+
+    console.log(`[Stock Approval] Owner ${verifiedUser.email} APPROVED listing ${listingId} at ₦${finalPrice}`);
+
+    return res.json({
+      success: true,
+      message: 'Stock submission approved and activated successfully',
+      listingId,
+      approvedPrice: finalPrice
+    });
+  } catch (err: any) {
+    console.error('Error approving stock:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to approve stock' });
+  }
+});
+
+// 2. Owner Reject Stock Submission
+app.post('/api/stock/reject', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: valid token required' });
+    }
+
+    // Strict server-side Owner check
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid);
+    if (!isOwner) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Access restricted strictly to the website Owner.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service unavailable' });
+    }
+
+    const { listingId, rejectionReason } = req.body;
+    if (!listingId || !rejectionReason || !rejectionReason.trim()) {
+      return res.status(400).json({ success: false, error: 'listingId and rejectionReason are required' });
+    }
+
+    const listingRef = doc(db, 'listings', listingId);
+    const listingSnap = await getDoc(listingRef);
+    if (!listingSnap.exists()) {
+      return res.status(404).json({ success: false, error: 'Listing not found in database' });
+    }
+
+    const listingData = listingSnap.data();
+    const nowIso = new Date().toISOString();
+    const quantity = Number(listingData.stockCount || listingData.stock || (Array.isArray(listingData.inventory) ? listingData.inventory.length : 1));
+
+    // A. Update listing: do NOT activate stock, store rejection reason
+    await setDoc(listingRef, {
+      approvalStatus: 'rejected',
+      status: 'reserved', // keep inactive & hidden from marketplace
+      rejectionReason: rejectionReason.trim(),
+      rejectedBy: verifiedUser.email,
+      rejectedAt: nowIso,
+      updatedAt: nowIso
+    }, { merge: true });
+
+    // B. Record permanent audit record in stock_approvals
+    const approvalId = `appr_rej_${listingId}_${Date.now()}`;
+    await setDoc(doc(db, 'stock_approvals', approvalId), {
+      id: approvalId,
+      listingId,
+      title: listingData.title || 'Account Stock',
+      category: listingData.category || 'General',
+      submitterId: listingData.sellerId || listingData.creatorId || '',
+      submitterName: listingData.sellerName || 'Seller',
+      submitterEmail: listingData.sellerEmail || '',
+      status: 'rejected',
+      rejectionReason: rejectionReason.trim(),
+      originalPrice: Number(listingData.price || 0),
+      quantity,
+      submittedAt: listingData.createdAt || nowIso,
+      reviewedAt: nowIso,
+      reviewedBy: verifiedUser.email,
+      reviewedByUid: verifiedUser.uid
+    });
+
+    // C. Create permanent notification for the submitter with the rejection reason
+    const sellerUid = listingData.sellerId || listingData.creatorId;
+    if (sellerUid) {
+      const notifId = `notif_rej_${listingId}_${Date.now()}`;
+      await setDoc(doc(db, 'user_notifications', notifId), {
+        id: notifId,
+        userId: sellerUid,
+        userEmail: listingData.sellerEmail || '',
+        title: 'Stock Rejected',
+        message: `Your stock submission "${listingData.title}" was rejected by the Owner. Reason: ${rejectionReason.trim()}`,
+        type: 'stock_rejected',
+        relatedId: listingId,
+        rejectionReason: rejectionReason.trim(),
+        read: false,
+        createdAt: nowIso
+      });
+    }
+
+    console.log(`[Stock Approval] Owner ${verifiedUser.email} REJECTED listing ${listingId}. Reason: ${rejectionReason}`);
+
+    return res.json({
+      success: true,
+      message: 'Stock submission rejected and submitter notified',
+      listingId,
+      rejectionReason: rejectionReason.trim()
+    });
+  } catch (err: any) {
+    console.error('Error rejecting stock:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to reject stock' });
+  }
+});
+
+// 3. Owner Update Pending Listing Details & Price before approval
+app.post('/api/stock/update-pending-details', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid);
+    if (!isOwner) return res.status(403).json({ success: false, error: 'Forbidden: Owner access required' });
+
+    if (!db) return res.status(500).json({ success: false, error: 'Database service unavailable' });
+
+    const { listingId, price, title, description } = req.body;
+    if (!listingId) return res.status(400).json({ success: false, error: 'Missing listingId' });
+
+    const listingRef = doc(db, 'listings', listingId);
+    const updateFields: any = { updatedAt: new Date().toISOString() };
+    if (price !== undefined && !isNaN(Number(price))) {
+      updateFields.price = Number(price);
+    }
+    if (title !== undefined && title.trim()) {
+      updateFields.title = title.trim();
+    }
+    if (description !== undefined) {
+      updateFields.description = description.trim();
+    }
+
+    await setDoc(listingRef, updateFields, { merge: true });
+    return res.json({ success: true, message: 'Pending stock updated successfully', listingId, updateFields });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Owner Inspect Stock Inventory details (including credentials)
+app.get('/api/stock/inventory/:listingId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid);
+    if (!isOwner) return res.status(403).json({ success: false, error: 'Forbidden: Owner access required' });
+
+    if (!db) return res.status(500).json({ success: false, error: 'Database service unavailable' });
+
+    const listingId = req.params.listingId;
+    const invCol = collection(db, 'listings', listingId, 'inventory');
+    const snap = await getDocs(invCol);
+    const items = await Promise.all(snap.docs.map(async (docSnap) => {
+      const base = docSnap.data();
+      let secureDetails = {};
+      try {
+        const secSnap = await getDoc(doc(db, 'listings', listingId, 'inventory', docSnap.id, 'secure', 'details'));
+        if (secSnap.exists()) {
+          secureDetails = secSnap.data();
+        }
+      } catch {}
+      return { id: docSnap.id, ...base, ...secureDetails };
+    }));
+
+    return res.json({ success: true, items });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. User Notifications: Create Notification
+app.post('/api/notifications/create', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!db) return res.status(500).json({ success: false, error: 'Database service unavailable' });
+
+    const { userId, userEmail, title, message, type, relatedId, metadata } = req.body;
+    if (!userId || !title || !message) {
+      return res.status(400).json({ success: false, error: 'userId, title, and message are required' });
+    }
+
+    const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const nowIso = new Date().toISOString();
+    await setDoc(doc(db, 'user_notifications', notifId), {
+      id: notifId,
+      userId,
+      userEmail: userEmail || '',
+      title: title.trim(),
+      message: message.trim(),
+      type: type || 'system',
+      relatedId: relatedId || null,
+      read: false,
+      createdAt: nowIso,
+      metadata: metadata || {}
+    });
+
+    return res.json({ success: true, notificationId: notifId });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6. User Notifications: Mark as Read
+app.post('/api/notifications/mark-read', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!db) return res.status(500).json({ success: false, error: 'Database service unavailable' });
+
+    const { notificationId } = req.body;
+    if (!notificationId) return res.status(400).json({ success: false, error: 'Missing notificationId' });
+
+    const notifRef = doc(db, 'user_notifications', notificationId);
+    await setDoc(notifRef, {
+      read: true,
+      readAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    return res.json({ success: true, message: 'Notification marked as read' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. User Notifications: Mark All as Read
+app.post('/api/notifications/mark-all-read', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!db) return res.status(500).json({ success: false, error: 'Database service unavailable' });
+
+    const isOwner = isAuthorizedOwnerEmail(verifiedUser.email) || isAuthorizedOwnerUid(verifiedUser.uid);
+    const targetUserIds = isOwner ? [verifiedUser.uid, 'owner'] : [verifiedUser.uid];
+
+    for (const uid of targetUserIds) {
+      const q = query(
+        collection(db, 'user_notifications'),
+        where('userId', '==', uid),
+        where('read', '==', false)
+      );
+      const snap = await getDocs(q);
+      const batchPromises = snap.docs.map(d =>
+        setDoc(doc(db, 'user_notifications', d.id), {
+          read: true,
+          readAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true })
+      );
+      await Promise.all(batchPromises);
+    }
+
+    return res.json({ success: true, message: 'All notifications marked as read' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -3425,126 +4348,36 @@ app.get('/api/admin/wallets', async (req, res) => {
   }
 });
 
-// 4. OneGridHub Virtual Numbers Proxy Endpoints
-function getOneGridHubConfig() {
-  // If .env or config files exist on disk, parse them dynamically to support hot updates without restart
-  let envFileKey = '';
-  let envBaseUrl = '';
-  let envMarkup = 0;
-
-  const candidatePaths = [
-    path.join(process.cwd(), '.env'),
-    path.join(process.cwd(), '.env.local'),
-    path.join(process.cwd(), '.env.production'),
-    '/app/.dev.env.json'
+// 4. VirtualSMSNumbers Provider Configuration (Server-Side Proxy)
+function getVirtualSMSNumbersConfig() {
+  const candidates = [
+    process.env.VSN_API_KEY,
+    process.env.VIRTUALSMSNUMBERS_API_KEY,
+    process.env.VIRTUAL_SMS_NUMBERS_API_KEY,
+    process.env.VSN_KEY
   ];
-
-  for (const envPath of candidatePaths) {
-    try {
-      if (fs.existsSync(envPath)) {
-        if (envPath.endsWith('.json')) {
-          const jsonContent = JSON.parse(fs.readFileSync(envPath, 'utf8'));
-          for (const [k, v] of Object.entries(jsonContent)) {
-            const key = k.trim();
-            const val = typeof v === 'string' ? v.trim().replace(/^["']|["']$/g, '') : String(v);
-            if (
-              (key === 'ONEGRIDHUB_API_KEY' ||
-               key === 'ONEGRID_API_KEY' ||
-               key === 'ONEGRIDHUB_KEY' ||
-               key === 'ONE_GRID_HUB_API_KEY' ||
-               key === 'OGH_API_KEY' ||
-               key === 'VIRTUAL_NUMBER_API_KEY' ||
-               key === 'ONEGRIDHUB_TOKEN' ||
-               key === 'ONEGRIDHUB_SECRET') &&
-              val
-            ) {
-              envFileKey = val;
-            } else if (key === 'ONEGRIDHUB_BASE_URL' && val) {
-              envBaseUrl = val;
-            } else if (key === 'VIRTUAL_NUMBER_MARKUP' && val) {
-              envMarkup = Number(val) || 0;
-            }
-          }
-        } else {
-          const content = fs.readFileSync(envPath, 'utf8');
-          for (const line of content.split('\n')) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('#') || !trimmed.includes('=')) continue;
-            const [k, ...vParts] = trimmed.split('=');
-            const key = k.trim();
-            const val = vParts.join('=').trim().replace(/^["']|["']$/g, '');
-            if (
-              (key === 'ONEGRIDHUB_API_KEY' ||
-               key === 'ONEGRID_API_KEY' ||
-               key === 'ONEGRIDHUB_KEY' ||
-               key === 'ONE_GRID_HUB_API_KEY' ||
-               key === 'OGH_API_KEY' ||
-               key === 'VIRTUAL_NUMBER_API_KEY' ||
-               key === 'ONEGRIDHUB_TOKEN' ||
-               key === 'ONEGRIDHUB_SECRET') &&
-              val
-            ) {
-              envFileKey = val;
-            } else if (key === 'ONEGRIDHUB_BASE_URL' && val) {
-              envBaseUrl = val;
-            } else if (key === 'VIRTUAL_NUMBER_MARKUP' && val) {
-              envMarkup = Number(val) || 0;
-            }
-          }
-        }
+  let apiKey = '';
+  for (const c of candidates) {
+    if (c && typeof c === 'string') {
+      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
+      if (clean && clean !== 'undefined' && clean !== 'null' && !clean.startsWith('MY_')) {
+        apiKey = clean;
+        break;
       }
-    } catch {
-      // Ignore candidate file read error
     }
   }
-
-  const rawKey = (
-    process.env.ONEGRIDHUB_SMM_API_KEY ||
-    process.env.ONEGRIDHUB_API_KEY ||
-    process.env.ONEGRID_API_KEY ||
-    process.env.VITE_ONEGRID_API_KEY ||
-    process.env.VITE_ONEGRIDHUB_API_KEY ||
-    process.env.VITE_ONEGRIDHUB_SMM_API_KEY ||
-    process.env.ONEGRIDHUB_KEY ||
-    process.env.ONEGRIDHUB_SMM_KEY ||
-    process.env.ONE_GRID_HUB_API_KEY ||
-    process.env.OGH_API_KEY ||
-    process.env.SMM_API_KEY ||
-    process.env.VITE_SMM_API_KEY ||
-    process.env.VIRTUAL_NUMBER_API_KEY ||
-    process.env.ONEGRIDHUB_TOKEN ||
-    process.env.ONEGRIDHUB_SECRET ||
-    envFileKey ||
-    ''
-  ).trim().replace(/^["']|["']$/g, '');
-
-  const isConfigured = Boolean(rawKey && !['UNDEFINED', 'NULL', ''].includes(rawKey.toUpperCase()));
-  const apiKey = isConfigured ? rawKey : '';
-  const isRealKey = Boolean(apiKey && !['ONEGRIDHUB_API_KEY', 'YOUR_API_KEY', 'MY_ONEGRIDHUB_API_KEY', 'PLACEHOLDER', 'UNDEFINED', 'NULL'].includes(apiKey.toUpperCase()) && !apiKey.startsWith('MY_'));
-
-  const markup = envMarkup || Number(process.env.DIGITAL_PRODUCT_MARKUP) || Number(process.env.VITE_DIGITAL_PRODUCT_MARKUP) || Number(process.env.VIRTUAL_NUMBER_MARKUP) || 500;
-  let rawBaseUrl = (process.env.ONEGRIDHUB_BASE_URL || envBaseUrl || 'https://onegridhub.com/api/v1/index.php')
-    .trim()
-    .replace(/^["']|["']$/g, '')
-    .replace(/\/+$/, '');
-
-  let oneGridBaseUrl = rawBaseUrl;
-  if (!oneGridBaseUrl.includes('/api/v1')) {
-    oneGridBaseUrl = `${oneGridBaseUrl}/api/v1/index.php`;
-  } else if (!oneGridBaseUrl.endsWith('.php')) {
-    oneGridBaseUrl = `${oneGridBaseUrl}/index.php`;
-  }
-
-  return { apiKey, isRealKey, markup, oneGridBaseUrl };
+  const baseUrl = (process.env.VSN_BASE_URL || 'https://virtualsmsnumbers.com/api/v1').trim().replace(/\/+$/, '');
+  const eurToNgnRate = Number(process.env.EUR_TO_NGN_RATE) || 1750;
+  const markup = Number(process.env.DIGITAL_PRODUCT_MARKUP) || Number(process.env.VITE_DIGITAL_PRODUCT_MARKUP) || Number(process.env.VIRTUAL_NUMBER_MARKUP) || 500;
+  return { apiKey, baseUrl, hasApiKey: Boolean(apiKey), eurToNgnRate, markup };
 }
 
-const getOneGridHubApiKey = (): string => {
-  return getOneGridHubConfig().apiKey;
+const getOneGridHubConfig = () => {
+  const cfg = getVirtualSMSNumbersConfig();
+  return { apiKey: cfg.apiKey, isRealKey: cfg.hasApiKey, markup: cfg.markup, oneGridBaseUrl: cfg.baseUrl };
 };
-
-const isRealOneGridHubKey = (): boolean => {
-  return getOneGridHubConfig().isRealKey;
-};
+const getOneGridHubApiKey = (): string => getVirtualSMSNumbersConfig().apiKey;
+const isRealOneGridHubKey = (): boolean => getVirtualSMSNumbersConfig().hasApiKey;
 
 // Interface for Virtual Number Marketplace Pricing Configuration
 interface VirtualNumberPricingSettings {
@@ -4265,6 +5098,10 @@ let cachedServersList: CachedVirtualEntry<any[]> | null = null;
 const cachedServicesByServerCountry = new Map<string, CachedVirtualEntry<any[]>>();
 
 const handleOneGridHubRequest = async (req: express.Request, res: express.Response, explicitAction?: string) => {
+  return handleVirtualSMSNumbersGateway(req, res, db, firebaseProjectId, verifyFirebaseIdToken, explicitAction);
+};
+
+const _legacy_unused_handleOneGridHubRequest = async (req: express.Request, res: express.Response, explicitAction?: string) => {
   res.setHeader('Content-Type', 'application/json');
   try {
     const method = req.method;
@@ -5305,8 +6142,12 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           const resolvedCountry = resolveCountryDetails(country, phoneNumber);
           const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
 
+          const transactionId = generateUniqueTransactionId('update');
+
           const orderData = {
+            id: orderId,
             orderId,
+            transactionId,
             providerActivationId: providerActivationId || orderId,
             userId: authUid,
             userEmail,
@@ -5341,6 +6182,7 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           try {
             await setDoc(doc(db, 'purchases', orderId), {
               id: orderId,
+              transactionId,
               listingId: orderId,
               listingTitle: `Virtual Number (${service.toUpperCase()}) - ${formattedPhone}`,
               category: 'virtual_number',
@@ -5369,6 +6211,7 @@ const handleOneGridHubRequest = async (req: express.Request, res: express.Respon
           // 6. Write completed purchase ledger transaction
           await setDoc(doc(db, 'wallet_transactions', orderId), {
             id: orderId,
+            transactionId,
             userId: authUid,
             userEmail,
             amount: customerPrice,
@@ -6813,6 +7656,27 @@ setTimeout(async () => {
   }
 }, 1000);
 
+// ============================================================================
+// VOIKER BOOSTING GATEWAY & SOCIAL BOOST ROUTES
+// ============================================================================
+const handleVoikerRequest = async (req: express.Request, res: express.Response, explicitAction?: string) => {
+  return handleVoikerGateway(req, res, db, firebaseProjectId, verifyFirebaseIdToken, explicitAction);
+};
+
+// Dedicated Voiker routes
+app.all('/api/voiker', (req, res) => handleVoikerRequest(req, res));
+app.all('/api/voiker/:action', (req, res) => handleVoikerRequest(req, res, req.params.action));
+
+// Social Boost routes routed directly to Voiker Boosting Gateway
+app.all('/api/social-boost', (req, res) => handleVoikerRequest(req, res));
+app.all('/api/social-boost/status/:orderId', (req, res) => {
+  req.query.orderId = req.params.orderId;
+  return handleVoikerRequest(req, res, 'status');
+});
+app.all('/api/social-boost/:action', (req, res) => handleVoikerRequest(req, res, req.params.action));
+app.all('/.netlify/functions/social-boost', (req, res) => handleVoikerRequest(req, res));
+app.all('/.netlify/functions/social-boost/:action', (req, res) => handleVoikerRequest(req, res, req.params.action));
+
 // 1. GET /api/social-boost/services
 app.get('/api/social-boost/services', async (req, res) => {
   try {
@@ -7375,6 +8239,7 @@ app.post('/api/social-boost/order', async (req, res) => {
 
       // Dispatch to OneGridHub upstream SMM API if real provider is live
       const orderId = `ORD-SB-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const transactionId = generateUniqueTransactionId('boost');
       let providerOrderId = '';
 
       try {
@@ -7396,6 +8261,7 @@ app.post('/api/social-boost/order', async (req, res) => {
       const orderDocData = {
         id: orderId,
         orderId,
+        transactionId,
         userId: uid,
         userEmail,
         userName,
@@ -7426,6 +8292,7 @@ app.post('/api/social-boost/order', async (req, res) => {
       try {
         await setDoc(doc(db, 'purchases', orderId), {
           id: orderId,
+          transactionId,
           listingId: orderId,
           listingTitle: `Social Boost: ${baseService.name} (${orderQty.toLocaleString()} units)`,
           category: 'social_boost',
@@ -7451,6 +8318,7 @@ app.post('/api/social-boost/order', async (req, res) => {
       // Record in wallet_transactions
       await setDoc(doc(db, 'wallet_transactions', orderId), {
         id: orderId,
+        transactionId,
         userId: uid,
         userEmail,
         amount: totalCharge,
@@ -7716,63 +8584,28 @@ app.all('/api/onegridhub', (req, res) => handleOneGridHubRequest(req, res));
 app.all('/api/onegridhub/:action', (req, res) => handleOneGridHubRequest(req, res, req.params.action));
 app.all('/api/virtual-numbers', (req, res) => handleOneGridHubRequest(req, res));
 app.all('/api/virtual-numbers/:action', (req, res) => handleOneGridHubRequest(req, res, req.params.action));
+app.all('/.netlify/functions/onegridhub', (req, res) => handleOneGridHubRequest(req, res));
+app.all('/.netlify/functions/onegridhub/:action', (req, res) => handleOneGridHubRequest(req, res, req.params.action));
+app.all('/.netlify/functions/virtual-numbers', (req, res) => handleOneGridHubRequest(req, res));
+app.all('/.netlify/functions/virtual-numbers/:action', (req, res) => handleOneGridHubRequest(req, res, req.params.action));
+
+// Dedicated VirtualSMSNumbers Webhook Endpoint (POST /hooks/virtualsmsnumbers)
+app.post('/hooks/virtualsmsnumbers', (req, res) => handleVirtualSMSNumbersWebhook(req, res, db));
+app.get('/hooks/virtualsmsnumbers', (_req, res) => {
+  res.status(200).json({ status: 'ok', service: 'VirtualSMSNumbers Webhook Gateway' });
+});
+app.all('/hooks/virtualsmsnumbers', (req, res) => {
+  if (req.method === 'POST') {
+    return handleVirtualSMSNumbersWebhook(req, res, db);
+  }
+  return res.status(200).json({ status: 'ok', service: 'VirtualSMSNumbers Webhook Gateway' });
+});
 
 // =========================================================================
-// NEW PROVIDER 2: XTRALOGSTOOLS / SERVICE NUMBER 2 / VIRTUAL NUMBER 2
+// NEW PROVIDER 2: XTRALOGSTOOLS / SERVICE NUMBER 2 / VIRTUAL NUMBER 2 (Deprecated / Cleared)
 // =========================================================================
 const getXtraLogsToolsConfig = () => {
-  const candidates = [
-    process.env.ESTRALOG_API_KEY,
-    process.env.ESTRALOGS_API_KEY,
-    process.env.ESTRALOG_TOOLS_API_KEY,
-    process.env.ESTRALOGS_TOOLS_API_KEY,
-    process.env.EXTRA_LOG_API_KEY,
-    process.env.EXTRA_LOGS_API_KEY,
-    process.env.EXTRA_LOG_TOOLS_API_KEY,
-    process.env.EXTRA_LOGS_TOOLS_API_KEY,
-    process.env.XTRALOGSTOOLS_API_KEY,
-    process.env.XTRALOGS_API_KEY,
-    process.env.XTRALOGS_TOOLS_API_KEY,
-    process.env.PROVIDER2_NUMBERS_API_KEY,
-    process.env.PROVIDER2_SOCIAL_BOOST_API_KEY,
-    process.env.PROVIDER2_SMM_API_KEY,
-    process.env.PROVIDER2_API_KEY,
-    process.env.SERVICE_NUMBER_2_API_KEY,
-    process.env.VIRTUAL_NUMBER_2_API_KEY
-  ];
-  let apiKey = '';
-  for (const c of candidates) {
-    if (c && typeof c === 'string') {
-      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
-      if (clean && clean !== 'undefined' && clean !== 'null' && !clean.startsWith('MY_')) {
-        apiKey = clean;
-        break;
-      }
-    }
-  }
-
-  const rawBase = (
-    process.env.ESTRALOG_BASE_URL ||
-    process.env.ESTRALOGS_BASE_URL ||
-    process.env.ESTRALOG_TOOLS_BASE_URL ||
-    process.env.EXTRA_LOG_BASE_URL ||
-    process.env.EXTRA_LOGS_BASE_URL ||
-    process.env.EXTRA_LOG_TOOLS_BASE_URL ||
-    process.env.EXTRA_LOGS_TOOLS_BASE_URL ||
-    process.env.XTRALOGSTOOLS_BASE_URL ||
-    process.env.PROVIDER2_NUMBERS_BASE_URL ||
-    process.env.PROVIDER2_SOCIAL_BOOST_BASE_URL ||
-    'https://xtralogstools.com/api/v1/index.php'
-  ).trim().replace(/^['"`]|['"`]$/g, '').trim();
-
-  let baseUrl = rawBase;
-  if (!baseUrl.includes('/api/v1')) {
-    baseUrl = `${baseUrl.replace(/\/+$/, '')}/api/v1/index.php`;
-  } else if (!baseUrl.endsWith('.php')) {
-    baseUrl = `${baseUrl.replace(/\/+$/, '')}/index.php`;
-  }
-
-  return { apiKey, baseUrl };
+  return { apiKey: '', baseUrl: '' };
 };
 
 const normalizeXtraLogsServer = (serverParam: string = '', tabParam: string = 'usa'): string => {
@@ -8439,251 +9272,516 @@ app.all('/api/xtralogstools/:action', (req, res) => handleServiceNumber2Request(
 // NEW PROVIDER 2: SOCIAL BOOST 2
 // =========================================================================
 const getProvider2SocialBoostConfig = () => {
-  const candidates = [
-    process.env.PROVIDER2_SOCIAL_BOOST_API_KEY,
-    process.env.ER2_SOCIAL_BOOST_API_KEY,
-    process.env.SOCIAL_BOOST_2_API_KEY,
-    process.env.XTRALOGSTOOLS_API_KEY,
-    process.env.XTRALOGS_API_KEY
-  ];
-  let apiKey = '';
-  for (const c of candidates) {
-    if (c && typeof c === 'string') {
-      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
-      if (clean && clean !== 'undefined' && clean !== 'null' && !clean.startsWith('MY_')) {
-        apiKey = clean;
-        break;
-      }
-    }
-  }
-
-  const rawBase = (
-    process.env.PROVIDER2_SOCIAL_BOOST_BASE_URL ||
-    process.env.ER2_SOCIAL_BOOST_BASE_URL ||
-    process.env.XTRALOGSTOOLS_BASE_URL ||
-    'https://xtralogstools.com/api/v1/index.php'
-  ).trim().replace(/^['"`]|['"`]$/g, '').trim();
-
-  let baseUrl = rawBase;
-  if (!baseUrl.includes('/api/v1')) {
-    baseUrl = `${baseUrl.replace(/\/+$/, '')}/api/v1/index.php`;
-  } else if (!baseUrl.endsWith('.php')) {
-    baseUrl = `${baseUrl.replace(/\/+$/, '')}/index.php`;
-  }
-
-  return { apiKey, baseUrl };
+  return { apiKey: '', baseUrl: '' };
 };
 
 const DEFAULT_P2_SOCIAL_SERVICES = [
+  // TikTok (Real Voiker IDs)
   {
-    service: '201',
-    name: 'Instagram Followers [High Quality - Non Drop - Instant]',
+    service: '3',
+    id: '3',
+    name: 'TikTok Views Real 💎',
     type: 'Default',
-    category: 'Instagram Followers',
-    rate: 1800,
+    category: 'TikTok - Views',
+    rateUsd: 0.1246,
+    rate: 206,
+    pricePerThousandNgn: 206,
+    min: 1000,
+    max: 50000000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'TikTok',
+    description: 'Directly routed through Voiker network for instant video impressions.'
+  },
+  {
+    service: '6',
+    id: '6',
+    name: 'TikTok Likes | 💖',
+    type: 'Default',
+    category: 'TikTok - Likes',
+    rateUsd: 0.5670,
+    rate: 936,
+    pricePerThousandNgn: 936,
+    min: 10,
+    max: 100000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'TikTok',
+    description: 'High-speed genuine heart likes to trigger TikTok engagement metrics.'
+  },
+  {
+    service: '834',
+    id: '834',
+    name: 'TikTok Followers 🌍 | ✅Quality: ₕQ',
+    type: 'Default',
+    category: 'TikTok - Followers',
+    rateUsd: 2.7450,
+    rate: 4529,
+    pricePerThousandNgn: 4529,
     min: 50,
+    max: 5000000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'TikTok',
+    description: 'Grow your profile audience with authentic global followers.'
+  },
+  {
+    service: '44',
+    id: '44',
+    name: 'TikTok Comments ~ Custom ~ 𝐇𝐐 🚀',
+    type: 'Custom Comments',
+    category: 'TikTok - Comments',
+    rateUsd: 8.4524,
+    rate: 13946,
+    pricePerThousandNgn: 13946,
+    min: 10,
+    max: 100000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'TikTok',
+    description: 'Custom relevant comments written by you posted directly to your video.'
+  },
+  {
+    service: '841',
+    id: '841',
+    name: 'TikTok Shares 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
+    type: 'Default',
+    category: 'TikTok - Shares',
+    rateUsd: 0.1606,
+    rate: 265,
+    pricePerThousandNgn: 265,
+    min: 10,
+    max: 217545811,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'TikTok',
+    description: 'Boost video redistribute signals and content recommendation on TikTok.'
+  },
+  {
+    service: '10',
+    id: '10',
+    name: 'TikTok Video Saves [Refill: 30 Days] 🔥♻️',
+    type: 'Default',
+    category: 'TikTok - Saves',
+    rateUsd: 0.1688,
+    rate: 279,
+    pricePerThousandNgn: 279,
+    min: 10,
     max: 100000,
     dripfeed: false,
     refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Instagram',
-    description: 'Instant start. Refill button active for 30 days.'
-  },
-  {
-    service: '202',
-    name: 'Instagram Likes [Real Active - 20k/Day - Super Fast]',
-    type: 'Default',
-    category: 'Instagram Likes',
-    rate: 450,
-    min: 50,
-    max: 50000,
-    dripfeed: false,
-    refill: false,
     cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Instagram',
-    description: 'Fast delivery within 5-10 minutes.'
+    provider: 'Voiker',
+    platform: 'TikTok',
+    description: 'Authentic TikTok bookmark favorites with 30-day automated refill.'
   },
+
+  // Instagram (Real Voiker IDs)
   {
-    service: '203',
-    name: 'TikTok Followers [Worldwide Real Accounts - Instant]',
+    service: '7',
+    id: '7',
+    name: 'Instagram - Likes + Impressions Real Profiles 💖 🌎 🔥',
     type: 'Default',
-    category: 'TikTok Followers',
-    rate: 2200,
+    category: 'Instagram - Likes',
+    rateUsd: 0.0855,
+    rate: 141,
+    pricePerThousandNgn: 141,
     min: 100,
-    max: 50000,
+    max: 100000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Instagram',
+    description: 'Post and Reels likes with real profile impressions.'
+  },
+  {
+    service: '711',
+    id: '711',
+    name: 'Instagram Followers | 𝐎𝐥𝐝 𝐀𝐜𝐜𝐨𝐮𝐧𝐭 [R365 ♻️] ❌',
+    type: 'Default',
+    category: 'Instagram - Followers',
+    rateUsd: 3.1949,
+    rate: 5272,
+    pricePerThousandNgn: 5272,
+    min: 10,
+    max: 217545811,
     dripfeed: false,
     refill: true,
     cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'TikTok',
-    description: 'High retention accounts, zero drop.'
+    provider: 'Voiker',
+    platform: 'Instagram',
+    description: 'High retention Instagram followers with 365-day warranty and refill.'
   },
   {
-    service: '204',
-    name: 'TikTok FYP Video Views [Algorithm Trigger - Instant]',
+    service: '43',
+    id: '43',
+    name: 'Instagram Views 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
     type: 'Default',
-    category: 'TikTok Views',
-    rate: 150,
-    min: 500,
-    max: 1000000,
-    dripfeed: true,
+    category: 'Instagram - Views',
+    rateUsd: 0.0027,
+    rate: 4,
+    pricePerThousandNgn: 4,
+    min: 100,
+    max: 2147483647,
+    dripfeed: false,
     refill: false,
     cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'TikTok',
-    description: 'Boosts video ranking and algorithm discovery.'
+    provider: 'Voiker',
+    platform: 'Instagram',
+    description: 'Ultra fast video and reels impressions to trigger discovery algorithm.'
   },
   {
-    service: '205',
-    name: 'YouTube Views [High Retention - Monetizable]',
+    service: '151',
+    id: '151',
+    name: 'Instagram Mix Positive Emoji Comments',
     type: 'Default',
-    category: 'YouTube Views',
-    rate: 3100,
-    min: 500,
-    max: 500000,
-    dripfeed: true,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'YouTube',
-    description: 'Real audience watch time, safe for monetized channels.'
-  },
-  {
-    service: '206',
-    name: 'Telegram Channel Members [Non Drop - 0% Drop Rate]',
-    type: 'Default',
-    category: 'Telegram Members',
-    rate: 1650,
-    min: 50,
+    category: 'Instagram - Comments',
+    rateUsd: 4.5491,
+    rate: 7506,
+    pricePerThousandNgn: 7506,
+    min: 10,
     max: 200000,
     dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Telegram',
-    description: 'High quality channel subscribers.'
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Instagram',
+    description: 'Engaging positive comments and emoji reactions.'
   },
   {
-    service: '207',
-    name: 'Twitter / X Followers [Organic Looking - Instant]',
+    service: '19',
+    id: '19',
+    name: 'Instagram Saves + Impressions 🚀',
     type: 'Default',
-    category: 'Twitter Followers',
-    rate: 2800,
-    min: 100,
-    max: 50000,
+    category: 'Instagram - Saves',
+    rateUsd: 0.1357,
+    rate: 224,
+    pricePerThousandNgn: 224,
+    min: 10,
+    max: 400000,
     dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Twitter',
-    description: 'Verified appearance, stable profiles.'
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Instagram',
+    description: 'Post saves and discovery reach impressions.'
   },
+
+  // Facebook (Real Voiker IDs)
   {
-    service: '208',
-    name: 'Facebook Page Likes & Followers [High Quality]',
+    service: '42',
+    id: '42',
+    name: 'Facebook Page & Profile Followers 🔴',
     type: 'Default',
-    category: 'Facebook Page Likes',
-    rate: 1950,
-    min: 100,
+    category: 'Facebook - Followers',
+    rateUsd: 0.2358,
+    rate: 389,
+    pricePerThousandNgn: 389,
+    min: 10,
     max: 50000,
     dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
     platform: 'Facebook',
-    description: 'Permanent page followers and engagements.'
+    description: 'Grow your Facebook business page or personal creator profile followers.'
   },
   {
-    service: '209',
-    name: 'Discord Server Members [Online Active - Real Profiles]',
+    service: '177',
+    id: '177',
+    name: 'Facebook Post Likes',
     type: 'Default',
-    category: 'Discord Members',
-    rate: 3500,
+    category: 'Facebook - Post Likes',
+    rateUsd: 0.2498,
+    rate: 412,
+    pricePerThousandNgn: 412,
+    min: 10,
+    max: 50000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Facebook',
+    description: 'Instant likes for any Facebook post, photo, or status update.'
+  },
+  {
+    service: '698',
+    id: '698',
+    name: 'Facebook Views ~ 10 Seconds',
+    type: 'Default',
+    category: 'Facebook - Video Views',
+    rateUsd: 0.4436,
+    rate: 732,
+    pricePerThousandNgn: 732,
+    min: 500,
+    max: 10000000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Facebook',
+    description: 'High watch-time video views for Facebook watch & video posts.'
+  },
+
+  // YouTube (Real Voiker IDs)
+  {
+    service: '264',
+    id: '264',
+    name: 'Youtube Views | Monetizable | Best For SEO',
+    type: 'Default',
+    category: 'YouTube - Views',
+    rateUsd: 3.6497,
+    rate: 6022,
+    pricePerThousandNgn: 6022,
     min: 100,
-    max: 15000,
+    max: 100000000,
     dripfeed: false,
     refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Discord',
-    description: 'Real active server members with custom avatars.'
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'YouTube',
+    description: 'Source: Suggested, browse features, and external. Safe for monetization.'
   },
   {
-    service: '210',
-    name: 'LinkedIn Connections & Followers [Professional HQ]',
+    service: '298',
+    id: '298',
+    name: 'YouTube Subscribers ℍ𝕚𝕘𝕙 𝔻𝕣𝕠𝕡 ℕ𝕠 ℝ𝕖𝕗𝕚𝕝𝕝',
     type: 'Default',
-    category: 'LinkedIn Connections',
-    rate: 5400,
-    min: 50,
+    category: 'YouTube - Subscribers',
+    rateUsd: 0.0924,
+    rate: 152,
+    pricePerThousandNgn: 152,
+    min: 10,
+    max: 500000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'YouTube',
+    description: 'Rapid subscriber growth for new and existing YouTube channels.'
+  },
+  {
+    service: '282',
+    id: '282',
+    name: 'YouTube Likes 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
+    type: 'Default',
+    category: 'YouTube - Likes',
+    rateUsd: 0.1992,
+    rate: 329,
+    pricePerThousandNgn: 329,
+    min: 10,
     max: 5000,
     dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'LinkedIn',
-    description: 'Corporate & business network growth.'
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'YouTube',
+    description: 'Instant thumbs-up likes to improve video ranking and audience engagement.'
   },
+
+  // Twitter / X (Real Voiker IDs)
   {
-    service: '211',
-    name: 'Spotify Track Plays [Royalty Eligible - Global Streams]',
+    service: '810',
+    id: '810',
+    name: 'Twitter Followers | Real Profile Base',
     type: 'Default',
-    category: 'Spotify Plays',
-    rate: 950,
-    min: 500,
-    max: 50000,
-    dripfeed: true,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Spotify',
-    description: 'Safe for artist royalties and algorithm charting.'
-  },
-  {
-    service: '212',
-    name: 'Snapchat Public Profile Followers [Real US/EU]',
-    type: 'Default',
-    category: 'Snapchat Followers',
-    rate: 3800,
+    category: 'Twitter - Followers',
+    rateUsd: 1.4573,
+    rate: 2405,
+    pricePerThousandNgn: 2405,
     min: 100,
     max: 10000,
     dripfeed: false,
-    refill: true,
-    cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Snapchat',
-    description: 'Aged profiles for Snapchat creators.'
-  },
-  {
-    service: '213',
-    name: 'Global Website Visitors [Organic Direct SEO Traffic]',
-    type: 'Default',
-    category: 'Website Traffic',
-    rate: 850,
-    min: 1000,
-    max: 500000,
-    dripfeed: true,
     refill: false,
     cancel: false,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Website',
-    description: 'Google Analytics tracked, high dwell time.'
+    provider: 'Voiker',
+    platform: 'Twitter',
+    description: 'Grow your X audience and follower count safely.'
   },
   {
-    service: '214',
-    name: 'Multi-Network Social Growth & Engagement Boost',
+    service: '751',
+    id: '751',
+    name: 'Twitter Likes | HQ | R30',
     type: 'Default',
-    category: 'Special Growth',
-    rate: 2100,
-    min: 100,
-    max: 20000,
+    category: 'Twitter - Likes',
+    rateUsd: 2.3905,
+    rate: 3944,
+    pricePerThousandNgn: 3944,
+    min: 10,
+    max: 10000,
     dripfeed: false,
     refill: true,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Twitter',
+    description: 'Likes on tweets to increase impressions and algorithm visibility.'
+  },
+  {
+    service: '831',
+    id: '831',
+    name: 'Twitter Retweets',
+    type: 'Default',
+    category: 'Twitter - Retweets',
+    rateUsd: 1.3021,
+    rate: 2148,
+    pricePerThousandNgn: 2148,
+    min: 20,
+    max: 5000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Twitter',
+    description: 'Direct retweets to amplify reach across the Twitter feed.'
+  },
+
+  // Telegram (Real Voiker IDs)
+  {
+    service: '513',
+    id: '513',
+    name: 'Telegram Members | Max 100K | 0-15 Minutes',
+    type: 'Default',
+    category: 'Telegram - Members',
+    rateUsd: 0.3545,
+    rate: 585,
+    pricePerThousandNgn: 585,
+    min: 10,
+    max: 100000,
+    dripfeed: false,
+    refill: false,
     cancel: true,
-    provider: 'Provider 2 High-Speed Pool',
-    platform: 'Other',
-    description: 'Cross-platform engagement package.'
+    provider: 'Voiker',
+    platform: 'Telegram',
+    description: 'Rapid member growth for Telegram channels and public groups.'
+  },
+  {
+    service: '968',
+    id: '968',
+    name: 'Telegram Post Views ⚡ 🔥',
+    type: 'Default',
+    category: 'Telegram - Views',
+    rateUsd: 0.0083,
+    rate: 14,
+    pricePerThousandNgn: 14,
+    min: 10,
+    max: 500000,
+    dripfeed: false,
+    refill: false,
+    cancel: true,
+    provider: 'Voiker',
+    platform: 'Telegram',
+    description: 'Post views on Telegram broadcasts to simulate active readership.'
+  },
+
+  // WhatsApp (Real Voiker IDs)
+  {
+    service: '776',
+    id: '776',
+    name: 'Whatsapp Channel Members 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
+    type: 'Default',
+    category: 'Whatsapp - Members',
+    rateUsd: 2.8327,
+    rate: 4674,
+    pricePerThousandNgn: 4674,
+    min: 10,
+    max: 10000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'WhatsApp',
+    description: 'Active followers and members for WhatsApp Public Channels.'
+  },
+
+  // Spotify (Real Voiker IDs)
+  {
+    service: '432',
+    id: '432',
+    name: 'Spotify Free Plays [Lifetime Guaranteed] ♻️',
+    type: 'Default',
+    category: 'Spotify - Plays',
+    rateUsd: 0.4584,
+    rate: 756,
+    pricePerThousandNgn: 756,
+    min: 1000,
+    max: 1000000000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Spotify',
+    description: 'Stream plays on your track to boost artist algorithm placement.'
+  },
+
+  // Discord (Real Voiker IDs)
+  {
+    service: '1040',
+    id: '1040',
+    name: 'Discord Offline Members | ✅Quality: Real With Avatar',
+    type: 'Default',
+    category: 'Discord',
+    rateUsd: 2.8350,
+    rate: 4678,
+    pricePerThousandNgn: 4678,
+    min: 50,
+    max: 1500,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Discord',
+    description: 'Join members to increase Discord server headcount and credibility.'
+  },
+
+  // LinkedIn (Real Voiker IDs)
+  {
+    service: '4631',
+    id: '4631',
+    name: 'Linkedin Followers | Page or Profile | 30 Days Refill ♻️',
+    type: 'Default',
+    category: 'LinkedIn',
+    rateUsd: 13.6500,
+    rate: 22523,
+    pricePerThousandNgn: 22523,
+    min: 10,
+    max: 100000000,
+    dripfeed: false,
+    refill: true,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'LinkedIn',
+    description: 'Followers on company pages or personal profiles with 30-day refill.'
+  },
+
+  // Website Traffic (Real Voiker IDs)
+  {
+    service: '560',
+    id: '560',
+    name: 'Website Traffic [WW - Direct Visits] 💧',
+    type: 'Default',
+    category: 'Website Traffic',
+    rateUsd: 0.5354,
+    rate: 883,
+    pricePerThousandNgn: 883,
+    min: 100,
+    max: 1000000,
+    dripfeed: false,
+    refill: false,
+    cancel: false,
+    provider: 'Voiker',
+    platform: 'Website',
+    description: 'Direct browser visits to increase web traffic and analytics rankings.'
   }
 ];
 
@@ -8694,12 +9792,13 @@ const handleSocialBoost2Request = async (req: express.Request, res: express.Resp
 
     if (action === 'services') {
       let rawServices = [...DEFAULT_P2_SOCIAL_SERVICES];
-      let pricingSettings = { profitMarginPercent: 35, usdToNgnRate: 1550, fixedMarkupPerThousand: 200 };
+      // Zero-markup direct Voiker pricing: profitMarginPercent = 0, fixedMarkupPerThousand = 0
+      let pricingSettings = { profitMarginPercent: 0, usdToNgnRate: 1650, fixedMarkupPerThousand: 0 };
       if (db) {
         try {
           const settingsSnap = await getDoc(doc(db, 'settings', 'social_boost_2_pricing'));
           if (settingsSnap.exists()) {
-            pricingSettings = { ...pricingSettings, ...settingsSnap.data() };
+            pricingSettings = { ...pricingSettings, ...settingsSnap.data(), profitMarginPercent: 0, fixedMarkupPerThousand: 0 };
           }
         } catch (e) {
           console.warn('[SocialBoost2] Firestore settings notice:', e);
@@ -8712,7 +9811,7 @@ const handleSocialBoost2Request = async (req: express.Request, res: express.Resp
         pricePerThousandNgn: Number(s.pricePerThousandNgn || s.rate || 1500),
         rate: Number(s.rate || s.pricePerThousandNgn || 1500),
       }));
-      return res.json({ success: true, provider: 'Provider 2', services, pricingSettings });
+      return res.json({ success: true, provider: 'Voiker', services, pricingSettings });
     }
 
     if (action === 'order') {
@@ -8979,20 +10078,57 @@ app.use((err: any, req: any, res: any, _next: any) => {
   });
 });
 
-// 2. Vite Middleware integration
+// 2. Vite Middleware & Production Static Serving integration
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  const distAssetsPath = path.join(distPath, 'assets');
+  const distIndexExists = fs.existsSync(path.join(distPath, 'index.html'));
+
+  if (process.env.NODE_ENV === 'production' && distIndexExists) {
+    app.use(express.static(distPath, {
+      maxAge: '1d',
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+        } else if (filePath.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css; charset=utf-8');
+        }
+      }
+    }));
+    // Return 404 text/plain for missing asset chunks so browsers don't receive index.html as a JS module
+    app.get(['/assets/*', '/*.js', '/*.mjs', '/*.css'], (req, res) => {
+      res.status(404).type('text/plain').send('Asset not found');
+    });
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  } else {
+    // In dev mode, if dist/assets exists from compilation, serve them so cached asset requests succeed
+    if (fs.existsSync(distAssetsPath)) {
+      app.use('/assets', express.static(distAssetsPath, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
+            res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+          } else if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css; charset=utf-8');
+          }
+        }
+      }));
+    }
+
+    // Explicitly return 404 text/plain for missing /assets/* or *.js files so Vite SPA fallback NEVER returns text/html for JS modules!
+    app.get(['/assets/*', '/*.js', '/*.mjs'], (req, res, next) => {
+      if (req.path.startsWith('/src') || req.path.startsWith('/@') || req.path.startsWith('/node_modules')) {
+        return next();
+      }
+      res.status(404).type('text/plain').send('Asset not found');
+    });
+
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {

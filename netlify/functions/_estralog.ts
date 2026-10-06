@@ -6,52 +6,7 @@
  */
 
 export const getEstraLogConfig = () => {
-  const candidates = [
-    process.env.ESTRALOG_API_KEY,
-    process.env.ESTRALOGS_API_KEY,
-    process.env.ESTRALOG_TOOLS_API_KEY,
-    process.env.ESTRALOGS_TOOLS_API_KEY,
-    process.env.XTRALOGSTOOLS_API_KEY,
-    process.env.EXTRA_LOG_API_KEY,
-    process.env.EXTRA_LOGS_API_KEY,
-    process.env.PROVIDER2_NUMBERS_API_KEY,
-    process.env.PROVIDER2_SOCIAL_BOOST_API_KEY,
-    process.env.PROVIDER2_SMM_API_KEY,
-    process.env.PROVIDER2_API_KEY,
-    process.env.VIRTUAL_NUMBER_2_API_KEY
-  ];
-
-  let apiKey = '';
-  for (const c of candidates) {
-    if (c && typeof c === 'string') {
-      const clean = c.trim().replace(/^['"`]|['"`]$/g, '').trim();
-      if (clean && clean !== 'undefined' && clean !== 'null' && !clean.startsWith('MY_')) {
-        apiKey = clean;
-        break;
-      }
-    }
-  }
-
-  const rawBase = (
-    process.env.ESTRALOG_BASE_URL ||
-    process.env.ESTRALOGS_BASE_URL ||
-    process.env.ESTRALOG_TOOLS_BASE_URL ||
-    process.env.XTRALOGSTOOLS_BASE_URL ||
-    process.env.EXTRA_LOG_BASE_URL ||
-    process.env.EXTRA_LOGS_BASE_URL ||
-    process.env.PROVIDER2_NUMBERS_BASE_URL ||
-    process.env.PROVIDER2_SOCIAL_BOOST_BASE_URL ||
-    'https://xtralogstools.com/api/v1/index.php'
-  ).trim().replace(/^['"`]|['"`]$/g, '').trim();
-
-  let baseUrl = rawBase;
-  if (!baseUrl.includes('/api/v1')) {
-    baseUrl = `${baseUrl.replace(/\/+$/, '')}/api/v1/index.php`;
-  } else if (!baseUrl.endsWith('.php')) {
-    baseUrl = `${baseUrl.replace(/\/+$/, '')}/index.php`;
-  }
-
-  return { apiKey, baseUrl };
+  return { apiKey: '', baseUrl: '' };
 };
 
 export const normalizeEstraLogServer = (serverParam: string = '', tabParam: string = 'usa'): string => {

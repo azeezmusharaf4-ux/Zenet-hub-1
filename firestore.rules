@@ -23,6 +23,7 @@ service cloud.firestore {
       return request.auth != null && (
         isOwnerEmail() ||
         (request.auth.token.role is string && (request.auth.token.role == 'admin' || request.auth.token.role == 'owner')) ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid))) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' ||
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
@@ -38,11 +39,19 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    // Admins Collection (Fast lookup for administrative privileges)
+    match /admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     // Users Collection
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId) || isAdmin();
-      allow update: if isOwner(userId) || isAdmin() || (
+      allow create: if (isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role in ['buyer', 'customer', 'seller'])) || isAdmin();
+      allow update: if isAdmin() || (
+        isOwner(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']))
+      ) || (
         isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referralCount', 'totalReferralEarnings', 'walletBalance', 'balance', 'withdrawalId', 'updatedAt', 'sellerTotalRevenue', 'sellerGrossSales', 'sellerOwnerFee', 'sellerCompletedSales'])
       );
       allow delete: if isOwner(userId) || isAdmin();
@@ -58,6 +67,34 @@ service cloud.firestore {
       allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin());
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // Withdrawal Transaction IDs (Database-level uniqueness registry for withdrawal transactions)
+    match /withdrawal_transaction_ids/{txId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Stock Approvals Collection (Audit trail for Owner stock approvals and rejections)
+    match /stock_approvals/{approvalId} {
+      allow read: if isAuthenticated() && (resource.data.submitterId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // User Notifications Collection (Permanent, read-only to other users, no deletion allowed)
+    match /user_notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        (resource.data.userId == 'owner' && isAdmin()) || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      // Allow marking as read only; deletion is strictly forbidden
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        (resource.data.userId == 'owner' && isAdmin()) || 
+        isAdmin()
+      ) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt', 'updatedAt']);
+      allow delete: if false; // NOTIFICATIONS MUST NOT BE DELETED
     }
 
     // Seller Revenues Collection (Live 70% seller / 30% platform split tracking)

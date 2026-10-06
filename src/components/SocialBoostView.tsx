@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   ArrowLeft, 
   ChevronRight, 
@@ -23,10 +23,22 @@ import {
   Zap,
   ShoppingBag,
   Settings,
+  Instagram,
+  Facebook,
+  Youtube,
+  Twitter,
+  Send,
+  Music2,
+  Gamepad2,
+  Linkedin,
+  Globe,
   Sliders,
-  Save
+  DollarSign,
+  Radio,
+  ExternalLink
 } from 'lucide-react';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { User } from 'firebase/auth';
 import { UserProfile, SocialBoostService, SocialBoostOrder } from '../types';
 import { auth, db, getSafeIdToken } from '../lib/firebase';
 import { safeApiFetch, sanitizeApiErrorMessage } from '../utils/api';
@@ -56,40 +68,32 @@ export const TikTokIcon: React.FC<{ className?: string }> = ({ className = "w-6 
   </svg>
 );
 
-// High-speed fallback TikTok services catalogue - strictly 6 verified services in exact order
+// WhatsApp Vector Icon Component
+export const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-6 h-6 text-white" }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+  </svg>
+);
+
+// High-speed fallback services catalogue covering all major platforms with REAL Voiker IDs
 const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
+  // --- TIKTOK (Voiker Real IDs) ---
   {
-    id: 'tt-followers',
+    id: 'vk-3',
+    provider: 'Voiker',
+    providerServiceId: '3',
     platform: 'TikTok',
-    category: 'TikTok Followers',
-    name: 'Real TikTok Followers',
-    type: 'Followers',
-    ratePer1000: 2400,
-    min: 100,
-    max: 50000,
-    deliverySpeed: '5,000 - 10,000 / day',
-    refill: true,
-    quality: 'High-Retention Profile Accounts',
-    description: 'Intended for genuine audience growth with steady profile followers, gradual automated delivery, and retention stability.',
-    inputLabel: 'TikTok Profile Link or @Username',
-    inputPlaceholder: 'https://www.tiktok.com/@username or @username',
-    inputType: 'link',
-    isActive: true,
-    isBestValue: true
-  },
-  {
-    id: 'tt-likes',
-    platform: 'TikTok',
-    category: 'TikTok Likes',
-    name: 'Real TikTok Likes',
-    type: 'Likes',
-    ratePer1000: 850,
-    min: 50,
-    max: 100000,
-    deliverySpeed: '20,000 - 50,000 / day',
-    refill: true,
-    quality: 'High-Retention Video Likes',
-    description: 'Designed to deliver genuine engagement signals to your TikTok videos, enhancing post visibility and interaction.',
+    category: 'TikTok - Views',
+    name: 'TikTok Views Real 💎',
+    type: 'Views',
+    rateUsd: 0.1246,
+    ratePer1000: 206,
+    min: 1000,
+    max: 50000000,
+    deliverySpeed: 'Instant Automated Start',
+    refill: false,
+    quality: 'High-Retention Algorithmic Discovery',
+    description: 'Directly routed through Voiker network for instant video impressions and reach.',
     inputLabel: 'TikTok Video URL',
     inputPlaceholder: 'https://www.tiktok.com/@username/video/1234567890',
     inputType: 'link',
@@ -97,90 +101,796 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     isCheapest: true
   },
   {
-    id: 'tt-comments',
+    id: 'vk-6',
+    provider: 'Voiker',
+    providerServiceId: '6',
     platform: 'TikTok',
-    category: 'TikTok Comments',
-    name: 'Real TikTok Comments',
-    type: 'Comments',
-    ratePer1000: 4500,
+    category: 'TikTok - Likes',
+    name: 'TikTok Likes | 💖',
+    type: 'Likes',
+    rateUsd: 0.5670,
+    ratePer1000: 936,
     min: 10,
-    max: 2000,
-    deliverySpeed: '1,000 - 3,000 / day',
+    max: 100000,
+    deliverySpeed: 'Instant Start',
     refill: false,
-    quality: 'Custom Contextual Comments',
-    description: 'Real custom written comments posted on your TikTok video. You define the exact comment text to maintain authentic relevance.',
-    inputLabel: 'TikTok Video URL',
-    inputPlaceholder: 'https://www.tiktok.com/@username/video/1234567890',
-    inputType: 'custom_comments',
-    isActive: true,
-    isBestValue: false
-  },
-  {
-    id: 'tt-shares',
-    platform: 'TikTok',
-    category: 'TikTok Shares',
-    name: 'Real TikTok Shares',
-    type: 'Shares',
-    ratePer1000: 650,
-    min: 50,
-    max: 50000,
-    deliverySpeed: '10,000 - 30,000 / day',
-    refill: true,
-    quality: 'High-Retention Shares',
-    description: 'Increases the post share count to simulate genuine content redistribution across the TikTok recommendation ecosystem.',
+    quality: 'Real Accounts Engagement',
+    description: 'High-speed genuine heart likes to trigger TikTok engagement metrics.',
     inputLabel: 'TikTok Video URL',
     inputPlaceholder: 'https://www.tiktok.com/@username/video/1234567890',
     inputType: 'link',
     isActive: true
   },
   {
-    id: 'tt-favorites',
+    id: 'vk-834',
+    provider: 'Voiker',
+    providerServiceId: '834',
     platform: 'TikTok',
-    category: 'TikTok Favorites',
-    name: 'Real TikTok Favorites',
-    type: 'Favorites',
-    ratePer1000: 750,
+    category: 'TikTok - Followers',
+    name: 'TikTok Followers 🌍 | ✅Quality: ₕQ',
+    type: 'Followers',
+    rateUsd: 2.7450,
+    ratePer1000: 4529,
     min: 50,
-    max: 50000,
-    deliverySpeed: '10,000 - 25,000 / day',
-    refill: true,
-    quality: 'High-Retention Video Favorites',
-    description: 'Authentic TikTok bookmark favorites to strengthen video recommendation signals and ranking performance.',
-    inputLabel: 'TikTok Video URL',
-    inputPlaceholder: 'https://www.tiktok.com/@username/video/1234567890',
-    inputType: 'link',
-    isActive: true
-  },
-  {
-    id: 'tt-views',
-    platform: 'TikTok',
-    category: 'TikTok Views',
-    name: 'Real TikTok Views',
-    type: 'Views',
-    ratePer1000: 250,
-    min: 500,
-    max: 2000000,
-    deliverySpeed: '50,000 - 200,000 / day',
-    refill: true,
-    quality: 'High-Retention Video Impressions',
-    description: 'Designed to deliver organic watch-time signals and video play impressions, helping trigger natural discovery and algorithmic reach.',
-    inputLabel: 'TikTok Video URL',
-    inputPlaceholder: 'https://www.tiktok.com/@username/video/1234567890',
+    max: 5000000,
+    deliverySpeed: '5,000 - 15,000 / day',
+    refill: false,
+    quality: 'High-Retention Global Followers',
+    description: 'Grow your profile audience with authentic global followers.',
+    inputLabel: 'TikTok Profile Link or @Username',
+    inputPlaceholder: 'https://www.tiktok.com/@username or @username',
     inputType: 'link',
     isActive: true,
     isBestValue: true
+  },
+  {
+    id: 'vk-44',
+    provider: 'Voiker',
+    providerServiceId: '44',
+    platform: 'TikTok',
+    category: 'TikTok - Comments',
+    name: 'TikTok Comments ~ Custom ~ 𝐇𝐐 🚀',
+    type: 'Comments',
+    rateUsd: 8.4524,
+    ratePer1000: 13946,
+    min: 10,
+    max: 100000,
+    deliverySpeed: 'Starts in 0-10 min',
+    refill: false,
+    quality: 'Custom Written Text',
+    description: 'Custom relevant comments written by you posted directly to your video.',
+    inputLabel: 'TikTok Video URL & Custom Comments (1 per line)',
+    inputPlaceholder: 'https://www.tiktok.com/@username/video/1234567890\nGreat video!\nLove this content!',
+    inputType: 'custom_comments',
+    isActive: true
+  },
+  {
+    id: 'vk-841',
+    provider: 'Voiker',
+    providerServiceId: '841',
+    platform: 'TikTok',
+    category: 'TikTok - Shares',
+    name: 'TikTok Shares 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
+    type: 'Shares',
+    rateUsd: 0.1606,
+    ratePer1000: 265,
+    min: 10,
+    max: 217545811,
+    deliverySpeed: '500K / day',
+    refill: false,
+    quality: 'Algorithm Signal Boost',
+    description: 'Boost video redistribute signals and content recommendation on TikTok.',
+    inputLabel: 'TikTok Video URL',
+    inputPlaceholder: 'https://www.tiktok.com/@username/video/1234567890',
+    inputType: 'link',
+    isActive: true
+  },
+  {
+    id: 'vk-10',
+    provider: 'Voiker',
+    providerServiceId: '10',
+    platform: 'TikTok',
+    category: 'TikTok - Saves',
+    name: 'TikTok Video Saves [Refill: 30 Days] 🔥♻️',
+    type: 'Favorites',
+    rateUsd: 0.1688,
+    ratePer1000: 279,
+    min: 10,
+    max: 100000,
+    deliverySpeed: 'Fast Organic Pacing',
+    refill: true,
+    quality: 'Bookmark Retention Signals',
+    description: 'Authentic TikTok bookmark favorites with 30-day automated refill.',
+    inputLabel: 'TikTok Video URL',
+    inputPlaceholder: 'https://www.tiktok.com/@username/video/1234567890',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- INSTAGRAM (Voiker Real IDs) ---
+  {
+    id: 'vk-7',
+    provider: 'Voiker',
+    providerServiceId: '7',
+    platform: 'Instagram',
+    category: 'Instagram - Likes',
+    name: 'Instagram - Likes + Impressions Real Profiles 💖 🌎 🔥',
+    type: 'Likes',
+    rateUsd: 0.0855,
+    ratePer1000: 141,
+    min: 100,
+    max: 100000,
+    deliverySpeed: 'Instant Start',
+    refill: false,
+    quality: 'Real Profiles with Impressions',
+    description: 'Post and Reels likes with real profile impressions.',
+    inputLabel: 'Instagram Post / Reel URL',
+    inputPlaceholder: 'https://instagram.com/p/... or reel link',
+    inputType: 'link',
+    isActive: true,
+    isCheapest: true
+  },
+  {
+    id: 'vk-711',
+    provider: 'Voiker',
+    providerServiceId: '711',
+    platform: 'Instagram',
+    category: 'Instagram - Followers',
+    name: 'Instagram Followers | 𝐎𝐥𝐝 𝐀𝐜𝐜𝐨𝐮𝐧𝐭 [R365 ♻️] ❌',
+    type: 'Followers',
+    rateUsd: 3.1949,
+    ratePer1000: 5272,
+    min: 10,
+    max: 217545811,
+    deliverySpeed: 'Gradual Organic Pace',
+    refill: true,
+    cancel: true,
+    quality: 'Aged Accounts with Posts',
+    description: 'High retention Instagram followers with 365-day warranty and refill.',
+    inputLabel: 'Instagram Profile Link or @Username',
+    inputPlaceholder: 'https://instagram.com/username or @username',
+    inputType: 'link',
+    isActive: true,
+    isBestValue: true
+  },
+  {
+    id: 'vk-43',
+    provider: 'Voiker',
+    providerServiceId: '43',
+    platform: 'Instagram',
+    category: 'Instagram - Views',
+    name: 'Instagram Views 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
+    type: 'Views',
+    rateUsd: 0.0027,
+    ratePer1000: 4,
+    min: 100,
+    max: 2147483647,
+    deliverySpeed: 'Instant Delivery',
+    refill: false,
+    quality: 'High Retention Video Views',
+    description: 'Ultra fast video and reels impressions to trigger discovery algorithm.',
+    inputLabel: 'Instagram Reel or Video URL',
+    inputPlaceholder: 'https://instagram.com/reel/...',
+    inputType: 'link',
+    isActive: true
+  },
+  {
+    id: 'vk-151',
+    provider: 'Voiker',
+    providerServiceId: '151',
+    platform: 'Instagram',
+    category: 'Instagram - Comments',
+    name: 'Instagram Mix Positive Emoji Comments',
+    type: 'Comments',
+    rateUsd: 4.5491,
+    ratePer1000: 7506,
+    min: 10,
+    max: 200000,
+    deliverySpeed: 'Gradual Pace',
+    refill: false,
+    quality: 'Positive Emoji Comments',
+    description: 'Engaging positive comments and emoji reactions to improve social proof.',
+    inputLabel: 'Instagram Post URL',
+    inputPlaceholder: 'https://instagram.com/p/...',
+    inputType: 'link',
+    isActive: true
+  },
+  {
+    id: 'vk-19',
+    provider: 'Voiker',
+    providerServiceId: '19',
+    platform: 'Instagram',
+    category: 'Instagram - Saves',
+    name: 'Instagram Saves + Impressions 🚀',
+    type: 'Favorites',
+    rateUsd: 0.1357,
+    ratePer1000: 224,
+    min: 10,
+    max: 400000,
+    deliverySpeed: 'Instant Start',
+    refill: false,
+    quality: 'Bookmark Signals',
+    description: 'Post saves and discovery reach impressions.',
+    inputLabel: 'Instagram Post URL',
+    inputPlaceholder: 'https://instagram.com/p/...',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- FACEBOOK (Voiker Real IDs) ---
+  {
+    id: 'vk-42',
+    provider: 'Voiker',
+    providerServiceId: '42',
+    platform: 'Facebook',
+    category: 'Facebook - Followers',
+    name: 'Facebook Page & Profile Followers 🔴',
+    type: 'Followers',
+    rateUsd: 0.2358,
+    ratePer1000: 389,
+    min: 10,
+    max: 50000,
+    deliverySpeed: 'Steady Delivery',
+    refill: false,
+    quality: 'Active Profiles',
+    description: 'Grow your Facebook business page or personal creator profile followers.',
+    inputLabel: 'Facebook Page or Profile URL',
+    inputPlaceholder: 'https://facebook.com/...',
+    inputType: 'link',
+    isActive: true
+  },
+  {
+    id: 'vk-177',
+    provider: 'Voiker',
+    providerServiceId: '177',
+    platform: 'Facebook',
+    category: 'Facebook - Post Likes',
+    name: 'Facebook Post Likes',
+    type: 'Likes',
+    rateUsd: 0.2498,
+    ratePer1000: 412,
+    min: 10,
+    max: 50000,
+    deliverySpeed: 'Fast Delivery',
+    refill: false,
+    quality: 'Real Accounts',
+    description: 'Instant likes for any Facebook post, photo, or status update.',
+    inputLabel: 'Facebook Post URL',
+    inputPlaceholder: 'https://facebook.com/.../posts/...',
+    inputType: 'link',
+    isActive: true
+  },
+  {
+    id: 'vk-698',
+    provider: 'Voiker',
+    providerServiceId: '698',
+    platform: 'Facebook',
+    category: 'Facebook - Video Views',
+    name: 'Facebook Views ~ 10 Seconds',
+    type: 'Views',
+    rateUsd: 0.4436,
+    ratePer1000: 732,
+    min: 500,
+    max: 10000000,
+    deliverySpeed: 'Fast Delivery',
+    refill: false,
+    quality: '10s Retention Views',
+    description: 'High watch-time video views for Facebook watch & video posts.',
+    inputLabel: 'Facebook Video URL',
+    inputPlaceholder: 'https://facebook.com/watch/?v=...',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- YOUTUBE (Voiker Real IDs) ---
+  {
+    id: 'vk-264',
+    provider: 'Voiker',
+    providerServiceId: '264',
+    platform: 'YouTube',
+    category: 'YouTube - Views',
+    name: 'Youtube Views | Monetizable | Best For SEO | Suggested + Browse | Lifetime Guaranteed',
+    type: 'Views',
+    rateUsd: 3.6497,
+    ratePer1000: 6022,
+    min: 100,
+    max: 100000000,
+    deliverySpeed: 'Natural Organic Pacing',
+    refill: true,
+    quality: 'Monetizable SEO Views',
+    description: 'Source: Suggested, browse features, and external. Safe for monetization.',
+    inputLabel: 'YouTube Video URL',
+    inputPlaceholder: 'https://youtube.com/watch?v=...',
+    inputType: 'link',
+    isActive: true,
+    isBestValue: true
+  },
+  {
+    id: 'vk-298',
+    provider: 'Voiker',
+    providerServiceId: '298',
+    platform: 'YouTube',
+    category: 'YouTube - Subscribers',
+    name: 'YouTube Subscribers ℍ𝕚𝕘𝕙 𝔻𝕣𝕠𝕡 ℕ𝕠 ℝ𝕖𝕗𝕚𝕝𝕝',
+    type: 'Subscribers',
+    rateUsd: 0.0924,
+    ratePer1000: 152,
+    min: 10,
+    max: 500000,
+    deliverySpeed: 'Steady Pace',
+    refill: false,
+    quality: 'Wholesale Channel Growth',
+    description: 'Rapid subscriber growth for new and existing YouTube channels.',
+    inputLabel: 'YouTube Channel Link',
+    inputPlaceholder: 'https://youtube.com/@channel or channel link',
+    inputType: 'link',
+    isActive: true,
+    isCheapest: true
+  },
+  {
+    id: 'vk-282',
+    provider: 'Voiker',
+    providerServiceId: '282',
+    platform: 'YouTube',
+    category: 'YouTube - Likes',
+    name: 'YouTube Likes 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
+    type: 'Likes',
+    rateUsd: 0.1992,
+    ratePer1000: 329,
+    min: 10,
+    max: 5000,
+    deliverySpeed: 'Instant Start',
+    refill: false,
+    quality: 'High Quality Likes',
+    description: 'Instant thumbs-up likes to improve video ranking and audience engagement.',
+    inputLabel: 'YouTube Video URL',
+    inputPlaceholder: 'https://youtube.com/watch?v=...',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- TWITTER / X (Voiker Real IDs) ---
+  {
+    id: 'vk-810',
+    provider: 'Voiker',
+    providerServiceId: '810',
+    platform: 'Twitter / X',
+    category: 'Twitter - Followers',
+    name: 'Twitter Followers | Real Profile Base',
+    type: 'Followers',
+    rateUsd: 1.4573,
+    ratePer1000: 2405,
+    min: 100,
+    max: 10000,
+    deliverySpeed: 'Fast Delivery',
+    refill: false,
+    quality: 'Active Profiles',
+    description: 'Grow your X audience and follower count safely.',
+    inputLabel: 'Twitter / X Profile Link or @handle',
+    inputPlaceholder: 'https://x.com/username or @username',
+    inputType: 'link',
+    isActive: true
+  },
+  {
+    id: 'vk-751',
+    provider: 'Voiker',
+    providerServiceId: '751',
+    platform: 'Twitter / X',
+    category: 'Twitter - Likes',
+    name: 'Twitter Likes | HQ | R30',
+    type: 'Likes',
+    rateUsd: 2.3905,
+    ratePer1000: 3944,
+    min: 10,
+    max: 10000,
+    deliverySpeed: 'Instant Start',
+    refill: true,
+    quality: 'High Quality Likes with 30d Refill',
+    description: 'Likes on tweets to increase impressions and algorithm visibility.',
+    inputLabel: 'Tweet URL',
+    inputPlaceholder: 'https://x.com/user/status/123...',
+    inputType: 'link',
+    isActive: true
+  },
+  {
+    id: 'vk-831',
+    provider: 'Voiker',
+    providerServiceId: '831',
+    platform: 'Twitter / X',
+    category: 'Twitter - Retweets',
+    name: 'Twitter Retweets',
+    type: 'Shares',
+    rateUsd: 1.3021,
+    ratePer1000: 2148,
+    min: 20,
+    max: 5000,
+    deliverySpeed: 'Fast Delivery',
+    refill: false,
+    quality: 'Organic Retweets',
+    description: 'Direct retweets to amplify reach across the Twitter feed.',
+    inputLabel: 'Tweet URL',
+    inputPlaceholder: 'https://x.com/user/status/123...',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- TELEGRAM (Voiker Real IDs) ---
+  {
+    id: 'vk-513',
+    provider: 'Voiker',
+    providerServiceId: '513',
+    platform: 'Telegram',
+    category: 'Telegram - Members',
+    name: 'Telegram Members | Max 100K | 0-15 Minutes',
+    type: 'Members',
+    rateUsd: 0.3545,
+    ratePer1000: 585,
+    min: 10,
+    max: 100000,
+    deliverySpeed: '0-15 Minutes Start',
+    refill: false,
+    cancel: true,
+    quality: 'Fast Channel/Group Members',
+    description: 'Rapid member growth for Telegram channels and public groups.',
+    inputLabel: 'Telegram Channel/Group Link',
+    inputPlaceholder: 'https://t.me/channelname or @channelname',
+    inputType: 'link',
+    isActive: true,
+    isCheapest: true
+  },
+  {
+    id: 'vk-968',
+    provider: 'Voiker',
+    providerServiceId: '968',
+    platform: 'Telegram',
+    category: 'Telegram - Views',
+    name: 'Telegram Post Views ⚡ 🔥',
+    type: 'Views',
+    rateUsd: 0.0083,
+    ratePer1000: 14,
+    min: 10,
+    max: 500000,
+    deliverySpeed: 'Instant Speed',
+    refill: false,
+    cancel: true,
+    quality: 'Ultra-Fast Post Impressions',
+    description: 'Post views on Telegram broadcasts to simulate active readership.',
+    inputLabel: 'Telegram Post Link',
+    inputPlaceholder: 'https://t.me/channel/123',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- WHATSAPP (Voiker Real IDs) ---
+  {
+    id: 'vk-776',
+    provider: 'Voiker',
+    providerServiceId: '776',
+    platform: 'WhatsApp',
+    category: 'Whatsapp - Members',
+    name: 'Whatsapp Channel Members 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
+    type: 'Members',
+    rateUsd: 2.8327,
+    ratePer1000: 4674,
+    min: 10,
+    max: 10000,
+    deliverySpeed: 'Fast Delivery',
+    refill: false,
+    quality: 'Channel Followers',
+    description: 'Active followers and members for WhatsApp Public Channels.',
+    inputLabel: 'WhatsApp Channel Link',
+    inputPlaceholder: 'https://whatsapp.com/channel/...',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- SPOTIFY (Voiker Real IDs) ---
+  {
+    id: 'vk-432',
+    provider: 'Voiker',
+    providerServiceId: '432',
+    platform: 'Spotify & Music',
+    category: 'Spotify - Plays',
+    name: 'Spotify Free Plays [Lifetime Guaranteed] [Max: 1M] ♻️',
+    type: 'Views',
+    rateUsd: 0.4584,
+    ratePer1000: 756,
+    min: 1000,
+    max: 1000000000,
+    deliverySpeed: '20K / day',
+    refill: false,
+    quality: 'Royalty-Eligible Streams',
+    description: 'Stream plays on your track to boost artist algorithm placement.',
+    inputLabel: 'Spotify Track URL',
+    inputPlaceholder: 'https://open.spotify.com/track/...',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- DISCORD (Voiker Real IDs) ---
+  {
+    id: 'vk-1040',
+    provider: 'Voiker',
+    providerServiceId: '1040',
+    platform: 'Discord',
+    category: 'Discord',
+    name: 'Discord Offline Members | ✅Quality: Real With Avatar',
+    type: 'Members',
+    rateUsd: 2.8350,
+    ratePer1000: 4678,
+    min: 50,
+    max: 1500,
+    deliverySpeed: 'Instant Speed',
+    refill: false,
+    quality: 'Real Avatars & Handles',
+    description: 'Join members to increase Discord server headcount and credibility.',
+    inputLabel: 'Discord Server Invite Link',
+    inputPlaceholder: 'https://discord.gg/...',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- LINKEDIN (Voiker Real IDs) ---
+  {
+    id: 'vk-4631',
+    provider: 'Voiker',
+    providerServiceId: '4631',
+    platform: 'LinkedIn',
+    category: 'LinkedIn',
+    name: 'Linkedin Followers | Page or Profile | 30 Days Refill ♻️',
+    type: 'Followers',
+    rateUsd: 13.6500,
+    ratePer1000: 22523,
+    min: 10,
+    max: 100000000,
+    deliverySpeed: 'Steady B2B Pace',
+    refill: true,
+    quality: 'Professional Profiles',
+    description: 'Followers on company pages or personal profiles with 30-day refill.',
+    inputLabel: 'LinkedIn Profile or Company Page URL',
+    inputPlaceholder: 'https://linkedin.com/in/... or company link',
+    inputType: 'link',
+    isActive: true
+  },
+
+  // --- WEBSITE TRAFFIC (Voiker Real IDs) ---
+  {
+    id: 'vk-560',
+    provider: 'Voiker',
+    providerServiceId: '560',
+    platform: 'Website Traffic & SEO',
+    category: 'Website Traffic',
+    name: 'Website Traffic [WW - Direct Visits] [Speed: 50K/Day] 💧',
+    type: 'Views',
+    rateUsd: 0.5354,
+    ratePer1000: 883,
+    min: 100,
+    max: 1000000,
+    deliverySpeed: '50K / day',
+    refill: false,
+    quality: 'Worldwide Organic Direct Visits',
+    description: 'Direct browser visits to increase web traffic and analytics rankings.',
+    inputLabel: 'Website URL',
+    inputPlaceholder: 'https://example.com',
+    inputType: 'link',
+    isActive: true
   }
 ];
 
-export interface SocialBoostViewProps {
-  user?: any;
+// Predefined platform branding definitions for catalogue display
+interface PlatformCardInfo {
+  id: string;
+  name: string;
+  description: string;
+  bgColor: string;
+  textColor: string;
+  iconBg: string;
+  badgeColor: string;
+  popularTypes: string[];
+}
+
+const PLATFORMS_METADATA: PlatformCardInfo[] = [
+  {
+    id: 'TikTok',
+    name: 'TikTok',
+    description: 'Followers, Likes, Views, Comments, Shares & Saves',
+    bgColor: 'hover:border-black/30',
+    textColor: 'group-hover:text-black',
+    iconBg: 'bg-black text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Likes', 'Views', 'Comments', 'Shares']
+  },
+  {
+    id: 'Instagram',
+    name: 'Instagram',
+    description: 'Followers, HQ Likes, Reel Views, Comments & Story Reach',
+    bgColor: 'hover:border-pink-500/40',
+    textColor: 'group-hover:text-pink-600',
+    iconBg: 'bg-linear-to-tr from-amber-500 via-rose-500 to-purple-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Likes', 'Views', 'Comments', 'Reels']
+  },
+  {
+    id: 'YouTube',
+    name: 'YouTube',
+    description: 'Subscribers, Monetizable Views, Likes, Comments & Watch Time',
+    bgColor: 'hover:border-red-500/40',
+    textColor: 'group-hover:text-red-600',
+    iconBg: 'bg-red-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Subscribers', 'Views', 'Likes', 'Comments', 'Watch Hours']
+  },
+  {
+    id: 'Facebook',
+    name: 'Facebook',
+    description: 'Page Followers, Post Likes, Video Views & Group Members',
+    bgColor: 'hover:border-blue-600/40',
+    textColor: 'group-hover:text-blue-600',
+    iconBg: 'bg-blue-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Likes', 'Views', 'Members']
+  },
+  {
+    id: 'Twitter / X',
+    name: 'Twitter / X',
+    description: 'High-Retention Followers, Retweets, Likes & Impressions',
+    bgColor: 'hover:border-neutral-900/40',
+    textColor: 'group-hover:text-neutral-900',
+    iconBg: 'bg-neutral-950 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Likes', 'Shares', 'Views']
+  },
+  {
+    id: 'Telegram',
+    name: 'Telegram',
+    description: 'Channel Members, Post Views, Reactions & Group Boost',
+    bgColor: 'hover:border-sky-500/40',
+    textColor: 'group-hover:text-sky-600',
+    iconBg: 'bg-sky-500 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Members', 'Views', 'Likes']
+  },
+  {
+    id: 'WhatsApp',
+    name: 'WhatsApp',
+    description: 'Channel Followers, Group Members & Engagement',
+    bgColor: 'hover:border-emerald-500/40',
+    textColor: 'group-hover:text-emerald-600',
+    iconBg: 'bg-emerald-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Members']
+  },
+  {
+    id: 'Spotify & Music',
+    name: 'Spotify & Music',
+    description: 'Track Plays, Monthly Listeners, Playlist Followers & Saves',
+    bgColor: 'hover:border-green-500/40',
+    textColor: 'group-hover:text-green-600',
+    iconBg: 'bg-green-500 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Views', 'Followers']
+  },
+  {
+    id: 'Discord',
+    name: 'Discord',
+    description: 'Online Active Members, Offline Server Members & Boosts',
+    bgColor: 'hover:border-indigo-500/40',
+    textColor: 'group-hover:text-indigo-600',
+    iconBg: 'bg-indigo-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Members']
+  },
+  {
+    id: 'LinkedIn',
+    name: 'LinkedIn',
+    description: 'Connections, Company Page Followers, Post Likes & Shares',
+    bgColor: 'hover:border-blue-700/40',
+    textColor: 'group-hover:text-blue-700',
+    iconBg: 'bg-blue-700 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Likes', 'Shares']
+  },
+  {
+    id: 'Twitch & Streaming',
+    name: 'Twitch & Streaming',
+    description: 'Live Stream Viewers, Channel Followers & Video Views',
+    bgColor: 'hover:border-purple-600/40',
+    textColor: 'group-hover:text-purple-600',
+    iconBg: 'bg-purple-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Views', 'Followers']
+  },
+  {
+    id: 'Website Traffic & SEO',
+    name: 'Website Traffic & SEO',
+    description: 'Direct Organic Website Visitors, Search Engine Impressions',
+    bgColor: 'hover:border-teal-500/40',
+    textColor: 'group-hover:text-teal-600',
+    iconBg: 'bg-teal-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Views']
+  },
+  {
+    id: 'Reviews & Ratings',
+    name: 'Reviews & Ratings',
+    description: 'Google Maps Reviews, Trustpilot Ratings & App Reviews',
+    bgColor: 'hover:border-amber-500/40',
+    textColor: 'group-hover:text-amber-600',
+    iconBg: 'bg-amber-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Comments']
+  },
+  {
+    id: 'Threads',
+    name: 'Threads',
+    description: 'Followers, Likes, Reposts & Thread Replies',
+    bgColor: 'hover:border-black/40',
+    textColor: 'group-hover:text-black',
+    iconBg: 'bg-black text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Likes', 'Shares']
+  },
+  {
+    id: 'Snapchat',
+    name: 'Snapchat',
+    description: 'Public Profile Followers, Story Views & Spotlight Likes',
+    bgColor: 'hover:border-amber-400/50',
+    textColor: 'group-hover:text-amber-500',
+    iconBg: 'bg-yellow-400 text-black',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Views']
+  },
+  {
+    id: 'Pinterest',
+    name: 'Pinterest',
+    description: 'Board Followers, Pin Repins & Impressions',
+    bgColor: 'hover:border-red-600/40',
+    textColor: 'group-hover:text-red-600',
+    iconBg: 'bg-red-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Shares']
+  },
+  {
+    id: 'Reddit',
+    name: 'Reddit',
+    description: 'Post Upvotes, Subreddit Subscribers & Karma Growth',
+    bgColor: 'hover:border-orange-500/40',
+    textColor: 'group-hover:text-orange-600',
+    iconBg: 'bg-orange-600 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Likes', 'Members']
+  },
+  {
+    id: 'Quora',
+    name: 'Quora',
+    description: 'Question Answers, Followers, Upvotes & Spaces Reach',
+    bgColor: 'hover:border-red-700/40',
+    textColor: 'group-hover:text-red-700',
+    iconBg: 'bg-red-800 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Likes', 'Views']
+  },
+  {
+    id: 'Other Services',
+    name: 'Other Growth Services',
+    description: 'Snapchat, Reddit Upvotes, Pinterest Pins, Quora & Multi-Network',
+    bgColor: 'hover:border-purple-500/40',
+    textColor: 'group-hover:text-purple-600',
+    iconBg: 'bg-purple-700 text-white',
+    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    popularTypes: ['Followers', 'Likes', 'Views']
+  }
+];
+
+interface SocialBoostViewProps {
+  user: User | null;
   userProfile: UserProfile | null;
   walletBalance: number;
   onRefreshProfile?: () => Promise<void> | void;
   onBackToMarketplace: () => void;
   onOpenWallet: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
-  onBalanceUpdated?: (newBal: number) => void;
+  onBalanceUpdated?: (newBalance: number) => void;
 }
 
 export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
@@ -193,16 +903,17 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   onOpenAuth,
   onBalanceUpdated
 }) => {
-  // Navigation mode: 'categories' (the initial clean TikTok category row) or 'tiktok-services' (the TikTok Boost services page)
-  const [viewMode, setViewMode] = useState<'categories' | 'tiktok-services'>('categories');
+  // Navigation: 'categories' (select platform) or 'platform-services' (browse services for that platform)
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
-  // TikTok Boost services catalogue
-  const [services, setServices] = useState<SocialBoostService[]>(DEFAULT_TIKTOK_SERVICES);
+  // Live services catalogue from Voiker
+  const [allServices, setAllServices] = useState<SocialBoostService[]>(DEFAULT_TIKTOK_SERVICES);
   const [isLoadingServices, setIsLoadingServices] = useState<boolean>(false);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
 
-  // TikTok Sub-tab: 'browse' or 'orders'
+  // Sub-tab: 'browse' or 'orders'
   const [activeSubTab, setActiveSubTab] = useState<'browse' | 'orders'>('browse');
 
   // Order Placement Modal state
@@ -218,6 +929,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   const [orders, setOrders] = useState<SocialBoostOrder[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [actionLoadingOrderId, setActionLoadingOrderId] = useState<string | null>(null);
+  const [actionNotification, setActionNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Admin authorization check
   const isAdmin = Boolean(
@@ -227,12 +940,24 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     userProfile?.role === 'owner'
   );
 
-  // TikTok Admin Settings Modal State
+  // Admin Settings Modal State
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab] = useState<'voiker' | 'tiktok'>('voiker');
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
   const [settingsSaveSuccess, setSettingsSaveSuccess] = useState<boolean>(false);
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
+  const [voikerBalance, setVoikerBalance] = useState<{ balanceUsd: number; balanceNgn: number; currency: string } | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
 
+  // Voiker Global Pricing Settings (Zero Markup Direct Mode)
+  const [voikerPricing, setVoikerPricing] = useState({
+    defaultMarkupPercent: 0,
+    minMarkupPer1k: 0,
+    usdToNgnRate: 1650,
+    pricingStyle: 'natural'
+  });
+
+  // Configured TikTok service overrides
   const [configuredSettings, setConfiguredSettings] = useState<Record<string, TikTokServiceSetting>>({
     'tt-followers': { id: 'tt-followers', name: 'TikTok Followers', minQuantity: 10, maxQuantity: 1000000, pricePer1k: 2400 },
     'tt-likes': { id: 'tt-likes', name: 'TikTok Likes', minQuantity: 50, maxQuantity: 500000, pricePer1k: 850 },
@@ -241,257 +966,327 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     'tt-views': { id: 'tt-views', name: 'TikTok Views', minQuantity: 500, maxQuantity: 2000000, pricePer1k: 250 }
   });
 
-  // Apply saved settings to active services list
-  const applySettingsToServices = (configMap: Record<string, TikTokServiceSetting>) => {
-    if (!configMap || typeof configMap !== 'object') return;
-    setServices((prev) =>
-      prev.map((svc) => {
-        const lower = (svc.type || svc.name || '').toLowerCase();
-        let key = svc.id;
-        if (!configMap[key]) {
-          if (lower.includes('follower')) key = 'tt-followers';
-          else if (lower.includes('like')) key = 'tt-likes';
-          else if (lower.includes('comment')) key = 'tt-comments';
-          else if (lower.includes('share')) key = 'tt-shares';
-          else if (lower.includes('view') || lower.includes('play')) key = 'tt-views';
-        }
-        const cfg = configMap[key];
-        if (cfg) {
-          return {
-            ...svc,
-            min: typeof cfg.minQuantity === 'number' && cfg.minQuantity > 0 ? Number(cfg.minQuantity) : svc.min,
-            max: typeof cfg.maxQuantity === 'number' && cfg.maxQuantity > 0 ? Number(cfg.maxQuantity) : svc.max,
-            ratePer1000: typeof cfg.pricePer1k === 'number' && cfg.pricePer1k > 0 ? Number(cfg.pricePer1k) : svc.ratePer1000
-          };
-        }
-        return svc;
-      })
-    );
-  };
+  // Fetch Voiker & Boosting services from backend
+  const loadServices = useCallback(async () => {
+    setIsLoadingServices(true);
+    try {
+      const callerEmail = user?.email || userProfile?.email || '';
+      // Try /api/voiker/services first
+      let res: any = await safeApiFetch(`/api/voiker/services?callerEmail=${encodeURIComponent(callerEmail)}`);
+      if (!res || !res.success || !Array.isArray(res.services) || res.services.length === 0) {
+        // Fallback to /api/social-boost/services
+        res = await safeApiFetch(`/api/social-boost/services?action=services&callerEmail=${encodeURIComponent(callerEmail)}`);
+      }
 
-  // Realtime subscription to Firestore & API fallback for permanent persistence
+      if (res && res.success && Array.isArray(res.services) && res.services.length > 0) {
+        setAllServices(res.services);
+        setHasApiKey(Boolean(res.hasApiKey));
+      } else {
+        setAllServices(DEFAULT_TIKTOK_SERVICES);
+      }
+    } catch (err) {
+      console.warn('[Voiker] Live services fetch notice:', err);
+      setAllServices(DEFAULT_TIKTOK_SERVICES);
+    } finally {
+      setIsLoadingServices(false);
+    }
+  }, [user?.email, userProfile?.email]);
+
   useEffect(() => {
-    let isMounted = true;
-    let unsub: (() => void) | undefined;
+    loadServices();
+  }, [loadServices]);
 
+  // Realtime subscription to TikTok settings
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
     try {
       if (db) {
         const docRef = doc(db, 'system_settings', 'tiktok_services_config');
         unsub = onSnapshot(docRef, (docSnap) => {
-          if (isMounted && docSnap.exists()) {
+          if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data && data.services) {
-              setConfiguredSettings((prev) => ({ ...prev, ...data.services }));
-              applySettingsToServices(data.services);
+            if (data?.services && typeof data.services === 'object') {
+              setConfiguredSettings(data.services);
             }
           }
-        }, (err) => {
-          console.warn('[TikTokBoost] Firestore snapshot notice:', err.message);
         });
       }
     } catch (err) {
-      console.warn('[TikTokBoost] Setup snapshot notice:', err);
+      console.warn('[Voiker] Firestore settings snapshot notice:', err);
     }
-
-    // API fetch fallback
-    safeApiFetch('/api/tiktok-services/settings').then((res: any) => {
-      if (isMounted && res && res.success && res.services) {
-        setConfiguredSettings((prev) => ({ ...prev, ...res.services }));
-        applySettingsToServices(res.services);
-      }
-    }).catch(() => {});
-
     return () => {
-      isMounted = false;
       if (unsub) unsub();
     };
   }, []);
 
-  // Save TikTok Settings Handler
-  const handleSaveTikTokSettings = async () => {
-    setIsSavingSettings(true);
-    setSettingsSaveSuccess(false);
-    setSettingsSaveError(null);
-
+  // Fetch Wholesale Provider Balance (Owner only)
+  const fetchVoikerBalance = useCallback(async () => {
+    if (!isAdmin) return;
+    setIsLoadingBalance(true);
     try {
-      // Validate all services
-      for (const svcDef of SETTINGS_SERVICES_LIST) {
-        const item = configuredSettings[svcDef.id];
-        if (!item || Number(item.minQuantity) <= 0 || Number(item.maxQuantity) <= 0 || Number(item.pricePer1k) <= 0) {
-          throw new Error(`Please enter valid positive numbers for ${svcDef.name}.`);
-        }
-        if (Number(item.minQuantity) > Number(item.maxQuantity)) {
-          throw new Error(`Minimum quantity cannot exceed maximum quantity for ${svcDef.name}.`);
-        }
-      }
-
       const token = await getSafeIdToken(auth.currentUser);
-
-      // 1. Direct Firestore setDoc if authenticated as admin
-      if (db) {
-        try {
-          const docRef = doc(db, 'system_settings', 'tiktok_services_config');
-          await setDoc(docRef, {
-            services: configuredSettings,
-            updatedAt: new Date().toISOString(),
-            updatedBy: user?.email || auth.currentUser?.email || 'admin'
-          }, { merge: true });
-        } catch (dbErr) {
-          console.warn('[TikTokBoost] Direct Firestore setDoc notice, using server API:', dbErr);
-        }
-      }
-
-      // 2. Server API POST with admin token (ensures backend persistence)
-      const res: any = await safeApiFetch('/api/tiktok-services/settings', {
-        method: 'POST',
+      const res: any = await safeApiFetch('/api/voiker/balance', {
         headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ services: configuredSettings })
-      });
-
-      if (!res || !res.success) {
-        throw new Error(res?.error || 'Failed to save TikTok settings on server.');
-      }
-
-      // 3. Immediately apply to active services
-      applySettingsToServices(configuredSettings);
-
-      setSettingsSaveSuccess(true);
-      setTimeout(() => {
-        setSettingsSaveSuccess(false);
-        setIsSettingsOpen(false);
-      }, 1500);
-    } catch (err: any) {
-      console.error('Error saving TikTok settings:', err);
-      setSettingsSaveError(sanitizeApiErrorMessage(err.message || 'Failed to save settings. Please verify admin privileges.'));
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
-
-  // Fetch TikTok services from backend
-  useEffect(() => {
-    let isMounted = true;
-    const loadServices = async () => {
-      setIsLoadingServices(true);
-      try {
-        const callerEmail = user?.email || userProfile?.email || '';
-        const endpoint = `/api/social-boost/services?action=services&callerEmail=${encodeURIComponent(callerEmail)}`;
-        const res: any = await safeApiFetch(endpoint);
-        if (isMounted && res && res.success && Array.isArray(res.services)) {
-          const apiServices = res.services;
-          const usedProviderIds = new Set<string>();
-
-          const updatedCanonical = DEFAULT_TIKTOK_SERVICES.map(canonical => {
-            const lowerCanonicalType = (canonical.type || '').toLowerCase();
-            const match = apiServices.find((s: SocialBoostService) => {
-              if (s.id && usedProviderIds.has(s.id)) return false;
-              const isTikTok = s.platform === 'TikTok' || 
-                (s.category && s.category.toLowerCase().includes('tiktok')) ||
-                (s.name && s.name.toLowerCase().includes('tiktok'));
-              if (!isTikTok) return false;
-              const combined = `${s.name || ''} ${s.category || ''} ${s.type || ''}`.toLowerCase();
-              if (lowerCanonicalType === 'followers') return combined.includes('follower');
-              if (lowerCanonicalType === 'likes') return combined.includes('like') && !combined.includes('favorite') && !combined.includes('save') && !combined.includes('comment') && !combined.includes('share');
-              if (lowerCanonicalType === 'comments') return combined.includes('comment');
-              if (lowerCanonicalType === 'shares') return combined.includes('share') || combined.includes('repost');
-              if (lowerCanonicalType === 'favorites') return combined.includes('favorite') || combined.includes('save') || combined.includes('bookmark');
-              if (lowerCanonicalType === 'views') return combined.includes('view') || combined.includes('play');
-              return false;
-            });
-            if (match) {
-              if (match.id) usedProviderIds.add(match.id);
-              return {
-                ...canonical,
-                id: canonical.id, // Strictly preserve unique canonical ID to prevent duplicate keys
-                providerServiceId: match.providerServiceId || match.id,
-                ratePer1000: match.ratePer1000 || match.pricePerThousandNgn || canonical.ratePer1000,
-                min: match.min || canonical.min,
-                max: match.max || canonical.max,
-                deliverySpeed: match.deliverySpeed || canonical.deliverySpeed,
-              };
-            }
-            return canonical;
-          });
-          setServices(updatedCanonical);
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
-      } catch (err) {
-        console.warn('[TikTokBoost] Live services fetch notice, using base catalogue:', err);
-      } finally {
-        if (isMounted) setIsLoadingServices(false);
+      });
+      if (res && res.success) {
+        setVoikerBalance({
+          balanceUsd: res.balanceUsd || 0,
+          balanceNgn: res.balanceNgn || 0,
+          currency: res.currency || 'USD'
+        });
       }
-    };
+    } catch (e) {
+      console.warn('[Voiker] Balance fetch notice:', e);
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  }, [isAdmin]);
 
-    loadServices();
-    return () => { isMounted = false; };
-  }, [user?.email, userProfile?.email]);
+  useEffect(() => {
+    if (isSettingsOpen && isAdmin) {
+      fetchVoikerBalance();
+    }
+  }, [isSettingsOpen, isAdmin, fetchVoikerBalance]);
 
-  // Fetch User's TikTok Orders
-  const fetchOrders = async () => {
+  // Fetch User's Boosting Orders
+  const fetchOrders = useCallback(async () => {
     if (!auth.currentUser) return;
     setIsLoadingOrders(true);
     try {
-      const res: any = await safeApiFetch(`/api/social-boost/orders?action=orders&userId=${encodeURIComponent(auth.currentUser.uid)}`);
+      const token = await getSafeIdToken(auth.currentUser);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      let res: any = await safeApiFetch(`/api/voiker/orders?userId=${encodeURIComponent(auth.currentUser.uid)}`, { headers });
+      if (!res || !res.success) {
+        res = await safeApiFetch(`/api/social-boost/orders?action=orders&userId=${encodeURIComponent(auth.currentUser.uid)}`, { headers });
+      }
       if (res && res.success && Array.isArray(res.orders)) {
-        // Filter TikTok orders
-        const tiktokOrders = res.orders.filter((o: SocialBoostOrder) => 
-          !o.platform || o.platform === 'TikTok' || (o.serviceName && o.serviceName.toLowerCase().includes('tiktok'))
-        );
-        setOrders(tiktokOrders);
+        setOrders(res.orders);
       }
     } catch (err) {
-      console.warn('[TikTokBoost] Orders fetch notice:', err);
+      console.warn('[Voiker] Orders fetch notice:', err);
     } finally {
       setIsLoadingOrders(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (activeSubTab === 'orders' || orderSuccess) {
       fetchOrders();
     }
-  }, [activeSubTab, orderSuccess]);
+  }, [activeSubTab, orderSuccess, fetchOrders]);
+
+  // Handle Refill Request for eligible orders
+  const handleRefillOrder = async (order: SocialBoostOrder) => {
+    if (!auth.currentUser || actionLoadingOrderId) return;
+    setActionLoadingOrderId(order.id);
+    setActionNotification(null);
+    try {
+      const token = await getSafeIdToken(auth.currentUser);
+      const res: any = await safeApiFetch('/api/voiker/refill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ orderId: order.id, order: order.providerOrderId || order.id })
+      });
+      if (res && res.success) {
+        setActionNotification({
+          type: 'success',
+          message: res.message || 'Refill successfully requested from provider.'
+        });
+        await fetchOrders();
+      } else {
+        throw new Error(res?.error || 'Provider rejected refill request.');
+      }
+    } catch (err: any) {
+      setActionNotification({
+        type: 'error',
+        message: err.message || 'Failed to submit refill request.'
+      });
+    } finally {
+      setActionLoadingOrderId(null);
+    }
+  };
+
+  // Handle Cancel Order for eligible orders
+  const handleCancelOrder = async (order: SocialBoostOrder) => {
+    if (!auth.currentUser || actionLoadingOrderId) return;
+    if (!window.confirm('Are you sure you want to cancel this order? If permitted by Voiker, funds will be refunded to your wallet.')) return;
+    setActionLoadingOrderId(order.id);
+    setActionNotification(null);
+    try {
+      const token = await getSafeIdToken(auth.currentUser);
+      const res: any = await safeApiFetch('/api/voiker/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ orderId: order.id, order: order.providerOrderId || order.id })
+      });
+      if (res && res.success) {
+        setActionNotification({
+          type: 'success',
+          message: res.message || 'Order cancelled successfully. Wallet balance refunded.'
+        });
+        if (onRefreshProfile) await onRefreshProfile();
+        await fetchOrders();
+      } else {
+        throw new Error(res?.error || 'Cancellation rejected or order cannot be cancelled.');
+      }
+    } catch (err: any) {
+      setActionNotification({
+        type: 'error',
+        message: err.message || 'Failed to cancel order.'
+      });
+    } finally {
+      setActionLoadingOrderId(null);
+    }
+  };
+
+  // Filtered Services for the selected platform
+  const currentPlatformServices = useMemo(() => {
+    if (!selectedPlatform) return [];
+    const platLower = selectedPlatform.toLowerCase().trim();
+
+    return allServices.filter(svc => {
+      const sPlat = (svc.platform || '').toLowerCase().trim();
+      const sCat = (svc.category || '').toLowerCase().trim();
+      const sName = (svc.name || '').toLowerCase().trim();
+
+      if (platLower.includes('tiktok')) {
+        return sPlat.includes('tiktok') || sCat.includes('tiktok') || sName.includes('tiktok');
+      }
+      if (platLower.includes('instagram')) {
+        return sPlat.includes('instagram') || sCat.includes('instagram') || sName.includes('instagram') || sPlat.includes('ig ');
+      }
+      if (platLower.includes('youtube')) {
+        return sPlat.includes('youtube') || sCat.includes('youtube') || sName.includes('youtube') || sPlat.includes('yt ');
+      }
+      if (platLower.includes('facebook')) {
+        return sPlat.includes('facebook') || sCat.includes('facebook') || sName.includes('facebook') || sPlat.includes('fb ');
+      }
+      if (platLower.includes('twitter') || platLower.includes(' x')) {
+        return sPlat.includes('twitter') || sCat.includes('twitter') || sPlat.includes(' x ') || sPlat.includes('x.com');
+      }
+      if (platLower.includes('telegram')) {
+        return sPlat.includes('telegram') || sCat.includes('telegram') || sPlat.includes('tg ');
+      }
+      if (platLower.includes('whatsapp')) {
+        return sPlat.includes('whatsapp') || sCat.includes('whatsapp') || sPlat.includes('wa ');
+      }
+      if (platLower.includes('spotify') || platLower.includes('music')) {
+        return sPlat.includes('spotify') || sCat.includes('spotify') || sPlat.includes('music');
+      }
+      if (platLower.includes('discord')) {
+        return sPlat.includes('discord') || sCat.includes('discord');
+      }
+      if (platLower.includes('linkedin')) {
+        return sPlat.includes('linkedin') || sCat.includes('linkedin');
+      }
+      if (platLower.includes('twitch') || platLower.includes('streaming')) {
+        return sPlat.includes('twitch') || sPlat.includes('stream');
+      }
+      if (platLower.includes('traffic') || platLower.includes('seo')) {
+        return sPlat.includes('traffic') || sPlat.includes('visitor') || sPlat.includes('seo');
+      }
+      if (platLower.includes('review')) {
+        return sPlat.includes('review') || sCat.includes('review');
+      }
+      if (platLower.includes('threads')) {
+        return sPlat.includes('threads') || sCat.includes('threads') || sName.includes('threads');
+      }
+      if (platLower.includes('snapchat')) {
+        return sPlat.includes('snapchat') || sCat.includes('snapchat') || sName.includes('snapchat');
+      }
+      if (platLower.includes('pinterest')) {
+        return sPlat.includes('pinterest') || sCat.includes('pinterest') || sName.includes('pinterest');
+      }
+      if (platLower.includes('reddit')) {
+        return sPlat.includes('reddit') || sCat.includes('reddit') || sName.includes('reddit');
+      }
+
+      return sPlat === platLower;
+    });
+  }, [allServices, selectedPlatform]);
+
+  // Dynamic Type/Category filter tabs for the current platform
+  const dynamicFilterCategories = useMemo(() => {
+    const types = new Set<string>();
+    currentPlatformServices.forEach(s => {
+      if (s.type) types.add(s.type);
+    });
+    return ['All', ...Array.from(types).sort()];
+  }, [currentPlatformServices]);
+
+  // Filtered Services by Type and Search
+  const filteredServices = useMemo(() => {
+    return currentPlatformServices.filter(service => {
+      // Type filter
+      if (activeTypeFilter !== 'All') {
+        const sType = (service.type || '').toLowerCase();
+        const fType = activeTypeFilter.toLowerCase();
+        if (!sType.includes(fType)) return false;
+      }
+
+      // Search query
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const name = (service.name || '').toLowerCase();
+        const cat = (service.category || '').toLowerCase();
+        const desc = (service.description || '').toLowerCase();
+        if (!name.includes(query) && !cat.includes(query) && !desc.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [currentPlatformServices, activeTypeFilter, searchQuery]);
 
   // Open Order Modal for a selected service
   const handleOpenOrderModal = (service: SocialBoostService) => {
     setSelectedService(service);
+    const minQ = service.min || 100;
+    setOrderQuantity(Math.max(minQ, 1000 > minQ && 1000 <= (service.max || 100000) ? 1000 : minQ));
     setOrderTarget('');
-    // Default quantity clamped to service min
-    const initialQty = Math.max(service.min, Math.min(1000, service.max));
-    setOrderQuantity(initialQty);
     setOrderComments('');
     setOrderError(null);
   };
 
   // Close Order Modal
   const handleCloseOrderModal = () => {
+    if (isSubmittingOrder) return;
     setSelectedService(null);
     setOrderError(null);
   };
 
-  // Calculate live order total cost
+  // Calculated Order Cost in NGN
   const calculatedCost = useMemo(() => {
     if (!selectedService) return 0;
-    const rate = selectedService.ratePer1000 || selectedService.pricePerThousandNgn || 1000;
-    const qty = Math.max(0, orderQuantity || 0);
-    return Math.max(1, Math.round((qty / 1000) * rate));
+    const rate = selectedService.ratePer1000 || selectedService.pricePerThousandNgn || 1500;
+    const qty = Math.max(0, Number(orderQuantity) || 0);
+    return Math.max(10, Math.round((rate / 1000) * qty));
   }, [selectedService, orderQuantity]);
 
-  // Handle Order Submission
-  const handleSubmitOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Place Order handler (Coming Soon state)
+  const handlePlaceOrder = async () => {
+    setOrderError('Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.');
+    return;
+
     if (!selectedService) return;
 
-    if (!user && !auth.currentUser) {
+    if (!auth.currentUser) {
       if (onOpenAuth) onOpenAuth('login');
       return;
     }
 
     const cleanTarget = orderTarget.trim();
     if (!cleanTarget) {
-      setOrderError(selectedService.inputLabel || 'Please provide your TikTok link or username.');
+      setOrderError(selectedService.inputLabel || 'Please provide your target link or username.');
       return;
     }
 
@@ -519,26 +1314,39 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         target: cleanTarget,
         link: cleanTarget,
         quantity: orderQuantity,
-        amountNgn: calculatedCost,
-        totalCost: calculatedCost,
-        comments: selectedService.inputType === 'custom_comments' ? orderComments : undefined
+        ratePer1000: selectedService.ratePer1000,
+        comments: selectedService.inputType === 'custom_comments' ? orderComments : undefined,
+        action: 'order'
       };
 
-      const data: any = await safeApiFetch('/api/social-boost/order', {
+      // Try dedicated Voiker order endpoint first
+      let data: any = await safeApiFetch('/api/voiker/order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ ...payload, action: 'order' })
+        body: JSON.stringify(payload)
       });
 
       if (!data || !data.success) {
-        throw new Error(data?.error || 'Failed to place TikTok boost order.');
+        // Fallback to social-boost endpoint
+        data = await safeApiFetch('/api/social-boost/order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Failed to place boosting order.');
       }
 
       const newOrder: SocialBoostOrder = data.order || {
-        id: data.orderId || `tt-${Date.now()}`,
+        id: data.orderId || `vk-${Date.now()}`,
         serviceName: selectedService.name,
         target: cleanTarget,
         quantity: orderQuantity,
@@ -560,78 +1368,12 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
       }
       fetchOrders();
     } catch (err: any) {
-      console.error('[TikTokBoost] Order Error:', err);
-      setOrderError(sanitizeApiErrorMessage(err.message || 'Failed to process TikTok boost order.'));
+      console.error('[VoikerBoost] Order Error:', err);
+      setOrderError(sanitizeApiErrorMessage(err.message || 'Failed to process boosting order.'));
     } finally {
       setIsSubmittingOrder(false);
     }
   };
-
-  // Filtered services for TikTok Services Page - STRICTLY the 6 Real TikTok Services
-  const filteredServices = useMemo(() => {
-    return services
-      .filter(service => {
-        // Enforce customer-facing restriction: ONLY Followers, Likes, Comments, Shares, Favorites, Views
-        const lowerName = (service.name || '').toLowerCase();
-        const lowerCat = (service.category || '').toLowerCase();
-        const lowerType = (service.type || '').toLowerCase();
-        const combined = `${lowerName} ${lowerCat} ${lowerType}`;
-
-        const isFollowers = combined.includes('follower');
-        const isLikes = combined.includes('like');
-        const isComments = combined.includes('comment');
-        const isShares = combined.includes('share') || combined.includes('repost');
-        const isFavorites = combined.includes('favorite') || combined.includes('save') || combined.includes('bookmark');
-        const isViews = combined.includes('view') || combined.includes('play');
-
-        // Discard any other unrelated/extra options
-        if (!isFollowers && !isLikes && !isComments && !isShares && !isFavorites && !isViews) {
-          return false;
-        }
-
-        // Active type filter pill
-        if (activeTypeFilter === 'Followers' && !isFollowers) return false;
-        if (activeTypeFilter === 'Likes' && !isLikes) return false;
-        if (activeTypeFilter === 'Comments' && !isComments) return false;
-        if (activeTypeFilter === 'Shares' && !isShares) return false;
-        if (activeTypeFilter === 'Favorites' && !isFavorites) return false;
-        if (activeTypeFilter === 'Views' && !isViews) return false;
-
-        // Search query
-        if (searchQuery.trim()) {
-          const query = searchQuery.toLowerCase().trim();
-          const desc = (service.description || '').toLowerCase();
-          if (!lowerName.includes(query) && !lowerCat.includes(query) && !desc.includes(query)) {
-            return false;
-          }
-        }
-        return true;
-      })
-      .map(service => {
-        // Guarantee clear and honest engagement descriptions
-        const lower = `${service.name || ''} ${service.category || ''} ${service.type || ''}`.toLowerCase();
-        let honestDesc = service.description;
-
-        if (lower.includes('follower')) {
-          honestDesc = 'Intended for genuine audience growth with steady profile followers, gradual automated delivery, and retention stability.';
-        } else if (lower.includes('like')) {
-          honestDesc = 'Designed to deliver genuine engagement signals to your TikTok videos, enhancing post visibility and interaction.';
-        } else if (lower.includes('comment')) {
-          honestDesc = 'Real custom written comments posted on your TikTok video. You define the exact comment text to maintain authentic relevance.';
-        } else if (lower.includes('share') || lower.includes('repost')) {
-          honestDesc = 'Increases the post share count to simulate genuine content redistribution across the TikTok recommendation ecosystem.';
-        } else if (lower.includes('favorite') || lower.includes('save') || lower.includes('bookmark')) {
-          honestDesc = 'Authentic TikTok bookmark favorites to strengthen video recommendation signals and ranking performance.';
-        } else if (lower.includes('view') || lower.includes('play')) {
-          honestDesc = 'Designed to deliver organic watch-time signals and video play impressions, helping trigger natural discovery and algorithmic reach.';
-        }
-
-        return {
-          ...service,
-          description: honestDesc
-        };
-      });
-  }, [services, activeTypeFilter, searchQuery]);
 
   // Copy handler
   const handleCopy = (text: string, id: string) => {
@@ -640,45 +1382,127 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Helper for type badges
+  // Helper for type badges and icons
   const getTypeIcon = (type?: string) => {
     const lower = (type || '').toLowerCase();
     if (lower.includes('follower')) return <Users className="w-3.5 h-3.5 text-purple-600" />;
-    if (lower.includes('like')) return <Heart className="w-3.5 h-3.5 text-rose-500" />;
+    if (lower.includes('like') || lower.includes('reaction')) return <Heart className="w-3.5 h-3.5 text-rose-500" />;
     if (lower.includes('comment')) return <MessageSquare className="w-3.5 h-3.5 text-amber-500" />;
     if (lower.includes('share') || lower.includes('repost')) return <Share2 className="w-3.5 h-3.5 text-emerald-500" />;
     if (lower.includes('favorite') || lower.includes('save') || lower.includes('bookmark')) return <Bookmark className="w-3.5 h-3.5 text-pink-500" />;
-    if (lower.includes('view') || lower.includes('play')) return <Eye className="w-3.5 h-3.5 text-blue-500" />;
+    if (lower.includes('view') || lower.includes('play') || lower.includes('stream')) return <Eye className="w-3.5 h-3.5 text-blue-500" />;
+    if (lower.includes('member') || lower.includes('subscriber')) return <Users className="w-3.5 h-3.5 text-indigo-600" />;
     return <Zap className="w-3.5 h-3.5 text-indigo-500" />;
   };
 
-  // Helper to render the Settings Modal
-  const renderTikTokSettingsModal = () => {
+  // Helper to render platform icon
+  const renderPlatformIcon = (platformName: string, className = "w-6 h-6") => {
+    const p = platformName.toLowerCase();
+    if (p.includes('tiktok')) return <TikTokIcon className={className} />;
+    if (p.includes('instagram')) return <Instagram className={className} />;
+    if (p.includes('youtube')) return <Youtube className={className} />;
+    if (p.includes('facebook')) return <Facebook className={className} />;
+    if (p.includes('twitter') || p.includes(' x')) return <Twitter className={className} />;
+    if (p.includes('telegram')) return <Send className={className} />;
+    if (p.includes('whatsapp')) return <WhatsAppIcon className={className} />;
+    if (p.includes('spotify') || p.includes('music')) return <Music2 className={className} />;
+    if (p.includes('discord')) return <Gamepad2 className={className} />;
+    if (p.includes('linkedin')) return <Linkedin className={className} />;
+    if (p.includes('traffic') || p.includes('seo')) return <Globe className={className} />;
+    if (p.includes('threads')) return <MessageSquare className={className} />;
+    if (p.includes('snapchat')) return <Sparkles className={className} />;
+    if (p.includes('pinterest')) return <Bookmark className={className} />;
+    if (p.includes('reddit')) return <Zap className={className} />;
+    if (p.includes('quora')) return <MessageSquare className={className} />;
+    return <TrendingUp className={className} />;
+  };
+
+  // Helper to get platform metadata
+  const getPlatformMeta = (platformName: string): PlatformCardInfo => {
+    const match = PLATFORMS_METADATA.find(m => m.id.toLowerCase() === platformName.toLowerCase());
+    if (match) return match;
+    return {
+      id: platformName,
+      name: platformName,
+      description: `Authentic automated growth services for ${platformName}`,
+      bgColor: 'hover:border-purple-500/40',
+      textColor: 'group-hover:text-purple-600',
+      iconBg: 'bg-purple-600 text-white',
+      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      popularTypes: ['Engagement']
+    };
+  };
+
+  // Status Badge Component
+  const renderStatusBadge = (status?: string) => {
+    const s = (status || 'pending').toLowerCase();
+    if (s.includes('complete')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          <span>Completed</span>
+        </span>
+      );
+    }
+    if (s.includes('progress') || s.includes('processing')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+          <RefreshCw className="w-3 h-3 text-purple-600 animate-spin" />
+          <span>In Progress</span>
+        </span>
+      );
+    }
+    if (s.includes('cancel') || s.includes('refund')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
+          <X className="w-3 h-3 text-rose-600" />
+          <span>Cancelled & Refunded</span>
+        </span>
+      );
+    }
+    if (s.includes('partial')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+          <AlertCircle className="w-3 h-3 text-amber-600" />
+          <span>Partially Fulfilled</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+        <Clock className="w-3 h-3 text-blue-600" />
+        <span>Pending Start</span>
+      </span>
+    );
+  };
+
+  // Helper to render the Admin Settings Modal
+  const renderSettingsModal = () => {
     if (!isSettingsOpen) return null;
 
     return (
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
         <div
-          className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 my-auto relative animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
+          className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl max-w-xl w-full p-4 sm:p-6 shadow-2xl space-y-4 my-auto relative animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
           <div className="flex items-center justify-between pb-3 border-b border-[#F1F5F9]">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-purple-50 text-[#7C3AED] flex items-center justify-center shrink-0">
-                <span className="text-lg">⚙️</span>
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7C3AED] flex items-center justify-center shrink-0">
+                <Sliders className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base sm:text-lg font-black text-[#0F172A]">
-                    TikTok Services Settings
+                    Boosting Service Settings
                   </h3>
                   <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 rounded-md">
-                    Admin Controls
+                    Owner Controls
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-[#64748B]">
-                  Configure minimum, maximum, and amount per 1,000 for each TikTok service.
+                  Manage Voiker provider connection, wholesale margins, and service overrides.
                 </p>
               </div>
             </div>
@@ -692,168 +1516,289 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             </button>
           </div>
 
-          {/* Success / Error Notification */}
+          {/* Modal Tabs */}
+          <div className="flex items-center gap-2 border-b border-[#F1F5F9] pb-2">
+            <button
+              type="button"
+              onClick={() => setSettingsTab('voiker')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                settingsTab === 'voiker'
+                  ? 'bg-[#7C3AED] text-white shadow-2xs'
+                  : 'bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              Voiker Provider & Pricing
+            </button>
+            <button
+              type="button"
+              onClick={() => setSettingsTab('tiktok')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                settingsTab === 'tiktok'
+                  ? 'bg-[#7C3AED] text-white shadow-2xs'
+                  : 'bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              TikTok Overrides
+            </button>
+          </div>
+
+          {/* Tab 1: Voiker Provider & Margins */}
+          {settingsTab === 'voiker' && (
+            <div className="space-y-4 overflow-y-auto pr-1 flex-1 py-1">
+              {/* Provider Connection Status Card */}
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-bold text-[#0F172A]">Upstream Provider: Voiker (SMM API v2)</span>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-white border border-[#E2E8F0] rounded-md text-[#64748B]">
+                    https://voiker.com/api/v2
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#64748B] leading-relaxed">
+                  Real-time catalogue sync active. <strong>{allServices.length.toLocaleString()}</strong> services loaded directly from Voiker network.
+                </div>
+              </div>
+
+              {/* Wholesale Balance */}
+              <div className="bg-purple-50/60 border border-purple-200/80 rounded-xl p-3.5 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider font-bold text-purple-700">
+                    Voiker Wholesale Account Balance
+                  </div>
+                  <div className="text-lg font-black text-[#0F172A] mt-0.5">
+                    {isLoadingBalance ? (
+                      <span className="text-xs text-[#64748B]">Checking...</span>
+                    ) : voikerBalance ? (
+                      <span>${voikerBalance.balanceUsd.toFixed(2)} USD <span className="text-xs font-semibold text-[#64748B]">(~₦{voikerBalance.balanceNgn.toLocaleString()})</span></span>
+                    ) : hasApiKey ? (
+                      <span>Connected (Key active)</span>
+                    ) : (
+                      <span className="text-xs text-amber-700 font-bold">VOIKER_API_KEY environment variable pending</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchVoikerBalance}
+                  className="px-2.5 py-1.5 bg-white border border-purple-200 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-100 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isLoadingBalance ? 'animate-spin' : ''}`} />
+                  <span>Check</span>
+                </button>
+              </div>
+
+              {/* Pricing Controls Form */}
+              <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 space-y-3">
+                <h4 className="text-xs font-extrabold text-[#0F172A] uppercase tracking-wider">
+                  ZENET HUB Boosting Pricing Rules
+                </h4>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-[#475569] block mb-1">
+                      Default Profit Markup (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="300"
+                      value={voikerPricing.defaultMarkupPercent}
+                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, defaultMarkupPercent: Number(e.target.value) || 45 }))}
+                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs text-[#0F172A] font-bold"
+                    />
+                    <span className="text-[9px] text-[#64748B]">Applied on top of provider wholesale cost</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-[#475569] block mb-1">
+                      Min Margin / 1k (₦)
+                    </label>
+                    <input
+                      type="number"
+                      min="50"
+                      value={voikerPricing.minMarkupPer1k}
+                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, minMarkupPer1k: Number(e.target.value) || 350 }))}
+                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs text-[#0F172A] font-bold"
+                    />
+                    <span className="text-[9px] text-[#64748B]">Floor margin per 1,000 units</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="text-[11px] font-bold text-[#475569] block mb-1">
+                      USD to NGN Rate
+                    </label>
+                    <input
+                      type="number"
+                      min="500"
+                      value={voikerPricing.usdToNgnRate}
+                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, usdToNgnRate: Number(e.target.value) || 1650 }))}
+                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs text-[#0F172A] font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-[#475569] block mb-1">
+                      Pricing Style
+                    </label>
+                    <select
+                      value={voikerPricing.pricingStyle}
+                      onChange={(e: any) => setVoikerPricing(prev => ({ ...prev, pricingStyle: e.target.value }))}
+                      className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs text-[#0F172A] font-bold"
+                    >
+                      <option value="natural">Natural (Exact NGN)</option>
+                      <option value="clean">Clean (Nearest ₦100)</option>
+                      <option value="tiered">Tiered (Nearest ₦50)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isSavingSettings}
+                  onClick={async () => {
+                    setIsSavingSettings(true);
+                    setSettingsSaveSuccess(false);
+                    setSettingsSaveError(null);
+                    try {
+                      const token = await getSafeIdToken(auth.currentUser);
+                      const res: any = await safeApiFetch('/api/voiker/pricing-settings', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(voikerPricing)
+                      });
+                      if (res && res.success) {
+                        setSettingsSaveSuccess(true);
+                        await loadServices();
+                      } else {
+                        throw new Error(res?.error || 'Failed to update settings');
+                      }
+                    } catch (e: any) {
+                      setSettingsSaveError(e.message);
+                    } finally {
+                      setIsSavingSettings(false);
+                    }
+                  }}
+                  className="w-full py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{isSavingSettings ? 'Saving...' : 'Apply & Save Pricing Rules'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 2: TikTok Overrides */}
+          {settingsTab === 'tiktok' && (
+            <div className="overflow-y-auto space-y-3 pr-1 flex-1 py-1">
+              <p className="text-[11px] text-[#64748B]">
+                Configure fixed prices and limits for canonical TikTok services.
+              </p>
+              {SETTINGS_SERVICES_LIST.map((svcDef) => {
+                const cfg = configuredSettings[svcDef.id] || {
+                  id: svcDef.id,
+                  name: svcDef.name,
+                  minQuantity: svcDef.defaultMin,
+                  maxQuantity: svcDef.defaultMax,
+                  pricePer1k: svcDef.defaultPrice
+                };
+
+                return (
+                  <div
+                    key={svcDef.id}
+                    className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#0F172A]">{svcDef.name}</span>
+                      <span className="text-[10px] text-[#7C3AED] font-black">
+                        ₦{(Number(cfg.pricePer1k) || 0).toLocaleString()} / 1,000
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[9px] font-bold text-[#475569] block mb-0.5">Min</label>
+                        <input
+                          type="number"
+                          value={cfg.minQuantity}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setConfiguredSettings(prev => ({
+                              ...prev,
+                              [svcDef.id]: { ...cfg, minQuantity: val }
+                            }));
+                          }}
+                          className="w-full bg-white border border-[#E2E8F0] rounded px-2 py-1 text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-[#475569] block mb-0.5">Max</label>
+                        <input
+                          type="number"
+                          value={cfg.maxQuantity}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setConfiguredSettings(prev => ({
+                              ...prev,
+                              [svcDef.id]: { ...cfg, maxQuantity: val }
+                            }));
+                          }}
+                          className="w-full bg-white border border-[#E2E8F0] rounded px-2 py-1 text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-[#475569] block mb-0.5">Price / 1k (₦)</label>
+                        <input
+                          type="number"
+                          value={cfg.pricePer1k}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setConfiguredSettings(prev => ({
+                              ...prev,
+                              [svcDef.id]: { ...cfg, pricePer1k: val }
+                            }));
+                          }}
+                          className="w-full bg-white border border-[#E2E8F0] rounded px-2 py-1 text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Success / Error notification */}
           {settingsSaveSuccess && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold animate-in fade-in">
+            <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>TikTok settings saved permanently to the database!</span>
+              <span>Settings successfully synchronized and persisted!</span>
             </div>
           )}
 
           {settingsSaveError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-800 text-xs font-bold animate-in fade-in">
+            <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold rounded-xl flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{settingsSaveError}</span>
             </div>
           )}
-
-          {/* Services List to Configure */}
-          <div className="overflow-y-auto space-y-3 pr-1 flex-1 py-1">
-            {SETTINGS_SERVICES_LIST.map((svcDef) => {
-              const cfg = configuredSettings[svcDef.id] || {
-                id: svcDef.id,
-                name: svcDef.name,
-                minQuantity: svcDef.defaultMin,
-                maxQuantity: svcDef.defaultMax,
-                pricePer1k: svcDef.defaultPrice
-              };
-
-              return (
-                <div
-                  key={svcDef.id}
-                  className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl sm:rounded-2xl p-3.5 space-y-2.5 transition hover:border-[#7C3AED]/30"
-                >
-                  {/* Service Title & Icon */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1.5 bg-white border border-[#E2E8F0] rounded-lg shadow-2xs">
-                        {getTypeIcon(svcDef.type)}
-                      </span>
-                      <span className="text-xs sm:text-sm font-extrabold text-[#0F172A]">
-                        {svcDef.name}
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold text-[#64748B]">
-                      Amount: <strong className="text-[#7C3AED]">₦{(Number(cfg.pricePer1k) || 0).toLocaleString()}</strong> / 1,000
-                    </span>
-                  </div>
-
-                  {/* Editable Fields Grid */}
-                  <div className="grid grid-cols-3 gap-2">
-                    {/* Min Quantity */}
-                    <div>
-                      <label className="text-[10px] font-bold text-[#475569] block mb-1">
-                        Minimum
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={cfg.minQuantity}
-                        onChange={(e) => {
-                          const val = Math.max(1, parseInt(e.target.value) || 1);
-                          setConfiguredSettings((prev) => ({
-                            ...prev,
-                            [svcDef.id]: {
-                              ...cfg,
-                              minQuantity: val
-                            }
-                          }));
-                        }}
-                        className="w-full bg-white border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-[#0F172A] focus:outline-hidden focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]/30"
-                      />
-                    </div>
-
-                    {/* Max Quantity */}
-                    <div>
-                      <label className="text-[10px] font-bold text-[#475569] block mb-1">
-                        Maximum
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={cfg.maxQuantity}
-                        onChange={(e) => {
-                          const val = Math.max(1, parseInt(e.target.value) || 1);
-                          setConfiguredSettings((prev) => ({
-                            ...prev,
-                            [svcDef.id]: {
-                              ...cfg,
-                              maxQuantity: val
-                            }
-                          }));
-                        }}
-                        className="w-full bg-white border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-[#0F172A] focus:outline-hidden focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]/30"
-                      />
-                    </div>
-
-                    {/* Price Per 1k */}
-                    <div>
-                      <label className="text-[10px] font-bold text-[#475569] block mb-1">
-                        Amount / 1,000 (₦)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={cfg.pricePer1k}
-                        onChange={(e) => {
-                          const val = Math.max(1, parseInt(e.target.value) || 1);
-                          setConfiguredSettings((prev) => ({
-                            ...prev,
-                            [svcDef.id]: {
-                              ...cfg,
-                              pricePer1k: val
-                            }
-                          }));
-                        }}
-                        className="w-full bg-white border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 text-xs font-mono font-black text-[#7C3AED] focus:outline-hidden focus:border-[#7C3AED] focus:ring-1 focus:ring-[#7C3AED]/30"
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Modal Actions */}
-          <div className="pt-3 border-t border-[#F1F5F9] flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(false)}
-              className="px-4 py-2 text-xs font-bold text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] rounded-xl transition cursor-pointer"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="button"
-              disabled={isSavingSettings}
-              onClick={handleSaveTikTokSettings}
-              className="px-5 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-xs hover:shadow-sm transition cursor-pointer flex items-center gap-1.5 active:scale-98"
-            >
-              {isSavingSettings ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Saving to Database...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save TikTok Settings</span>
-                </>
-              )}
-            </button>
-          </div>
         </div>
       </div>
     );
   };
 
   // =========================================================================
-  // VIEW 1: CLEAN TIKTOK CATEGORY ROW (REPLACES MAINTENANCE SCREEN ENTIRELY)
+  // VIEW 1: PLATFORMS CATALOGUE (CLEAN GRID OF ALL SUPPORTED SOCIAL NETWORKS)
   // =========================================================================
-  if (viewMode === 'categories') {
+  if (!selectedPlatform) {
     return (
-      <div className="w-full max-w-3xl mx-auto py-6 sm:py-10 px-4 sm:px-6 animate-in fade-in duration-150">
+      <div className="w-full max-w-4xl mx-auto py-6 sm:py-10 px-4 sm:px-6 animate-in fade-in duration-150">
         {/* Top Back Navigation to Marketplace & Settings */}
         <div className="flex items-center justify-between gap-3 mb-6">
           <button
@@ -865,89 +1810,128 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             <span>Back to Marketplace</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (isAdmin) {
-                setIsSettingsOpen(true);
-              } else {
-                alert('Access restricted: Only authorized admins can configure TikTok settings.');
-              }
-            }}
-            title="TikTok Services Settings"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-50 text-[#0F172A] hover:text-[#7C3AED] border border-[#E2E8F0] hover:border-[#7C3AED]/40 rounded-xl text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer"
-          >
-            <span className="text-sm leading-none">⚙️</span>
-            <span>Settings</span>
-          </button>
+          <div className="flex items-center gap-2.5">
+            {/* Wallet Balance */}
+            <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5 shadow-2xs">
+              <Wallet className="w-4 h-4 text-[#7C3AED]" />
+              <span className="text-xs text-[#64748B] font-medium hidden sm:inline">Balance:</span>
+              <span className="text-xs sm:text-sm font-black text-[#0F172A]">
+                ₦{walletBalance.toLocaleString()}
+              </span>
+              <button
+                type="button"
+                onClick={onOpenWallet}
+                className="text-[10px] sm:text-xs font-black bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-2 py-0.5 rounded-md transition cursor-pointer ml-1"
+              >
+                + Top Up
+              </button>
+            </div>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                title="Boosting Settings"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-50 text-[#0F172A] hover:text-[#7C3AED] border border-[#E2E8F0] hover:border-[#7C3AED]/40 rounded-xl text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Header Section */}
-        <div className="mb-6">
+        <div className="mb-8">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-[#7C3AED] border border-purple-200 text-xs font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" />
-            <span>Social Boost Services</span>
+            <span>Automated Social Boosting</span>
+            <span className="ml-1 px-1.5 py-0.5 bg-[#7C3AED] text-white text-[9px] font-black rounded-sm uppercase tracking-wider">Coming Soon</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
-            Social Boost
+            Social Media Boost
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B] font-medium mt-1">
-            Select a platform below to supercharge your social media growth and viral reach.
+            Social Media Boosting is coming soon! Our high-speed delivery network is undergoing final provider setup and will be enabled shortly.
           </p>
         </div>
 
-        {/* Clean TikTok Category Row Card */}
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => setViewMode('tiktok-services')}
-            className="w-full bg-white hover:bg-[#FDFCFE] border border-[#E2E8F0] hover:border-[#7C3AED]/60 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all duration-200 flex items-center justify-between group cursor-pointer text-left focus:outline-hidden focus:ring-2 focus:ring-[#7C3AED]/20"
-          >
-            <div className="flex items-center gap-3.5 sm:gap-4">
-              {/* TikTok Icon */}
-              <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-200">
-                <TikTokIcon className="w-6 h-6 text-white" />
-              </div>
+        {/* Platform Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+          {PLATFORMS_METADATA.map((platform) => {
+            // Count services for this platform
+            const count = allServices.filter(s => {
+              const sp = (s.platform || '').toLowerCase();
+              const pl = platform.id.toLowerCase();
+              return sp.includes(pl) || pl.includes(sp);
+            }).length;
 
-              {/* Title & Description */}
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-base sm:text-lg font-black text-[#0F172A] tracking-tight group-hover:text-[#7C3AED] transition-colors">
-                    TikTok
-                  </span>
-                  <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
-                    Active
-                  </span>
+            return (
+              <button
+                key={platform.id}
+                type="button"
+                onClick={() => {
+                  setSelectedPlatform(platform.id);
+                  setActiveTypeFilter('All');
+                  setSearchQuery('');
+                  setActiveSubTab('browse');
+                }}
+                className={`bg-white hover:bg-[#FDFCFE] border border-[#E2E8F0] ${platform.bgColor} rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 flex items-center justify-between group cursor-pointer text-left focus:outline-hidden focus:ring-2 focus:ring-[#7C3AED]/20`}
+              >
+                <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+                  {/* Platform Icon */}
+                  <div className={`w-12 h-12 rounded-xl ${platform.iconBg} flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform duration-200`}>
+                    {renderPlatformIcon(platform.id, "w-6 h-6")}
+                  </div>
+
+                  {/* Title & Description */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-base sm:text-lg font-black text-[#0F172A] tracking-tight ${platform.textColor} transition-colors truncate`}>
+                        {platform.name}
+                      </span>
+                      <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-purple-100 text-[#7C3AED] border border-purple-200 rounded-full">
+                        Coming Soon
+                      </span>
+                      {count > 0 && (
+                        <span className="text-[10px] font-semibold text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-md">
+                          {count} services
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#64748B] font-medium mt-1 line-clamp-1">
+                      {platform.description}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs sm:text-sm text-[#64748B] font-medium mt-0.5">
-                  Followers, Likes, Views, Comments & Shares
-                </p>
-              </div>
-            </div>
 
-            {/* Right arrow / chevron */}
-            <div className="w-9 h-9 rounded-full bg-[#F8FAFC] group-hover:bg-[#EDE9FE] flex items-center justify-center text-[#94A3B8] group-hover:text-[#7C3AED] transition-colors shrink-0">
-              <ChevronRight className="w-5 h-5" />
-            </div>
-          </button>
+                {/* Right Arrow */}
+                <div className="w-8 h-8 rounded-full bg-[#F8FAFC] group-hover:bg-[#EDE9FE] flex items-center justify-center text-[#94A3B8] group-hover:text-[#7C3AED] transition-colors shrink-0 ml-2">
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Render TikTok Admin Settings Modal if open */}
-        {renderTikTokSettingsModal()}
+        {/* Owner Settings Modal */}
+        {renderSettingsModal()}
       </div>
     );
   }
 
   // =========================================================================
-  // VIEW 2: TIKTOK BOOST SERVICES PAGE
+  // VIEW 2: PLATFORM SERVICES VIEW (SERVICES CATALOGUE FOR CHOSEN PLATFORM)
   // =========================================================================
+  const currentMeta = getPlatformMeta(selectedPlatform);
+
   return (
     <div className="w-full max-w-5xl mx-auto py-6 sm:py-8 px-4 sm:px-6 animate-in fade-in duration-150">
       {/* Top Header Navigation */}
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         <button
           type="button"
-          onClick={() => setViewMode('categories')}
+          onClick={() => setSelectedPlatform(null)}
           className="inline-flex items-center gap-2 text-sm font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -958,7 +1942,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           {/* User Wallet Balance Badge */}
           <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5 shadow-2xs">
             <Wallet className="w-4 h-4 text-[#7C3AED]" />
-            <span className="text-xs text-[#64748B] font-medium">Balance:</span>
+            <span className="text-xs text-[#64748B] font-medium hidden sm:inline">Balance:</span>
             <span className="text-xs sm:text-sm font-black text-[#0F172A]">
               ₦{walletBalance.toLocaleString()}
             </span>
@@ -971,43 +1955,38 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             </button>
           </div>
 
-          {/* ⚙️ Small Settings Button at top-right */}
-          <button
-            type="button"
-            onClick={() => {
-              if (isAdmin) {
-                setIsSettingsOpen(true);
-              } else {
-                alert('Access restricted: Only authorized admins can configure TikTok settings.');
-              }
-            }}
-            title="TikTok Services Settings"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-50 text-[#0F172A] hover:text-[#7C3AED] border border-[#E2E8F0] hover:border-[#7C3AED]/40 rounded-xl text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer"
-          >
-            <span className="text-sm leading-none">⚙️</span>
-            <span>Settings</span>
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              title="Boosting Settings"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-50 text-[#0F172A] hover:text-[#7C3AED] border border-[#E2E8F0] hover:border-[#7C3AED]/40 rounded-xl text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Settings</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main Title & Subtitle */}
+      {/* Main Platform Title Banner */}
       <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-6 shadow-xs">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-black flex items-center justify-center text-white shrink-0 shadow-sm">
-              <TikTokIcon className="w-7 h-7 text-white" />
+            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl ${currentMeta.iconBg} flex items-center justify-center shrink-0 shadow-sm`}>
+              {renderPlatformIcon(selectedPlatform, "w-7 h-7")}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-[#0F172A] tracking-tight">
-                  TikTok Boost Services
+                  {selectedPlatform} Boost Services
                 </h1>
                 <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 rounded-md">
-                  Instant Start
+                  Voiker Verified
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-[#64748B] font-medium mt-0.5">
-                Boost your TikTok profile with real follower growth, genuine post likes, organic video views, authentic comments, and distribution shares.
+                {currentMeta.description}
               </p>
             </div>
           </div>
@@ -1058,7 +2037,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search TikTok services (Followers, Likes, Comments, Shares, Favorites, Views)..."
+                placeholder={`Search ${selectedPlatform} services by name, speed, or type...`}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
               />
               {searchQuery && (
@@ -1074,7 +2053,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
             {/* Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-              {['All', 'Followers', 'Likes', 'Comments', 'Shares', 'Favorites', 'Views'].map((filter) => (
+              {dynamicFilterCategories.map((filter) => (
                 <button
                   key={filter}
                   type="button"
@@ -1098,12 +2077,12 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           {isLoadingServices ? (
             <div className="bg-white border border-[#E2E8F0] rounded-2xl p-10 text-center flex flex-col items-center justify-center">
               <RefreshCw className="w-6 h-6 text-[#7C3AED] animate-spin mb-3" />
-              <p className="text-sm font-semibold text-[#64748B]">Loading verified TikTok services...</p>
+              <p className="text-sm font-semibold text-[#64748B]">Loading live Voiker services...</p>
             </div>
           ) : filteredServices.length === 0 ? (
             <div className="bg-white border border-[#E2E8F0] rounded-2xl p-10 text-center flex flex-col items-center justify-center">
               <AlertCircle className="w-8 h-8 text-[#94A3B8] mb-2" />
-              <h3 className="text-base font-bold text-[#0F172A]">No TikTok services found</h3>
+              <h3 className="text-base font-bold text-[#0F172A]">No {selectedPlatform} services found</h3>
               <p className="text-xs sm:text-sm text-[#64748B] mt-1">
                 Try searching with a different keyword or resetting your filter.
               </p>
@@ -1118,7 +2097,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           ) : (
             <div className="grid grid-cols-1 gap-2.5">
               {filteredServices.map((service, index) => {
-                const rate = service.ratePer1000 || service.pricePerThousandNgn || 1000;
+                const rate = service.ratePer1000 || service.pricePerThousandNgn || 1500;
                 return (
                   <div
                     key={`${service.id}-${index}`}
@@ -1129,7 +2108,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-md text-[10px] sm:text-[11px] font-bold text-[#475569]">
                           {getTypeIcon(service.type || service.category)}
-                          <span>{service.type || service.category || 'TikTok'}</span>
+                          <span>{service.type || service.category || selectedPlatform}</span>
                         </span>
                         {service.isBestValue && (
                           <span className="px-1.5 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider">
@@ -1139,6 +2118,11 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                         {service.isCheapest && (
                           <span className="px-1.5 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider">
                             Cheapest
+                          </span>
+                        )}
+                        {service.refill && (
+                          <span className="px-1.5 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-[9px] sm:text-[10px] font-bold">
+                            Refill Guaranteed
                           </span>
                         )}
                       </div>
@@ -1154,9 +2138,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       )}
 
                       <div className="flex items-center gap-2 sm:gap-2.5 text-[10px] sm:text-[11px] text-[#64748B] pt-0.5 flex-wrap">
-                        <span>Min: <strong className="text-[#0F172A]">{service.min.toLocaleString()}</strong></span>
+                        <span>Min: <strong className="text-[#0F172A]">{(service.min || 10).toLocaleString()}</strong></span>
                         <span>•</span>
-                        <span>Max: <strong className="text-[#0F172A]">{service.max.toLocaleString()}</strong></span>
+                        <span>Max: <strong className="text-[#0F172A]">{(service.max || 100000).toLocaleString()}</strong></span>
                         {service.deliverySpeed && (
                           <>
                             <span>•</span>
@@ -1183,10 +2167,10 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleOpenOrderModal(service)}
-                        className="px-3.5 sm:px-4 py-1.5 sm:py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black rounded-xl shadow-xs hover:shadow-sm transition cursor-pointer flex items-center gap-1.5 active:scale-98"
+                        className="px-3.5 sm:px-4 py-1.5 sm:py-2 bg-purple-100 hover:bg-purple-200 text-[#7C3AED] border border-purple-200 text-xs font-black rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-98"
                       >
-                        <Zap className="w-3 h-3 fill-current" />
-                        <span>Boost Now</span>
+                        <Clock className="w-3 h-3 text-[#7C3AED]" />
+                        <span>Coming Soon</span>
                       </button>
                     </div>
                   </div>
@@ -1201,7 +2185,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
       {activeSubTab === 'orders' && (
         <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-[#0F172A]">My TikTok Boost Orders</h2>
+            <h2 className="text-base font-bold text-[#0F172A]">
+              My Boosting Orders ({orders.length})
+            </h2>
             <button
               type="button"
               onClick={fetchOrders}
@@ -1209,17 +2195,41 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               className="inline-flex items-center gap-1.5 text-xs text-[#7C3AED] hover:text-[#6D28D9] font-bold cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingOrders ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>Refresh Status</span>
             </button>
           </div>
 
+          {actionNotification && (
+            <div className={`p-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 ${
+              actionNotification.type === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                : 'bg-rose-50 text-rose-800 border border-rose-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                {actionNotification.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span>{actionNotification.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionNotification(null)}
+                className="text-[#64748B] hover:text-[#0F172A] p-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {!user ? (
             <div className="text-center py-8">
-              <p className="text-xs sm:text-sm text-[#64748B] mb-3">Please sign in to view your TikTok boost order history.</p>
+              <p className="text-xs sm:text-sm text-[#64748B] mb-3">Please sign in to view your order history.</p>
               <button
                 type="button"
                 onClick={() => onOpenAuth && onOpenAuth('login')}
-                className="px-4 py-2 bg-[#7C3AED] text-white text-xs font-bold rounded-xl"
+                className="px-4 py-2 bg-[#7C3AED] text-white text-xs font-bold rounded-xl cursor-pointer"
               >
                 Log In
               </button>
@@ -1227,19 +2237,19 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           ) : isLoadingOrders ? (
             <div className="text-center py-8">
               <RefreshCw className="w-5 h-5 text-[#7C3AED] animate-spin mx-auto mb-2" />
-              <p className="text-xs text-[#64748B]">Loading your orders...</p>
+              <p className="text-xs text-[#64748B]">Synchronizing order statuses from provider...</p>
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-10">
               <ShoppingBag className="w-8 h-8 text-[#94A3B8] mx-auto mb-2" />
-              <p className="text-xs sm:text-sm font-bold text-[#0F172A]">No TikTok orders placed yet</p>
+              <p className="text-xs sm:text-sm font-bold text-[#0F172A]">No boosting orders found</p>
               <p className="text-xs text-[#64748B] mt-1">Select any service from the Browse tab to place your first boost!</p>
               <button
                 type="button"
                 onClick={() => setActiveSubTab('browse')}
-                className="mt-3 px-4 py-2 bg-purple-50 text-[#7C3AED] text-xs font-bold rounded-xl hover:bg-purple-100"
+                className="mt-3 px-4 py-2 bg-purple-50 text-[#7C3AED] text-xs font-bold rounded-xl hover:bg-purple-100 cursor-pointer"
               >
-                Browse TikTok Services
+                Browse Services
               </button>
             </div>
           ) : (
@@ -1250,41 +2260,96 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                     <th className="py-2.5 px-3">Order ID</th>
                     <th className="py-2.5 px-3">Service</th>
                     <th className="py-2.5 px-3">Target</th>
-                    <th className="py-2.5 px-3">Quantity</th>
+                    <th className="py-2.5 px-3">Qty</th>
                     <th className="py-2.5 px-3">Cost</th>
                     <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3">Refill / Cancel</th>
+                    <th className="py-2.5 px-3 text-right">Date</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1F5F9]">
-                  {orders.map((ord, ordIdx) => {
-                    const statusStr = (ord.status || 'pending').toLowerCase();
-                    const statusBg = 
-                      statusStr === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                      statusStr === 'in_progress' || statusStr === 'processing' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                      statusStr === 'canceled' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                      'bg-amber-50 text-amber-700 border-amber-200';
+                  {orders.map((ord: any) => {
+                    const orderIdStr = ord.orderId || ord.id || 'N/A';
+                    const isPending = ['pending', 'awaiting'].includes((ord.status || '').toLowerCase());
+                    const canRefill = Boolean(ord.refill && ord.providerOrderId && ['completed', 'in_progress'].includes((ord.status || '').toLowerCase()));
+                    const canCancel = Boolean(ord.cancel && ord.providerOrderId && isPending);
+                    const isLoadingThis = actionLoadingOrderId === ord.id;
 
                     return (
-                      <tr key={`${ord.id || 'ord'}-${ordIdx}`} className="hover:bg-[#F8FAFC]">
-                        <td className="py-3 px-3 font-mono font-bold text-[#0F172A]">
-                          #{ord.id.slice(-6).toUpperCase()}
-                        </td>
-                        <td className="py-3 px-3 font-medium text-[#0F172A] max-w-[200px] truncate">
-                          {ord.serviceName || 'TikTok Boost'}
-                        </td>
-                        <td className="py-3 px-3 text-[#64748B] max-w-[150px] truncate">
-                          {ord.target || ord.targetUrl || ord.link || '-'}
-                        </td>
-                        <td className="py-3 px-3 font-semibold text-[#0F172A]">
-                          {Number(ord.quantity || 0).toLocaleString()}
-                        </td>
-                        <td className="py-3 px-3 font-bold text-[#7C3AED]">
-                          ₦{Number(ord.charge || ord.totalChargeNgn || 0).toLocaleString()}
+                      <tr key={orderIdStr} className="hover:bg-[#F8FAFC] transition">
+                        <td className="py-3 px-3 font-mono text-[11px] text-[#0F172A]">
+                          <div className="flex items-center gap-1.5">
+                            <span>{orderIdStr}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(orderIdStr, orderIdStr)}
+                              className="text-[#94A3B8] hover:text-[#0F172A] p-0.5 cursor-pointer"
+                            >
+                              {copiedId === orderIdStr ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                          {ord.providerOrderId && (
+                            <span className="text-[9px] text-[#64748B] block mt-0.5">
+                              Provider #{ord.providerOrderId}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-wider ${statusBg}`}>
-                            {ord.status || 'pending'}
+                          <div className="font-bold text-[#0F172A] line-clamp-1 max-w-[200px]">
+                            {ord.serviceName || ord.service || 'Boosting Service'}
+                          </div>
+                          <span className="text-[10px] text-[#64748B]">
+                            {ord.platform || selectedPlatform}
                           </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="font-mono text-[11px] text-[#475569] truncate block max-w-[160px]" title={ord.target || ord.link}>
+                            {ord.target || ord.link}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-bold text-[#0F172A]">
+                          {(ord.quantity || 0).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-3 font-black text-[#7C3AED]">
+                          ₦{(ord.totalCharge || ord.price || ord.charge || 0).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-3">
+                          {renderStatusBadge(ord.status)}
+                          {ord.remains !== undefined && ord.remains !== null && (
+                            <span className="text-[9px] text-[#64748B] block mt-0.5">
+                              Remains: {ord.remains}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {canRefill && (
+                              <button
+                                type="button"
+                                onClick={() => handleRefillOrder(ord)}
+                                disabled={isLoadingThis}
+                                className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-[10px] font-bold cursor-pointer transition disabled:opacity-50"
+                              >
+                                {isLoadingThis ? '...' : 'Refill'}
+                              </button>
+                            )}
+                            {canCancel && (
+                              <button
+                                type="button"
+                                onClick={() => handleCancelOrder(ord)}
+                                disabled={isLoadingThis}
+                                className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md text-[10px] font-bold cursor-pointer transition disabled:opacity-50"
+                              >
+                                {isLoadingThis ? '...' : 'Cancel'}
+                              </button>
+                            )}
+                            {!canRefill && !canCancel && (
+                              <span className="text-[10px] text-[#94A3B8]">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-right text-[11px] text-[#94A3B8] whitespace-nowrap">
+                          {ord.createdAt ? new Date(ord.createdAt).toLocaleDateString() : 'Recent'}
                         </td>
                       </tr>
                     );
@@ -1296,273 +2361,252 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         </div>
       )}
 
-      {/* ======================= ORDER MODAL ======================= */}
+      {/* ======================= ORDER PLACEMENT MODAL ======================= */}
       {selectedService && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div 
-            className="bg-white border border-[#E2E8F0] rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-150"
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div
+            className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 my-auto relative animate-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-5 sm:px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center text-white shrink-0">
-                  <TikTokIcon className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-black text-[#0F172A]">
-                    Place TikTok Boost Order
+            <div className="flex items-center justify-between pb-3 border-b border-[#F1F5F9]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={handleCloseOrderModal}
+                  className="p-1.5 rounded-lg hover:bg-[#F1F5F9] text-[#64748B] hover:text-[#0F172A] transition"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#7C3AED]">
+                    {selectedService.platform || selectedPlatform} • {selectedService.type || selectedService.category}
+                  </div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-[#0F172A] truncate">
+                    {selectedService.name}
                   </h3>
-                  <span className="text-[11px] text-[#64748B] font-medium">
-                    Instant automated fulfillment
-                  </span>
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={handleCloseOrderModal}
-                className="p-1.5 text-[#94A3B8] hover:text-[#0F172A] rounded-full hover:bg-[#F1F5F9] transition"
+                className="text-[#94A3B8] hover:text-[#0F172A] p-1.5 rounded-lg hover:bg-[#F1F5F9] transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body Form */}
-            <form onSubmit={handleSubmitOrder} className="p-5 sm:p-6 space-y-4">
-              {/* Selected Service Card */}
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3.5 space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-[#7C3AED]">{selectedService.type || selectedService.category}</span>
-                  <span className="font-black text-[#0F172A]">
-                    ₦{(selectedService.ratePer1000 || selectedService.pricePerThousandNgn || 1000).toLocaleString()} / 1,000
+            <div className="space-y-4 overflow-y-auto pr-1 flex-1 py-1">
+              {/* Rate & Features Header */}
+              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#64748B] block">Price per 1,000 units</span>
+                  <span className="text-base font-black text-[#7C3AED]">
+                    ₦{(selectedService.ratePer1000 || selectedService.pricePerThousandNgn || 1500).toLocaleString()}
                   </span>
                 </div>
-                <div className="text-xs font-semibold text-[#0F172A] leading-tight">
-                  {selectedService.name}
-                </div>
-                <div className="text-[11px] text-[#64748B]">
-                  Min: {selectedService.min.toLocaleString()} • Max: {selectedService.max.toLocaleString()}
+                <div className="text-right text-[11px] text-[#64748B]">
+                  <span>Min: <strong>{(selectedService.min || 10).toLocaleString()}</strong></span>
+                  <span className="mx-1">•</span>
+                  <span>Max: <strong>{(selectedService.max || 100000).toLocaleString()}</strong></span>
                 </div>
               </div>
 
-              {/* Target Link or Username Input */}
+              {/* Dynamic Target Input */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-[#0F172A]">
-                  {selectedService.inputLabel || 'TikTok Profile URL or Video URL'} <span className="text-rose-500">*</span>
+                <label className="text-xs font-bold text-[#0F172A] block">
+                  {selectedService.inputLabel || `${selectedPlatform} Target URL or @Username`}
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={orderTarget}
-                  onChange={(e) => setOrderTarget(e.target.value)}
-                  placeholder={selectedService.inputPlaceholder || 'https://www.tiktok.com/@username/video/...'}
-                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
-                />
-                <p className="text-[11px] text-[#64748B]">
-                  Ensure profile or video is public before submitting.
-                </p>
+                {selectedService.inputType === 'custom_comments' ? (
+                  <textarea
+                    rows={4}
+                    value={orderComments}
+                    onChange={(e) => setOrderComments(e.target.value)}
+                    placeholder="Enter custom comments (1 comment per line)...&#10;Great post!&#10;Awesome content!"
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-xs text-[#0F172A] font-medium focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={orderTarget}
+                    onChange={(e) => setOrderTarget(e.target.value)}
+                    placeholder={selectedService.inputPlaceholder || `https://${selectedPlatform?.toLowerCase().replace(/[^a-z0-9]/g, '')}.com/...`}
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-xs text-[#0F172A] font-medium focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
+                  />
+                )}
+                <span className="text-[10px] text-[#64748B] block">
+                  Ensure account/post is set to <strong>Public</strong> before placing order.
+                </span>
               </div>
 
               {/* Quantity Input */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[#0F172A]">
-                    Quantity <span className="text-rose-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-[#64748B]">
-                    Min: {selectedService.min} • Max: {selectedService.max.toLocaleString()}
+                  <label className="text-xs font-bold text-[#0F172A]">Quantity to Boost</label>
+                  <span className="text-[10px] text-[#64748B]">
+                    Min: {(selectedService.min || 10).toLocaleString()} | Max: {(selectedService.max || 100000).toLocaleString()}
                   </span>
                 </div>
                 <input
                   type="number"
-                  required
-                  min={selectedService.min}
-                  max={selectedService.max}
+                  min={selectedService.min || 10}
+                  max={selectedService.max || 100000}
+                  step={50}
                   value={orderQuantity}
-                  onChange={(e) => setOrderQuantity(Number(e.target.value))}
-                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-[#0F172A] focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition font-mono font-bold"
+                  onChange={(e) => setOrderQuantity(Number(e.target.value) || 0)}
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-sm text-[#0F172A] font-extrabold focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
                 />
 
-                {(orderQuantity < selectedService.min || orderQuantity > selectedService.max) && (
-                  <p className="text-[11px] text-rose-600 font-semibold">
-                    Quantity must be between {selectedService.min.toLocaleString()} and {selectedService.max.toLocaleString()}
-                  </p>
-                )}
-
-                {/* Quick Quantity Chips */}
-                <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                  {[selectedService.min, 500, 1000, 5000, 10000]
-                    .filter((q) => q >= selectedService.min && q <= selectedService.max)
-                    .map((q) => (
-                      <button
-                        key={q}
-                        type="button"
-                        onClick={() => setOrderQuantity(q)}
-                        className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0] transition cursor-pointer"
-                      >
-                        +{q.toLocaleString()}
-                      </button>
-                    ))}
+                {/* Quick Select Buttons */}
+                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                  {[selectedService.min, 500, 1000, 2500, 5000, 10000].filter(q => q >= (selectedService.min || 10) && q <= (selectedService.max || 100000)).map(qty => (
+                    <button
+                      key={qty}
+                      type="button"
+                      onClick={() => setOrderQuantity(qty)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                        orderQuantity === qty
+                          ? 'bg-purple-100 text-[#7C3AED] border-purple-300'
+                          : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9]'
+                      }`}
+                    >
+                      {qty.toLocaleString()}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Custom Comments textarea if required */}
-              {selectedService.inputType === 'custom_comments' && (
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-[#0F172A]">
-                    Custom Comments (1 per line) <span className="text-rose-500">*</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    required
-                    value={orderComments}
-                    onChange={(e) => setOrderComments(e.target.value)}
-                    placeholder="Enter each comment on a new line..."
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-xs text-[#0F172A] focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
-                  />
-                </div>
-              )}
-
               {/* Total Calculation & Wallet Check */}
-              <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-4 space-y-2">
+              <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3.5 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#64748B] font-medium">Calculated Price:</span>
-                  <span className="text-base sm:text-lg font-black text-[#7C3AED]">
+                  <span className="text-[#64748B]">Total Charge:</span>
+                  <span className="text-base font-black text-[#7C3AED]">
                     ₦{calculatedCost.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-purple-200/60">
-                  <span className="text-[#64748B] font-medium">Your Wallet Balance:</span>
-                  <span className="font-bold text-[#0F172A]">
-                    ₦{walletBalance.toLocaleString()}
-                  </span>
+                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-purple-200/60">
+                  <span className="text-[#64748B]">Your Wallet Balance:</span>
+                  <span className="font-extrabold text-[#0F172A]">₦{walletBalance.toLocaleString()}</span>
                 </div>
 
                 {walletBalance < calculatedCost && (
-                  <div className="pt-2 text-[11px] text-amber-700 flex items-start gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      Insufficient balance. You need ₦{(calculatedCost - walletBalance).toLocaleString()} more to place this boost.
-                    </span>
+                  <div className="text-[11px] text-rose-600 font-bold flex items-center justify-between pt-1">
+                    <span>Shortfall: ₦{(calculatedCost - walletBalance).toLocaleString()}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleCloseOrderModal();
+                        onOpenWallet();
+                      }}
+                      className="underline hover:text-rose-700 cursor-pointer"
+                    >
+                      + Fund Wallet
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Error banner */}
+              {/* Order Error Notification */}
               {orderError && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                   <span>{orderError}</span>
                 </div>
               )}
+            </div>
 
-              {/* Action Buttons */}
-              <div className="pt-2">
-                {!user ? (
-                  <button
-                    type="button"
-                    onClick={() => { handleCloseOrderModal(); onOpenAuth?.('login'); }}
-                    className="w-full py-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
-                  >
-                    Log In to Order
-                  </button>
-                ) : walletBalance < calculatedCost ? (
-                  <button
-                    type="button"
-                    onClick={() => { handleCloseOrderModal(); onOpenWallet(); }}
-                    className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <Wallet className="w-4 h-4" />
-                    <span>Top Up Wallet (₦{calculatedCost.toLocaleString()})</span>
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={isSubmittingOrder}
-                    className="w-full py-3 bg-[#7C3AED] hover:bg-[#6D28D9] disabled:bg-purple-300 text-white font-black text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    {isSubmittingOrder ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Fulfilling TikTok Boost...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-4 h-4 fill-current" />
-                        <span>Confirm & Place Order (₦{calculatedCost.toLocaleString()})</span>
-                      </>
-                    )}
-                  </button>
-                )}
+            {/* Modal Actions (Coming Soon state) */}
+            <div className="space-y-3 pt-3 border-t border-[#F1F5F9]">
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 text-xs font-bold flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#7C3AED] shrink-0" />
+                <span>Social Media Boosting is coming soon! Live order placement will open as soon as provider setup is finalized. Your wallet balance has not been charged.</span>
               </div>
-            </form>
+
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-1.5 text-xs text-[#7C3AED] font-bold">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Coming Soon</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseOrderModal}
+                    className="px-4 py-2 border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePlaceOrder}
+                    className="px-4 py-2 bg-purple-100 text-[#7C3AED] border border-purple-200 text-xs font-black rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-98"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Coming Soon</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* ======================= ORDER SUCCESS MODAL ======================= */}
       {orderSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white border border-[#E2E8F0] rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+              <CheckCircle2 className="w-8 h-8" />
             </div>
 
             <div>
-              <h3 className="text-lg font-black text-[#0F172A]">
-                TikTok Boost Order Placed!
-              </h3>
-              <p className="text-xs sm:text-sm text-[#64748B] mt-1">
-                Your order has been queued for automated delivery.
+              <h3 className="text-lg font-black text-[#0F172A]">Order Successfully Placed!</h3>
+              <p className="text-xs text-[#64748B] mt-1">
+                Your boost request has been submitted to the provider and automated delivery will begin shortly.
               </p>
             </div>
 
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-xs space-y-2 text-left">
-              <div className="flex justify-between items-center">
+            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 text-left text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
                 <span className="text-[#64748B]">Order ID:</span>
-                <span className="font-mono font-bold text-[#0F172A]">#{orderSuccess.id}</span>
+                <span className="font-mono font-bold text-[#0F172A]">{orderSuccess.id}</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <span className="text-[#64748B]">Service:</span>
-                <span className="font-semibold text-[#0F172A] truncate max-w-[200px]">{orderSuccess.serviceName}</span>
+                <span className="font-extrabold text-[#0F172A] truncate max-w-[200px]">{orderSuccess.serviceName}</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <span className="text-[#64748B]">Quantity:</span>
-                <span className="font-bold text-[#0F172A]">{Number(orderSuccess.quantity).toLocaleString()}</span>
+                <span className="font-bold text-[#0F172A]">{(orderSuccess.quantity || 0).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <span className="text-[#64748B]">Amount Paid:</span>
-                <span className="font-bold text-[#7C3AED]">₦{Number(orderSuccess.charge).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[#64748B]">Status:</span>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
-                  {orderSuccess.status || 'Processing'}
-                </span>
+                <span className="font-black text-[#7C3AED]">₦{(orderSuccess.charge || 0).toLocaleString()}</span>
               </div>
             </div>
 
             <div className="flex items-center gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => { setOrderSuccess(null); setActiveSubTab('orders'); }}
-                className="flex-1 py-2.5 bg-purple-50 hover:bg-purple-100 text-[#7C3AED] font-bold text-xs rounded-xl transition cursor-pointer"
+                onClick={() => {
+                  setOrderSuccess(null);
+                  setActiveSubTab('orders');
+                }}
+                className="w-full py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black rounded-xl transition shadow-xs cursor-pointer"
               >
-                View in Orders
-              </button>
-              <button
-                type="button"
-                onClick={() => setOrderSuccess(null)}
-                className="flex-1 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-xs rounded-xl transition cursor-pointer"
-              >
-                Continue
+                Track in My Orders
               </button>
             </div>
           </div>
         </div>
       )}
-      {/* Render TikTok Admin Settings Modal if open */}
-      {renderTikTokSettingsModal()}
+
+      {/* Owner Settings Modal */}
+      {renderSettingsModal()}
     </div>
   );
 };
+
+export default SocialBoostView;
+

@@ -27,6 +27,48 @@
       },
       "required": ["uid", "email"]
     },
+    "user_notifications": {
+      "title": "User Notifications",
+      "description": "Permanent notification records for users and Owner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "relatedId": { "type": "string" },
+        "rejectionReason": { "type": "string" },
+        "read": { "type": "boolean" },
+        "readAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "message", "read", "createdAt"]
+    },
+    "stock_approvals": {
+      "title": "Stock Approvals",
+      "description": "Permanent audit history of stock approvals and rejections",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "listingId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "submitterId": { "type": "string" },
+        "submitterName": { "type": "string" },
+        "submitterEmail": { "type": "string" },
+        "status": { "type": "string" },
+        "rejectionReason": { "type": "string" },
+        "originalPrice": { "type": "number" },
+        "approvedPrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "submittedAt": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "reviewedBy": { "type": "string" }
+      },
+      "required": ["id", "listingId", "submitterId", "status", "submittedAt"]
+    },
     "withdrawal_requests": {
       "title": "Withdrawal Requests",
       "description": "Payout withdrawal requests submitted by authorized website Owner and Administrators",
@@ -417,6 +459,14 @@
     "/withdrawal_requests/{requestId}": {
       "schema": "withdrawal_requests",
       "description": "Payout withdrawal requests submitted by authorized website Owner and Administrators"
+    },
+    "/stock_approvals/{approvalId}": {
+      "schema": "stock_approvals",
+      "description": "Permanent stock approval and rejection audit records"
+    },
+    "/user_notifications/{notificationId}": {
+      "schema": "user_notifications",
+      "description": "Permanent user notification records"
     }
   }
 }
