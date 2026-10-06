@@ -519,11 +519,50 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     }
   };
 
-  // 4. Buy Virtual Number Action (Coming Soon state)
+  // 4. Buy Virtual Number Action
   const handleBuyNumber = async () => {
+    if (buyingLoading || priceLoading || !isPriceAvailable) return;
     setErrorMessage('');
     setInfoMessage('');
-    setComingSoonNotice('Virtual SMS / Service Numbers is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.');
+    setComingSoonNotice('');
+    setBuyingLoading(true);
+
+    try {
+      const headers = await getAuthHeaders();
+      const { ok, data } = await safeFetchJson('/api/onegridhub/buy', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'buy',
+          country: selectedCountry,
+          service: selectedService,
+          optionId: selectedOptionId,
+          selectedPrice: calculatedPrice,
+          userId: userProfile?.uid
+        })
+      });
+
+      if (!ok || !data || !data.success) {
+        const errMsg = data?.error || data?.message || 'Failed to allocate virtual number.';
+        throw new Error(errMsg);
+      }
+
+      const newOrder = data.order || data;
+      setActiveOrder(newOrder);
+      setPollingStatus('WAITING');
+      setVerificationCode('');
+      setSmsContent('');
+      setElapsedSeconds(0);
+      setInfoMessage(`Allocated +${newOrder.phoneNumber || ''}! Waiting for SMS code (up to 20 mins).`);
+
+      startSmsPolling(newOrder.orderId || newOrder.id);
+      if (onRefreshProfile) onRefreshProfile();
+      fetchOrders();
+    } catch (err: any) {
+      setErrorMessage(sanitizeApiErrorMessage(err.message, 'Purchase failed.'));
+    } finally {
+      setBuyingLoading(false);
+    }
   };
 
   // 5. SMS Polling Mechanism
@@ -684,56 +723,56 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   return (
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
       
-      {/* 1. TOP HEADER & WALLET BAR (COMPACT & SLEEK) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 bg-white p-3 sm:px-4 sm:py-3 rounded-2xl sm:rounded-3xl border border-[#E9E2FA] shadow-xs">
-        <div className="flex items-center space-x-2.5 sm:space-x-3">
+      {/* 1. TOP HEADER & WALLET BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-3xl border border-[#E9E2FA] shadow-xs">
+        <div className="flex items-center space-x-3">
           <button
             type="button"
             onClick={onBackToMarketplace}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] rounded-xl sm:rounded-2xl transition cursor-pointer border border-[#E9E2FA] flex items-center justify-center shrink-0 active:scale-95 shadow-2xs"
+            className="w-10 h-10 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] rounded-2xl transition cursor-pointer border border-[#E9E2FA] flex items-center justify-center shrink-0 active:scale-95 shadow-2xs"
             title="Back to Marketplace"
           >
-            <ArrowLeft className="w-4.5 h-4.5 text-[#171329]" />
+            <ArrowLeft className="w-5 h-5 text-[#171329]" />
           </button>
 
-          <div className="min-w-0">
-            <div className="flex items-center space-x-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-[#171329]">
+          <div>
+            <div className="flex items-center space-x-2">
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-[#171329]">
                 Service Numbers
               </h1>
-              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FAF8FE] border border-[#E9E2FA] text-[#6D28D9]">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FAF8FE] border border-[#E9E2FA] text-[#6D28D9]">
                 VirtualSMS
               </span>
             </div>
-            <p className="text-[11px] sm:text-xs text-[#64748B] font-medium leading-tight truncate sm:whitespace-normal">
+            <p className="text-xs text-[#64748B] font-medium">
               Instant OTP activation and real-time carrier virtual numbers
             </p>
           </div>
         </div>
 
         {/* Wallet Balance & Action */}
-        <div className="flex items-center space-x-2 sm:space-x-2.5 self-end sm:self-auto shrink-0">
-          <div className="flex items-center space-x-1.5 sm:space-x-2 bg-[#FAF8FE] border border-[#E9E2FA] px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl">
-            <span className="text-[11px] sm:text-xs font-medium text-[#64748B]">Balance:</span>
-            <span className="text-xs sm:text-sm font-black text-[#6D28D9]">
+        <div className="flex items-center space-x-3 self-end sm:self-auto">
+          <div className="flex items-center space-x-2 bg-[#FAF8FE] border border-[#E9E2FA] px-3.5 py-1.5 rounded-2xl">
+            <span className="text-xs font-medium text-[#64748B]">Balance:</span>
+            <span className="text-sm font-black text-[#6D28D9]">
               ₦{Number(walletBalance || 0).toLocaleString()}
             </span>
             <button
               onClick={onOpenWallet}
-              className="p-1 bg-[#6D28D9] hover:bg-[#5B21B6] text-white rounded-md sm:rounded-lg transition cursor-pointer"
+              className="p-1 bg-[#6D28D9] hover:bg-[#5B21B6] text-white rounded-lg transition cursor-pointer"
               title="Top Up Wallet"
             >
-              <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {isOwner && (
             <button
               onClick={() => setIsOwnerSettingsOpen(true)}
-              className="p-1.5 sm:p-2 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] rounded-xl sm:rounded-2xl border border-[#E9E2FA] transition cursor-pointer"
+              className="p-2.5 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#716B82] hover:text-[#171329] rounded-2xl border border-[#E9E2FA] transition cursor-pointer"
               title="Pricing Engine Settings"
             >
-              <Settings className="w-4 h-4 text-[#716B82]" />
+              <Settings className="w-4.5 h-4.5" />
             </button>
           )}
         </div>
@@ -741,7 +780,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
       {/* Notifications */}
       {infoMessage && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold p-3 sm:p-4 rounded-2xl flex items-center justify-between shadow-xs animate-in fade-in">
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold p-4 rounded-2xl flex items-center justify-between shadow-xs animate-in fade-in">
           <div className="flex items-center space-x-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{infoMessage}</span>
@@ -750,8 +789,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         </div>
       )}
 
-      {errorMessage && !errorMessage.toLowerCase().includes('top-up') && !errorMessage.toLowerCase().includes('top_up') && !errorMessage.toLowerCase().includes('€20') && !errorMessage.toLowerCase().includes('provider notice') && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold p-3 sm:p-4 rounded-2xl flex items-center justify-between shadow-xs animate-in fade-in">
+      {errorMessage && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold p-4 rounded-2xl flex items-center justify-between shadow-xs animate-in fade-in">
           <div className="flex items-center space-x-2">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMessage}</span>
@@ -760,9 +799,9 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         </div>
       )}
 
-      {/* API Connection Error Fallback Banner (Hiding Provider Notices) */}
-      {apiConnectionError && !apiConnectionError.toLowerCase().includes('top-up') && !apiConnectionError.toLowerCase().includes('€20') && !apiConnectionError.toLowerCase().includes('provider notice') && (
-        <div className="bg-amber-50 border border-amber-300 text-amber-900 p-3 sm:p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+      {/* API Connection Error Fallback Banner */}
+      {apiConnectionError && (
+        <div className="bg-amber-50 border border-amber-300 text-amber-900 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center space-x-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
             <div>
@@ -797,9 +836,6 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 <h3 className="text-lg font-black text-[#171329] tracking-tight">
                   Quick buy
                 </h3>
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FAF8FE] border border-[#E9E2FA] text-[#6D28D9]">
-                  Coming Soon
-                </span>
               </div>
               <p className="text-xs text-[#64748B] mt-1.5 leading-relaxed">
                 Pick a service and a country — the cheapest available operator is selected automatically.
@@ -1122,26 +1158,40 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
               )}
             </div>
 
-            {/* BUY NUMBER BUTTON (COMING SOON STATE) */}
+            {/* BUY NUMBER BUTTON */}
             <div>
               <button
                 type="button"
                 onClick={handleBuyNumber}
-                className="w-full py-3.5 px-5 rounded-2xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all bg-[#FAF8FE] hover:bg-[#F3F0FA] text-[#6D28D9] border border-[#E9E2FA] shadow-xs flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
-                title="Service Numbers is coming soon"
+                disabled={buyingLoading || priceLoading || !isPriceAvailable}
+                className={`w-full py-4 px-5 rounded-2xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer ${
+                  buyingLoading || priceLoading || !isPriceAvailable
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                    : 'bg-[#6D28D9] hover:bg-[#5B21B6] text-white active:scale-[0.99] shadow-purple-600/25'
+                }`}
               >
-                <Clock className="w-4 h-4 text-[#6D28D9] mr-1.5" />
-                <span>Virtual Numbers — Coming Soon</span>
+                {buyingLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                    <span>Allocating Number...</span>
+                  </>
+                ) : priceLoading ? (
+                  <span>Checking Availability...</span>
+                ) : (
+                  <>
+                    <Smartphone className="w-4 h-4 mr-1.5" />
+                    <span>Buy Number (₦{calculatedPrice.toLocaleString()})</span>
+                  </>
+                )}
               </button>
 
-              <div className="mt-2.5 p-3 bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl text-center space-y-0.5">
-                <p className="text-xs font-bold text-[#6D28D9]">
-                  Service Numbers is coming soon!
-                </p>
-                <p className="text-[11px] text-[#64748B] font-medium">
-                  We are finalizing carrier routes. Live purchases will open shortly. Your wallet balance will not be charged.
-                </p>
-              </div>
+              {comingSoonNotice && (
+                <div className="mt-3 p-3.5 bg-purple-50 border border-purple-200 rounded-2xl text-center space-y-1 animate-in fade-in">
+                  <p className="text-xs font-bold text-[#6D28D9] leading-relaxed">
+                    {comingSoonNotice}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Security Assurance Footer */}

@@ -1297,26 +1297,20 @@ export const handleVirtualSMSNumbersGateway = async (
             // User is NOT debited! Return provider error directly
             const errCode = supplierError.code || supplierError.data?.error?.code || 'PROVIDER_DECLINED';
             const errMsg = supplierError.message || supplierError.data?.error?.message || 'Provider reported insufficient provider balance or allocation error.';
-            const isTopUpReq = String(errCode).toLowerCase().includes('top_up') || String(errMsg).toLowerCase().includes('top-up') || String(errMsg).toLowerCase().includes('€20');
             return res.status(422).json({
               success: false,
               code: errCode,
-              error: isTopUpReq
-                ? 'Virtual SMS / Service Numbers is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.'
-                : `Service notice: ${errMsg}. Your wallet balance was not charged.`
+              error: `Provider notice: ${errMsg}. Your wallet balance was not charged.`
             });
           }
 
           if (!activationResult || activationResult.error || (!activationResult.id && !activationResult.phone_number && !activationResult.phone)) {
             const errCode = activationResult?.error?.code || 'PROVIDER_DECLINED';
             const errMsg = activationResult?.error?.message || activationResult?.message || 'Provider reported no available numbers or insufficient balance.';
-            const isTopUpReq = String(errCode).toLowerCase().includes('top_up') || String(errMsg).toLowerCase().includes('top-up') || String(errMsg).toLowerCase().includes('€20');
             return res.status(422).json({
               success: false,
               code: errCode,
-              error: isTopUpReq
-                ? 'Virtual SMS / Service Numbers is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.'
-                : `Service notice: ${errMsg}. Your wallet balance was not charged.`
+              error: `Provider notice: ${errMsg}. Your wallet balance was not charged.`
             });
           }
 

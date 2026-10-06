@@ -1272,11 +1272,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     return Math.max(10, Math.round((rate / 1000) * qty));
   }, [selectedService, orderQuantity]);
 
-  // Place Order handler (Coming Soon state)
+  // Place Order handler
   const handlePlaceOrder = async () => {
-    setOrderError('Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.');
-    return;
-
     if (!selectedService) return;
 
     if (!auth.currentUser) {
@@ -1846,13 +1843,12 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-[#7C3AED] border border-purple-200 text-xs font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" />
             <span>Automated Social Boosting</span>
-            <span className="ml-1 px-1.5 py-0.5 bg-[#7C3AED] text-white text-[9px] font-black rounded-sm uppercase tracking-wider">Coming Soon</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
             Social Media Boost
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B] font-medium mt-1">
-            Social Media Boosting is coming soon! Our high-speed delivery network is undergoing final provider setup and will be enabled shortly.
+            Select a platform below to supercharge your social growth, viral visibility, and audience reach.
           </p>
         </div>
 
@@ -1890,8 +1886,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       <span className={`text-base sm:text-lg font-black text-[#0F172A] tracking-tight ${platform.textColor} transition-colors truncate`}>
                         {platform.name}
                       </span>
-                      <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-purple-100 text-[#7C3AED] border border-purple-200 rounded-full">
-                        Coming Soon
+                      <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${platform.badgeColor} rounded-full`}>
+                        Active
                       </span>
                       {count > 0 && (
                         <span className="text-[10px] font-semibold text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-md">
@@ -2167,10 +2163,10 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleOpenOrderModal(service)}
-                        className="px-3.5 sm:px-4 py-1.5 sm:py-2 bg-purple-100 hover:bg-purple-200 text-[#7C3AED] border border-purple-200 text-xs font-black rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-98"
+                        className="px-3.5 sm:px-4 py-1.5 sm:py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black rounded-xl shadow-xs hover:shadow-sm transition cursor-pointer flex items-center gap-1.5 active:scale-98"
                       >
-                        <Clock className="w-3 h-3 text-[#7C3AED]" />
-                        <span>Coming Soon</span>
+                        <Zap className="w-3 h-3 fill-current" />
+                        <span>Boost Now</span>
                       </button>
                     </div>
                   </div>
@@ -2517,36 +2513,34 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               )}
             </div>
 
-            {/* Modal Actions (Coming Soon state) */}
-            <div className="space-y-3 pt-3 border-t border-[#F1F5F9]">
-              <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 text-xs font-bold flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#7C3AED] shrink-0" />
-                <span>Social Media Boosting is coming soon! Live order placement will open as soon as provider setup is finalized. Your wallet balance has not been charged.</span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2.5">
-                <div className="flex items-center gap-1.5 text-xs text-[#7C3AED] font-bold">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Coming Soon</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCloseOrderModal}
-                    className="px-4 py-2 border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] text-xs font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePlaceOrder}
-                    className="px-4 py-2 bg-purple-100 text-[#7C3AED] border border-purple-200 text-xs font-black rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-98"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Coming Soon</span>
-                  </button>
-                </div>
-              </div>
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#F1F5F9]">
+              <button
+                type="button"
+                onClick={handleCloseOrderModal}
+                disabled={isSubmittingOrder}
+                className="px-4 py-2 border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePlaceOrder}
+                disabled={isSubmittingOrder || walletBalance < calculatedCost}
+                className="px-5 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-98"
+              >
+                {isSubmittingOrder ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Processing Order...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5 fill-current" />
+                    <span>Confirm & Pay ₦{calculatedCost.toLocaleString()}</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

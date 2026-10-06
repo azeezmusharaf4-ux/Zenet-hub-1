@@ -106,13 +106,13 @@ export const ZenetHeader: React.FC<ZenetHeaderProps> = ({
             href="https://wa.me/2349138764755"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-200 cursor-pointer shrink-0"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-200 cursor-pointer shrink-0"
             title="Chat on WhatsApp"
             aria-label="WhatsApp"
           >
             <svg 
               viewBox="10 12 155 152" 
-              className="w-10 h-10 sm:w-11 sm:h-11 drop-shadow-xs"
+              className="w-9 h-9 sm:w-10 sm:h-10"
               aria-hidden="true"
             >
               <path fill="#fff" d="m12.966 161.238 10.439-38.114a73.42 73.42 0 0 1-9.821-36.772c.017-40.556 33.021-73.55 73.578-73.55 19.681.01 38.154 7.669 52.047 21.572s21.537 32.383 21.53 52.037c-.018 40.553-33.027 73.553-73.578 73.553h-.032c-12.313-.005-24.412-3.094-35.159-8.954z"/>
