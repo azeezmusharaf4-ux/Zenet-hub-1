@@ -117,6 +117,17 @@ export const getNetlifyFunctionFallback = (path: string): string | null => {
     const actionParam = sub ? (qs ? `&action=${sub}` : `?action=${sub}`) : '';
     return `/.netlify/functions/onegridhub${qs}${actionParam}`;
   }
+  if (pathname.startsWith('/api/virtual-numbers')) {
+    const sub = pathname.replace('/api/virtual-numbers', '').replace(/^\//, '');
+    const actionParam = sub ? (qs ? `&action=${sub}` : `?action=${sub}`) : '';
+    return `/.netlify/functions/onegridhub${qs}${actionParam}`;
+  }
+  if (pathname.startsWith('/api/paystack/resolve-account')) {
+    return `/.netlify/functions/paystack-resolve-account${qs}`;
+  }
+  if (pathname.startsWith('/api/paystack/banks')) {
+    return `/.netlify/functions/paystack-banks${qs}`;
+  }
   if (pathname.startsWith('/api/paystack/initialize')) {
     return `/.netlify/functions/paystack-initialize${qs}`;
   }
@@ -131,6 +142,15 @@ export const getNetlifyFunctionFallback = (path: string): string | null => {
   }
   if (pathname.startsWith('/api/paystack/webhook')) {
     return `/.netlify/functions/paystack-webhook${qs}`;
+  }
+  if (pathname.startsWith('/api/withdrawals')) {
+    const sub = pathname.replace('/api/withdrawals', '').replace(/^\//, '');
+    let searchParams = new URLSearchParams(search || '');
+    if (sub && !searchParams.has('action')) {
+      searchParams.set('action', sub);
+    }
+    const finalSearch = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return `/.netlify/functions/withdrawals-manage${finalSearch}`;
   }
   if (pathname.startsWith('/api/wallet/purchase')) {
     return `/.netlify/functions/wallet-purchase${qs}`;

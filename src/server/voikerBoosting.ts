@@ -690,13 +690,13 @@ export const handleVoikerGateway = async (
             return res.status(422).json({
               success: false,
               code: voikerRes.error || 'PROVIDER_REJECTED',
-              error: `Voiker provider notice: ${errMsg}. Your wallet balance was not charged.`
+              error: 'Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.'
             });
           } else {
             return res.status(422).json({
               success: false,
               code: 'PROVIDER_ERROR',
-              error: 'Voiker provider did not return a valid order ID. Your wallet balance was not charged.'
+              error: 'Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.'
             });
           }
         } catch (upstreamErr: any) {
@@ -704,7 +704,7 @@ export const handleVoikerGateway = async (
           return res.status(502).json({
             success: false,
             code: 'PROVIDER_UNAVAILABLE',
-            error: `Voiker provider gateway error: ${upstreamErr.message}. Your wallet was not charged.`
+            error: 'Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet was not charged.'
           });
         }
       } else {

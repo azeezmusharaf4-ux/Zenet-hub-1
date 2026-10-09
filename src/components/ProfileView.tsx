@@ -23,6 +23,7 @@ import {
 import { auth, db } from '../lib/firebase';
 import { isAuthorizedOwner } from '../lib/authorizedOwners';
 import { ActiveAppView, UserProfile } from '../types';
+import { useTheme } from '../context/ThemeContext';
 import { DashboardTab } from './UserDashboardModal';
 import { PaymentNotificationsModal } from './PaymentNotificationsModal';
 import { NotificationsModal } from './NotificationsModal';
@@ -63,6 +64,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenAuth
 }) => {
   // Modal states for embedded actions
+  const { theme, setTheme } = useTheme();
   const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
   const [isPaymentNotificationsOpen, setIsPaymentNotificationsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -539,24 +541,39 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             <div className="space-y-2">
               <button
+                type="button"
                 onClick={() => {
-                  showToast('Light Theme is currently active and optimized for ZENET HUB.', 'success');
-                  setIsAppearanceModalOpen(false);
+                  setTheme('light');
+                  showToast('Light Clean Theme activated.', 'success');
                 }}
-                className="w-full p-3 rounded-2xl border-2 border-[#5B4DF5] bg-[#F5F3FF] text-left flex items-center justify-between"
+                className={`w-full p-3 rounded-2xl border-2 text-left flex items-center justify-between cursor-pointer transition ${
+                  theme === 'light'
+                    ? 'border-[#5B4DF5] bg-[#F5F3FF]'
+                    : 'border-[#EAE6F8] bg-white hover:bg-[#FAF9FF]'
+                }`}
               >
-                <span className="font-black text-xs text-[#0F172A]">Light Clean Theme (Default)</span>
-                <CheckCircle2 className="w-4 h-4 text-[#5B4DF5]" />
+                <span className={`font-black text-xs ${theme === 'light' ? 'text-[#0F172A]' : 'text-[#64748B]'}`}>
+                  Light Clean Theme (Default)
+                </span>
+                {theme === 'light' && <CheckCircle2 className="w-4 h-4 text-[#5B4DF5]" />}
               </button>
 
               <button
+                type="button"
                 onClick={() => {
-                  showToast('Dark Mode preference saved! Future updates will activate full dark theme styling.', 'success');
-                  setIsAppearanceModalOpen(false);
+                  setTheme('dark');
+                  showToast('Dark Mode activated.', 'success');
                 }}
-                className="w-full p-3 rounded-2xl border border-[#EAE6F8] bg-white hover:bg-[#FAF9FF] text-left flex items-center justify-between"
+                className={`w-full p-3 rounded-2xl border-2 text-left flex items-center justify-between cursor-pointer transition ${
+                  theme === 'dark'
+                    ? 'border-[#5B4DF5] bg-[#F5F3FF]'
+                    : 'border-[#EAE6F8] bg-white hover:bg-[#FAF9FF]'
+                }`}
               >
-                <span className="font-bold text-xs text-[#64748B]">Dark Mode (Preview)</span>
+                <span className={`font-black text-xs ${theme === 'dark' ? 'text-[#0F172A]' : 'text-[#64748B]'}`}>
+                  Dark Mode
+                </span>
+                {theme === 'dark' && <CheckCircle2 className="w-4 h-4 text-[#5B4DF5]" />}
               </button>
             </div>
 

@@ -23,7 +23,8 @@ import {
   Info,
   Clock,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { doc, updateDoc, setDoc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -131,7 +132,7 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
   const [isSubmittingReply, setIsSubmittingReply] = useState<string | null>(null);
 
-  const isOwnerUser = isAuthorizedOwner(user, userProfile);
+  const isOwnerUser = isAuthorizedOwner(user, userProfile) || user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com';
   if (!user || (!isOwnerUser && userProfile?.role === 'buyer')) return null;
 
   // Filter inquiries related to seller's listings or where sellerId matches user.uid (Owners can see store inquiries)
@@ -621,13 +622,29 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                               </span>
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>Approved / Active</span>
+                                <span>Active</span>
                               </span>
                             </div>
 
                             <h5 className="font-bold text-slate-900 text-sm line-clamp-1">{listing.title}</h5>
                             <div className="flex items-center justify-between text-xs pt-2 border-t border-purple-50">
-                              <span className="font-black text-purple-600 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-purple-600 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                                {isOwnerUser && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteListing(listing.id);
+                                    }}
+                                    className="w-7 h-7 rounded-full flex items-center justify-center text-rose-500 hover:text-white hover:bg-rose-600 bg-rose-50 border border-rose-200 transition cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Delete stock (Owner only)"
+                                    aria-label="Delete stock"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                               <button
                                 onClick={() => setEditingListing(listing)}
                                 className="text-xs text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer"
@@ -682,8 +699,24 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                             <p className="text-[11px] text-amber-700 bg-amber-50/70 p-2 rounded-xl border border-amber-200">
                               ⏳ Submitted for Owner review. Will become active once approved.
                             </p>
-                            <div className="flex items-center justify-between text-xs pt-2 border-t border-amber-100">
-                              <span className="font-black text-amber-700 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                             <div className="flex items-center justify-between text-xs pt-2 border-t border-amber-100">
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-amber-700 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                                {isOwnerUser && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteListing(listing.id);
+                                    }}
+                                    className="w-7 h-7 rounded-full flex items-center justify-center text-rose-500 hover:text-white hover:bg-rose-600 bg-rose-50 border border-rose-200 transition cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Delete stock (Owner only)"
+                                    aria-label="Delete stock"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                               <button
                                 onClick={() => setEditingListing(listing)}
                                 className="text-xs text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 cursor-pointer"
@@ -729,7 +762,23 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
                               )}
 
                               <div className="flex items-center justify-between text-xs pt-2 border-t border-rose-100">
-                                <span className="font-black text-rose-700 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-black text-rose-700 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                                  {isOwnerUser && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDeleteListing(listing.id);
+                                      }}
+                                      className="w-7 h-7 rounded-full flex items-center justify-center text-rose-500 hover:text-white hover:bg-rose-600 bg-rose-50 border border-rose-200 transition cursor-pointer active:scale-95 shadow-2xs"
+                                      title="Delete stock (Owner only)"
+                                      aria-label="Delete stock"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                                 <button
                                   onClick={() => setEditingListing(listing)}
                                   className="text-xs text-rose-700 hover:text-rose-900 font-bold flex items-center gap-1 cursor-pointer"
@@ -782,7 +831,23 @@ export const SellerDashboardModal: React.FC<SellerDashboardModalProps> = ({
 
                             <h5 className="font-bold text-slate-900 text-sm line-clamp-1">{listing.title}</h5>
                             <div className="flex items-center justify-between text-xs pt-2 border-t border-purple-50">
-                              <span className="font-black text-purple-600 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-purple-600 font-mono">₦{Number(listing.price).toLocaleString()}</span>
+                                {isOwnerUser && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteListing(listing.id);
+                                    }}
+                                    className="w-7 h-7 rounded-full flex items-center justify-center text-rose-500 hover:text-white hover:bg-rose-600 bg-rose-50 border border-rose-200 transition cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Delete stock (Owner only)"
+                                    aria-label="Delete stock"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                               <button
                                 onClick={() => setEditingListing(listing)}
                                 className="text-xs text-purple-600 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer"

@@ -37,6 +37,18 @@
 
 # Route Paystack & Wallet endpoints to Netlify Functions
 [[redirects]]
+  from = "/api/paystack/resolve-account"
+  to = "/.netlify/functions/paystack-resolve-account"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/paystack/banks"
+  to = "/.netlify/functions/paystack-banks"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/paystack/initialize"
   to = "/.netlify/functions/paystack-initialize"
   status = 200
@@ -63,6 +75,49 @@
 [[redirects]]
   from = "/api/paystack/webhook"
   to = "/.netlify/functions/paystack-webhook"
+  status = 200
+  force = true
+
+# Route Withdrawals endpoints to Netlify Functions
+[[redirects]]
+  from = "/api/withdrawals/request"
+  to = "/.netlify/functions/withdrawals-manage?action=request"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/withdrawals/all-history"
+  to = "/.netlify/functions/withdrawals-manage?action=all-history"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/withdrawals/search-transaction"
+  to = "/.netlify/functions/withdrawals-manage?action=search-transaction"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/withdrawals/confirm-payment"
+  to = "/.netlify/functions/withdrawals-manage?action=confirm-payment"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/withdrawals/update-status"
+  to = "/.netlify/functions/withdrawals-manage?action=update-status"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/withdrawals/*"
+  to = "/.netlify/functions/withdrawals-manage?action=:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/withdrawals"
+  to = "/.netlify/functions/withdrawals-manage"
   status = 200
   force = true
 
@@ -101,25 +156,25 @@
 # Virtual Numbers / SMS Boost endpoints
 [[redirects]]
   from = "/api/onegridhub/*"
-  to = "/.netlify/functions/api"
+  to = "/.netlify/functions/onegridhub"
   status = 200
   force = true
 
 [[redirects]]
   from = "/api/onegridhub"
-  to = "/.netlify/functions/api"
+  to = "/.netlify/functions/onegridhub"
   status = 200
   force = true
 
 [[redirects]]
   from = "/api/virtual-numbers/*"
-  to = "/.netlify/functions/api"
+  to = "/.netlify/functions/onegridhub"
   status = 200
   force = true
 
 [[redirects]]
   from = "/api/virtual-numbers"
-  to = "/.netlify/functions/api"
+  to = "/.netlify/functions/onegridhub"
   status = 200
   force = true
 

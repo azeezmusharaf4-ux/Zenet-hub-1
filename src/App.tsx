@@ -2329,17 +2329,33 @@ export default function App() {
 
   const handleConfirmDeleteListing = async () => {
     if (!deletingListingId) return;
-    // Admins are strictly prohibited from deleting products from ZENET HUB
-    const isAdminUser = isOwner || userProfile?.role === 'admin' || userProfile?.role === 'owner';
-    if (isAdminUser) {
-      console.warn('Action denied: Admin product deletion is permanently disabled.');
+    // Only the website owner (azeezmusharaf4@gmail.com) can delete stock listings
+    const isOwnerUser = isAuthorizedOwner(user, userProfile) || user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' || userProfile?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com';
+    if (!isOwnerUser) {
+      console.warn('Action denied: Only the owner of the website can delete stock listings.');
       setDeletingListingId(null);
       return;
     }
     setIsDeleting(true);
     try {
+      // 1. Cascade cleanup on server
+      try {
+        const token = user ? await user.getIdToken() : '';
+        await fetch(`/api/admin/listings/${deletingListingId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        });
+      } catch (srvErr) {
+        console.warn('Server listing delete notice, falling back to direct db delete:', srvErr);
+      }
+
+      // 2. Direct Firestore deletion
       const listingRef = doc(db, 'listings', deletingListingId);
       await deleteDoc(listingRef);
+
       setListings((prev) => prev.filter((item) => item.id !== deletingListingId));
       if (selectedListing?.id === deletingListingId) {
         setSelectedListing(null);
@@ -3016,7 +3032,7 @@ export default function App() {
           onToggleSave={handleToggleSave}
           onViewSellerProfile={(sellerId, sellerName) => navigateRoute({ seller: { id: sellerId, name: sellerName } })}
           onDelete={handleRequestDeleteListing}
-          canDelete={false}
+          canDelete={Boolean(isOwner || user?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com')}
         />
       )}
 
@@ -3151,21 +3167,33 @@ export default function App() {
             onClose={() => setAdminOpen(false)}
             onApproveListing={async (id) => {
               const listingRef = doc(db, 'listings', id);
-              await setDoc(listingRef, { approvalStatus: 'approved' }, { merge: true });
+              await setDoc(listingRef, { approvalStatus: 'approved', status: 'active' }, { merge: true });
+              setListings((prev) =>
+                prev.map((item) => (item.id === id ? { ...item, approvalStatus: 'approved', status: 'active' } : item))
+              );
             }}
             onRejectListing={async (id) => {
               const listingRef = doc(db, 'listings', id);
               await setDoc(listingRef, { approvalStatus: 'rejected' }, { merge: true });
+              setListings((prev) =>
+                prev.map((item) => (item.id === id ? { ...item, approvalStatus: 'rejected' } : item))
+              );
             }}
             onToggleFeatured={async (id, featured) => {
               const listingRef = doc(db, 'listings', id);
               await setDoc(listingRef, { featured: !featured }, { merge: true });
+              setListings((prev) =>
+                prev.map((item) => (item.id === id ? { ...item, featured: !featured } : item))
+              );
             }}
             onUpdateUserProfile={(profile) => setUserProfile(profile)}
             onUpdateListing={(updated) => {
               setListings((prev) =>
                 prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
               );
+            }}
+            onDeleteListing={(id) => {
+              setListings((prev) => prev.filter((item) => item.id !== id));
             }}
           />
         </React.Suspense>
@@ -3259,15 +3287,15 @@ export default function App() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-100 shadow-xs">
-              <Trash2 className="w-8 h-8" />
+              <Trash2 className="w-8 h-8 text-rose-600" />
             </div>
             
             <div className="space-y-2">
               <h3 className="text-xl font-extrabold text-[#0F172A]">
-                Are you sure you want to delete this product?
+                Are you sure you want to delete this log?
               </h3>
               <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
-                This action is permanent. The product will be deleted from Firebase Firestore and removed immediately from the marketplace.
+                This action is permanent. The log will be deleted permanently from the website.
               </p>
             </div>
 
@@ -3278,13 +3306,13 @@ export default function App() {
                 disabled={isDeleting}
                 className="flex-1 px-5 py-3 rounded-2xl border border-[#EBE7F7] bg-[#F8F7FD] hover:bg-[#F1F0FB] text-[#0F172A] font-bold text-xs sm:text-sm transition cursor-pointer"
               >
-                Cancel
+                No
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDeleteListing}
                 disabled={isDeleting}
-                className="flex-1 px-5 py-3 rounded-2xl bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-extrabold text-xs sm:text-sm shadow-md shadow-[#5B4DF5]/20 transition cursor-pointer flex items-center justify-center space-x-2"
+                className="flex-1 px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-red-600/20 transition cursor-pointer flex items-center justify-center space-x-2"
               >
                 {isDeleting ? (
                   <>
@@ -3292,7 +3320,7 @@ export default function App() {
                     <span>Deleting...</span>
                   </>
                 ) : (
-                  <span>Delete</span>
+                  <span>Yes</span>
                 )}
               </button>
             </div>
@@ -3340,19 +3368,21 @@ export default function App() {
         />
       </React.Suspense>
 
-      {/* 13. Mobile Bottom Navigation Bar (Home, Wallet, Profile) */}
-      <MobileBottomNav
-        activeView={activeView}
-        onSelectView={handleSelectView}
-        isWalletOpen={isWalletModalOpen}
-        onOpenWallet={() => {
-          if (!user) {
-            setAuthMode('login');
-          } else {
-            setIsWalletModalOpen(true);
-          }
-        }}
-      />
+      {/* 13. Mobile Bottom Navigation Bar (Home, Wallet, Profile) - Hidden during Log Approve inspection */}
+      {activeView !== 'log-approve' && (
+        <MobileBottomNav
+          activeView={activeView}
+          onSelectView={handleSelectView}
+          isWalletOpen={isWalletModalOpen}
+          onOpenWallet={() => {
+            if (!user) {
+              setAuthMode('login');
+            } else {
+              setIsWalletModalOpen(true);
+            }
+          }}
+        />
+      )}
 
       {/* 15. Clean Logout Confirmation Dialog */}
       <LogoutConfirmModal

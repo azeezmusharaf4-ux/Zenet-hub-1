@@ -127,8 +127,22 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
             </div>
           </div>
 
-          {/* Save / Bookmark Button */}
-          <div className="flex items-center gap-1 shrink-0">
+          {/* Save / Bookmark Button & Owner Delete Button */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {canDelete && onDelete && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(listing.id);
+                }}
+                className="w-7 h-7 rounded-full bg-red-500/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/30 transition cursor-pointer flex items-center justify-center shadow-xs"
+                title="Delete this log (Owner only)"
+                aria-label="Delete this log"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500 hover:text-white" />
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();

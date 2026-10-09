@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { auth, getSafeIdToken } from '../lib/firebase';
 import { UserProfile } from '../types';
-import { sanitizeApiErrorMessage, isValidOtpCode, resolveCountryInfo } from '../utils/api';
+import { sanitizeApiErrorMessage, isValidOtpCode, resolveCountryInfo, getNetlifyFunctionFallback } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
 
 export interface PriceOption {
@@ -87,9 +87,9 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   const [services, setServices] = useState<Array<{ id: string; slug?: string; name: string; category?: string }>>([]);
   const [orders, setOrders] = useState<any[]>([]);
 
-  // Selected values in Quick Buy Panel
-  const [selectedService, setSelectedService] = useState<string>('telegram');
-  const [selectedCountry, setSelectedCountry] = useState<string>('cheapest'); // 'cheapest' or country ISO (e.g. 'US')
+  // Selected values in Quick Buy Panel (Start empty per user requirements)
+  const [selectedService, setSelectedService] = useState<string>('');
+  const [selectedCountry, setSelectedCountry] = useState<string>(''); // empty initially, or 'cheapest', or country ISO (e.g. 'US')
   const [resolvedCheapestCountry, setResolvedCheapestCountry] = useState<{ id: string; name: string; flag: string; code: string } | null>(null);
 
   // Search dropdown states for Quick Buy
@@ -178,44 +178,61 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     return headers;
   };
 
-  // Safe JSON API fetcher that handles non-JSON responses gracefully
+  // Safe JSON API fetcher that handles non-JSON responses and Netlify fallback gracefully
   const safeFetchJson = async (url: string, options?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> => {
-    try {
-      const res = await fetch(url, {
-        ...options,
-        headers: {
-          'Accept': 'application/json, text/plain, */*',
-          ...(options?.headers || {})
-        }
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const data = await res.json();
-        return { ok: res.ok, status: res.status, data };
-      }
-      const text = await res.text();
+    const doFetch = async (targetUrl: string): Promise<{ ok: boolean; status: number; data: any; isHtml: boolean }> => {
       try {
-        const data = JSON.parse(text);
-        return { ok: res.ok, status: res.status, data };
-      } catch {
+        const res = await fetch(targetUrl, {
+          ...options,
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            ...(options?.headers || {})
+          }
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          return { ok: res.ok, status: res.status, data, isHtml: false };
+        }
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          return { ok: res.ok, status: res.status, data, isHtml: false };
+        } catch {
+          const isHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html');
+          return {
+            ok: false,
+            status: res.status,
+            data: { error: sanitizeApiErrorMessage(text, 'This option is currently updating. Please choose another country or service.') },
+            isHtml
+          };
+        }
+      } catch (netErr: any) {
         return {
           ok: false,
-          status: res.status,
-          data: { error: sanitizeApiErrorMessage(text, 'This option is currently updating. Please choose another country or service.') }
+          status: 0,
+          data: { error: sanitizeApiErrorMessage(netErr?.message, 'Network connection issue. Please check your connection.') },
+          isHtml: false
         };
       }
-    } catch (netErr: any) {
-      return {
-        ok: false,
-        status: 0,
-        data: { error: sanitizeApiErrorMessage(netErr?.message, 'Network connection issue. Please check your connection.') }
-      };
+    };
+
+    let result = await doFetch(url);
+    if ((!result.ok || result.isHtml || result.status === 404 || result.status === 502) && url.startsWith('/api/')) {
+      const fallbackUrl = getNetlifyFunctionFallback(url);
+      if (fallbackUrl && fallbackUrl !== url) {
+        const fallbackResult = await doFetch(fallbackUrl);
+        if (fallbackResult.ok && !fallbackResult.isHtml && fallbackResult.data) {
+          result = fallbackResult;
+        }
+      }
     }
+    return { ok: result.ok, status: result.status, data: result.data };
   };
 
   // Service display and branding helper
   const getServiceDisplayName = (serviceId: string, fallbackName?: string) => {
-    if (!serviceId) return 'Select a service';
+    if (!serviceId) return 'Select service';
     if (fallbackName && fallbackName.trim() !== '' && fallbackName.toLowerCase() !== serviceId.toLowerCase()) {
       return fallbackName;
     }
@@ -396,12 +413,13 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     fetchOrders();
   }, []);
 
-  // 2. Fetch Price whenever selectedService or selectedCountry changes
+  // 2. Fetch Price whenever both selectedService and selectedCountry are chosen
   const fetchPrice = async (serviceToUse = selectedService, countryToUse = selectedCountry) => {
-    if (!serviceToUse) {
+    if (!serviceToUse || !countryToUse) {
       setCalculatedPrice(0);
       setPriceOptions([]);
       setIsPriceAvailable(false);
+      setPriceErrorMessage('');
       return;
     }
 
@@ -486,8 +504,13 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   };
 
   useEffect(() => {
-    if (selectedService) {
+    if (selectedService && selectedCountry) {
       fetchPrice(selectedService, selectedCountry);
+    } else {
+      setCalculatedPrice(0);
+      setPriceOptions([]);
+      setIsPriceAvailable(false);
+      setPriceErrorMessage('');
     }
   }, [selectedService, selectedCountry]);
 
@@ -521,7 +544,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
   // 4. Buy Virtual Number Action
   const handleBuyNumber = async () => {
-    if (buyingLoading || priceLoading || !isPriceAvailable) return;
+    if (buyingLoading || priceLoading || !isPriceAvailable || !selectedService || !selectedCountry) return;
     setErrorMessage('');
     setInfoMessage('');
     setComingSoonNotice('');
@@ -677,10 +700,27 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     }, 2000);
   };
 
-  // Search filters
+  // Search filters & priority sorting for 500+ API services and 220+ API countries
   const filteredServices = useMemo(() => {
-    if (!serviceSearchQuery.trim()) return services;
     const q = serviceSearchQuery.toLowerCase().trim();
+    if (!q) {
+      const popularSlugs = [
+        'telegram', 'tg', 'whatsapp', 'wa', 'google', 'go', 'openai', 'oi',
+        'instagram', 'ig', 'tiktok', 'tk', 'facebook', 'fb', 'twitter', 'tw',
+        'netflix', 'nf', 'apple', 'wx', 'snapchat', 'fu', 'paypal', 'ts',
+        'binance', 'wb', 'discord', 'ds', 'amazon', 'am', 'uber', 'ub', 'steam', 'st'
+      ];
+      return [...services].sort((a, b) => {
+        const aSlug = (a.slug || a.id || '').toLowerCase();
+        const bSlug = (b.slug || b.id || '').toLowerCase();
+        const aIdx = popularSlugs.indexOf(aSlug);
+        const bIdx = popularSlugs.indexOf(bSlug);
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    }
     return services.filter(s => {
       const name = (s.name || '').toLowerCase();
       const id = (s.id || '').toLowerCase();
@@ -691,8 +731,20 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   }, [services, serviceSearchQuery]);
 
   const filteredCountries = useMemo(() => {
-    if (!countrySearchQuery.trim()) return countries;
     const q = countrySearchQuery.toLowerCase().trim();
+    if (!q) {
+      const popularCodes = ['US', 'GB', 'CA', 'NG', 'PT', 'FR', 'DE', 'NL', 'BR', 'IN', 'ID', 'PH', 'ZA', 'GH', 'KE'];
+      return [...countries].sort((a, b) => {
+        const aCode = (a.id || a.code || '').toUpperCase();
+        const bCode = (b.id || b.code || '').toUpperCase();
+        const aIdx = popularCodes.indexOf(aCode);
+        const bIdx = popularCodes.indexOf(bCode);
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    }
     return countries.filter(c => {
       const name = (c.name || '').toLowerCase();
       const id = (c.id || '').toLowerCase();
@@ -701,8 +753,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     });
   }, [countries, countrySearchQuery]);
 
-  const selectedCountryObj = countries.find(c => c.id === selectedCountry);
-  const selectedServiceObj = services.find(s => s.id === selectedService);
+  const selectedCountryObj = countries.find(c => c.id === selectedCountry || c.code === selectedCountry);
+  const selectedServiceObj = services.find(s => s.id === selectedService || s.slug === selectedService);
 
   const formatTime = (seconds: number) => {
     const min = Math.floor(seconds / 60);
@@ -838,7 +890,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 </h3>
               </div>
               <p className="text-xs text-[#64748B] mt-1.5 leading-relaxed">
-                Pick a service and a country — the cheapest available operator is selected automatically.
+                Select a service and country to receive an instant verification code.
               </p>
             </div>
 
@@ -858,12 +910,25 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   className="w-full flex items-center justify-between bg-[#FAF8FE] hover:bg-[#F3F0FA] border border-[#E9E2FA] p-3 rounded-2xl text-left transition cursor-pointer shadow-2xs group"
                 >
                   <div className="flex items-center space-x-2.5 truncate">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${getServiceColor(selectedService)} shadow-2xs`}>
-                      {getServiceBadgeInitial(selectedService)}
-                    </div>
-                    <span className="text-xs sm:text-sm font-bold text-[#171329] truncate">
-                      {getServiceDisplayName(selectedService, selectedServiceObj?.name)}
-                    </span>
+                    {selectedService ? (
+                      <>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${getServiceColor(selectedService)} shadow-2xs`}>
+                          {getServiceBadgeInitial(selectedService)}
+                        </div>
+                        <span className="text-xs sm:text-sm font-bold text-[#171329] truncate">
+                          {getServiceDisplayName(selectedService, selectedServiceObj?.name)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-7 h-7 rounded-lg bg-white border border-[#E9E2FA] flex items-center justify-center text-xs font-bold text-[#64748B] shadow-2xs shrink-0">
+                          #
+                        </div>
+                        <span className="text-xs sm:text-sm font-semibold text-[#64748B] truncate">
+                          Select service
+                        </span>
+                      </>
+                    )}
                   </div>
                   <ChevronDown className={`w-4 h-4 text-[#64748B] shrink-0 transition-transform ${isServiceDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -947,7 +1012,16 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   className="w-full flex items-center justify-between bg-[#FAF8FE] hover:bg-[#F3F0FA] border border-[#E9E2FA] p-3 rounded-2xl text-left transition cursor-pointer shadow-2xs group"
                 >
                   <div className="flex items-center space-x-2.5 truncate">
-                    {selectedCountry === 'cheapest' ? (
+                    {!selectedCountry ? (
+                      <>
+                        <div className="w-7 h-7 rounded-lg bg-white border border-[#E9E2FA] flex items-center justify-center text-base shadow-2xs shrink-0">
+                          🌐
+                        </div>
+                        <span className="text-xs sm:text-sm font-semibold text-[#64748B] truncate">
+                          Select country
+                        </span>
+                      </>
+                    ) : selectedCountry === 'cheapest' ? (
                       <>
                         <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm shrink-0">
                           ★
@@ -1081,7 +1155,11 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                     Actual Price (NGN)
                   </span>
                   <div className="flex items-baseline space-x-1.5 mt-0.5">
-                    {priceLoading ? (
+                    {!selectedService || !selectedCountry ? (
+                      <span className="text-xs font-semibold text-[#64748B] py-1">
+                        Select service & country
+                      </span>
+                    ) : priceLoading ? (
                       <div className="flex items-center space-x-1.5 text-xs text-[#6D28D9] font-bold py-1">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         <span>Calculating best price...</span>
@@ -1106,7 +1184,9 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
                     Stock
                   </span>
-                  {priceLoading ? (
+                  {!selectedService || !selectedCountry ? (
+                    <span className="text-xs text-[#64748B]">—</span>
+                  ) : priceLoading ? (
                     <span className="text-xs text-[#64748B]">Checking...</span>
                   ) : isPriceAvailable ? (
                     <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
@@ -1118,13 +1198,21 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                 </div>
               </div>
 
-              {priceErrorMessage && (
+              {!selectedService || !selectedCountry ? (
+                <p className="text-[11px] text-[#64748B] font-medium leading-tight">
+                  {!selectedService && !selectedCountry 
+                    ? 'Please choose a service and country above to view live number prices.'
+                    : !selectedService
+                    ? 'Please select a service above to see available numbers.'
+                    : 'Please select a country above to see available numbers.'}
+                </p>
+              ) : priceErrorMessage ? (
                 <p className="text-[11px] text-rose-600 font-medium leading-tight">
                   {priceErrorMessage}
                 </p>
-              )}
+              ) : null}
 
-              {priceOptions.length > 1 && (
+              {selectedService && selectedCountry && priceOptions.length > 1 && (
                 <div className="pt-2 border-t border-[#E9E2FA] space-y-1.5">
                   <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">
                     Carrier Route Options
@@ -1163,20 +1251,26 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
               <button
                 type="button"
                 onClick={handleBuyNumber}
-                disabled={buyingLoading || priceLoading || !isPriceAvailable}
+                disabled={buyingLoading || priceLoading || !isPriceAvailable || !selectedService || !selectedCountry}
                 className={`w-full py-4 px-5 rounded-2xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer ${
-                  buyingLoading || priceLoading || !isPriceAvailable
+                  buyingLoading || priceLoading || !isPriceAvailable || !selectedService || !selectedCountry
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
                     : 'bg-[#6D28D9] hover:bg-[#5B21B6] text-white active:scale-[0.99] shadow-purple-600/25'
                 }`}
               >
-                {buyingLoading ? (
+                {!selectedService ? (
+                  <span>Select a Service</span>
+                ) : !selectedCountry ? (
+                  <span>Select a Country</span>
+                ) : buyingLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
                     <span>Allocating Number...</span>
                   </>
                 ) : priceLoading ? (
                   <span>Checking Availability...</span>
+                ) : !isPriceAvailable ? (
+                  <span>No Numbers Available</span>
                 ) : (
                   <>
                     <Smartphone className="w-4 h-4 mr-1.5" />

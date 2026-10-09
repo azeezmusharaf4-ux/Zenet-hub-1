@@ -1,18 +1,16 @@
 @import "tailwindcss";
 
 /* =========================================================
-   BMB SMART CHAIN / ZENET HUB - CORE DESIGN SYSTEM & ENGINE
-   High-Contrast, Crisp Typography, Razor-Sharp Mobile CSS
+   ZENET HUB - CORE DUAL THEME SYSTEM (LIGHT & DARK PURPLE)
+   High-Contrast, Crisp Typography, Zero-Jank Mobile Engine
    ========================================================= */
 
-/* 1. Root & Reset */
+/* 1. Global Reset & Performance Base */
 *, ::before, ::after {
   box-sizing: border-box;
 }
 
 html {
-  background-color: #FFFFFF !important;
-  color: #0F172A !important;
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -26,8 +24,6 @@ html {
 }
 
 body {
-  background-color: #FFFFFF !important;
-  color: #0F172A !important;
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -44,7 +40,6 @@ body {
 }
 
 #root {
-  background-color: #FFFFFF !important;
   width: 100%;
   max-width: 100vw;
   min-height: 100vh;
@@ -56,15 +51,7 @@ body {
   position: relative;
 }
 
-/* 2. Global Typography Polish */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.025em;
-  color: #0F172A !important;
-}
-
-/* Ensure SVG elements never stretch, skew, or distort */
+/* Ensure SVG elements never stretch or distort */
 svg {
   flex-shrink: 0;
   max-width: 100%;
@@ -74,7 +61,7 @@ button svg, a svg {
   flex-shrink: 0;
 }
 
-/* 3. Mobile Touch & Interaction Hygiene */
+/* Mobile Touch & Interaction Hygiene */
 button, 
 a, 
 [role="button"],
@@ -85,7 +72,6 @@ textarea {
   touch-action: manipulation;
 }
 
-/* Prevent iOS Safari from auto-zooming and breaking layouts on input focus */
 @media screen and (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]), 
   select, 
@@ -94,7 +80,6 @@ textarea {
   }
 }
 
-/* Ensure mobile buttons have comfortable min-height */
 @media screen and (max-width: 640px) {
   button:not(.inline-btn):not([class*="p-1"]):not([class*="p-0"]):not([class*="w-"]):not([class*="h-"]),
   .btn-touch {
@@ -121,7 +106,7 @@ textarea {
   overscroll-behavior: contain;
 }
 
-/* Refined, unobtrusive custom scrollbars */
+/* Custom Scrollbars */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -138,7 +123,6 @@ textarea {
   background: #94A3B8;
 }
 
-/* Hide scrollbar utility */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -147,386 +131,156 @@ textarea {
   scrollbar-width: none;
 }
 
+.listing-card,
+[class*="ListingCard"] {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.flex-1 {
+  min-width: 0;
+}
+
+
 /* =========================================================
-   LIGHT THEME SURFACE & CARD SYSTEM (ZENET HUB)
+   2. LIGHT CLEAN THEME SYSTEM (DEFAULT)
+   Only active when NOT in dark mode
    ========================================================= */
 
-/* 1. Main Backgrounds & Page Containers: White / Light Lavender */
-.bg-\[\#0F0F17\],
-.bg-\[\#0b0518\],
-.bg-\[\#0A0713\],
-.bg-\[\#090514\],
-.bg-\[\#05020d\],
-.bg-\[\#05020c\],
-.bg-\[\#06030c\],
-.bg-\[\#07030e\],
-.bg-\[\#070311\],
-.bg-\[\#090315\],
-.bg-\[\#0a0416\],
-.bg-\[\#0d061c\],
-.bg-\[\#0b0616\],
-.bg-\[\#0d0718\],
-.bg-\[\#0c051a\],
-.bg-slate-950 {
-  background-color: #FAF5FF !important; /* Soft Light Lavender */
+html:not(.dark),
+html.light,
+html[data-theme="light"] {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  color-scheme: light !important;
+}
+
+html:not(.dark) body,
+html.light body,
+html[data-theme="light"] body {
+  background-color: #FFFFFF !important;
   color: #0F172A !important;
 }
 
-/* 2. Cards, Modals & Main Content Panels: Pure White */
-.bg-\[\#171827\],
-.bg-\[\#130a24\],
-.bg-\[\#150c2a\],
-.bg-\[\#150c2a\]\/95,
-.bg-\[\#150c2a\]\/80,
-.bg-\[\#180e30\],
-.bg-\[\#180e30\]\/90,
-.bg-\[\#190d33\],
-.bg-\[\#180c33\],
-.bg-\[\#120826\],
-.bg-\[\#0e061e\],
-.bg-\[\#0c051f\],
-.bg-\[\#1c0e3b\],
-.bg-\[\#1a0e35\],
-.bg-\[\#140a27\],
-.bg-\[\#170c2e\],
-.bg-\[\#100720\],
-.bg-slate-900 {
+html:not(.dark) #root,
+html.light #root,
+html[data-theme="light"] #root {
+  background-color: #FFFFFF !important;
+}
+
+html:not(.dark) h1, 
+html:not(.dark) h2, 
+html:not(.dark) h3, 
+html:not(.dark) h4, 
+html:not(.dark) h5, 
+html:not(.dark) h6 {
+  font-weight: 800 !important;
+  letter-spacing: -0.025em;
+  color: #0F172A !important;
+}
+
+/* Light Theme Backgrounds & Surfaces */
+html:not(.dark) .bg-\[\#0F0F17\],
+html:not(.dark) .bg-\[\#0b0518\],
+html:not(.dark) .bg-\[\#0A0713\],
+html:not(.dark) .bg-\[\#090514\],
+html:not(.dark) .bg-\[\#05020d\],
+html:not(.dark) .bg-\[\#05020c\],
+html:not(.dark) .bg-\[\#06030c\],
+html:not(.dark) .bg-\[\#07030e\],
+html:not(.dark) .bg-\[\#070311\],
+html:not(.dark) .bg-\[\#090315\],
+html:not(.dark) .bg-\[\#0a0416\],
+html:not(.dark) .bg-\[\#0d061c\],
+html:not(.dark) .bg-\[\#0b0616\],
+html:not(.dark) .bg-\[\#0d0718\],
+html:not(.dark) .bg-\[\#0c051a\],
+html:not(.dark) .bg-slate-950 {
+  background-color: #FAF5FF !important;
+  color: #0F172A !important;
+}
+
+html:not(.dark) .bg-\[\#171827\],
+html:not(.dark) .bg-\[\#130a24\],
+html:not(.dark) .bg-\[\#150c2a\],
+html:not(.dark) .bg-\[\#150c2a\]\/95,
+html:not(.dark) .bg-\[\#150c2a\]\/80,
+html:not(.dark) .bg-\[\#180e30\],
+html:not(.dark) .bg-\[\#180e30\]\/90,
+html:not(.dark) .bg-\[\#190d33\],
+html:not(.dark) .bg-\[\#180c33\],
+html:not(.dark) .bg-\[\#120826\],
+html:not(.dark) .bg-\[\#0e061e\],
+html:not(.dark) .bg-\[\#0c051f\],
+html:not(.dark) .bg-\[\#1c0e3b\],
+html:not(.dark) .bg-\[\#1a0e35\],
+html:not(.dark) .bg-\[\#140a27\],
+html:not(.dark) .bg-\[\#170c2e\],
+html:not(.dark) .bg-\[\#100720\],
+html:not(.dark) .bg-slate-900 {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   border-color: #F3E8FF !important;
   box-shadow: 0 1px 3px 0 rgba(124, 58, 237, 0.04), 0 1px 2px -1px rgba(124, 58, 237, 0.04) !important;
 }
 
-/* 3. Nested Sub-Panels, Filter Rows & Secondary Cards: Light Lavender Tint */
-.bg-\[\#1a0f34\],
-.bg-\[\#1e1039\],
-.bg-\[\#1d0f3b\],
-.bg-\[\#20123d\],
-.bg-\[\#24114f\],
-.bg-\[\#170830\],
-.bg-\[\#1f123c\],
-.bg-\[\#1f113e\],
-.bg-\[\#231542\],
-.bg-\[\#231544\],
-.bg-\[\#1a0e33\],
-.bg-\[\#1e123a\],
-.bg-\[\#1f103d\],
-.bg-\[\#170c30\],
-.bg-\[\#2b184d\],
-.bg-\[\#1a0d3b\],
-.bg-\[\#190d34\],
-.bg-\[\#25144b\],
-.bg-\[\#211145\],
-.bg-slate-800 {
+html:not(.dark) .bg-\[\#1a0f34\],
+html:not(.dark) .bg-\[\#1e1039\],
+html:not(.dark) .bg-\[\#1d0f3b\],
+html:not(.dark) .bg-\[\#20123d\],
+html:not(.dark) .bg-\[\#24114f\],
+html:not(.dark) .bg-\[\#170830\],
+html:not(.dark) .bg-\[\#1f123c\],
+html:not(.dark) .bg-\[\#1f113e\],
+html:not(.dark) .bg-\[\#231542\],
+html:not(.dark) .bg-\[\#231544\],
+html:not(.dark) .bg-\[\#1a0e33\],
+html:not(.dark) .bg-\[\#1e123a\],
+html:not(.dark) .bg-\[\#1f103d\],
+html:not(.dark) .bg-\[\#170c30\],
+html:not(.dark) .bg-\[\#2b184d\],
+html:not(.dark) .bg-\[\#1a0d3b\],
+html:not(.dark) .bg-\[\#190d34\],
+html:not(.dark) .bg-\[\#25144b\],
+html:not(.dark) .bg-\[\#211145\],
+html:not(.dark) .bg-slate-800 {
   background-color: #FAF5FF !important;
   color: #0F172A !important;
   border-color: #E9D5FF !important;
 }
 
-/* 4. Fine Borders & Dividers */
-[class*="border-\[\#"],
-.border-slate-800,
-.border-slate-700 {
+html:not(.dark) [class*="border-\[\#"],
+html:not(.dark) .border-slate-800,
+html:not(.dark) .border-slate-700 {
   border-color: #E9D5FF !important;
 }
 
-/* 5. High-Contrast Dark Navy Text Legibility */
-.text-white:not(button *):not(a *):not(.badge-text):not([class*="bg-"]):not([class*="from-"]):not([class*="to-"]) {
+html:not(.dark) .text-white:not(button *):not(a *):not(.badge-text):not([class*="bg-"]):not([class*="from-"]):not([class*="to-"]) {
   color: #0F172A !important;
 }
 
-.text-slate-100,
-.text-slate-200,
-.text-purple-100,
-.text-purple-200 {
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-purple-100,
+html:not(.dark) .text-purple-200 {
   color: #0F172A !important;
 }
 
-/* Secondary & Muted Body Text - Highly Legible Dark Slate */
-.text-purple-300\/40,
-.text-purple-300\/50,
-.text-purple-300\/60,
-.text-purple-300\/70,
-.text-purple-300\/80,
-.text-purple-200\/80,
-.text-purple-400\/60,
-.text-slate-400,
-.text-slate-300 {
+html:not(.dark) .text-purple-300\/40,
+html:not(.dark) .text-purple-300\/50,
+html:not(.dark) .text-purple-300\/60,
+html:not(.dark) .text-purple-300\/70,
+html:not(.dark) .text-purple-300\/80,
+html:not(.dark) .text-purple-200\/80,
+html:not(.dark) .text-purple-400\/60,
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-slate-300 {
   color: #334155 !important;
 }
 
-/* =========================================================
-   ZENET HUB SINGLE DESIGN STANDARD: PURPLE/VIOLET + LIGHT LAVENDER
-   ========================================================= */
-
-/* Main Purple / Violet Brand Text & Eyebrows */
-.text-purple-600,
-.text-purple-700,
-.text-violet-600,
-.text-violet-700,
-.text-indigo-600,
-.text-indigo-700,
-.text-\[\#7C3AED\],
-.text-\[\#6D28D9\],
-.text-\[\#a855f7\],
-.text-\[\#9e67fa\],
-.text-\[\#a16eff\],
-/* Normalize any stray blue, pink, cyan, green, amber, orange to Zenet Purple */
-.text-blue-500,
-.text-blue-600,
-.text-blue-700,
-.text-cyan-500,
-.text-cyan-600,
-.text-pink-500,
-.text-pink-600,
-.text-amber-500,
-.text-amber-600,
-.text-orange-500,
-.text-orange-600,
-.text-emerald-500,
-.text-emerald-600,
-.text-green-500,
-.text-green-600 {
-  color: #7C3AED !important; /* Zenet Main Purple */
-}
-
-/* Deep Purple Headings & Emphasis */
-.text-purple-800,
-.text-purple-900,
-.text-violet-800,
-.text-violet-900,
-.text-blue-800,
-.text-blue-900,
-.text-pink-700,
-.text-pink-800,
-.text-rose-700,
-.text-rose-800 {
-  color: #5B21B6 !important; /* Deep Violet */
-}
-
-/* Secondary Accents: Light Purple Text */
-.text-purple-400,
-.text-purple-500,
-.text-purple-300,
-.text-violet-400,
-.text-violet-500,
-.text-blue-400,
-.text-pink-400,
-.text-cyan-400,
-.text-amber-400,
-.text-emerald-400,
-.text-green-400 {
-  color: #6D28D9 !important; /* Clear, readable purple */
-  font-weight: 600;
-}
-
-/* Alert / Warning / Danger Text: Consistent High-Contrast Zenet Violet */
-.text-rose-400,
-.text-rose-500,
-.text-rose-600,
-.text-red-400,
-.text-red-500,
-.text-red-600 {
-  color: #6D28D9 !important;
-}
-
-/* =========================================================
-   STATUS PILLS, BADGES & CHIPS: LIGHT PURPLE ACCENTS
-   ========================================================= */
-
-/* Normalize all badges (purple, blue, pink, amber, emerald, rose) to Light Lavender + Purple */
-.bg-purple-50,
-.bg-purple-100,
-.bg-purple-950,
-.bg-purple-950\/80,
-.bg-purple-900\/50,
-.bg-blue-50,
-.bg-blue-100,
-.bg-blue-950,
-.bg-blue-950\/80,
-.bg-blue-900\/40,
-.bg-pink-50,
-.bg-pink-100,
-.bg-pink-950,
-.bg-pink-950\/80,
-.bg-pink-900\/40,
-.bg-amber-50,
-.bg-amber-100,
-.bg-amber-200,
-.bg-amber-950,
-.bg-amber-950\/80,
-.bg-amber-950\/90,
-.bg-amber-950\/60,
-.bg-amber-500\/20,
-.bg-amber-500\/10,
-.bg-emerald-50,
-.bg-emerald-100,
-.bg-emerald-950,
-.bg-emerald-950\/80,
-.bg-emerald-950\/90,
-.bg-emerald-950\/70,
-.bg-emerald-950\/60,
-.bg-emerald-950\/50,
-.bg-emerald-500\/20,
-.bg-emerald-500\/10,
-.bg-rose-50,
-.bg-rose-100,
-.bg-rose-950,
-.bg-rose-950\/80,
-.bg-rose-950\/90,
-.bg-rose-950\/70,
-.bg-rose-950\/40,
-.bg-rose-500\/20,
-.bg-rose-500\/10,
-.bg-cyan-50,
-.bg-cyan-950,
-.bg-blue-50\/50,
-.bg-blue-50\/60,
-.bg-pink-50\/50,
-.bg-pink-50\/60 {
-  background-color: #FAF5FF !important; /* Soft Light Lavender */
-  color: #5B21B6 !important;            /* Deep Purple */
-  border-color: #E9D5FF !important;      /* Light Purple Border */
-}
-
-/* Normalize stray badge dots to Zenet Purple */
-.bg-emerald-400,
-.bg-emerald-500,
-.bg-green-400,
-.bg-green-500,
-.bg-cyan-400,
-.bg-cyan-500,
-.bg-pink-500,
-.bg-blue-500 {
-  background-color: #7C3AED !important;
-}
-
-/* =========================================================
-   MAIN ACTION BUTTONS: ZENET HUB PURPLE/VIOLET
-   ========================================================= */
-
-/* Primary Action Buttons: Solid Zenet Violet */
-button.bg-purple-600,
-button.bg-purple-700,
-button.bg-purple-500,
-button.bg-\[\#7C3AED\],
-button.bg-\[\#5B21B6\],
-button.bg-violet-600,
-button.bg-violet-700,
-button.bg-blue-600,
-button.bg-blue-700,
-button.bg-pink-600,
-button.bg-pink-700,
-button.bg-indigo-600,
-button.bg-indigo-700,
-button.bg-cyan-500,
-button.bg-cyan-600,
-button.bg-emerald-600,
-button.bg-emerald-700,
-button.bg-amber-500,
-button.bg-rose-600,
-.bg-purple-600,
-.bg-purple-700,
-.bg-purple-500,
-.bg-\[\#7C3AED\],
-.bg-\[\#5B21B6\],
-.bg-violet-600,
-.bg-violet-700,
-.bg-blue-600,
-.bg-blue-700,
-.bg-pink-600,
-.bg-pink-700,
-.bg-indigo-600 {
-  background-color: #7C3AED !important;
-  color: #FFFFFF !important;
-  border-color: #6D28D9 !important;
-}
-
-button.bg-purple-600:hover,
-button.bg-purple-700:hover,
-button.bg-violet-600:hover,
-button.bg-blue-600:hover,
-button.bg-blue-700:hover,
-button.bg-pink-600:hover,
-button.bg-indigo-600:hover,
-button.bg-rose-600:hover {
-  background-color: #6D28D9 !important;
-  border-color: #5B21B6 !important;
-}
-
-/* Ensure text and SVGs inside primary action buttons stay pure white */
-button.bg-purple-600 *,
-button.bg-purple-700 *,
-button.bg-violet-600 *,
-button.bg-blue-600 *,
-button.bg-blue-700 *,
-button.bg-pink-600 *,
-button.bg-pink-700 *,
-.bg-purple-600 *,
-.bg-blue-600 *,
-.bg-pink-600 * {
-  color: #FFFFFF !important;
-}
-
-/* Secondary & Cancel Buttons: Light Lavender with Purple Border and Dark Navy Text */
-button.bg-purple-50,
-button.bg-purple-100,
-button.bg-blue-50,
-button.bg-pink-50,
-button.bg-rose-50,
-button.bg-slate-100,
-button.bg-\[\#20123e\] {
-  background-color: #FAF5FF !important;
-  color: #5B21B6 !important;
-  border-color: #E9D5FF !important;
-}
-
-button.bg-purple-50:hover,
-button.bg-purple-100:hover,
-button.bg-blue-50:hover,
-button.bg-pink-50:hover,
-button.bg-slate-100:hover,
-button.bg-\[\#20123e\]:hover {
-  background-color: #F3E8FF !important;
-  color: #4C1D95 !important;
-  border-color: #D8B4FE !important;
-}
-
-/* 6. Modal Backdrops & Overlays */
-.bg-slate-950\/90,
-.bg-slate-900\/60,
-.bg-black\/80,
-.bg-black\/70,
-.bg-black\/60,
-.bg-black\/50,
-.bg-black\/40,
-.bg-\[\#07030e\]\/85,
-.bg-\[\#05020d\]\/80,
-.bg-\[\#06030c\]\/85 {
-  background-color: rgba(15, 23, 42, 0.65) !important;
-}
-
-@supports (backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px)) {
-  .bg-slate-950\/90,
-  .bg-slate-900\/60,
-  .bg-black\/80,
-  .bg-black\/70,
-  .bg-black\/60,
-  .bg-black\/50,
-  .bg-black\/40,
-  .bg-\[\#07030e\]\/85,
-  .bg-\[\#05020d\]\/80,
-  .bg-\[\#06030c\]\/85 {
-    background-color: rgba(15, 23, 42, 0.55) !important;
-    backdrop-filter: blur(4px) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
-  }
-}
-
-/* 7. Form Inputs, Selects & Textareas - Clean White with Purple Focus */
-input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea {
+html:not(.dark) input:not([type="checkbox"]):not([type="radio"]),
+html:not(.dark) select,
+html:not(.dark) textarea {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
   border-color: #E2E8F0 !important;
@@ -534,46 +288,350 @@ textarea {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-input:not([type="checkbox"]):not([type="radio"]):focus,
-select:focus,
-textarea:focus {
+html:not(.dark) input:not([type="checkbox"]):not([type="radio"]):focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus {
   border-color: #7C3AED !important;
   outline: none !important;
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15) !important;
 }
 
-input::placeholder,
-textarea::placeholder {
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
   color: #94A3B8 !important;
   opacity: 0.85;
-  font-weight: 400;
 }
 
-/* 8. Tables & Data Grids */
-table th {
-  background-color: #FFFFFF !important;
-  color: #0F172A !important;
-  border-color: #F3E8FF !important;
-  font-weight: 700 !important;
+
+/* =========================================================
+   3. DARK MODE SYSTEM (DARK PURPLE & BLACK PALETTE)
+   Active when html.dark or html[data-theme="dark"]
+   Reflects exact screenshots palette:
+   - Pitch-black purple background (#070410)
+   - Deep rich dark purple cards (#110a24)
+   - Purple/violet borders (#2c1850)
+   - Luminous purple accents (#c084fc / #8b5cf6)
+   - Crisp white text (#FFFFFF)
+   - Soft lavender subtitles (#a49abf)
+   ========================================================= */
+
+html.dark,
+html[data-theme="dark"],
+html.dark body,
+html[data-theme="dark"] body,
+html.dark #root,
+html[data-theme="dark"] #root {
+  background-color: #070410 !important;
+  color: #FFFFFF !important;
+  color-scheme: dark !important;
 }
 
-table td {
-  border-color: #F3E8FF !important;
-  color: #1E293B !important;
+/* 3.1 Dark Page Wrappers, Views & Main Layout Areas */
+html.dark .min-h-screen,
+html.dark .bg-\[\#F8F7FF\],
+html.dark .bg-\[\#FAF8FE\],
+html.dark .bg-\[\#F8F7FD\],
+html.dark .bg-\[\#FAF9FF\],
+html.dark .bg-\[\#F5F3FF\],
+html.dark .bg-\[\#FAF5FF\],
+html.dark .bg-\[\#F5F0FF\],
+html.dark .bg-\[\#FDFCFE\],
+html.dark .bg-\[\#F9F7FE\],
+html.dark .bg-\[\#F3F0FF\],
+html.dark .bg-\[\#F3F0FA\],
+html.dark .bg-\[\#F8F9FA\],
+html.dark .bg-\[\#F4F2FC\],
+html.dark .bg-\[\#EEF2FF\],
+html.dark .bg-slate-50\/0,
+html.dark .bg-purple-50\/40,
+html.dark .bg-amber-50\/30,
+html.dark aside.bg-\[\#FAF8FE\],
+html.dark main,
+html.dark [data-app-wrapper] {
+  background-color: #070410 !important;
+  color: #FFFFFF !important;
 }
 
-table tr:hover {
-  background-color: #FAF5FF !important;
+/* 3.2 Dark Cards, Containers, Modals, Panels & Dropdowns */
+html.dark .bg-white,
+html.dark .bg-white\/95,
+html.dark .bg-white\/90,
+html.dark .bg-white\/80,
+html.dark .bg-\[\#FFFFFF\],
+html.dark .bg-slate-50,
+html.dark .bg-slate-100,
+html.dark .bg-gray-50,
+html.dark .bg-gray-100,
+html.dark .bg-purple-50,
+html.dark .bg-amber-50,
+html.dark [class*="bg-white"],
+html.dark .listing-card,
+html.dark [class*="ListingCard"],
+html.dark .bg-\[\#171827\],
+html.dark .bg-\[\#130a24\],
+html.dark .bg-\[\#150c2a\],
+html.dark .bg-\[\#120826\],
+html.dark .bg-\[\#0f0721\],
+html.dark .bg-\[\#100722\],
+html.dark .bg-\[\#190d34\],
+html.dark .bg-\[\#170c30\],
+html.dark .bg-slate-900,
+html.dark .bg-slate-950 {
+  background-color: #110a24 !important;
+  color: #FFFFFF !important;
+  border-color: #2c1850 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.65), 0 2px 8px -2px rgba(124, 58, 237, 0.12) !important;
 }
 
-/* 9. Safety against card clipping or breaking on mobile */
-.listing-card,
-[class*="ListingCard"] {
-  min-width: 0;
-  overflow: hidden;
+/* 3.3 Sub-Panels, Inner Cards, Table Rows & Nested Containers */
+html.dark .bg-\[\#F1EEF9\],
+html.dark .bg-\[\#F1F0FB\],
+html.dark .bg-\[\#F3EEFF\],
+html.dark .bg-\[\#F8FAFC\],
+html.dark .bg-\[\#F1F5F9\],
+html.dark .bg-\[\#F2EFFC\],
+html.dark .bg-\[\#F1F3F9\],
+html.dark .bg-\[\#EBE7F7\],
+html.dark .bg-\[\#E2E8F0\],
+html.dark .bg-\[\#E0DAFD\],
+html.dark .bg-\[\#1a0f34\],
+html.dark .bg-\[\#1e1039\],
+html.dark .bg-\[\#20123d\],
+html.dark .bg-\[\#1a0e33\],
+html.dark .bg-\[\#2b184d\],
+html.dark .bg-slate-800 {
+  background-color: #180e34 !important;
+  color: #FFFFFF !important;
+  border-color: #381e64 !important;
 }
 
-/* Ensure no horizontal flex items blow out viewport */
-.flex-1 {
-  min-width: 0;
+/* 3.4 Purple / Violet Borders & Outlines */
+html.dark .border-\[\#EBE7F7\],
+html.dark .border-\[\#E9E2FA\],
+html.dark .border-\[\#EAE6F8\],
+html.dark .border-\[\#EDE9FE\],
+html.dark .border-\[\#DDD6FE\],
+html.dark .border-\[\#F1EEF9\],
+html.dark .border-\[\#E2E8F0\],
+html.dark .border-\[\#F1F5F9\],
+html.dark .border-\[\#C4B5FD\],
+html.dark .border-\[\#CBD5E1\],
+html.dark .border-\[\#EDF2F7\],
+html.dark .border-\[\#C7D2FE\],
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-gray-300,
+html.dark .border-purple-100,
+html.dark .border-purple-200,
+html.dark .border-violet-100,
+html.dark .border-violet-200,
+html.dark [class*="border-\[\#E"],
+html.dark [class*="border-\[\#F"],
+html.dark [class*="border-\[\#D"],
+html.dark [class*="border-slate-"],
+html.dark [class*="border-gray-"] {
+  border-color: #2c1850 !important;
+}
+
+/* 3.5 High-Contrast Typography: Crisp White Headings & Main Text */
+html.dark h1, 
+html.dark h2, 
+html.dark h3, 
+html.dark h4, 
+html.dark h5, 
+html.dark h6,
+html.dark .text-\[\#0F172A\],
+html.dark .text-\[\#171329\],
+html.dark .text-\[\#1E293B\],
+html.dark .text-\[\#1E192E\],
+html.dark .text-\[\#334155\],
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-950,
+html.dark .text-gray-900,
+html.dark .text-gray-800,
+html.dark .text-black,
+html.dark .text-slate-700 {
+  color: #FFFFFF !important;
+}
+
+/* 3.6 Readable Soft Lavender Secondary Text */
+html.dark .text-\[\#64748B\],
+html.dark .text-\[\#475569\],
+html.dark .text-\[\#716B82\],
+html.dark .text-slate-600,
+html.dark .text-slate-500,
+html.dark .text-gray-600,
+html.dark .text-gray-500 {
+  color: #a49abf !important;
+}
+
+/* 3.7 Muted Supporting Text */
+html.dark .text-\[\#94A3B8\],
+html.dark .text-slate-400,
+html.dark .text-gray-400 {
+  color: #7d6f96 !important;
+}
+
+/* 3.8 Luminous Violet Highlights & Brand Accents */
+html.dark .text-\[\#5B4DF5\],
+html.dark .text-\[\#7C3AED\],
+html.dark .text-\[\#6D28D9\],
+html.dark .text-\[\#5c5cf6\],
+html.dark .text-\[\#4838EE\],
+html.dark .text-\[\#5B21B6\],
+html.dark .text-purple-600,
+html.dark .text-purple-700,
+html.dark .text-violet-600,
+html.dark .text-violet-700,
+html.dark .text-indigo-600 {
+  color: #c084fc !important;
+}
+
+/* 3.9 Form Inputs, Selects & Textareas in Dark Mode */
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea {
+  background-color: #110a24 !important;
+  color: #FFFFFF !important;
+  border-color: #351d5c !important;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]):focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25) !important;
+  outline: none !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #73658f !important;
+  opacity: 1 !important;
+}
+
+/* 3.10 Navigation: Top Header, Sidebar & Bottom Nav */
+html.dark #zenet-global-header,
+html.dark header,
+html.dark aside,
+html.dark #zenet-mobile-bottom-nav,
+html.dark nav {
+  background-color: rgba(10, 6, 20, 0.94) !important;
+  border-color: #241442 !important;
+  color: #FFFFFF !important;
+}
+
+html.dark #zenet-mobile-bottom-nav {
+  box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Inactive bottom nav items */
+html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]) {
+  color: #a49abf !important;
+}
+html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]) svg {
+  color: #a49abf !important;
+}
+html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]) span {
+  color: #a49abf !important;
+}
+
+/* 3.11 Primary Buttons in Dark Mode */
+html.dark button.bg-\[\#7C3AED\],
+html.dark button.bg-\[\#5B4DF5\],
+html.dark button.bg-purple-600,
+html.dark button.bg-purple-700,
+html.dark .bg-\[\#7C3AED\],
+html.dark .bg-\[\#5B4DF5\],
+html.dark .bg-purple-600 {
+  background-color: #7c3aed !important;
+  color: #FFFFFF !important;
+  border-color: #9333ea !important;
+}
+
+html.dark button.bg-\[\#7C3AED\]:hover,
+html.dark button.bg-\[\#5B4DF5\]:hover,
+html.dark button.bg-purple-600:hover {
+  background-color: #6d28d9 !important;
+  border-color: #7c3aed !important;
+}
+
+/* Secondary Buttons & Soft Pills */
+html.dark .bg-\[\#EDE9FE\],
+html.dark button.bg-\[\#EDE9FE\],
+html.dark .bg-purple-50,
+html.dark .bg-purple-100,
+html.dark .bg-\[\#F5F3FF\],
+html.dark button.bg-slate-100 {
+  background-color: #1e123b !important;
+  color: #ddd6fe !important;
+  border-color: #3b2068 !important;
+}
+
+html.dark .bg-\[\#EDE9FE\]:hover,
+html.dark button.bg-\[\#EDE9FE\]:hover,
+html.dark .bg-purple-50:hover,
+html.dark .bg-purple-100:hover,
+html.dark .bg-\[\#F5F3FF\]:hover {
+  background-color: #2b1a52 !important;
+  color: #FFFFFF !important;
+}
+
+/* 3.12 Modals, Dialogs & Backdrop Overlays */
+html.dark [role="dialog"],
+html.dark .modal-content {
+  background-color: #110a24 !important;
+  border-color: #2c1850 !important;
+  color: #FFFFFF !important;
+}
+
+html.dark .bg-black\/50,
+html.dark .bg-black\/60,
+html.dark .bg-black\/70,
+html.dark .bg-black\/80,
+html.dark .bg-slate-950\/90,
+html.dark .bg-slate-900\/60 {
+  background-color: rgba(4, 2, 10, 0.78) !important;
+}
+
+/* 3.13 Tables in Dark Mode */
+html.dark table th {
+  background-color: #140b2a !important;
+  color: #FFFFFF !important;
+  border-color: #2c1850 !important;
+}
+
+html.dark table td {
+  border-color: #241442 !important;
+  color: #e2d9f3 !important;
+}
+
+html.dark table tr:hover {
+  background-color: #190f36 !important;
+}
+
+/* 3.14 Badges & Status Chips */
+html.dark .bg-purple-50,
+html.dark .bg-blue-50,
+html.dark .bg-pink-50,
+html.dark .bg-emerald-50,
+html.dark .bg-amber-50 {
+  background-color: #1a0f36 !important;
+  color: #c4b5fd !important;
+  border-color: #381e64 !important;
+}
+
+/* 3.15 Dark Scrollbar */
+html.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #0d071a;
+}
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #351d5c;
+}
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4e2b82;
 }

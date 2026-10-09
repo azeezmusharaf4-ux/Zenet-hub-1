@@ -124,8 +124,8 @@ service cloud.firestore {
         // Allow buyers to update stock and status during checkout
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'stockCount', 'status', 'inventory', 'updatedAt'])
       );
-      // Product deletion is strictly forbidden to protect marketplace history and records
-      allow delete: if false;
+      // Only authorized website owner / admin can delete stock listings
+      allow delete: if isAdmin();
 
       // Inventory subcollection: status and availability of accounts (contains NO credentials/passwords)
       match /inventory/{itemId} {

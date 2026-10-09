@@ -9,6 +9,21 @@
     <meta property="og:title" content="ZENET HUB - Verified Social Accounts Marketplace" />
     <meta property="og:description" content="ZENET HUB - Verified social accounts marketplace, social media growth boosting marketplace, virtual phone numbers, and instant escrow wallet payment hub." />
     
+    <!-- Immediate Theme Preference Initializer (Zero Flash) -->
+    <script>
+      (function() {
+        try {
+          var savedTheme = localStorage.getItem('zenet_theme_mode');
+          if (savedTheme === 'dark') {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.style.colorScheme = 'dark';
+          }
+        } catch (e) {}
+      })();
+    </script>
+
     <!-- Universal Compatibility Guards for Older iOS & Android WebKit Engines -->
     <script>
       (function() {

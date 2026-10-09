@@ -10,6 +10,12 @@
 /api/health                 /.netlify/functions/health                200!
 /api/onegridhub/*           /.netlify/functions/onegridhub            200!
 /api/onegridhub             /.netlify/functions/onegridhub            200!
+/api/virtual-numbers/*      /.netlify/functions/onegridhub            200!
+/api/virtual-numbers        /.netlify/functions/onegridhub            200!
+/api/paystack/resolve-account /.netlify/functions/paystack-resolve-account 200!
+/api/paystack/banks         /.netlify/functions/paystack-banks        200!
+/api/withdrawals/*          /.netlify/functions/withdrawals-manage    200!
+/api/withdrawals            /.netlify/functions/withdrawals-manage    200!
 /api/social-boost/*         /.netlify/functions/social-boost          200!
 /api/social-boost           /.netlify/functions/social-boost          200!
 /api/service-number-2/*     /.netlify/functions/service-number-2      200!

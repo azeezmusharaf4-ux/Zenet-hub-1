@@ -83,6 +83,20 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
             <h2 className="text-xl font-black text-slate-900 tracking-tight leading-snug">{current.title}</h2>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {canDelete && onDelete && (
+              <button 
+                type="button"
+                onClick={() => {
+                  onDelete(current.id);
+                  onClose();
+                }}
+                className="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/30 transition cursor-pointer flex items-center justify-center shadow-xs"
+                title="Delete this log (Owner only)"
+                aria-label="Delete this log"
+              >
+                <Trash2 className="w-4 h-4 text-red-500 hover:text-white" />
+              </button>
+            )}
             <button 
               onClick={onClose}
               className="p-1.5 rounded-full hover:bg-purple-50 text-slate-400 hover:text-slate-900 transition cursor-pointer"

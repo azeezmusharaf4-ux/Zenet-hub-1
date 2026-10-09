@@ -68,6 +68,11 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
   onViewSellerProfile,
   onDeleteListing
 }) => {
+  const isOwnerUser = Boolean(
+    isAuthorizedOwner(null, userProfile) ||
+    userProfile?.email?.toLowerCase() === 'azeezmusharaf4@gmail.com' ||
+    userProfile?.role === 'admin'
+  );
 
   // Sort and filter listings
   const filteredAndSortedListings = useMemo(() => {
@@ -250,7 +255,7 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
               onToggleSave={onToggleSave}
               onViewSellerProfile={onViewSellerProfile}
               onDelete={onDeleteListing}
-              canDelete={false}
+              canDelete={isOwnerUser}
             />
           ))}
         </div>

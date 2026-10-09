@@ -3849,6 +3849,68 @@ app.post('/api/notifications/mark-all-read', async (req, res) => {
   }
 });
 
+// Secure Admin Stock Management: Delete entire listing/stock (Owner only)
+app.delete('/api/admin/listings/:listingId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+
+    const isAuthorized = Boolean(
+      verifiedUser && (
+        verifiedUser.isAdmin ||
+        isAuthorizedOwnerEmail(verifiedUser.email) ||
+        isAuthorizedOwnerUid(verifiedUser.uid) ||
+        verifiedUser.email?.toLowerCase() === 'azeezmusharaf4@gmail.com'
+      )
+    );
+
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, error: 'Forbidden: Only authorized Owners can delete stock listings.' });
+    }
+
+    const { listingId } = req.params;
+    if (!listingId) {
+      return res.status(400).json({ success: false, error: 'Listing ID is required.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database not initialized.' });
+    }
+
+    // 1. Delete all inventory items and their secure subcollections
+    try {
+      const invCol = collection(db, 'listings', listingId, 'inventory');
+      const invSnaps = await getDocs(invCol);
+      for (const itemDoc of invSnaps.docs) {
+        try {
+          const secRef = doc(db, 'listings', listingId, 'inventory', itemDoc.id, 'secure', 'details');
+          await deleteDoc(secRef);
+        } catch (_) {}
+        try {
+          await deleteDoc(itemDoc.ref);
+        } catch (_) {}
+      }
+    } catch (e) {
+      console.warn('Subcollection cleanup notice for listing deletion:', e);
+    }
+
+    // 2. Delete parent listing document
+    const listingRef = doc(db, 'listings', listingId);
+    await deleteDoc(listingRef);
+
+    console.log(`[Admin Stock Delete] Owner ${verifiedUser.email} deleted entire stock listing ${listingId}`);
+
+    return res.json({
+      success: true,
+      message: 'Stock listing deleted successfully',
+      listingId
+    });
+  } catch (err: any) {
+    console.error('Error in DELETE /api/admin/listings/:listingId:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to delete stock listing' });
+  }
+});
+
 // Secure Admin Stock Management: Delete stock item (including Sold items)
 app.delete('/api/admin/listings/:listingId/inventory/:itemId', async (req, res) => {
   try {

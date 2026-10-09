@@ -348,7 +348,7 @@ export const LogApproveView: React.FC<LogApproveViewProps> = ({
     const stockQty = Number(listing.stockCount || listing.stock || (accounts.length > 0 ? accounts.length : 1));
 
     return (
-      <div className="w-full min-h-[100dvh] bg-[#FAF8FE] flex flex-col pb-32 animate-in fade-in duration-150">
+      <div className="w-full min-h-[100dvh] bg-[#FAF8FE] flex flex-col pb-36 sm:pb-32 animate-in fade-in duration-150">
         
         {/* Top Header */}
         <div className="bg-white border-b border-[#F1EEF9] sticky top-0 z-30 px-3 sm:px-6 py-3.5 shadow-2xs">
@@ -669,24 +669,82 @@ export const LogApproveView: React.FC<LogApproveViewProps> = ({
                 })}
               </div>
             )}
+
+            {/* ACTION SECTION: Placed directly right here at the bottom of the Inspect Stock Accounts section ("Put it here") */}
+            <div className="pt-4 mt-3 border-t border-[#F1EEF9] dark:border-[#2c1850] space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-[#0F172A] dark:text-[#FAF8FE] flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-[#5B4DF5]" />
+                    <span>Inspection Decision & Approval</span>
+                  </h4>
+                  <p className="text-[11px] text-[#64748B] dark:text-[#a594c9]">
+                    Confirm and approve this stock to make it active, or keep it pending in queue.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                {/* 1. KEEP AS PENDING BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedReviewListing(null);
+                    setIsEditingPrice(false);
+                  }}
+                  className="w-full py-3.5 px-4 rounded-2xl border border-slate-200 dark:border-[#381e64] bg-slate-100 hover:bg-slate-200 dark:bg-[#1e123b] text-slate-700 dark:text-[#ddd6fe] font-extrabold text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-xs min-h-[48px]"
+                  title="Close review and keep this listing in pending status"
+                >
+                  <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span>Keep as Pending</span>
+                </button>
+
+                {/* 2. REJECT BUTTON */}
+                <button
+                  type="button"
+                  disabled={isProcessingAction}
+                  onClick={() => {
+                    setRejectingListing(listing);
+                    setRejectionReason('');
+                  }}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 font-extrabold text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 min-h-[48px]"
+                >
+                  <XCircle className="w-4 h-4 shrink-0" />
+                  <span>Reject Stock</span>
+                </button>
+
+                {/* 3. CONFIRM & APPROVE BUTTON */}
+                <button
+                  type="button"
+                  disabled={isProcessingAction}
+                  onClick={() => setConfirmingApproveListing(listing)}
+                  className="w-full py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/30 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 min-h-[48px]"
+                >
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>Confirm & Approve</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* 3. Bottom Sticky Action Bar: REJECT and APPROVE */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#F1EEF9] p-3 sm:p-4 shadow-xl">
-          <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+        {/* 3. Bottom Sticky Action Bar: REJECT and APPROVE (Elevated with safe-area support) */}
+        <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white dark:bg-[#110a24] border-t border-[#F1EEF9] dark:border-[#2c1850] px-3 sm:px-4 pt-3 pb-[max(env(safe-area-inset-bottom,0px),0.875rem)] shadow-[0_-4px_25px_rgba(0,0,0,0.35)]">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => {
                 setSelectedReviewListing(null);
                 setIsEditingPrice(false);
               }}
-              className="px-4 py-3 rounded-2xl border border-slate-200 text-slate-700 font-bold text-xs sm:text-sm hover:bg-slate-50 transition cursor-pointer"
+              className="px-3 sm:px-4 py-3 rounded-2xl border border-slate-200 dark:border-[#381e64] bg-slate-100 hover:bg-slate-200 dark:bg-[#1e123b] text-slate-700 dark:text-[#ddd6fe] font-bold text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0 min-h-[46px]"
+              title="Close review and keep this listing in pending status"
             >
-              Cancel
+              <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Keep as Pending</span>
             </button>
 
-            <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+            <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
               {/* REJECT BUTTON */}
               <button
                 type="button"
@@ -695,10 +753,10 @@ export const LogApproveView: React.FC<LogApproveViewProps> = ({
                   setRejectingListing(listing);
                   setRejectionReason('');
                 }}
-                className="flex-1 sm:flex-initial px-5 sm:px-6 py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="px-3 sm:px-5 py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 font-extrabold text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 min-h-[46px]"
               >
-                <XCircle className="w-4 h-4" />
-                <span>Reject Stock</span>
+                <XCircle className="w-4 h-4 shrink-0" />
+                <span>Reject</span>
               </button>
 
               {/* APPROVE BUTTON */}
@@ -706,10 +764,10 @@ export const LogApproveView: React.FC<LogApproveViewProps> = ({
                 type="button"
                 disabled={isProcessingAction}
                 onClick={() => setConfirmingApproveListing(listing)}
-                className="flex-1 sm:flex-initial px-6 sm:px-8 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/25 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 sm:flex-initial px-4 sm:px-7 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/25 transition cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-50 min-h-[46px] whitespace-nowrap"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Approve Stock</span>
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Confirm & Approve</span>
               </button>
             </div>
           </div>
@@ -717,7 +775,7 @@ export const LogApproveView: React.FC<LogApproveViewProps> = ({
 
         {/* MODAL: Confirmation Dialog for APPROVE */}
         {confirmingApproveListing && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
             <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 border border-[#EAE6F8] shadow-2xl space-y-4 animate-in zoom-in-95">
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-7 h-7 stroke-[2.4]" />
@@ -766,7 +824,7 @@ export const LogApproveView: React.FC<LogApproveViewProps> = ({
 
         {/* MODAL: Rejection Dialog for REJECT */}
         {rejectingListing && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
             <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 border border-[#EAE6F8] shadow-2xl space-y-4 animate-in zoom-in-95">
               <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
                 <XCircle className="w-7 h-7 stroke-[2.4]" />

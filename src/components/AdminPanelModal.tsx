@@ -68,7 +68,8 @@ import {
   Copy,
   ArrowDownToLine,
   Building2,
-  Check
+  Check,
+  Clock
 } from 'lucide-react';
 const AdminWalletsView = React.lazy(() => import('./AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
 
@@ -83,6 +84,7 @@ interface AdminPanelModalProps {
   onToggleFeatured?: (id: string, currentFeatured: boolean) => void;
   onUpdateUserProfile?: (profile: UserProfile) => void;
   onUpdateListing?: (updated: AccountListing) => void;
+  onDeleteListing?: (id: string) => void;
 }
 
 interface AdminEditListingModalProps {
@@ -1000,7 +1002,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   onRejectListing,
   onToggleFeatured,
   onUpdateUserProfile,
-  onUpdateListing
+  onUpdateListing,
+  onDeleteListing
 }) => {
   const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
@@ -1204,7 +1207,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [loadingReviews, setLoadingReviews] = useState(true);
 
   // Sub-filters & Search states
-  const [listingFilter, setListingFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'sold' | 'featured'>('all');
+  const [listingFilter, setListingFilter] = useState<'all' | 'pending' | 'active' | 'approved' | 'rejected' | 'sold' | 'featured'>('all');
   const [listingSearch, setListingSearch] = useState('');
   
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'admin' | 'seller' | 'buyer' | 'manager' | 'customer' | 'suspended'>('all');
@@ -1224,6 +1227,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   // Modals & Active Edit states
   const [editingListing, setEditingListing] = useState<AccountListing | null>(null);
   const [isSavingListing, setIsSavingListing] = useState(false);
+  const [deletingListing, setDeletingListing] = useState<AccountListing | null>(null);
+  const [isDeletingListing, setIsDeletingListing] = useState(false);
   const [replyingInquiry, setReplyingInquiry] = useState<Inquiry | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
 
@@ -1391,7 +1396,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const handleApprove = async (id: string) => {
     try {
       const docRef = doc(db, 'listings', id);
-      await setDoc(docRef, { approvalStatus: 'approved' }, { merge: true });
+      await setDoc(docRef, { approvalStatus: 'approved', status: 'active' }, { merge: true });
+      setListings((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, approvalStatus: 'approved', status: 'active' } : item))
+      );
       if (onApproveListing) onApproveListing(id);
     } catch (e) {
       console.error('Approve failed:', e);
@@ -1402,6 +1410,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     try {
       const docRef = doc(db, 'listings', id);
       await setDoc(docRef, { approvalStatus: 'rejected' }, { merge: true });
+      setListings((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, approvalStatus: 'rejected' } : item))
+      );
       if (onRejectListing) onRejectListing(id);
     } catch (e) {
       console.error('Reject failed:', e);
@@ -1413,6 +1424,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     try {
       const docRef = doc(db, 'listings', item.id);
       await setDoc(docRef, { status: newStatus }, { merge: true });
+      setListings((prev) =>
+        prev.map((l) => (l.id === item.id ? { ...l, status: newStatus } : l))
+      );
+      if (onUpdateListing) onUpdateListing({ ...item, status: newStatus });
     } catch (e) {
       console.error('Toggle sold status failed:', e);
     }
@@ -1423,9 +1438,46 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     try {
       const docRef = doc(db, 'listings', item.id);
       await setDoc(docRef, { featured: newFeatured }, { merge: true });
+      setListings((prev) =>
+        prev.map((l) => (l.id === item.id ? { ...l, featured: newFeatured } : l))
+      );
       if (onToggleFeatured) onToggleFeatured(item.id, !!item.featured);
     } catch (e) {
       console.error('Toggle featured failed:', e);
+    }
+  };
+
+  const handleConfirmDeleteListing = async () => {
+    if (!deletingListing) return;
+    setIsDeletingListing(true);
+    try {
+      const listingId = deletingListing.id;
+      // 1. Cascade cleanup on server proxy if available
+      try {
+        const token = user ? await getSafeIdToken(user) : '';
+        await fetch(`/api/admin/listings/${listingId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        });
+      } catch (srvErr) {
+        console.warn('Server listing delete notice, direct db delete proceeding:', srvErr);
+      }
+
+      // 2. Direct Firestore deletion
+      const listingRef = doc(db, 'listings', listingId);
+      await deleteDoc(listingRef);
+
+      // 3. Update local listings state
+      setListings((prev) => prev.filter((item) => item.id !== listingId));
+      if (onDeleteListing) onDeleteListing(listingId);
+    } catch (err) {
+      console.error('Failed to delete log from Firestore:', err);
+    } finally {
+      setIsDeletingListing(false);
+      setDeletingListing(null);
     }
   };
 
@@ -1725,13 +1777,43 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }
   };
 
+  // Helper functions to differentiate Active, Pending, and Sold logs
+  const getListingEffectiveStock = (item: AccountListing) => {
+    const invAvail = Array.isArray(item.inventory)
+      ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
+      : undefined;
+    const docStock = item.stockCount !== undefined 
+      ? item.stockCount 
+      : (item.stock !== undefined ? item.stock : (item.status === 'sold' ? 0 : 1));
+    return invAvail !== undefined ? Math.max(invAvail, docStock) : docStock;
+  };
+
+  const isListingSold = (item: AccountListing) => {
+    if ((item.status || '').toLowerCase() === 'sold') return true;
+    const effStock = getListingEffectiveStock(item);
+    return effStock <= 0;
+  };
+
+  const isListingPending = (item: AccountListing) => {
+    return item.approvalStatus === 'pending';
+  };
+
+  const isListingActive = (item: AccountListing) => {
+    return !isListingPending(item) && !isListingSold(item) && item.approvalStatus !== 'rejected';
+  };
+
   // Computed Filters with Memoization
   const filteredListings = useMemo(() => {
     return listings.filter((item) => {
-      if (listingFilter === 'pending' && item.approvalStatus !== 'pending') return false;
-      if (listingFilter === 'approved' && item.approvalStatus !== 'approved' && item.approvalStatus !== undefined) return false;
-      if (listingFilter === 'rejected' && item.approvalStatus !== 'rejected') return false;
-      if (listingFilter === 'sold' && item.status !== 'sold') return false;
+      const isSold = isListingSold(item);
+      const isPending = isListingPending(item);
+      const isRejected = item.approvalStatus === 'rejected';
+      const isActive = isListingActive(item);
+
+      if (listingFilter === 'pending' && !isPending) return false;
+      if ((listingFilter === 'active' || (listingFilter as string) === 'approved') && !isActive) return false;
+      if (listingFilter === 'rejected' && !isRejected) return false;
+      if (listingFilter === 'sold' && !isSold) return false;
       if (listingFilter === 'featured' && !item.featured) return false;
       if (listingSearch.trim()) {
         const q = listingSearch.toLowerCase();
@@ -1830,13 +1912,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   }, [reviews, reviewSearch]);
 
   // Computed Key Metrics & Statistics
-  const pendingCount = listings.filter((i) => i.approvalStatus === 'pending').length;
-  const approvedCount = listings.filter((i) => i.approvalStatus !== 'pending' && i.approvalStatus !== 'rejected').length;
-  const soldCount = listings.filter((i) => i.status === 'sold').length;
+  const pendingCount = listings.filter(isListingPending).length;
+  const activeCount = listings.filter(isListingActive).length;
+  const soldCount = listings.filter(isListingSold).length;
   const featuredCount = listings.filter((i) => i.featured).length;
 
   const totalGMV = listings.reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
-  const soldGMV = listings.filter(i => i.status === 'sold').reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
+  const soldGMV = listings.filter(isListingSold).reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
   const completedOrdersVolume = orders.filter(o => o.status === 'completed').reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
   const escrowHoldingVolume = orders.filter(o => o.status === 'escrow_holding').reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
 
@@ -2094,28 +2176,73 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               <div className="flex-1 overflow-y-auto p-5 space-y-5">
                 
                 {/* Stats Header Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setListingFilter('all')}
+                    className={`text-left p-3.5 rounded-2xl border transition cursor-pointer ${
+                      listingFilter === 'all'
+                        ? 'bg-slate-900 border-cyan-500/60 ring-1 ring-cyan-500/30'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
                     <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block">Total Inventory</span>
                     <span className="text-xl font-black text-white mt-0.5 block">{listings.length}</span>
-                  </div>
+                  </button>
 
-                  <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setListingFilter('active')}
+                    className={`text-left p-3.5 rounded-2xl border transition cursor-pointer ${
+                      listingFilter === 'active' || (listingFilter as string) === 'approved'
+                        ? 'bg-slate-900 border-emerald-500/60 ring-1 ring-emerald-500/30'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block">Active (Available)</span>
+                    <span className="text-xl font-black text-emerald-400 mt-0.5 block">{activeCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setListingFilter('pending')}
+                    className={`text-left p-3.5 rounded-2xl border transition cursor-pointer ${
+                      listingFilter === 'pending'
+                        ? 'bg-slate-900 border-amber-500/60 ring-1 ring-amber-500/30'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
                     <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block">Pending Review</span>
                     <span className={`text-xl font-black mt-0.5 block ${pendingCount > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
                       {pendingCount}
                     </span>
-                  </div>
+                  </button>
 
-                  <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
-                    <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block">Sold Out</span>
-                    <span className="text-xl font-black text-emerald-400 mt-0.5 block">{soldCount}</span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setListingFilter('sold')}
+                    className={`text-left p-3.5 rounded-2xl border transition cursor-pointer ${
+                      listingFilter === 'sold'
+                        ? 'bg-slate-900 border-indigo-500/60 ring-1 ring-indigo-500/30'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block">Sold Logs</span>
+                    <span className="text-xl font-black text-indigo-400 mt-0.5 block">{soldCount}</span>
+                  </button>
 
-                  <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setListingFilter('featured')}
+                    className={`text-left p-3.5 rounded-2xl border transition cursor-pointer col-span-2 sm:col-span-1 ${
+                      listingFilter === 'featured'
+                        ? 'bg-slate-900 border-cyan-500/60 ring-1 ring-cyan-500/30'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
                     <span className="text-slate-500 text-[10px] uppercase font-bold tracking-wider block">Featured</span>
                     <span className="text-xl font-black text-cyan-400 mt-0.5 block">{featuredCount}</span>
-                  </div>
+                  </button>
                 </div>
 
                 {/* Filters & Search */}
@@ -2124,43 +2251,46 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     <button
                       onClick={() => setListingFilter('all')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                        listingFilter === 'all' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                        listingFilter === 'all' ? 'bg-cyan-500 text-slate-950 font-extrabold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
                       All ({listings.length})
                     </button>
 
                     <button
-                      onClick={() => setListingFilter('pending')}
+                      onClick={() => setListingFilter('active')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                        listingFilter === 'pending' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                        listingFilter === 'active' || (listingFilter as string) === 'approved' ? 'bg-emerald-500 text-slate-950 font-extrabold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      Pending ({pendingCount})
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Active ({activeCount})
                     </button>
 
                     <button
-                      onClick={() => setListingFilter('approved')}
+                      onClick={() => setListingFilter('pending')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                        listingFilter === 'approved' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                        listingFilter === 'pending' ? 'bg-amber-500 text-slate-950 font-extrabold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      Approved ({approvedCount})
+                      <Clock className="w-3.5 h-3.5" />
+                      Pending ({pendingCount})
                     </button>
 
                     <button
                       onClick={() => setListingFilter('sold')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                        listingFilter === 'sold' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:text-white'
+                        listingFilter === 'sold' ? 'bg-indigo-500 text-white font-extrabold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
+                      <Tag className="w-3.5 h-3.5" />
                       Sold ({soldCount})
                     </button>
 
                     <button
                       onClick={() => setListingFilter('featured')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                        listingFilter === 'featured' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                        listingFilter === 'featured' ? 'bg-cyan-500 text-slate-950 font-extrabold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
                       <Flame className="w-3.5 h-3.5" />
@@ -2187,11 +2317,30 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       No listings match your filter criteria.
                     </div>
                   ) : (
-                    filteredListings.map((item) => (
+                    filteredListings.map((item) => {
+                      const isItemSold = isListingSold(item);
+                      const isItemPending = isListingPending(item);
+                      const isItemRejected = item.approvalStatus === 'rejected';
+                      const isItemActive = isListingActive(item);
+
+                      return (
                       <div
                         key={item.id}
-                        className="bg-slate-950 p-4 rounded-2xl border border-slate-800/90 hover:border-slate-700 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                        className="relative bg-slate-950 p-4 pr-12 sm:pr-14 rounded-2xl border border-slate-800/90 hover:border-slate-700 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                       >
+                        {/* Red Delete Logo Button (Small Red Circle for Owner / Creator) */}
+                        {(isOwner || canManageListing(item)) && (
+                          <button
+                            type="button"
+                            onClick={() => setDeletingListing(item)}
+                            className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/30 transition cursor-pointer flex items-center justify-center shadow-xs"
+                            title="Delete this log"
+                            aria-label="Delete this log"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500 hover:text-white" />
+                          </button>
+                        )}
+
                         <div className="flex items-start sm:items-center gap-3.5">
                           <img
                             src={item.imageUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&q=80'}
@@ -2204,12 +2353,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                 {item.category}
                               </span>
 
-                              {item.status === 'sold' && (
-                                <span className="text-[10px] font-bold text-rose-300 bg-rose-950/90 px-2 py-0.5 rounded border border-rose-800">
-                                  Sold Out
-                                </span>
-                              )}
-
                               {item.featured && (
                                 <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/40 flex items-center gap-1">
                                   <Sparkles className="w-3 h-3" />
@@ -2217,17 +2360,25 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                 </span>
                               )}
 
-                              {item.approvalStatus === 'pending' ? (
-                                <span className="text-[10px] font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/40">
+                              {isItemPending ? (
+                                <span className="text-[10px] font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/40 flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
                                   Pending Review
                                 </span>
-                              ) : item.approvalStatus === 'rejected' ? (
-                                <span className="text-[10px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800/40">
+                              ) : isItemRejected ? (
+                                <span className="text-[10px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800/40 flex items-center gap-1">
+                                  <XCircle className="w-3 h-3" />
                                   Rejected
                                 </span>
+                              ) : isItemSold ? (
+                                <span className="text-[10px] font-bold text-indigo-300 bg-indigo-950/90 px-2 py-0.5 rounded border border-indigo-800 flex items-center gap-1">
+                                  <Tag className="w-3 h-3" />
+                                  Sold
+                                </span>
                               ) : (
-                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">
-                                  Approved
+                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                  Active
                                 </span>
                               )}
                             </div>
@@ -2268,14 +2419,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                               <button
                                 onClick={() => handleToggleSoldStatus(item)}
                                 className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition cursor-pointer flex items-center gap-1 ${
-                                  item.status === 'sold'
+                                  isItemSold
                                     ? 'bg-purple-50 text-slate-500 border-purple-200 hover:bg-purple-100'
                                     : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
                                 }`}
                                 title="Toggle Sold / Active status"
                               >
                                 <CheckSquare className="w-3.5 h-3.5" />
-                                {item.status === 'sold' ? 'Mark Active' : 'Mark Sold'}
+                                {isItemSold ? 'Mark Active' : 'Mark Sold'}
                               </button>
 
                               <button
@@ -2299,6 +2450,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                                   <Flame className="w-4 h-4" />
                                 </button>
                               )}
+
+                              <button
+                                type="button"
+                                onClick={() => setDeletingListing(item)}
+                                className="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/30 transition cursor-pointer flex items-center justify-center shadow-xs shrink-0"
+                                title="Delete this log"
+                                aria-label="Delete this log"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500 hover:text-white" />
+                              </button>
                             </>
                           ) : (
                             <span className="text-[10px] text-slate-500 px-2 py-1 bg-purple-50/50 rounded-lg border border-purple-100 flex items-center gap-1">
@@ -2308,11 +2469,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                           )}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    );
+                  })
+                )}
               </div>
-            )}
+            </div>
+          )}
 
             {/* TAB 2: USER MANAGEMENT */}
             {activeTab === 'users' && (
@@ -3697,6 +3859,49 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
         )}
 
       </div>
+
+      {/* DELETE LOG CONFIRMATION POP-UP */}
+      {deletingListing && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto text-red-500">
+              <Trash2 className="w-6 h-6 text-red-500" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">
+                Are you sure you want to delete this log?
+              </h3>
+              <p className="text-xs text-slate-400 line-clamp-2">
+                {deletingListing.title}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingListing(null)}
+                disabled={isDeletingListing}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteListing}
+                disabled={isDeletingListing}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30 transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                {isDeletingListing ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  'Yes'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDIT LISTING OVERLAY MODAL */}
       {editingListing && (
