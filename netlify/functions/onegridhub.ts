@@ -29,8 +29,7 @@ const getVirtualSMSNumbersConfig = () => {
     process.env.VSN_API_KEY,
     process.env.VIRTUALSMSNUMBERS_API_KEY,
     process.env.VIRTUAL_SMS_NUMBERS_API_KEY,
-    process.env.VSN_KEY,
-    'vsn_live_Rl1JhcPURhhWpVxP3wVdkd24dD4ELVSr' // Configured genuine project API key fallback
+    process.env.VSN_KEY
   ];
   let apiKey = '';
   for (const c of candidates) {
