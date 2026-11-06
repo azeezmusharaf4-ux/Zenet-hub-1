@@ -409,9 +409,9 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto zenet-modal-backdrop">
       <div 
-        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-auto max-h-[92vh] flex flex-col relative text-[#0F172A]"
+        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-auto max-h-[92vh] flex flex-col relative text-[#0F172A] zenet-modal-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -753,14 +753,14 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({
             <button
               type="button"
               onClick={handleRequestClose}
-              className="px-5 py-3 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] rounded-full font-bold text-xs sm:text-sm transition cursor-pointer"
+              className="px-5 py-3 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] rounded-full font-bold text-xs sm:text-sm transition cursor-pointer zenet-btn-interactive"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold py-3 rounded-full shadow-md transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2"
+              className="flex-1 bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold py-3 rounded-full shadow-md transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2 zenet-btn-interactive"
             >
               <PlusCircle className="w-4 h-4" />
               <span>{loading ? 'Publishing Listing...' : 'Publish Account Listing'}</span>

@@ -10,6 +10,8 @@ export const AUTHORIZED_OWNER_EMAILS: readonly string[] = [
   'azeezmusharaf4@gmail.com', // Original Owner
   'muzenteofficial001@gmail.com', // Authorized Owner (muzente Official)
   'azeezmusharaf@gmail.com',
+  'zenethubifficial@gmail.com',
+  'zenethubofficial@gmail.com',
   'zenet-backend-service@zenetmarketplace.internal',
   'system-backend@zenetmarketplace.app'
 ];

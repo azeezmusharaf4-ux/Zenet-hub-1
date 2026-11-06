@@ -9,6 +9,77 @@
     <meta property="og:title" content="ZENET HUB - Verified Social Accounts Marketplace" />
     <meta property="og:description" content="ZENET HUB - Verified social accounts marketplace, social media growth boosting marketplace, virtual phone numbers, and instant escrow wallet payment hub." />
     
+    <!-- Suppress harmless Vite HMR WebSocket disconnects in iframe dev preview (HMR disabled in AI Studio) -->
+    <script>
+      (function() {
+        if (typeof window !== 'undefined') {
+          // 1. Silent dummy WebSocket for Vite HMR to prevent "WebSocket closed without opened"
+          if (window.WebSocket) {
+            var OrigWebSocket = window.WebSocket;
+            window.WebSocket = function(url, protocols) {
+              var isViteHmr = false;
+              if (protocols === 'vite-hmr' || protocols === 'vite-ping') isViteHmr = true;
+              if (Array.isArray(protocols) && (protocols.indexOf('vite-hmr') !== -1 || protocols.indexOf('vite-ping') !== -1)) isViteHmr = true;
+              if (typeof url === 'string' && (url.indexOf('token=') !== -1 || url.indexOf('vite') !== -1)) isViteHmr = true;
+
+              if (isViteHmr) {
+                var target = new EventTarget();
+                target.readyState = 1; // OPEN
+                target.send = function() {};
+                target.close = function() {};
+                target.addEventListener = EventTarget.prototype.addEventListener.bind(target);
+                target.removeEventListener = EventTarget.prototype.removeEventListener.bind(target);
+                target.dispatchEvent = EventTarget.prototype.dispatchEvent.bind(target);
+                setTimeout(function() {
+                  var openEvt = new Event('open');
+                  target.dispatchEvent(openEvt);
+                  if (typeof target.onopen === 'function') target.onopen(openEvt);
+                }, 10);
+                return target;
+              }
+              return new OrigWebSocket(url, protocols);
+            };
+            window.WebSocket.prototype = OrigWebSocket.prototype;
+            window.WebSocket.CONNECTING = 0;
+            window.WebSocket.OPEN = 1;
+            window.WebSocket.CLOSING = 2;
+            window.WebSocket.CLOSED = 3;
+          }
+
+          // 2. Unhandled rejection & global error suppression for @vite/client
+          window.addEventListener('unhandledrejection', function(event) {
+            var reason = event && (event.reason || event);
+            var msg = reason && (reason.message || String(reason));
+            var stack = reason && (reason.stack || '');
+            if (
+              (msg && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('vite') !== -1 || msg.indexOf('ws:') !== -1)) ||
+              (stack && (stack.indexOf('@vite/client') !== -1 || stack.indexOf('WebSocket') !== -1))
+            ) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              return false;
+            }
+          }, true);
+
+          window.addEventListener('error', function(event) {
+            var msg = event && (event.message || '');
+            var filename = event && (event.filename || '');
+            var error = event && event.error;
+            var stack = error && (error.stack || '');
+            if (
+              (msg && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('vite') !== -1)) ||
+              (filename && filename.indexOf('@vite/client') !== -1) ||
+              (stack && (stack.indexOf('@vite/client') !== -1 || stack.indexOf('WebSocket') !== -1))
+            ) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              return false;
+            }
+          }, true);
+        }
+      })();
+    </script>
+
     <!-- Immediate Theme Preference Initializer (Zero Flash) -->
     <script>
       (function() {

@@ -11,7 +11,7 @@
     "build:zip": "npm run build && python3 scripts/package-zip.py",
     "zip": "python3 scripts/package-zip.py",
     "generate-icons": "node scripts/generate-pwa-assets.js",
-    "start": "node dist/server.cjs",
+    "start": "node server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js *.zip",
     "lint": "tsc --noEmit"
@@ -31,6 +31,7 @@
     "firebase-admin": "^14.3.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "nodemailer": "^10.2.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "serverless-http": "^4.0.0",
@@ -41,6 +42,7 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0"
   }

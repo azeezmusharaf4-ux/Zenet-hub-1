@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
+import { processReferralRewardOnDeposit, QUALIFYING_DEPOSIT_THRESHOLD } from '../../src/server/referralService';
+import { sendReferralRewardEmail } from '../../src/server/emailService';
 
 export const handler = async (event: any) => {
   const headers = {
@@ -196,6 +198,32 @@ export const handler = async (event: any) => {
             });
 
             console.log(`[Netlify Paystack Webhook] Successfully credited ₦${amountNGN} to User ID ${targetUserId}. New balance: ₦${finalNewBalance}`);
+
+            // Rule 1 & 2: Automatically process referral reward for qualifying deposits (₦1,000+)
+            if (amountNGN >= QUALIFYING_DEPOSIT_THRESHOLD && targetUserId) {
+              try {
+                await processReferralRewardOnDeposit({
+                  db,
+                  depositedUserId: String(targetUserId),
+                  depositedUserEmail: customerEmail,
+                  depositAmount: amountNGN,
+                  depositReference: reference
+                }).then(async (refResult) => {
+                  if (refResult.rewarded && refResult.referrerEmail && refResult.referrerId) {
+                    sendReferralRewardEmail({
+                      to: refResult.referrerEmail,
+                      amount: refResult.rewardAmount || 100,
+                      newBalance: refResult.newReferrerBalance,
+                      qualifyingDepositAmount: amountNGN,
+                      reference,
+                      db
+                    }).catch(() => {});
+                  }
+                }).catch(() => {});
+              } catch (refErr) {
+                console.warn('[Netlify Paystack Webhook] Referral reward notice:', refErr);
+              }
+            }
           } else {
             console.warn(`[Netlify Paystack Webhook] Could not match transaction ${reference} to a user profile (email: ${customerEmail}, code: ${customerCode})`);
           }

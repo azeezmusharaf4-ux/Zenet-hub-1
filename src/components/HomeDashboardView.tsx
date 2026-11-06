@@ -235,10 +235,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       </div>
 
       {/* 2. WALLET CARD: Premium Indigo-Violet Gradient with Real Balance & Paystack Fund Action */}
-      <div className="w-full bg-gradient-to-br from-[#5B4DF5] via-[#6557F6] to-[#7546F8] rounded-[26px] sm:rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-indigo-600/20 relative overflow-hidden">
+      <div className="w-full bg-gradient-to-br from-[#5B4DF5] via-[#6557F6] to-[#7546F8] rounded-[26px] sm:rounded-3xl p-5 sm:p-6 text-white shadow-xl shadow-indigo-600/20 relative overflow-hidden zenet-wallet-enter">
         {/* Soft atmospheric glow accents */}
-        <div className="absolute -right-6 -top-6 w-36 h-36 rounded-full bg-white/10 blur-xl pointer-events-none" />
-        <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-purple-400/20 blur-xl pointer-events-none" />
+        <div className="absolute -right-6 -top-6 w-36 h-36 rounded-full bg-white/10 blur-xl pointer-events-none zenet-glow-pulse" />
+        <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-purple-400/20 blur-xl pointer-events-none zenet-glow-pulse" />
 
         <div className="relative z-10 space-y-4 sm:space-y-5">
           {/* Header Row: Label + Active Status Badge */}
@@ -263,7 +263,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <button
             id="wallet-add-money-btn"
             onClick={onOpenWallet}
-            className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-white text-[#5B4DF5] hover:bg-slate-50 active:scale-[0.99] font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xs transition cursor-pointer group"
+            className="w-full py-3.5 sm:py-4 px-4 rounded-2xl bg-white text-[#5B4DF5] hover:bg-slate-50 font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xs transition cursor-pointer group zenet-btn-interactive"
           >
             <Plus className="w-4 h-4 stroke-[3] text-[#5B4DF5] group-hover:rotate-90 transition-transform duration-200" />
             <span>Add Money</span>
@@ -284,7 +284,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <button
             id="quick-action-social-accounts"
             onClick={() => onSelectView('log-accounts')}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px]"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group min-h-[125px] sm:min-h-[145px] zenet-card-enter zenet-card-interactive zenet-card-stagger-1"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
               <Users className="w-6 h-6" />
@@ -301,7 +301,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <button
             id="quick-action-service-number"
             onClick={() => onSelectView('virtual-numbers')}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px]"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group min-h-[125px] sm:min-h-[145px] zenet-card-enter zenet-card-interactive zenet-card-stagger-2"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
               <Phone className="w-6 h-6" />
@@ -319,7 +319,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             type="button"
             id="quick-action-social-boost"
             onClick={() => onSelectView('social-boost')}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px] touch-manipulation select-none relative z-10"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group min-h-[125px] sm:min-h-[145px] touch-manipulation select-none relative z-10 zenet-card-enter zenet-card-interactive zenet-card-stagger-3"
             aria-label="Social Boost - Followers, Views & Likes"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs pointer-events-none">
@@ -337,7 +337,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           <button
             id="quick-action-zenet-update"
             onClick={onOpenZenetUpdate}
-            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98] min-h-[125px] sm:min-h-[145px]"
+            className="bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] hover:border-[#5B4DF5]/40 rounded-2xl sm:rounded-[22px] p-4 sm:p-5 flex flex-col items-center justify-center text-center shadow-2xs hover:shadow-xs transition-all cursor-pointer group min-h-[125px] sm:min-h-[145px] zenet-card-enter zenet-card-interactive zenet-card-stagger-4"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#EDE9FE] text-[#5B4DF5] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition-all duration-200 shadow-2xs">
               <Sparkles className="w-6 h-6" />
@@ -386,7 +386,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       onSelectPurchase(purchase);
                     }
                   }}
-                  className="w-full bg-white border border-[#EAE6F8] rounded-2xl sm:rounded-[20px] p-3.5 sm:p-4 flex items-center justify-between shadow-2xs hover:border-[#5B4DF5]/40 hover:shadow-xs transition-all cursor-pointer group active:scale-[0.99]"
+                  className="w-full bg-white border border-[#EAE6F8] rounded-2xl sm:rounded-[20px] p-3.5 sm:p-4 flex items-center justify-between shadow-2xs hover:border-[#5B4DF5]/40 hover:shadow-xs transition-all cursor-pointer group active:scale-[0.99] zenet-card-enter zenet-card-interactive"
                 >
                   <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 pr-2">
                     <div className="w-11 h-11 rounded-2xl bg-[#EDE9FE] flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-[#5B4DF5] group-hover:text-white transition duration-200">

@@ -1,6 +1,10 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import { Firestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
-import { isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from '../lib/authorizedOwners';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from '../lib/authorizedOwners.ts';
+import { sendSocialBoostOrderSuccessEmail } from './emailService.ts';
 
 // ============================================================================
 // VOIKER BOOSTING GATEWAY & SERVICE INTEGRATION (VOIKER.COM SMM API V2)
@@ -13,8 +17,15 @@ export interface VoikerConfig {
   hasApiKey: boolean;
 }
 
+export interface CategoryMarkupSetting {
+  markupFixedNgn?: number; // Markup amount in Naira per 1k
+  markupPercent?: number;  // Optional percentage markup
+}
+
 export interface VoikerPricingSettings {
+  apiKey?: string;
   defaultMarkupPercent: number;
+  defaultMarkupFixedNgn?: number; // Global default markup in Naira per 1k
   minMarkupPer1k: number;
   usdToNgnRate: number;
   pricingStyle: 'natural' | 'clean' | 'tiered';
@@ -22,8 +33,10 @@ export interface VoikerPricingSettings {
   disabledServices: string[];
   curatedServiceIds: string[];
   bestValueServiceIds: Record<string, string>;
+  categoryMarkups?: Record<string, CategoryMarkupSetting>; // Per-category markups: Followers, Views, Likes, Comments, Shares, Subscribers, Other
   serviceOverrides: Record<string, {
     customRatePer1000?: number;
+    customMarkupFixedNgn?: number; // Individual service markup in Naira per 1k
     customMarkupPercent?: number;
     enabled?: boolean;
     isBestValue?: boolean;
@@ -32,8 +45,9 @@ export interface VoikerPricingSettings {
 
 let cachedPricingSettings: VoikerPricingSettings = {
   defaultMarkupPercent: 0,
+  defaultMarkupFixedNgn: 0,
   minMarkupPer1k: 0,
-  usdToNgnRate: 1650,
+  usdToNgnRate: 1348.45,
   pricingStyle: 'natural',
   platformStatus: {
     TikTok: true,
@@ -55,22 +69,192 @@ let cachedPricingSettings: VoikerPricingSettings = {
   disabledServices: [],
   curatedServiceIds: [],
   bestValueServiceIds: {},
+  categoryMarkups: {
+    Followers: { markupFixedNgn: 0, markupPercent: 0 },
+    Views: { markupFixedNgn: 0, markupPercent: 0 },
+    Likes: { markupFixedNgn: 0, markupPercent: 0 },
+    Comments: { markupFixedNgn: 0, markupPercent: 0 },
+    Shares: { markupFixedNgn: 0, markupPercent: 0 },
+    Subscribers: { markupFixedNgn: 0, markupPercent: 0 },
+    Other: { markupFixedNgn: 0, markupPercent: 0 }
+  },
   serviceOverrides: {}
 };
 
-// In-memory cache for live Voiker services
+// ============================================================================
+// LIVE EXCHANGE RATE ENGINE (REAL-TIME USD -> NGN CONVERSION WITH AUDIT TRAIL)
+// ============================================================================
+
+export interface LiveExchangeRateRecord {
+  rate: number;
+  baseCurrency: string;
+  targetCurrency: string;
+  source: string;
+  retrievedAt: string;
+  timeLastUpdateUtc?: string;
+  isLive: boolean;
+}
+
+let cachedLiveExchangeRate: LiveExchangeRateRecord | null = null;
+let lastExchangeRateFetchTime = 0;
+const EXCHANGE_RATE_TTL_MS = 15 * 60 * 1000; // 15-minute live rate freshness cache
+
+export const fetchLiveUsdToNgnRate = async (
+  db?: Firestore | null,
+  forceRefresh: boolean = false
+): Promise<LiveExchangeRateRecord> => {
+  const now = Date.now();
+  if (!forceRefresh && cachedLiveExchangeRate && (now - lastExchangeRateFetchTime < EXCHANGE_RATE_TTL_MS)) {
+    return cachedLiveExchangeRate;
+  }
+
+  const apis = [
+    {
+      name: 'open.er-api.com',
+      url: 'https://open.er-api.com/v6/latest/USD',
+      parse: (data: any) => ({
+        rate: Number(data?.rates?.NGN),
+        timeUtc: data?.time_last_update_utc
+      })
+    },
+    {
+      name: 'api.exchangerate-api.com',
+      url: 'https://api.exchangerate-api.com/v4/latest/USD',
+      parse: (data: any) => ({
+        rate: Number(data?.rates?.NGN),
+        timeUtc: data?.date
+      })
+    },
+    {
+      name: 'fawazahmed0/currency-api',
+      url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
+      parse: (data: any) => ({
+        rate: Number(data?.usd?.ngn),
+        timeUtc: data?.date
+      })
+    }
+  ];
+
+  let fetchedRecord: LiveExchangeRateRecord | null = null;
+  let lastError: string | null = null;
+
+  for (const api of apis) {
+    try {
+      const res = await fetch(api.url, {
+        headers: { 'User-Agent': 'ZENET-HUB-LiveExchange/1.0', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(6000)
+      });
+      if (!res.ok) {
+        lastError = `${api.name} HTTP ${res.status}`;
+        continue;
+      }
+      const data: any = await res.json();
+      const parsed = api.parse(data);
+      if (typeof parsed.rate === 'number' && parsed.rate > 500 && parsed.rate < 5000 && !isNaN(parsed.rate)) {
+        const roundedRate = Math.round(parsed.rate * 100) / 100;
+        fetchedRecord = {
+          rate: roundedRate,
+          baseCurrency: 'USD',
+          targetCurrency: 'NGN',
+          source: api.name,
+          retrievedAt: new Date().toISOString(),
+          timeLastUpdateUtc: parsed.timeUtc ? String(parsed.timeUtc) : new Date().toUTCString(),
+          isLive: true
+        };
+        break;
+      }
+    } catch (err: any) {
+      lastError = `${api.name}: ${err.message}`;
+    }
+  }
+
+  if (fetchedRecord) {
+    cachedLiveExchangeRate = fetchedRecord;
+    lastExchangeRateFetchTime = now;
+    cachedPricingSettings.usdToNgnRate = fetchedRecord.rate;
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'system_settings', 'live_exchange_rate'), fetchedRecord, { merge: true });
+        await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+          usdToNgnRate: fetchedRecord.rate,
+          defaultMarkupPercent: 0,
+          minMarkupPer1k: 0,
+          pricingStyle: 'natural',
+          exchangeRateRetrievedAt: fetchedRecord.retrievedAt,
+          exchangeRateSource: fetchedRecord.source,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        console.log(`[ExchangeRate] Live USD/NGN rate ${fetchedRecord.rate} (${fetchedRecord.source}) persisted to Firestore.`);
+      } catch (dbErr: any) {
+        console.warn('[ExchangeRate] Firestore save notice:', dbErr.message);
+      }
+    }
+    return fetchedRecord;
+  }
+
+  // If live fetch failed: check Firestore backup to preserve last verified exchange rate
+  if (db && !cachedLiveExchangeRate) {
+    try {
+      const savedSnap = await getDoc(doc(db, 'system_settings', 'live_exchange_rate'));
+      if (savedSnap.exists()) {
+        const d = savedSnap.data() as LiveExchangeRateRecord;
+        if (d && d.rate > 500) {
+          cachedLiveExchangeRate = {
+            ...d,
+            isLive: false
+          };
+          console.warn(`[ExchangeRate] Live exchange API notice (${lastError}). Preserved last verified rate ${d.rate} from ${d.retrievedAt}`);
+          return cachedLiveExchangeRate;
+        }
+      }
+    } catch {}
+  }
+
+  if (cachedLiveExchangeRate) {
+    return {
+      ...cachedLiveExchangeRate,
+      isLive: false
+    };
+  }
+
+  throw new Error(`Unable to retrieve live USD-to-NGN exchange rate: ${lastError || 'All exchange-rate APIs unreachable.'}`);
+};
+
+// In-memory cache for live Voiker services & counts
+const CACHE_VOIKER_CATALOGUE_FILE = path.join(process.cwd(), '.cache_voiker_catalogue.json');
 let cachedVoikerServices: any[] = [];
+let cachedPlatformCounts: Record<string, number> | null = null;
+let cachedPlatformOrder: string[] = [];
 let lastVoikerSyncTime: string | null = null;
 let activeVoikerSyncPromise: Promise<any[]> | null = null;
+let lastPricingSettingsLoadTime = 0;
+const PRICING_SETTINGS_CACHE_TTL_MS = 60 * 1000; // 60s in-memory cache for Firestore system settings
+
+export const computeAndCacheCounts = (services: any[]): Record<string, number> => {
+  const counts: Record<string, number> = {};
+  const order: string[] = [];
+  for (const svc of services) {
+    const plat = svc.platform || 'Other Services';
+    if (counts[plat] === undefined) {
+      order.push(plat);
+      counts[plat] = 0;
+    }
+    counts[plat]++;
+  }
+  cachedPlatformCounts = counts;
+  cachedPlatformOrder = order;
+  return counts;
+};
 
 // User purchase idempotency locks
 const userOrderLocks = new Map<string, number>();
 
-// Helper: Get Voiker API configuration securely from server environment
+// Helper: Get Voiker API configuration securely from server environment or admin pricing settings
 export const getVoikerConfig = (): VoikerConfig => {
-  const apiKey = (process.env.VOIKER_API_KEY || '').trim();
-  const baseUrl = (process.env.VOIKER_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');
-  const usdToNgnRate = Number(process.env.USD_TO_NGN_RATE) || cachedPricingSettings.usdToNgnRate || 1650;
+  const apiKey = (process.env.VOIKER_API_KEY || process.env.VOIKA_API_KEY || cachedPricingSettings.apiKey || '').trim();
+  const baseUrl = (process.env.VOIKER_BASE_URL || process.env.VOIKA_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');
+  const usdToNgnRate = cachedLiveExchangeRate?.rate || cachedPricingSettings.usdToNgnRate || 1348.45;
   return {
     apiKey,
     baseUrl,
@@ -294,17 +478,30 @@ export const normalizeVoikerService = (
   };
 };
 
-// Load Pricing Settings from Firestore
-export const loadVoikerPricingSettings = async (db: Firestore | null): Promise<VoikerPricingSettings> => {
+// Load Pricing Settings from Firestore with 60s in-memory caching
+export const loadVoikerPricingSettings = async (db: Firestore | null, forceRefresh: boolean = false): Promise<VoikerPricingSettings> => {
   if (!db) return cachedPricingSettings;
+  const now = Date.now();
+  if (!forceRefresh && lastPricingSettingsLoadTime > 0 && (now - lastPricingSettingsLoadTime < PRICING_SETTINGS_CACHE_TTL_MS)) {
+    return cachedPricingSettings;
+  }
   try {
     const docSnap = await getDoc(doc(db, 'system_settings', 'voiker_pricing'));
     if (docSnap.exists()) {
       const data = docSnap.data();
       cachedPricingSettings = {
         ...cachedPricingSettings,
-        ...data
+        ...data,
+        defaultMarkupFixedNgn: typeof data.defaultMarkupFixedNgn === 'number' ? Math.max(0, data.defaultMarkupFixedNgn) : (cachedPricingSettings.defaultMarkupFixedNgn || 0),
+        defaultMarkupPercent: typeof data.defaultMarkupPercent === 'number' ? Math.max(0, data.defaultMarkupPercent) : (cachedPricingSettings.defaultMarkupPercent || 0),
+        categoryMarkups: data.categoryMarkups || cachedPricingSettings.categoryMarkups || {},
+        serviceOverrides: data.serviceOverrides || cachedPricingSettings.serviceOverrides || {}
       };
+      if (data?.apiKey) {
+        const cleanKey = String(data.apiKey).trim();
+        cachedPricingSettings.apiKey = cleanKey;
+        process.env.VOIKER_API_KEY = cleanKey;
+      }
     } else {
       // Fallback check social_boost_pricing
       const sbSnap = await getDoc(doc(db, 'system_settings', 'social_boost_pricing'));
@@ -312,14 +509,117 @@ export const loadVoikerPricingSettings = async (db: Firestore | null): Promise<V
         const sbData = sbSnap.data();
         cachedPricingSettings = {
           ...cachedPricingSettings,
-          ...sbData
+          ...sbData,
+          defaultMarkupFixedNgn: typeof sbData.defaultMarkupFixedNgn === 'number' ? Math.max(0, sbData.defaultMarkupFixedNgn) : (cachedPricingSettings.defaultMarkupFixedNgn || 0),
+          defaultMarkupPercent: typeof sbData.defaultMarkupPercent === 'number' ? Math.max(0, sbData.defaultMarkupPercent) : (cachedPricingSettings.defaultMarkupPercent || 0),
+          serviceOverrides: sbData.serviceOverrides || cachedPricingSettings.serviceOverrides || {}
         };
+        if (sbData?.apiKey) {
+          const cleanKey = String(sbData.apiKey).trim();
+          cachedPricingSettings.apiKey = cleanKey;
+          process.env.VOIKER_API_KEY = cleanKey;
+        }
       }
     }
+    lastPricingSettingsLoadTime = Date.now();
   } catch (err: any) {
     console.warn('[Voiker] Notice loading pricing settings:', err.message);
   }
   return cachedPricingSettings;
+};
+
+// Firestore catalogue partitioning helpers (prevents 1MB limit document size errors)
+const VOIKER_CHUNK_SIZE = 400;
+
+export const loadVoikerCatalogueFromFirestore = async (
+  db: Firestore
+): Promise<{ services: any[]; lastSyncedAt: string } | null> => {
+  try {
+    const metaSnap = await getDoc(doc(db, 'system_settings', 'voiker_catalogue'));
+    if (!metaSnap.exists()) return null;
+    const meta = metaSnap.data();
+    const lastSyncedAt = meta?.lastSyncedAt || new Date().toISOString();
+
+    // 1. If partitioned chunks exist, fetch and assemble them in parallel
+    if (typeof meta?.chunkCount === 'number' && meta.chunkCount > 0) {
+      const chunkPromises: Promise<any>[] = [];
+      for (let i = 0; i < meta.chunkCount; i++) {
+        chunkPromises.push(getDoc(doc(db, 'system_settings', `voiker_cat_part_${i}`)));
+      }
+      const chunkSnaps = await Promise.all(chunkPromises);
+      const combined: any[] = [];
+      for (const cSnap of chunkSnaps) {
+        if (cSnap.exists() && Array.isArray(cSnap.data()?.services)) {
+          combined.push(...cSnap.data().services);
+        }
+      }
+      if (combined.length > 0) {
+        return { services: combined, lastSyncedAt };
+      }
+    }
+
+    // 2. Legacy fallback for single document format
+    if (Array.isArray(meta?.services) && meta.services.length > 0) {
+      return { services: meta.services, lastSyncedAt };
+    }
+  } catch (err: any) {
+    console.warn('[Voiker] Notice loading catalogue from Firestore:', err.message);
+  }
+  return null;
+};
+
+export const saveVoikerCatalogueToFirestore = async (
+  db: Firestore,
+  normalized: any[],
+  syncTime: string
+): Promise<void> => {
+  try {
+    try {
+      const auth = getAuth();
+      if (!auth.currentUser) {
+        await signInWithEmailAndPassword(
+          auth,
+          'zenet-backend-service@zenetmarketplace.internal',
+          'ZenetSecureSystemBackend2026!#'
+        ).catch(() => {});
+      }
+    } catch {}
+
+    const chunkCount = Math.ceil(normalized.length / VOIKER_CHUNK_SIZE);
+
+    // Save each chunk partition in parallel
+    const writePromises: Promise<any>[] = [];
+    for (let i = 0; i < chunkCount; i++) {
+      const slice = normalized.slice(i * VOIKER_CHUNK_SIZE, (i + 1) * VOIKER_CHUNK_SIZE);
+      writePromises.push(
+        setDoc(doc(db, 'system_settings', `voiker_cat_part_${i}`), {
+          partIndex: i,
+          count: slice.length,
+          lastSyncedAt: syncTime,
+          services: slice
+        })
+      );
+    }
+    await Promise.all(writePromises);
+
+    // Write master manifest doc with live rate metadata (stays ~200 bytes, well under 1MB limit)
+    await setDoc(doc(db, 'system_settings', 'voiker_catalogue'), {
+      totalCount: normalized.length,
+      lastSyncedAt: syncTime,
+      provider: 'Voiker',
+      chunkCount,
+      chunkSize: VOIKER_CHUNK_SIZE,
+      liveExchangeRate: cachedLiveExchangeRate?.rate || 1348.45,
+      exchangeRateRetrievedAt: cachedLiveExchangeRate?.retrievedAt || syncTime,
+      exchangeRateSource: cachedLiveExchangeRate?.source || 'open.er-api.com',
+      markupPercent: 0,
+      services: [] // Empty placeholder prevents oversized document errors
+    });
+
+    console.log(`[Voiker] Persisted ${normalized.length} services across ${chunkCount} Firestore partitions with live rate ${cachedLiveExchangeRate?.rate || 1348.45}.`);
+  } catch (saveErr: any) {
+    console.warn('[Voiker] Notice saving catalogue to Firestore:', saveErr.message);
+  }
 };
 
 // Fetch full catalogue of Voiker services with fallback to quickSearch endpoint and Firestore caching
@@ -335,6 +635,19 @@ export const fetchVoikerServicesCatalogue = async (
     if (elapsed < CACHE_TTL_MS) {
       return cachedVoikerServices;
     }
+    // Stale-while-revalidate: return existing data immediately and revalidate in background
+    if (!activeVoikerSyncPromise) {
+      activeVoikerSyncPromise = (async (): Promise<any[]> => {
+        try {
+          return await fetchVoikerServicesCatalogue(db, true);
+        } catch {
+          return cachedVoikerServices;
+        }
+      })().finally(() => {
+        activeVoikerSyncPromise = null;
+      });
+    }
+    return cachedVoikerServices;
   }
 
   if (activeVoikerSyncPromise) {
@@ -343,7 +656,64 @@ export const fetchVoikerServicesCatalogue = async (
 
   activeVoikerSyncPromise = (async () => {
     try {
-      const { hasApiKey, usdToNgnRate } = getVoikerConfig();
+      // On cold start, check local disk snapshot first for 0ms startup
+      if (cachedVoikerServices.length === 0 && !forceRefresh) {
+        try {
+          if (fs.existsSync(CACHE_VOIKER_CATALOGUE_FILE)) {
+            const diskRaw = fs.readFileSync(CACHE_VOIKER_CATALOGUE_FILE, 'utf-8');
+            const diskData = JSON.parse(diskRaw);
+            if (Array.isArray(diskData?.services) && diskData.services.length > 0) {
+              cachedVoikerServices = diskData.services;
+              lastVoikerSyncTime = diskData.lastSyncedAt || new Date().toISOString();
+              computeAndCacheCounts(cachedVoikerServices);
+              console.log(`[Voiker] Instant disk-cache load: ${cachedVoikerServices.length} services ready.`);
+              // Revalidate live in background if older than 5 mins
+              setTimeout(() => {
+                fetchVoikerServicesCatalogue(db, true).catch(() => {});
+              }, 1000);
+              return cachedVoikerServices;
+            }
+          }
+        } catch (diskErr: any) {
+          console.warn('[Voiker] Disk cache read notice:', diskErr.message);
+        }
+      }
+
+      // On cold start, if Firestore has a saved snapshot, load it immediately to avoid blocking client
+      if (db && cachedVoikerServices.length === 0 && !forceRefresh) {
+        try {
+          const loaded = await loadVoikerCatalogueFromFirestore(db);
+          if (loaded && loaded.services.length > 0) {
+            cachedVoikerServices = loaded.services;
+            lastVoikerSyncTime = loaded.lastSyncedAt;
+            computeAndCacheCounts(cachedVoikerServices);
+            console.log(`[Voiker] Instant cold-start load: ${cachedVoikerServices.length} services loaded from Firestore snapshot.`);
+            // Sync live in background
+            setTimeout(() => {
+              fetchVoikerServicesCatalogue(db, true).catch(() => {});
+            }, 100);
+            return cachedVoikerServices;
+          }
+        } catch (dbReadErr: any) {
+          console.warn('[Voiker] Firestore cold-start read note:', dbReadErr.message);
+        }
+      }
+
+      // Automatically retrieve current USD-to-NGN exchange rate from reliable live API
+      let liveRateRecord: LiveExchangeRateRecord;
+      try {
+        liveRateRecord = await fetchLiveUsdToNgnRate(db, forceRefresh);
+      } catch (rateErr: any) {
+        console.error('[Voiker] Live exchange rate fetch error:', rateErr.message);
+        if (cachedVoikerServices.length > 0) {
+          // Preserve last verified prices
+          return cachedVoikerServices;
+        }
+        throw rateErr;
+      }
+
+      const usdToNgnRate = liveRateRecord.rate;
+      const { hasApiKey } = getVoikerConfig();
       let rawServices: any[] = [];
 
       // 1. Try authenticated API v2 services endpoint if API key exists
@@ -386,19 +756,25 @@ export const fetchVoikerServicesCatalogue = async (
         const normalized = rawServices.map(item => normalizeVoikerService(item, usdToNgnRate));
         cachedVoikerServices = normalized;
         lastVoikerSyncTime = new Date().toISOString();
+        computeAndCacheCounts(normalized);
 
-        // Persist to Firestore cache as resilient snapshot
+        // Save local disk snapshot for instant restart
+        try {
+          fs.writeFileSync(CACHE_VOIKER_CATALOGUE_FILE, JSON.stringify({
+            services: normalized,
+            lastSyncedAt: lastVoikerSyncTime,
+            totalCount: normalized.length,
+            liveExchangeRate: usdToNgnRate,
+            exchangeRateRetrievedAt: liveRateRecord.retrievedAt,
+            exchangeRateSource: liveRateRecord.source
+          }), 'utf-8');
+        } catch (diskWriteErr: any) {
+          console.warn('[Voiker] Disk cache save notice:', diskWriteErr.message);
+        }
+
+        // Persist to Firestore cache partitioned into safe chunks under 1MB
         if (db) {
-          try {
-            await setDoc(doc(db, 'system_settings', 'voiker_catalogue'), {
-              totalCount: normalized.length,
-              lastSyncedAt: lastVoikerSyncTime,
-              provider: 'Voiker',
-              services: normalized
-            }, { merge: true });
-          } catch (dbErr: any) {
-            console.warn('[Voiker] Firestore catalogue save note:', dbErr.message);
-          }
+          await saveVoikerCatalogueToFirestore(db, normalized, lastVoikerSyncTime);
         }
 
         return normalized;
@@ -407,10 +783,11 @@ export const fetchVoikerServicesCatalogue = async (
       // 3. Fallback: If network failed, load from Firestore backup cache
       if (db && cachedVoikerServices.length === 0) {
         try {
-          const snap = await getDoc(doc(db, 'system_settings', 'voiker_catalogue'));
-          if (snap.exists() && Array.isArray(snap.data()?.services) && snap.data().services.length > 0) {
-            cachedVoikerServices = snap.data().services;
-            lastVoikerSyncTime = snap.data().lastSyncedAt || new Date().toISOString();
+          const loaded = await loadVoikerCatalogueFromFirestore(db);
+          if (loaded && loaded.services.length > 0) {
+            cachedVoikerServices = loaded.services;
+            lastVoikerSyncTime = loaded.lastSyncedAt;
+            computeAndCacheCounts(cachedVoikerServices);
             console.log(`[Voiker] Loaded ${cachedVoikerServices.length} services from Firestore backup cache.`);
             return cachedVoikerServices;
           }
@@ -419,6 +796,9 @@ export const fetchVoikerServicesCatalogue = async (
         }
       }
 
+      if (cachedVoikerServices.length > 0) {
+        computeAndCacheCounts(cachedVoikerServices);
+      }
       return cachedVoikerServices;
     } catch (err: any) {
       console.warn('[Voiker] Service catalogue fetch error:', err.message);
@@ -432,17 +812,103 @@ export const fetchVoikerServicesCatalogue = async (
 };
 
 // Calculate customer price in accordance with ZENET HUB pricing engine rules
-// Zero-markup direct Voiker pricing mode: Voiker price -> ZENET HUB SMM service price directly
 export const calculateCustomerPrice = (
   providerRatePer1000: number,
-  _settings?: VoikerPricingSettings,
-  _serviceId?: string
+  settings?: VoikerPricingSettings,
+  serviceId?: string,
+  serviceName?: string,
+  serviceCategory?: string,
+  serviceType?: string
 ) => {
+  const providerRate = Math.max(1, providerRatePer1000);
+  if (!settings) {
+    return {
+      customerRatePer1000: providerRate,
+      markupPer1000: 0
+    };
+  }
+
+  const override = (settings.serviceOverrides && serviceId && settings.serviceOverrides[serviceId]) || {};
+  
+  // 1. Explicit direct rate override
+  if (typeof override.customRatePer1000 === 'number' && override.customRatePer1000 > 0) {
+    const customerRate = Math.max(providerRate, override.customRatePer1000);
+    return {
+      customerRatePer1000: customerRate,
+      markupPer1000: Math.max(0, customerRate - providerRate)
+    };
+  }
+
+  // 2. Individual service markup in Naira per 1,000 units (highest precedence)
+  if (typeof override.customMarkupFixedNgn === 'number' && override.customMarkupFixedNgn >= 0) {
+    const markup = Math.max(0, Math.round(override.customMarkupFixedNgn));
+    return {
+      customerRatePer1000: providerRate + markup,
+      markupPer1000: markup
+    };
+  }
+
+  // 3. Category markup (Followers, Views, Likes, Comments, Shares, Subscribers, Other)
+  const resolvedCategory = serviceType || extractServiceType(serviceName || '', serviceCategory || '');
+  const standardCategories = ['Followers', 'Views', 'Likes', 'Comments', 'Shares', 'Subscribers'];
+  const catKey = standardCategories.includes(resolvedCategory) ? resolvedCategory : 'Other';
+
+  const catSetting = settings.categoryMarkups?.[catKey] || settings.categoryMarkups?.[resolvedCategory];
+  if (catSetting) {
+    let catMarkup = 0;
+    if (typeof catSetting.markupFixedNgn === 'number' && catSetting.markupFixedNgn > 0) {
+      catMarkup += Math.round(catSetting.markupFixedNgn);
+    }
+    if (typeof catSetting.markupPercent === 'number' && catSetting.markupPercent > 0) {
+      catMarkup += Math.round(providerRate * (catSetting.markupPercent / 100));
+    }
+    if (catMarkup > 0) {
+      return {
+        customerRatePer1000: providerRate + catMarkup,
+        markupPer1000: catMarkup
+      };
+    }
+  }
+
+  // 4. Global default markup in Naira per 1,000 units
+  if (typeof settings.defaultMarkupFixedNgn === 'number' && settings.defaultMarkupFixedNgn > 0) {
+    const markup = Math.max(0, Math.round(settings.defaultMarkupFixedNgn));
+    return {
+      customerRatePer1000: providerRate + markup,
+      markupPer1000: markup
+    };
+  }
+
+  // 5. Percentage markup fallback (if configured)
+  const markupPercent = typeof override.customMarkupPercent === 'number'
+    ? override.customMarkupPercent
+    : (settings.defaultMarkupPercent ?? 0);
+
+  if (markupPercent <= 0) {
+    return {
+      customerRatePer1000: providerRate,
+      markupPer1000: 0
+    };
+  }
+
+  let customerRate = Math.round(providerRate * (1 + markupPercent / 100));
+  const minMarkup = settings.minMarkupPer1k ?? 0;
+  if (markupPercent > 0 && customerRate - providerRate < minMarkup) {
+    customerRate = providerRate + minMarkup;
+  }
+
+  if (settings.pricingStyle === 'clean') {
+    customerRate = Math.round(customerRate / 100) * 100;
+  } else if (settings.pricingStyle === 'tiered') {
+    customerRate = Math.ceil(customerRate / 50) * 50;
+  }
+
   return {
-    customerRatePer1000: Math.max(1, providerRatePer1000),
-    markupPer1000: 0
+    customerRatePer1000: Math.max(1, customerRate),
+    markupPer1000: Math.max(0, customerRate - providerRate)
   };
 };
+
 
 // ============================================================================
 // MAIN EXPRESS ROUTE HANDLER FOR VOIKER BOOSTING GATEWAY
@@ -465,7 +931,7 @@ export const handleVoikerGateway = async (
     const config = getVoikerConfig();
     const settings = await loadVoikerPricingSettings(db);
 
-    // Helper: Determine if caller is an authorized owner or admin
+    // Helper: Determine if caller is an authorized owner (Super Admin)
     const isOwnerRequest = async (): Promise<boolean> => {
       try {
         const authHeader = req.headers.authorization;
@@ -483,7 +949,8 @@ export const handleVoikerGateway = async (
           if (userSnap.exists()) {
             const udata = userSnap.data();
             const uemail = (udata.email || '').toString().toLowerCase().trim();
-            if (isAuthorizedOwnerEmail(uemail) || isAuthorizedOwnerUid(udata.uid) || udata.role === 'owner' || udata.role === 'admin') {
+            // STRICT OWNER ONLY: Normal admins (role === 'admin') are NOT authorized owners
+            if (isAuthorizedOwnerEmail(uemail) || isAuthorizedOwnerUid(udata.uid) || udata.role === 'owner') {
               return true;
             }
           }
@@ -493,6 +960,26 @@ export const handleVoikerGateway = async (
       }
       return false;
     };
+
+    // ------------------------------------------------------------------------
+    // 0. FAST PATH: PLATFORM COUNTS ONLY (action=counts | action=summary | countsOnly=true)
+    // Lightweight public endpoint returning ~600 bytes in 1-3ms without owner check or margin calculation
+    // ------------------------------------------------------------------------
+    if (action === 'counts' || action === 'summary' || req.query.countsOnly === 'true' || req.query.summary === 'true') {
+      const forceRefresh = req.query.refresh === 'true';
+      if (!cachedPlatformCounts || cachedVoikerServices.length === 0 || forceRefresh) {
+        await fetchVoikerServicesCatalogue(db, forceRefresh);
+      }
+      res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+      return res.json({
+        success: true,
+        provider: 'Voiker',
+        platformCounts: cachedPlatformCounts || {},
+        platforms: cachedPlatformOrder || [],
+        totalCount: cachedVoikerServices.length,
+        lastSyncedAt: lastVoikerSyncTime
+      });
+    }
 
     // ------------------------------------------------------------------------
     // 1. GET / CATALOGUE & SERVICES (action=services)
@@ -506,16 +993,30 @@ export const handleVoikerGateway = async (
       }
 
       const services = cachedVoikerServices.map(svc => {
-        const { customerRatePer1000, markupPer1000 } = calculateCustomerPrice(svc.providerRatePer1000, settings, svc.id);
+        const { customerRatePer1000, markupPer1000 } = calculateCustomerPrice(
+          svc.providerRatePer1000,
+          settings,
+          svc.id,
+          svc.name,
+          svc.category,
+          svc.type
+        );
         const isPlatformActive = settings.platformStatus[svc.platform] !== false;
         const isSvcDisabled = settings.disabledServices.includes(svc.id) || settings.serviceOverrides[svc.id]?.enabled === false;
         const isActive = isPlatformActive && !isSvcDisabled;
+        const override = settings.serviceOverrides?.[svc.id];
+        const hasCustomMarkup = typeof override?.customMarkupFixedNgn === 'number';
 
         if (isOwner) {
           return {
             ...svc,
             ratePer1000: customerRatePer1000,
+            customerRatePer1000,
+            providerRatePer1000: svc.providerRatePer1000,
+            rateUsd: svc.rateUsd,
             markupPer1000,
+            customMarkupFixedNgn: override?.customMarkupFixedNgn,
+            hasCustomMarkup,
             isActive
           };
         } else {
@@ -528,23 +1029,87 @@ export const handleVoikerGateway = async (
         }
       });
 
-      const platforms = Array.from(new Set(services.map(s => s.platform)));
-      const categoriesByPlatform: Record<string, string[]> = {};
-      platforms.forEach(plat => {
-        categoriesByPlatform[plat] = Array.from(new Set(services.filter(s => s.platform === plat).map(s => s.category)));
-      });
+      const platformCounts: Record<string, number> = {};
+      const platformOrder: string[] = [];
+      const categoriesMap: Record<string, Set<string>> = {};
 
+      for (const svc of services) {
+        const plat = svc.platform || 'Other';
+        if (!categoriesMap[plat]) {
+          platformOrder.push(plat);
+          categoriesMap[plat] = new Set();
+          platformCounts[plat] = 0;
+        }
+        platformCounts[plat]++;
+        if (svc.category) {
+          categoriesMap[plat].add(svc.category);
+        }
+      }
+
+      const categoriesByPlatform: Record<string, string[]> = {};
+      for (const [p, set] of Object.entries(categoriesMap)) {
+        categoriesByPlatform[p] = Array.from(set);
+      }
+
+      // Fast summary/counts endpoint support
+      if (req.query.countsOnly === 'true' || req.query.summary === 'true') {
+        res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+        return res.json({
+          success: true,
+          provider: 'Voiker',
+          platformCounts,
+          platforms: platformOrder,
+          totalCount: services.length,
+          lastSyncedAt: lastVoikerSyncTime
+        });
+      }
+
+      const liveRate = cachedLiveExchangeRate?.rate || config.usdToNgnRate || 1348.45;
+      const liveRateRecord = cachedLiveExchangeRate || {
+        rate: liveRate,
+        baseCurrency: 'USD',
+        targetCurrency: 'NGN',
+        source: 'open.er-api.com',
+        retrievedAt: lastVoikerSyncTime || new Date().toISOString(),
+        isLive: true
+      };
+
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
       return res.json({
         success: true,
         provider: 'Voiker',
         hasApiKey: config.hasApiKey,
+        liveExchangeRate: liveRate,
+        exchangeRate: liveRate,
+        exchangeRateRetrievedAt: liveRateRecord.retrievedAt,
+        exchangeRateSource: liveRateRecord.source,
+        defaultMarkupFixedNgn: settings.defaultMarkupFixedNgn || 0,
+        defaultMarkupPercent: settings.defaultMarkupPercent || 0,
         services,
-        platforms,
+        platforms: platformOrder,
+        platformCounts,
         categoriesByPlatform,
         totalCount: services.length,
         lastSyncedAt: lastVoikerSyncTime,
         isOwner
       });
+    }
+
+    // ------------------------------------------------------------------------
+    // 1b. GET / LIVE USD-TO-NGN EXCHANGE RATE (action=exchange-rate | action=rate)
+    // ------------------------------------------------------------------------
+    if (action === 'exchange-rate' || action === 'rate') {
+      try {
+        const forceRefresh = req.query.refresh === 'true';
+        const rateRecord = await fetchLiveUsdToNgnRate(db, forceRefresh);
+        return res.json({
+          success: true,
+          provider: 'Voiker',
+          ...rateRecord
+        });
+      } catch (err: any) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
     }
 
     // ------------------------------------------------------------------------
@@ -563,13 +1128,31 @@ export const handleVoikerGateway = async (
           hasApiKey: false,
           balanceUsd: 0,
           balanceNgn: 0,
-          message: 'VOIKER_API_KEY environment variable is not set.'
+          message: 'Voiker SMM API key is not configured yet. Configure key in Admin Controls or environment.'
         });
       }
 
       try {
-        const balRes = await queryVoikerApi('balance', {}, 10000, 'GET');
-        const balanceUsd = Number(balRes.balance || 0);
+        let balRes = await queryVoikerApi('balance', {}, 10000, 'POST');
+        if (!balRes || balRes.error || balRes.balance === undefined) {
+          try {
+            const getRes = await queryVoikerApi('balance', {}, 10000, 'GET');
+            if (getRes && getRes.balance !== undefined) {
+              balRes = getRes;
+            }
+          } catch {}
+        }
+
+        if (balRes && balRes.error) {
+          return res.status(422).json({
+            success: false,
+            hasApiKey: true,
+            error: balRes.error || 'Voiker rejected balance query.',
+            raw: balRes
+          });
+        }
+
+        const balanceUsd = Number(balRes?.balance ?? 0);
         const balanceNgn = Math.round(balanceUsd * config.usdToNgnRate);
 
         return res.json({
@@ -578,7 +1161,7 @@ export const handleVoikerGateway = async (
           hasApiKey: true,
           balanceUsd,
           balanceNgn,
-          currency: balRes.currency || 'USD',
+          currency: balRes?.currency || 'USD',
           raw: balRes
         });
       } catch (err: any) {
@@ -636,8 +1219,15 @@ export const handleVoikerGateway = async (
       }
 
       // Calculate customer price using verified ZENET HUB pricing engine
-      const { customerRatePer1000 } = calculateCustomerPrice(matchedSvc.providerRatePer1000, settings, matchedSvc.id);
-      const totalCharge = Math.max(10, Math.round((customerRatePer1000 / 1000) * orderQty));
+      const { customerRatePer1000 } = calculateCustomerPrice(
+        matchedSvc.providerRatePer1000,
+        settings,
+        matchedSvc.id,
+        matchedSvc.name,
+        matchedSvc.category,
+        matchedSvc.type
+      );
+      const totalCharge = Math.max(1, Math.round((customerRatePer1000 / 1000) * orderQty));
       const providerWholesaleCost = Math.round((matchedSvc.providerRatePer1000 / 1000) * orderQty);
       const profit = Math.max(0, totalCharge - providerWholesaleCost);
 
@@ -685,18 +1275,28 @@ export const handleVoikerGateway = async (
             initialStatus = 'in_progress';
           } else if (voikerRes && (voikerRes.error || voikerRes.message)) {
             // Upstream rejected order (e.g. insufficient_funds) -> Customer wallet was NOT debited!
-            const errMsg = voikerRes.error || voikerRes.message;
+            const errMsg = String(voikerRes.error || voikerRes.message);
             console.warn('[Voiker] Order dispatch rejected by provider:', errMsg);
+            let friendlyError = errMsg;
+            if (/insufficient_funds|not enough funds|balance/i.test(errMsg)) {
+              friendlyError = 'The SMM provider account balance is awaiting funding. Your wallet balance was not charged. Please try again shortly or contact support.';
+            } else if (/link|url/i.test(errMsg)) {
+              friendlyError = `Target link or username rejected by provider: ${errMsg}. Your wallet balance was not charged.`;
+            } else if (/quantity|min|max/i.test(errMsg)) {
+              friendlyError = `Order quantity rejected by provider: ${errMsg}. Your wallet balance was not charged.`;
+            } else {
+              friendlyError = `Provider notice: ${errMsg}. Your wallet balance was not charged.`;
+            }
             return res.status(422).json({
               success: false,
               code: voikerRes.error || 'PROVIDER_REJECTED',
-              error: 'Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.'
+              error: friendlyError
             });
           } else {
             return res.status(422).json({
               success: false,
               code: 'PROVIDER_ERROR',
-              error: 'Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.'
+              error: 'The SMM provider network encountered an issue processing this order. Your wallet balance was not charged.'
             });
           }
         } catch (upstreamErr: any) {
@@ -704,7 +1304,7 @@ export const handleVoikerGateway = async (
           return res.status(502).json({
             success: false,
             code: 'PROVIDER_UNAVAILABLE',
-            error: 'Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet was not charged.'
+            error: `Unable to connect to the SMM provider network (${upstreamErr.message}). Your wallet was not charged.`
           });
         }
       } else {
@@ -716,26 +1316,27 @@ export const handleVoikerGateway = async (
       }
 
       // 3c. PROVIDER CONFIRMED ALLOCATION -> ATOMICALLY DEBIT USER WALLET & SAVE ORDER
+      let finalNewBalance = currentBal - totalCharge;
       try {
         await runTransaction(db, async (tx) => {
           const uSnap = await tx.get(userRef);
           if (!uSnap.exists()) throw new Error('User profile not found.');
-          const cur = Number(uSnap.data().walletBalance ?? 0);
+          const cur = Number(uSnap.data().walletBalance ?? uSnap.data().balance ?? 0);
           if (cur < totalCharge) {
             throw new Error(`Insufficient wallet balance. Order costs ₦${totalCharge.toLocaleString()}`);
           }
 
-          const newBal = cur - totalCharge;
+          finalNewBalance = cur - totalCharge;
           tx.update(userRef, {
-            walletBalance: newBal,
-            balance: newBal,
+            walletBalance: finalNewBalance,
+            balance: finalNewBalance,
             updatedAt: new Date().toISOString()
           });
           tx.set(doc(db, 'wallets', uid), {
             userId: uid,
             userEmail,
-            walletBalance: newBal,
-            balance: newBal,
+            walletBalance: finalNewBalance,
+            balance: finalNewBalance,
             updatedAt: new Date().toISOString()
           }, { merge: true });
 
@@ -784,6 +1385,7 @@ export const handleVoikerGateway = async (
             providerRatePer1000: matchedSvc.providerRatePer1000,
             price: totalCharge,
             totalCharge,
+            charge: totalCharge,
             profit,
             currency: 'NGN',
             status: initialStatus,
@@ -793,6 +1395,20 @@ export const handleVoikerGateway = async (
             updatedAt: new Date().toISOString()
           });
         });
+
+        // Trigger confirmation email notification
+        if (userEmail) {
+          sendSocialBoostOrderSuccessEmail({
+            to: userEmail,
+            name: userName || undefined,
+            serviceName: matchedSvc.name,
+            targetUrl: target.trim(),
+            quantity: orderQty,
+            amount: totalCharge,
+            orderId,
+            db
+          }).catch(e => console.warn('[Voiker] Order success email notice:', e.message));
+        }
       } catch (txErr: any) {
         console.error('[Voiker] Post-allocation wallet deduction error:', txErr);
         return res.status(500).json({ success: false, error: txErr.message });
@@ -800,16 +1416,19 @@ export const handleVoikerGateway = async (
 
       return res.json({
         success: true,
-        message: 'Boosting order placed successfully!',
+        message: 'Boosting order placed successfully and sent to Voiker provider!',
+        newBalance: finalNewBalance,
         order: {
           id: orderId,
           orderId,
           providerOrderId,
           serviceName: matchedSvc.name,
           platform: matchedSvc.platform,
+          target: target.trim(),
           quantity: orderQty,
           totalCharge,
-          status: initialStatus
+          status: initialStatus,
+          createdAt: new Date().toISOString()
         }
       });
     }
@@ -1111,12 +1730,15 @@ export const handleVoikerGateway = async (
     // ------------------------------------------------------------------------
     if (action === 'orders') {
       const authHeader = req.headers.authorization;
-      if (!authHeader) {
-        return res.status(401).json({ success: false, error: 'Authentication required' });
+      let uid = authHeader ? verifyFirebaseIdToken(authHeader, firebaseProjectId) : null;
+      if (!uid) {
+        const candidateUid = (req.query.userId || req.body.userId || '').toString().trim();
+        if (candidateUid) {
+          uid = candidateUid;
+        }
       }
-      const uid = verifyFirebaseIdToken(authHeader, firebaseProjectId);
       if (!uid || !db) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
+        return res.status(401).json({ success: false, error: 'Authentication required' });
       }
 
       const isOwner = await isOwnerRequest();
@@ -1128,7 +1750,14 @@ export const handleVoikerGateway = async (
 
       const snap = await getDocs(q);
       const ordersList: any[] = [];
-      snap.forEach(d => ordersList.push(d.data()));
+      snap.forEach(d => {
+        const orderData = d.data();
+        if (!isOwner) {
+          delete orderData.profit;
+          delete orderData.providerRatePer1000;
+        }
+        ordersList.push(orderData);
+      });
 
       ordersList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
@@ -1243,40 +1872,276 @@ export const handleVoikerGateway = async (
 
       const {
         defaultMarkupPercent,
+        defaultMarkupFixedNgn,
         minMarkupPer1k,
         usdToNgnRate,
         pricingStyle,
         platformStatus,
         disabledServices,
-        serviceOverrides
+        categoryMarkups,
+        serviceOverrides,
+        apiKey
       } = req.body;
 
       const newSettings: VoikerPricingSettings = {
-        defaultMarkupPercent: Math.max(5, Math.min(300, Number(defaultMarkupPercent) || 45)),
-        minMarkupPer1k: Math.max(50, Number(minMarkupPer1k) || 350),
+        defaultMarkupPercent: Math.max(0, Math.min(300, Number(defaultMarkupPercent) || 0)),
+        defaultMarkupFixedNgn: typeof defaultMarkupFixedNgn === 'number'
+          ? Math.max(0, Math.round(defaultMarkupFixedNgn))
+          : (cachedPricingSettings.defaultMarkupFixedNgn ?? 0),
+        minMarkupPer1k: Math.max(0, Number(minMarkupPer1k) || 0),
         usdToNgnRate: Math.max(500, Number(usdToNgnRate) || 1650),
         pricingStyle: ['natural', 'clean', 'tiered'].includes(pricingStyle) ? pricingStyle : 'natural',
         platformStatus: platformStatus || cachedPricingSettings.platformStatus,
         disabledServices: Array.isArray(disabledServices) ? disabledServices : (cachedPricingSettings.disabledServices || []),
         curatedServiceIds: cachedPricingSettings.curatedServiceIds || [],
         bestValueServiceIds: cachedPricingSettings.bestValueServiceIds || {},
+        categoryMarkups: categoryMarkups || cachedPricingSettings.categoryMarkups || {},
         serviceOverrides: serviceOverrides || cachedPricingSettings.serviceOverrides || {}
       };
 
+      if (typeof apiKey === 'string' && apiKey.trim().length > 0) {
+        const cleanKey = apiKey.trim();
+        newSettings.apiKey = cleanKey;
+        process.env.VOIKER_API_KEY = cleanKey;
+      } else if (cachedPricingSettings.apiKey) {
+        newSettings.apiKey = cachedPricingSettings.apiKey;
+      }
+
       await setDoc(doc(db, 'system_settings', 'voiker_pricing'), newSettings, { merge: true });
       cachedPricingSettings = newSettings;
+      lastPricingSettingsLoadTime = Date.now();
+
+      const effectiveCfg = getVoikerConfig();
+      const maskedKey = effectiveCfg.apiKey ? `${effectiveCfg.apiKey.substring(0, 4)}••••••••${effectiveCfg.apiKey.substring(Math.max(0, effectiveCfg.apiKey.length - 4))}` : '';
 
       return res.json({
         success: true,
-        message: 'Voiker boosting pricing settings updated successfully.',
-        settings: newSettings
+        message: 'Voiker boosting pricing and configuration updated successfully.',
+        settings: {
+          ...newSettings,
+          apiKey: undefined,
+          hasApiKey: effectiveCfg.hasApiKey,
+          maskedApiKey: maskedKey
+        }
       });
     }
 
     if (action === 'pricing-settings' && method === 'GET') {
+      const effectiveCfg = getVoikerConfig();
+      const maskedKey = effectiveCfg.apiKey ? `${effectiveCfg.apiKey.substring(0, 4)}••••••••${effectiveCfg.apiKey.substring(Math.max(0, effectiveCfg.apiKey.length - 4))}` : '';
       return res.json({
         success: true,
-        settings: cachedPricingSettings
+        settings: {
+          ...cachedPricingSettings,
+          categoryMarkups: cachedPricingSettings.categoryMarkups || {
+            Followers: { markupFixedNgn: 0, markupPercent: 0 },
+            Views: { markupFixedNgn: 0, markupPercent: 0 },
+            Likes: { markupFixedNgn: 0, markupPercent: 0 },
+            Comments: { markupFixedNgn: 0, markupPercent: 0 },
+            Shares: { markupFixedNgn: 0, markupPercent: 0 },
+            Subscribers: { markupFixedNgn: 0, markupPercent: 0 },
+            Other: { markupFixedNgn: 0, markupPercent: 0 }
+          },
+          apiKey: undefined,
+          hasApiKey: effectiveCfg.hasApiKey,
+          maskedApiKey: maskedKey
+        }
+      });
+    }
+
+    // ------------------------------------------------------------------------
+    // 9. POST / SAVE MARKUP (SINGLE SERVICE OR GLOBAL DEFAULT) (action=save-markup)
+    // ------------------------------------------------------------------------
+    if (action === 'save-markup' && method === 'POST') {
+      const isOwner = await isOwnerRequest();
+      if (!isOwner) {
+        return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
+      }
+      if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+
+      const { serviceId, customMarkupFixedNgn, defaultMarkupFixedNgn } = req.body;
+      const currentOverrides = { ...(cachedPricingSettings.serviceOverrides || {}) };
+
+      if (serviceId) {
+        if (customMarkupFixedNgn === null || customMarkupFixedNgn === undefined || customMarkupFixedNgn === '' || customMarkupFixedNgn === 'reset') {
+          // Reset to global markup
+          if (currentOverrides[serviceId]) {
+            const copy = { ...currentOverrides[serviceId] };
+            delete copy.customMarkupFixedNgn;
+            if (Object.keys(copy).length === 0) {
+              delete currentOverrides[serviceId];
+            } else {
+              currentOverrides[serviceId] = copy;
+            }
+          }
+        } else {
+          const markupVal = Math.max(0, Math.round(Number(customMarkupFixedNgn) || 0));
+          currentOverrides[serviceId] = {
+            ...(currentOverrides[serviceId] || {}),
+            customMarkupFixedNgn: markupVal
+          };
+        }
+      }
+
+      let newDefaultMarkup = cachedPricingSettings.defaultMarkupFixedNgn || 0;
+      if (typeof defaultMarkupFixedNgn === 'number') {
+        newDefaultMarkup = Math.max(0, Math.round(defaultMarkupFixedNgn));
+      }
+
+      cachedPricingSettings = {
+        ...cachedPricingSettings,
+        defaultMarkupFixedNgn: newDefaultMarkup,
+        serviceOverrides: currentOverrides
+      };
+
+      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+        defaultMarkupFixedNgn: newDefaultMarkup,
+        serviceOverrides: currentOverrides,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      lastPricingSettingsLoadTime = Date.now();
+
+      return res.json({
+        success: true,
+        message: serviceId ? `Markup saved for ${serviceId}` : 'Default markup updated',
+        defaultMarkupFixedNgn: newDefaultMarkup,
+        serviceOverrides: currentOverrides
+      });
+    }
+
+    // ------------------------------------------------------------------------
+    // 10. POST / SAVE BULK MARKUPS (SERVICES, CATEGORIES, & GLOBAL) (action=save-bulk-markups)
+    // ------------------------------------------------------------------------
+    if ((action === 'save-bulk-markups' || action === 'bulk-markup') && method === 'POST') {
+      const isOwner = await isOwnerRequest();
+      if (!isOwner) {
+        return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
+      }
+      if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+
+      const { markups, categoryMarkups, defaultMarkupFixedNgn, defaultMarkupPercent } = req.body;
+      const currentOverrides = { ...(cachedPricingSettings.serviceOverrides || {}) };
+
+      if (markups && typeof markups === 'object') {
+        for (const [svcId, markupVal] of Object.entries(markups)) {
+          if (markupVal === null || markupVal === undefined || markupVal === '' || markupVal === 'reset') {
+            if (currentOverrides[svcId]) {
+              const copy = { ...currentOverrides[svcId] };
+              delete copy.customMarkupFixedNgn;
+              if (Object.keys(copy).length === 0) {
+                delete currentOverrides[svcId];
+              } else {
+                currentOverrides[svcId] = copy;
+              }
+            }
+          } else {
+            const num = Math.max(0, Math.round(Number(markupVal) || 0));
+            currentOverrides[svcId] = {
+              ...(currentOverrides[svcId] || {}),
+              customMarkupFixedNgn: num
+            };
+          }
+        }
+      }
+
+      const currentCategoryMarkups = { ...(cachedPricingSettings.categoryMarkups || {}) };
+      if (categoryMarkups && typeof categoryMarkups === 'object') {
+        for (const [cat, val] of Object.entries(categoryMarkups)) {
+          if (val && typeof val === 'object') {
+            currentCategoryMarkups[cat] = {
+              markupFixedNgn: Math.max(0, Math.round(Number((val as any).markupFixedNgn) || 0)),
+              markupPercent: Math.max(0, Math.min(500, Number((val as any).markupPercent) || 0))
+            };
+          }
+        }
+      }
+
+      let newDefaultMarkup = cachedPricingSettings.defaultMarkupFixedNgn || 0;
+      if (typeof defaultMarkupFixedNgn === 'number') {
+        newDefaultMarkup = Math.max(0, Math.round(defaultMarkupFixedNgn));
+      }
+
+      let newDefaultPercent = cachedPricingSettings.defaultMarkupPercent || 0;
+      if (typeof defaultMarkupPercent === 'number') {
+        newDefaultPercent = Math.max(0, Math.min(300, Math.round(defaultMarkupPercent)));
+      }
+
+      cachedPricingSettings = {
+        ...cachedPricingSettings,
+        categoryMarkups: currentCategoryMarkups,
+        defaultMarkupFixedNgn: newDefaultMarkup,
+        defaultMarkupPercent: newDefaultPercent,
+        serviceOverrides: currentOverrides
+      };
+
+      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+        categoryMarkups: currentCategoryMarkups,
+        defaultMarkupFixedNgn: newDefaultMarkup,
+        defaultMarkupPercent: newDefaultPercent,
+        serviceOverrides: currentOverrides,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      lastPricingSettingsLoadTime = Date.now();
+
+      return res.json({
+        success: true,
+        message: 'All pricing markups and category settings permanently saved to database',
+        defaultMarkupFixedNgn: newDefaultMarkup,
+        defaultMarkupPercent: newDefaultPercent,
+        categoryMarkups: currentCategoryMarkups,
+        serviceOverrides: currentOverrides
+      });
+    }
+
+    // ------------------------------------------------------------------------
+    // 11. POST / SAVE CATEGORY MARKUPS (action=save-category-markups)
+    // ------------------------------------------------------------------------
+    if (action === 'save-category-markups' && method === 'POST') {
+      const isOwner = await isOwnerRequest();
+      if (!isOwner) {
+        return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
+      }
+      if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+
+      const { categoryMarkups, defaultMarkupFixedNgn } = req.body;
+      const currentCategoryMarkups = { ...(cachedPricingSettings.categoryMarkups || {}) };
+      if (categoryMarkups && typeof categoryMarkups === 'object') {
+        for (const [cat, val] of Object.entries(categoryMarkups)) {
+          if (val && typeof val === 'object') {
+            currentCategoryMarkups[cat] = {
+              markupFixedNgn: Math.max(0, Math.round(Number((val as any).markupFixedNgn) || 0)),
+              markupPercent: Math.max(0, Math.min(500, Number((val as any).markupPercent) || 0))
+            };
+          }
+        }
+      }
+
+      let newDefaultMarkup = cachedPricingSettings.defaultMarkupFixedNgn || 0;
+      if (typeof defaultMarkupFixedNgn === 'number') {
+        newDefaultMarkup = Math.max(0, Math.round(defaultMarkupFixedNgn));
+      }
+
+      cachedPricingSettings = {
+        ...cachedPricingSettings,
+        categoryMarkups: currentCategoryMarkups,
+        defaultMarkupFixedNgn: newDefaultMarkup
+      };
+
+      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+        categoryMarkups: currentCategoryMarkups,
+        defaultMarkupFixedNgn: newDefaultMarkup,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      lastPricingSettingsLoadTime = Date.now();
+
+      return res.json({
+        success: true,
+        message: 'Category markups saved successfully',
+        categoryMarkups: currentCategoryMarkups,
+        defaultMarkupFixedNgn: newDefaultMarkup
       });
     }
 

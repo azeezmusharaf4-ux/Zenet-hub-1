@@ -13,6 +13,7 @@ import {
   getDocs, 
   runTransaction 
 } from './_firebase';
+import { sendWalletWithdrawalUpdateEmail, sendRefundSuccessEmail } from '../../src/server/emailService';
 
 const generatePermanentWithdrawalId = (): string => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -250,6 +251,21 @@ export const handler = async (event: any) => {
         });
       });
 
+      // Dispatch real email notification to user's registered Gmail
+      if (verifiedUser.email) {
+        await sendWalletWithdrawalUpdateEmail({
+          to: verifiedUser.email,
+          name: createdWithdrawalRecord?.userName,
+          amount,
+          status: 'pending',
+          bankName: bankName.trim(),
+          accountNumber: accountNumber.trim(),
+          reference: transactionId || reference,
+          date: dateStr,
+          db
+        }).catch(() => {});
+      }
+
       return {
         statusCode: 200,
         headers,
@@ -386,6 +402,21 @@ export const handler = async (event: any) => {
         // ignore
       }
 
+      // Dispatch real email notification confirming withdrawal payout
+      if (reqData.userEmail) {
+        await sendWalletWithdrawalUpdateEmail({
+          to: reqData.userEmail,
+          name: reqData.userName,
+          amount: Number(reqData.amount),
+          status: 'confirmed',
+          bankName: reqData.bankName,
+          accountNumber: reqData.accountNumber,
+          reference: reqData.transactionId || reqData.reference || requestId,
+          date: isoDate.split('T')[0],
+          db
+        }).catch(() => {});
+      }
+
       return {
         statusCode: 200,
         headers,
@@ -496,6 +527,32 @@ export const handler = async (event: any) => {
           updatedAt: isoDate,
           updatedBy: verifiedUser.email || 'Admin'
         });
+      }
+
+      // Dispatch real email notification on withdrawal status change or decline refund
+      if (reqData.userEmail) {
+        if (newStatus === 'rejected' || newStatus === 'declined' || newStatus === 'failed') {
+          await sendRefundSuccessEmail({
+            to: reqData.userEmail,
+            name: reqData.userName,
+            amount: Number(reqData.amount),
+            reason: `Withdrawal request declined: ${(adminNotes || '').trim() || 'Funds returned to wallet'}`,
+            orderId: reqData.transactionId || requestId,
+            db
+          }).catch(() => {});
+        } else {
+          await sendWalletWithdrawalUpdateEmail({
+            to: reqData.userEmail,
+            name: reqData.userName,
+            amount: Number(reqData.amount),
+            status: newStatus as any,
+            bankName: reqData.bankName,
+            accountNumber: reqData.accountNumber,
+            reference: reqData.transactionId || reqData.reference || requestId,
+            date: isoDate.split('T')[0],
+            db
+          }).catch(() => {});
+        }
       }
 
       return {

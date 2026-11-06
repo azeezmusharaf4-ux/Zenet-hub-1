@@ -9,16 +9,41 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
-import { isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from './src/lib/authorizedOwners';
-import { handleVirtualSMSNumbersGateway, handleVirtualSMSNumbersWebhook } from './src/server/virtualSmsNumbers';
-import { handleVoikerGateway } from './src/server/voikerBoosting';
+import { isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from './src/lib/authorizedOwners.ts';
+import { handleVirtualSMSNumbersGateway, handleVirtualSMSNumbersWebhook } from './src/server/virtualSmsNumbers.ts';
+import { handleVoikerGateway, fetchVoikerServicesCatalogue } from './src/server/voikerBoosting.ts';
+import {
+  sendZenetEmail,
+  sendWelcomeEmail,
+  sendLoginNotificationEmail,
+  sendVirtualNumberPurchaseEmail,
+  sendOtpAvailableNotificationEmail,
+  sendWalletDepositSuccessEmail,
+  sendRefundSuccessEmail,
+  sendProductPurchaseSuccessEmail,
+  sendSocialBoostOrderSuccessEmail,
+  sendWalletWithdrawalUpdateEmail,
+  sendWalletTransactionSuccessEmail,
+  sendReferralRewardEmail,
+  getEmailServiceStatus,
+  verifySmtpConnection,
+  OFFICIAL_SENDER_GMAIL
+} from './src/server/emailService.ts';
+import { 
+  processReferralRewardOnDeposit, 
+  linkReferralCode, 
+  QUALIFYING_DEPOSIT_THRESHOLD, 
+  REFERRAL_REWARD_AMOUNT 
+} from './src/server/referralService.ts';
 
 const app = express();
-const PORT = 3000;
+const portArgIdx = process.argv.indexOf('--port');
+const cliPort = portArgIdx !== -1 && process.argv[portArgIdx + 1] ? parseInt(process.argv[portArgIdx + 1], 10) : null;
+const envPort = process.env.APP_PORT || (process.env.PORT && process.env.PORT !== '8080' ? process.env.PORT : null);
+const PORT = cliPort || (envPort ? parseInt(envPort, 10) : 3000);
 
 app.disable('x-powered-by');
 
@@ -197,7 +222,14 @@ const SERVER_SERVICE_PASSWORD = 'ZenetSecureSystemBackend2026!#';
 
 async function ensureServerAuthenticated() {
   if (!serverAuth) return;
-  if (serverAuth.currentUser) return;
+  if (serverAuth.currentUser) {
+    try {
+      await serverAuth.currentUser.getIdToken(false);
+      return;
+    } catch {
+      // Token might be revoked or expired, re-sign in below
+    }
+  }
   try {
     await signInWithEmailAndPassword(serverAuth, SERVER_SERVICE_EMAIL, SERVER_SERVICE_PASSWORD);
   } catch (err: any) {
@@ -1265,6 +1297,18 @@ const fulfillLogOrderAndDeliver = async ({
         refundedToWallet: true,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+
+      // Dispatch real email notification to user's registered email for automatic refund
+      if (buyerEmail) {
+        sendRefundSuccessEmail({
+          to: buyerEmail,
+          name: buyerName,
+          amount: paidAmount,
+          reason: 'Listing account out of stock - Automatic refund credited to wallet',
+          orderId: effectiveOrderId,
+          db
+        }).catch((e) => console.warn('[EmailService] Log refund email notice:', e?.message));
+      }
     } catch (refErr) {
       console.error('[LOG Fulfillment] Failed to credit refund to wallet:', refErr);
     }
@@ -1301,6 +1345,20 @@ const fulfillLogOrderAndDeliver = async ({
   // Record 70% Seller / 30% Owner split permanently in database
   if (purchaseResult?.purchaseRecord) {
     await recordSellerRevenueSplit(purchaseResult.purchaseRecord);
+  }
+
+  // Dispatch real email confirmation directly to user's registered Gmail
+  if (purchaseResult?.purchaseRecord?.buyerEmail) {
+    sendProductPurchaseSuccessEmail({
+      to: purchaseResult.purchaseRecord.buyerEmail,
+      name: purchaseResult.purchaseRecord.buyerName,
+      productTitle: purchaseResult.purchaseRecord.listingTitle || 'Digital Account',
+      amount: purchaseResult.purchaseRecord.paidAmount,
+      orderId: purchaseResult.purchaseRecord.id,
+      transactionId: reference,
+      category: purchaseResult.purchaseRecord.category || 'Log Account',
+      db
+    }).catch((e) => console.warn('[EmailService] Log direct purchase email notice:', e?.message));
   }
 
   return {
@@ -1588,6 +1646,7 @@ const verifyAndCreditTransaction = async (
       // Atomic execution using Firestore runTransaction to prevent double crediting under high concurrency
       finalBalance = 0;
       let alreadyCredited = false;
+      let recordedPreviousBalance = 0;
 
       await runTransaction(db, async (transaction) => {
         const txDocRef = doc(db, 'wallet_transactions', reference);
@@ -1605,6 +1664,7 @@ const verifyAndCreditTransaction = async (
         const rawWBal = walletData.walletBalance !== undefined ? walletData.walletBalance : walletData.balance;
         const numWBal = typeof rawWBal === 'number' ? rawWBal : (rawWBal ? Number(rawWBal) : 0);
         const currentBal = Math.max(isNaN(numUBal) ? 0 : numUBal, isNaN(numWBal) ? 0 : numWBal);
+        recordedPreviousBalance = currentBal;
 
         if (liveTxSnap.exists()) {
           const liveData = liveTxSnap.data();
@@ -1685,6 +1745,61 @@ const verifyAndCreditTransaction = async (
       }
 
       console.log(`[Paystack Verify] Atomic Credit Complete: ₦${amountNaira} credited to User ${targetUid}. New Balance: ₦${finalBalance}`);
+
+      // Rule 1 & 2: Automatically process ₦100 referral reward for qualifying deposits (₦1,000+)
+      if (amountNaira >= QUALIFYING_DEPOSIT_THRESHOLD && targetUid) {
+        try {
+          processReferralRewardOnDeposit({
+            db,
+            depositedUserId: String(targetUid),
+            depositedUserEmail: customerEmail,
+            depositAmount: amountNaira,
+            depositReference: reference
+          }).then(async (refResult) => {
+            if (refResult.rewarded && refResult.referrerEmail && refResult.referrerId) {
+              console.log(`[Referral Reward] Credited ₦${refResult.rewardAmount || 100} to Referrer ${refResult.referrerId}`);
+              // Dispatch email notification to referrer
+              sendReferralRewardEmail({
+                to: refResult.referrerEmail,
+                amount: refResult.rewardAmount || 100,
+                newBalance: refResult.newReferrerBalance,
+                qualifyingDepositAmount: amountNaira,
+                reference,
+                db
+              }).catch((e) => console.warn('[EmailService] Referral reward email notice:', e?.message));
+            }
+          }).catch((refErr) => {
+            console.warn('[Referral System] Auto-reward execution notice:', refErr);
+          });
+        } catch (refTriggerErr) {
+          console.warn('[Referral System] Auto-reward trigger notice:', refTriggerErr);
+        }
+      }
+
+      // Dispatch automatic deposit confirmation email to the user's authentic registered email
+      try {
+        let recipientEmail = customerEmail;
+        if (!recipientEmail && targetUid) {
+          const userSnap = await getDoc(doc(db, 'users', String(targetUid)));
+          if (userSnap.exists()) {
+            recipientEmail = userSnap.data()?.email;
+          }
+        }
+        if (recipientEmail) {
+          sendWalletDepositSuccessEmail({
+            to: recipientEmail,
+            amount: amountNaira,
+            previousBalance: recordedPreviousBalance,
+            newBalance: finalBalance,
+            reference: reference,
+            paymentMethod: 'Paystack',
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            db
+          }).catch((e) => console.warn('[EmailService] Wallet deposit email notice:', e?.message));
+        }
+      } catch (emailErr) {
+        console.warn('[EmailService] Deposit recipient resolution notice:', emailErr);
+      }
 
     } catch (creditErr) {
       console.error('[Paystack Verify] Firestore error during crediting:', creditErr);
@@ -2141,6 +2256,20 @@ app.post('/api/wallet/purchase', async (req, res) => {
       await recordSellerRevenueSplit(purchaseResult.purchaseRecord);
     }
 
+    // Dispatch real email confirmation directly to user's registered Gmail
+    if (purchaseResult?.purchaseRecord?.buyerEmail) {
+      sendProductPurchaseSuccessEmail({
+        to: purchaseResult.purchaseRecord.buyerEmail,
+        name: purchaseResult.purchaseRecord.buyerName,
+        productTitle: purchaseResult.purchaseRecord.listingTitle || 'Digital Account',
+        amount: purchaseResult.purchaseRecord.price,
+        orderId: purchaseResult.purchaseRecord.id,
+        transactionId: purchaseResult.txId,
+        category: purchaseResult.purchaseRecord.category || 'Log Account',
+        db
+      }).catch((e) => console.warn('[EmailService] Wallet log purchase email notice:', e?.message));
+    }
+
     return res.json({
       success: true,
       ...purchaseResult
@@ -2393,6 +2522,21 @@ app.post('/api/withdrawals/request', async (req, res) => {
         channel: 'bank_transfer'
       });
     });
+
+    // Dispatch real email notification to user's registered Gmail
+    if (verifiedUser.email) {
+      sendWalletWithdrawalUpdateEmail({
+        to: verifiedUser.email,
+        name: createdWithdrawalRecord?.userName,
+        amount,
+        status: 'pending',
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        reference: transactionId || reference,
+        date: dateStr,
+        db
+      }).catch((e) => console.warn('[EmailService] Withdrawal request email notice:', e?.message));
+    }
 
     return res.json({
       success: true,
@@ -2726,6 +2870,32 @@ app.post('/api/withdrawals/update-status', async (req, res) => {
       });
     }
 
+    // Dispatch real email notifications to user's registered Gmail
+    if (reqData.userEmail) {
+      if (['rejected', 'failed'].includes(newStatus)) {
+        sendRefundSuccessEmail({
+          to: reqData.userEmail,
+          name: reqData.userName,
+          amount: Number(reqData.amount),
+          reason: `Withdrawal request declined: ${(adminNotes || '').trim() || 'Funds returned to wallet'}`,
+          orderId: reqData.transactionId || requestId,
+          db
+        }).catch((e) => console.warn('[EmailService] Withdrawal refund notice:', e?.message));
+      } else {
+        sendWalletWithdrawalUpdateEmail({
+          to: reqData.userEmail,
+          name: reqData.userName,
+          amount: Number(reqData.amount),
+          status: newStatus as any,
+          bankName: reqData.bankName,
+          accountNumber: reqData.accountNumber,
+          reference: reqData.transactionId || reqData.reference || requestId,
+          date: isoDate.split('T')[0],
+          db
+        }).catch((e) => console.warn('[EmailService] Withdrawal status email notice:', e?.message));
+      }
+    }
+
     return res.json({
       success: true,
       message: `Withdrawal request status updated to ${newStatus}.`,
@@ -2797,6 +2967,21 @@ app.post('/api/withdrawals/confirm-payment', async (req, res) => {
       });
     } catch (e) {
       // ignore
+    }
+
+    // Dispatch real email notification confirming withdrawal payout
+    if (reqData.userEmail) {
+      sendWalletWithdrawalUpdateEmail({
+        to: reqData.userEmail,
+        name: reqData.userName,
+        amount: Number(reqData.amount),
+        status: 'confirmed',
+        bankName: reqData.bankName,
+        accountNumber: reqData.accountNumber,
+        reference: reqData.transactionId || reqData.reference || requestId,
+        date: isoDate.split('T')[0],
+        db
+      }).catch((e) => console.warn('[EmailService] Withdrawal confirmation email notice:', e?.message));
     }
 
     return res.json({
@@ -3179,6 +3364,21 @@ app.post('/api/tiktok-promotion/order', async (req, res) => {
       });
     });
 
+    // Dispatch real email notification directly to user's registered Gmail
+    const targetRecipient = (userEmail || verifiedUser.email || '').trim();
+    if (targetRecipient) {
+      sendSocialBoostOrderSuccessEmail({
+        to: targetRecipient,
+        name: verifiedUser.email?.split('@')[0],
+        serviceName: svc.name,
+        targetUrl: targetUrl.trim(),
+        quantity: numQty,
+        amount: totalCost,
+        orderId,
+        db
+      }).catch((e) => console.warn('[EmailService] Boost order email notice:', e?.message));
+    }
+
     return res.json({
       success: true,
       orderId,
@@ -3405,6 +3605,260 @@ app.get('/api/user/profile', async (req, res) => {
   }
 });
 
+// =========================================================================
+// REAL EMAIL NOTIFICATION DISPATCH ENDPOINTS
+// =========================================================================
+
+// POST /api/notifications/auth-event: Real email notifications for auth events (welcome & login alert)
+app.post('/api/notifications/auth-event', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser || !verifiedUser.email) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Authentication required.' });
+    }
+
+    const { event, displayName } = req.body || {};
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+    const userAgent = (req.headers['user-agent'] as string) || '';
+
+    // If displayName wasn't passed, try reading from user profile in Firestore
+    let resolvedName = displayName;
+    if (!resolvedName && db) {
+      try {
+        const uSnap = await getDoc(doc(db, 'users', verifiedUser.uid));
+        if (uSnap.exists()) {
+          resolvedName = uSnap.data().displayName || uSnap.data().fullName || uSnap.data().username;
+        }
+      } catch {}
+    }
+
+    let deliveryResult = null;
+
+    if (event === 'welcome') {
+      deliveryResult = await sendWelcomeEmail({
+        to: verifiedUser.email,
+        name: resolvedName || undefined,
+        userId: verifiedUser.uid,
+        db
+      });
+    } else if (event === 'login') {
+      deliveryResult = await sendLoginNotificationEmail({
+        to: verifiedUser.email,
+        name: resolvedName || undefined,
+        ip: clientIp,
+        userAgent,
+        db
+      });
+    } else {
+      return res.status(400).json({ success: false, error: 'Unsupported auth event type.' });
+    }
+
+    return res.json({
+      success: true,
+      event,
+      recipient: verifiedUser.email,
+      delivery: deliveryResult
+    });
+  } catch (err: any) {
+    console.error('[AuthEvent Notification Error]:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Failed to dispatch email notification' });
+  }
+});
+
+// POST /api/referrals/link: Secure backend endpoint to link a user with a valid referral code
+app.post('/api/referrals/link', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const verifiedUser = await getVerifiedAuthUser(authHeader);
+    if (!verifiedUser || !verifiedUser.uid) {
+      return res.status(401).json({ success: false, error: 'Authentication required to link referral code.' });
+    }
+
+    const { referralCode, displayName, email } = req.body || {};
+    if (!referralCode || typeof referralCode !== 'string' || !referralCode.trim()) {
+      return res.status(400).json({ success: false, error: 'Referral code is required.' });
+    }
+
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service unavailable.' });
+    }
+
+    const result = await linkReferralCode({
+      db,
+      newUserId: verifiedUser.uid,
+      newUserEmail: email || verifiedUser.email || '',
+      newUserName: displayName || (verifiedUser.email ? verifiedUser.email.split('@')[0] : 'User'),
+      referralCode: referralCode.trim()
+    });
+
+    if (result.success) {
+      return res.json(result);
+    } else {
+      return res.status(400).json(result);
+    }
+  } catch (err: any) {
+    console.error('Error in /api/referrals/link:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Failed to link referral.' });
+  }
+});
+
+// GET /api/email/status: Check email configuration, official sender, and live SMTP connectivity
+app.get('/api/email/status', async (_req, res) => {
+  const status = getEmailServiceStatus();
+  const liveCheck = await verifySmtpConnection();
+  return res.json({
+    ...status,
+    liveSmtpCheck: liveCheck
+  });
+});
+
+// POST /api/email/test-send: Live email testing endpoint for testing real delivery
+app.post('/api/email/test-send', async (req, res) => {
+  try {
+    const { recipientEmail, eventType = 'login', testName = 'ZENET Member' } = req.body || {};
+    const cleanTo = (recipientEmail || '').trim().toLowerCase();
+
+    if (!cleanTo || !cleanTo.includes('@') || !cleanTo.includes('.')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a valid recipientEmail address (e.g. your personal Gmail).'
+      });
+    }
+
+    let deliveryResult = null;
+    const testId = `test_${Date.now()}`;
+
+    switch (eventType) {
+      case 'welcome':
+        deliveryResult = await sendWelcomeEmail({
+          to: cleanTo,
+          name: testName,
+          userId: testId,
+          db
+        });
+        break;
+
+      case 'login':
+        deliveryResult = await sendLoginNotificationEmail({
+          to: cleanTo,
+          name: testName,
+          ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '102.89.34.12',
+          userAgent: (req.headers['user-agent'] as string) || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          db
+        });
+        break;
+
+      case 'deposit':
+        deliveryResult = await sendWalletDepositSuccessEmail({
+          to: cleanTo,
+          name: testName,
+          amount: 5000,
+          previousBalance: 2500,
+          newBalance: 7500,
+          reference: `TEST_DEP_${Date.now()}`,
+          paymentMethod: 'Paystack Verified Checkout',
+          db
+        });
+        break;
+
+      case 'virtual_number':
+        deliveryResult = await sendVirtualNumberPurchaseEmail({
+          to: cleanTo,
+          name: testName,
+          serviceName: 'Telegram',
+          country: 'US',
+          phoneNumber: '+12025550143',
+          amount: 1800,
+          orderId: `TEST_VSN_${Date.now()}`,
+          db
+        });
+        break;
+
+      case 'otp':
+        deliveryResult = await sendOtpAvailableNotificationEmail({
+          to: cleanTo,
+          name: testName,
+          serviceName: 'WhatsApp',
+          country: 'GB',
+          phoneNumber: '+447911123456',
+          orderId: `TEST_OTP_${Date.now()}`,
+          db
+        });
+        break;
+
+      case 'refund':
+        deliveryResult = await sendRefundSuccessEmail({
+          to: cleanTo,
+          name: testName,
+          amount: 1800,
+          reason: 'Carrier verification code timeout - Full refund auto-credited to wallet',
+          orderId: `TEST_REFUND_${Date.now()}`,
+          db
+        });
+        break;
+
+      case 'product':
+        deliveryResult = await sendProductPurchaseSuccessEmail({
+          to: cleanTo,
+          name: testName,
+          productTitle: 'Aged Twitter / X Account (2020 Creation)',
+          amount: 6500,
+          orderId: `TEST_PROD_${Date.now()}`,
+          transactionId: `TX_${Date.now()}`,
+          category: 'Log Account',
+          db
+        });
+        break;
+
+      case 'social_boost':
+        deliveryResult = await sendSocialBoostOrderSuccessEmail({
+          to: cleanTo,
+          name: testName,
+          serviceName: 'TikTok High Retention Video Views',
+          targetUrl: 'https://www.tiktok.com/@zenethub/video/1234567890',
+          quantity: 5000,
+          amount: 3200,
+          orderId: `TEST_BOOST_${Date.now()}`,
+          db
+        });
+        break;
+
+      case 'withdrawal':
+        deliveryResult = await sendWalletWithdrawalUpdateEmail({
+          to: cleanTo,
+          name: testName,
+          amount: 15000,
+          status: 'completed',
+          bankName: 'Access Bank',
+          accountNumber: '0123456789',
+          reference: `TEST_WTH_${Date.now()}`,
+          db
+        });
+        break;
+
+      default:
+        deliveryResult = await sendLoginNotificationEmail({
+          to: cleanTo,
+          name: testName,
+          db
+        });
+        break;
+    }
+
+    return res.json({
+      success: deliveryResult?.success || false,
+      sender: OFFICIAL_SENDER_GMAIL,
+      recipient: cleanTo,
+      eventType,
+      deliveryResult
+    });
+  } catch (err: any) {
+    console.error('[TestSend Error]:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Failed to process test email' });
+  }
+});
+
 // Secure Admin/Role Management API (Owner Authority with Permanent Database Persistence)
 app.post('/api/admin/manage-role', async (req, res) => {
   try {
@@ -3446,33 +3900,92 @@ app.post('/api/admin/manage-role', async (req, res) => {
     // Standardize role value: 'admin' for administrators, 'buyer' for customers, 'seller' for sellers
     const standardizedRole = (newRole === 'admin') ? 'admin' : (newRole === 'seller' ? 'seller' : 'buyer');
 
+    // Guarantee backend service authentication before performing database writes
+    await ensureServerAuthenticated();
+
     if (db) {
       const nowIso = new Date().toISOString();
       const userRef = doc(db, 'users', targetUid);
+      const adminRef = doc(db, 'admins', targetUid);
       
-      // Update role permanently in users collection
-      await setDoc(userRef, { 
-        role: standardizedRole,
-        roleUpdatedAt: nowIso,
-        roleUpdatedBy: verifiedUser?.email || callerEmail || 'owner',
-        updatedAt: nowIso
-      }, { merge: true });
-
-      // Dual-sync to admins collection for fast rules/service checks
+      let targetUserEmail = '';
+      let targetUserName = '';
       try {
-        const adminRef = doc(db, 'admins', targetUid);
+        const uSnap = await getDoc(userRef);
+        if (uSnap.exists()) {
+          const uData = uSnap.data();
+          targetUserEmail = uData.email || '';
+          targetUserName = uData.displayName || uData.username || '';
+        }
+      } catch (fErr) {
+        console.warn('[Manage Role API] Target user prefetch notice:', fErr);
+      }
+
+      // Prevent demoting primary owner or service account
+      if (standardizedRole !== 'admin') {
+        if (
+          targetUid === '4Ro7kMiKr5bFZFHpMGT5OOzqv5N2' ||
+          isAuthorizedOwnerEmail(targetUserEmail) ||
+          targetUserEmail.toLowerCase() === 'azeezmusharaf4@gmail.com'
+        ) {
+          return res.status(403).json({ error: 'Forbidden: Primary Owner and Service Account cannot be demoted or removed.' });
+        }
+      }
+
+      // 1. Update role permanently in users collection
+      try {
+        await setDoc(userRef, { 
+          role: standardizedRole,
+          roleUpdatedAt: nowIso,
+          roleUpdatedBy: verifiedUser?.email || callerEmail || 'owner',
+          updatedAt: nowIso
+        }, { merge: true });
+      } catch (writeErr: any) {
+        console.warn('[Manage Role API] users setDoc warning, attempting REST API fallback:', writeErr?.message || writeErr);
+        if (serverAuth?.currentUser) {
+          const sToken = await serverAuth.currentUser.getIdToken(true);
+          await restPatchFirestoreDoc('users', targetUid, {
+            role: standardizedRole,
+            roleUpdatedAt: nowIso,
+            roleUpdatedBy: verifiedUser?.email || callerEmail || 'owner',
+            updatedAt: nowIso
+          }, sToken);
+        } else {
+          throw writeErr;
+        }
+      }
+
+      // 2. Dual-sync to admins collection for fast rules/service checks and accurate admin listing
+      try {
         if (standardizedRole === 'admin') {
           await setDoc(adminRef, {
             uid: targetUid,
+            email: targetUserEmail,
+            displayName: targetUserName,
             role: 'admin',
             grantedAt: nowIso,
-            grantedBy: verifiedUser?.email || callerEmail || 'owner'
+            grantedBy: verifiedUser?.email || callerEmail || 'owner',
+            updatedAt: nowIso
           }, { merge: true });
         } else {
           await deleteDoc(adminRef).catch(() => {});
         }
-      } catch (adminCollErr) {
+      } catch (adminCollErr: any) {
         console.warn('[Manage Role API] Admins collection sync notice:', adminCollErr);
+        if (standardizedRole === 'admin' && serverAuth?.currentUser) {
+          try {
+            const sToken = await serverAuth.currentUser.getIdToken(true);
+            await restCreateFirestoreDoc('admins', targetUid, {
+              uid: targetUid,
+              email: targetUserEmail,
+              displayName: targetUserName,
+              role: 'admin',
+              grantedAt: nowIso,
+              grantedBy: verifiedUser?.email || callerEmail || 'owner',
+              updatedAt: nowIso
+            }, sToken);
+          } catch {}
+        }
       }
     }
 
@@ -3487,6 +4000,21 @@ app.post('/api/admin/manage-role', async (req, res) => {
   } catch (err: any) {
     console.error('Error in /api/admin/manage-role:', err);
     res.status(500).json({ error: err.message || 'Failed to update user role' });
+  }
+});
+
+// Verified list of Administrators
+app.get('/api/admin/admins-list', async (req, res) => {
+  try {
+    await ensureServerAuthenticated();
+    const adminDocs: any[] = [];
+    if (db) {
+      const snap = await getDocs(collection(db, 'admins'));
+      snap.forEach(d => adminDocs.push({ id: d.id, ...d.data() }));
+    }
+    return res.json({ success: true, admins: adminDocs });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Error fetching admins' });
   }
 });
 
@@ -4346,6 +4874,36 @@ const handleAdminWalletOverride = async (req: any, res: any) => {
     }
 
     console.log(`[Admin Wallet Override] Success: ${verifiedUser?.email} updated user ${resolvedUid} (${resolvedEmail}) wallet from ₦${previousBalance} to ₦${newBalance} (action: ${action}, amount: ₦${numericAmount})`);
+
+    // Asynchronously dispatch email notification to user if email is known
+    if (resolvedEmail && resolvedEmail.includes('@')) {
+      const isCreditAction = action === 'credit' || (action === 'set' && newBalance >= previousBalance);
+      const diffAmount = Math.abs(newBalance - previousBalance);
+      if (diffAmount > 0) {
+        if (isCreditAction) {
+          sendWalletDepositSuccessEmail({
+            to: resolvedEmail,
+            amount: diffAmount,
+            previousBalance,
+            newBalance,
+            reference: txId,
+            paymentMethod: 'Account Credit (Admin Override)',
+            db
+          }).catch(err => console.warn('[Admin Wallet Override] Deposit email dispatch error:', err));
+        } else {
+          sendWalletTransactionSuccessEmail({
+            to: resolvedEmail,
+            type: 'debit',
+            amount: diffAmount,
+            previousBalance,
+            newBalance,
+            description: reason || 'Account Balance Adjustment',
+            reference: txId,
+            db
+          }).catch(err => console.warn('[Admin Wallet Override] Transaction email dispatch error:', err));
+        }
+      }
+    }
 
     return res.json({
       success: true,
@@ -8182,10 +8740,15 @@ app.post('/api/social-boost/order', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Invalid or expired session token.' });
     }
 
-    const { serviceId, target, quantity } = req.body;
-    if (!serviceId || !target || !quantity || Number(quantity) <= 0) {
-      return res.status(400).json({ success: false, error: 'serviceId, target URL/username, and quantity are required.' });
-    }
+    const { serviceId, target, quantity } = req.body || {};
+
+    // Provider is not funded yet. Live boost orders are paused.
+    // Prevent boost orders from being submitted and ensure NO wallet balance is deducted.
+    return res.status(200).json({
+      success: false,
+      isComingSoon: true,
+      error: '🚀 Social Media Boost Coming Soon!\nOur Social Media Boost service is currently being prepared. Live orders will be available once provider setup is complete. Please check back soon!'
+    });
 
     // Find service definition across base and live pool
     let servicePool = [...BASE_SOCIAL_SERVICES];
@@ -10186,8 +10749,9 @@ async function startServer() {
       res.status(404).type('text/plain').send('Asset not found');
     });
 
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -10195,6 +10759,12 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`ZENET Server running on http://0.0.0.0:${PORT}`);
+    // Pre-warm Voiker SMM catalogue & platform counts cache in background for instant 0ms responses
+    setTimeout(() => {
+      fetchVoikerServicesCatalogue(db).catch((err) => {
+        console.warn('[Voiker Pre-warm] Background warmup notice:', err.message);
+      });
+    }, 250);
   });
 }
 

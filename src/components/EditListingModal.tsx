@@ -1024,9 +1024,9 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/50 backdrop-blur-xs overflow-y-auto zenet-modal-backdrop">
       <div 
-        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-auto relative animate-in fade-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh]"
+        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl my-auto relative animate-in fade-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh] zenet-modal-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -1693,14 +1693,14 @@ export const EditListingModal: React.FC<EditListingModalProps> = ({
             <button
               type="button"
               onClick={handleRequestClose}
-              className="px-4 py-2.5 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] rounded-2xl text-xs font-bold transition cursor-pointer"
+              className="px-4 py-2.5 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F2EFFC] border border-[#EBE7F7] rounded-2xl text-xs font-bold transition cursor-pointer zenet-btn-interactive"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 bg-[#5B4DF5] hover:bg-[#4838EE] text-white text-xs font-extrabold rounded-2xl shadow-md transition cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-2.5 bg-[#5B4DF5] hover:bg-[#4838EE] text-white text-xs font-extrabold rounded-2xl shadow-md transition cursor-pointer flex items-center gap-2 disabled:opacity-50 zenet-btn-interactive"
             >
               <Save className="w-4 h-4" />
               <span>{loading ? 'Saving Changes...' : 'Save Listing Updates'}</span>

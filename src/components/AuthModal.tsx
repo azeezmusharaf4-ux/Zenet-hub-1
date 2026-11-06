@@ -17,12 +17,16 @@ import {
   CheckCircle2, 
   ArrowLeft
 } from 'lucide-react';
+import { TermsOfServiceView } from './TermsOfServiceView';
+import { PrivacyPolicyView } from './PrivacyPolicyView';
+import { ZenetLogoIcon } from './ZenetLogoIcon';
 
 interface AuthModalProps {
   mode: 'login' | 'signup';
   onClose: () => void;
   onSuccess: () => void;
   onSwitchMode?: (mode: 'login' | 'signup') => void;
+  onOpenPolicy?: (policy: 'terms-of-service' | 'privacy-policy') => void;
   sessionExpiredNotice?: string;
   hideCloseButton?: boolean;
   isFullScreenPage?: boolean;
@@ -33,6 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   onSuccess,
   onSwitchMode,
+  onOpenPolicy,
   sessionExpiredNotice,
   hideCloseButton = false,
   isFullScreenPage = true
@@ -70,6 +75,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(sessionExpiredNotice || '');
   const [successMsg, setSuccessMsg] = useState('');
+  const [policyModal, setPolicyModal] = useState<'terms-of-service' | 'privacy-policy' | null>(null);
+
+  const handleOpenPolicy = (policy: 'terms-of-service' | 'privacy-policy') => {
+    if (onOpenPolicy) {
+      onOpenPolicy(policy);
+    } else {
+      setPolicyModal(policy);
+    }
+  };
 
   useEffect(() => {
     if (sessionExpiredNotice) {
@@ -153,7 +167,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
       if (!agreeTerms) {
-        setError('Please agree to the Terms & conditions and Privacy Policy to register.');
+        setError('Please agree to the Terms of Service and Privacy Policy to register.');
         return;
       }
     }
@@ -193,6 +207,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           walletBalance: 0
         }, { merge: true }).catch(() => {});
 
+        // Dispatch real welcome email directly to user's registered Gmail
+        try {
+          const idToken = await user.getIdToken();
+          fetch('/api/notifications/auth-event', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              event: 'welcome',
+              displayName: cleanFullName
+            })
+          }).catch((e) => console.warn('Welcome email trigger notice:', e));
+        } catch (e) {
+          console.warn('Welcome token notice:', e);
+        }
+
       } else {
         const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
         const user = userCredential.user;
@@ -203,6 +235,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: cleanEmail,
           lastLoginAt: new Date().toISOString()
         }, { merge: true }).catch(() => {});
+
+        // Dispatch real login security alert directly to user's registered Gmail
+        try {
+          const idToken = await user.getIdToken();
+          fetch('/api/notifications/auth-event', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              event: 'login'
+            })
+          }).catch((e) => console.warn('Login email trigger notice:', e));
+        } catch (e) {
+          console.warn('Login token notice:', e);
+        }
       }
 
       onSuccess();
@@ -232,17 +281,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  if (policyModal === 'terms-of-service') {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto px-4 py-8 animate-in fade-in duration-150">
+        <TermsOfServiceView onBackToMarketplace={() => setPolicyModal(null)} />
+      </div>
+    );
+  }
+
+  if (policyModal === 'privacy-policy') {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto px-4 py-8 animate-in fade-in duration-150">
+        <PrivacyPolicyView onBackToMarketplace={() => setPolicyModal(null)} />
+      </div>
+    );
+  }
+
   return (
     <div className={`fixed inset-0 z-50 flex ${
       isFullScreenPage 
         ? 'flex-col items-center justify-start bg-white' 
-        : 'items-center justify-center p-4 bg-black/40 backdrop-blur-xs'
+        : 'items-center justify-center p-4 bg-black/40 backdrop-blur-xs zenet-modal-backdrop'
     } overflow-y-auto overflow-x-hidden w-full min-h-screen min-h-[100dvh]`}>
       
       {/* Centered Main Container */}
       <div 
-        className={`w-full max-w-[420px] sm:max-w-[440px] mx-auto bg-white px-6 sm:px-8 py-8 sm:py-10 relative flex flex-col justify-center ${
-          !isFullScreenPage ? 'rounded-2xl shadow-xl border border-slate-100' : ''
+        className={`w-full max-w-[420px] sm:max-w-[440px] mx-auto bg-white px-6 sm:px-8 py-8 sm:py-10 relative flex flex-col justify-center zenet-page-enter ${
+          !isFullScreenPage ? 'rounded-2xl shadow-xl border border-slate-100 zenet-modal-dialog' : ''
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -258,15 +323,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         )}
 
-        {/* Top Brand Logo: ZENET HUB */}
-        <div className="flex items-center gap-2.5 mb-7 sm:mb-8">
-          <div className="w-10 h-10 rounded-xl border-2 border-[#5c5cf6] bg-[#5c5cf6]/5 flex items-center justify-center text-[#5c5cf6] shrink-0">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <rect width="18" height="18" x="3" y="3" rx="4" />
-              <path d="M7 10h10" />
-              <path d="M7 14h5" />
-              <circle cx="16.5" cy="14" r="1.5" fill="currentColor" />
-            </svg>
+        {/* Top Brand Logo: ZENET HUB - Stagger Step 1 */}
+        <div className="flex items-center gap-2.5 mb-7 sm:mb-8 zenet-stagger-item zenet-stagger-1">
+          <div className="w-10 h-10 rounded-xl border-2 border-[#5c5cf6] bg-[#5c5cf6]/10 flex items-center justify-center text-[#5c5cf6] shrink-0 shadow-xs relative overflow-hidden group">
+            <ZenetLogoIcon className="w-6 h-6" />
           </div>
           <div className="flex items-center">
             <span className="text-2xl font-black tracking-tight text-[#5c5cf6] uppercase">
@@ -275,16 +335,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         </div>
 
-        {/* Title & Subtitle */}
-        <div className="mb-7 sm:mb-8">
+        {/* Title & Subtitle - Stagger Steps 2 and 3 */}
+        <div key={`header-${mode}`} className="mb-7 sm:mb-8">
           {mode === 'login' && (
             <>
-              <h1 className="text-[32px] sm:text-[36px] font-black text-slate-900 tracking-tight leading-[1.15]">
+              {/* Main Heading - Stagger Step 2 */}
+              <h1 className="text-[32px] sm:text-[36px] font-black text-slate-900 tracking-tight leading-[1.15] zenet-stagger-item zenet-stagger-2">
                 Welcome Back <br />
                 <span className="text-slate-900">to </span>
                 <span className="text-[#5c5cf6]">Zenet Hub</span>
               </h1>
-              <p className="text-slate-500 text-sm sm:text-[15px] mt-2.5 font-normal">
+              {/* Subtitle - Stagger Step 3 */}
+              <p className="text-slate-500 text-sm sm:text-[15px] mt-2.5 font-normal zenet-stagger-item zenet-stagger-3">
                 Hello there, login to continue!
               </p>
             </>
@@ -292,12 +354,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {mode === 'signup' && (
             <>
-              <h1 className="text-[32px] sm:text-[36px] font-black text-slate-900 tracking-tight leading-[1.15]">
+              <h1 className="text-[32px] sm:text-[36px] font-black text-slate-900 tracking-tight leading-[1.15] zenet-stagger-item zenet-stagger-2">
                 Create Account <br />
                 <span className="text-slate-900">to </span>
                 <span className="text-[#5c5cf6]">Zenet Hub</span>
               </h1>
-              <p className="text-slate-500 text-sm sm:text-[15px] mt-2.5 font-normal">
+              <p className="text-slate-500 text-sm sm:text-[15px] mt-2.5 font-normal zenet-stagger-item zenet-stagger-3">
                 Hello there, register to continue!
               </p>
             </>
@@ -305,12 +367,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {mode === 'forgot' && (
             <>
-              <h1 className="text-[30px] sm:text-[34px] font-black text-slate-900 tracking-tight leading-[1.15]">
+              <h1 className="text-[30px] sm:text-[34px] font-black text-slate-900 tracking-tight leading-[1.15] zenet-stagger-item zenet-stagger-2">
                 Reset Password <br />
                 <span className="text-slate-900">for </span>
                 <span className="text-[#5c5cf6]">Zenet Hub</span>
               </h1>
-              <p className="text-slate-500 text-sm sm:text-[15px] mt-2.5 font-normal">
+              <p className="text-slate-500 text-sm sm:text-[15px] mt-2.5 font-normal zenet-stagger-item zenet-stagger-3">
                 Enter your email address to receive a password reset link.
               </p>
             </>
@@ -334,13 +396,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         {/* FORM */}
-        <form onSubmit={handleSubmit} className="w-full">
+        <form key={mode} onSubmit={handleSubmit} className="w-full">
           
           {/* ================= LOGIN FORM ================= */}
           {mode === 'login' && (
             <div>
-              {/* Email* */}
-              <div>
+              {/* Email* - Stagger Step 4 */}
+              <div className="zenet-stagger-item zenet-stagger-4">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Email*
                 </label>
@@ -354,8 +416,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              {/* Password* */}
-              <div className="mt-5">
+              {/* Password* - Stagger Step 5 */}
+              <div className="mt-5 zenet-stagger-item zenet-stagger-5">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Password*
                 </label>
@@ -378,8 +440,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              {/* Forgot Password? Link */}
-              <div className="text-right mt-2.5">
+              {/* Forgot Password? Link - Stagger Step 6 */}
+              <div className="text-right mt-2.5 zenet-stagger-item zenet-stagger-6">
                 <button
                   type="button"
                   onClick={() => {
@@ -393,17 +455,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </button>
               </div>
 
-              {/* Login Button */}
+              {/* Login Button - Stagger Step 7 */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-8 bg-[#5c5cf6] hover:bg-[#4d4df0] active:bg-[#4342db] text-white font-semibold text-base py-3.5 rounded-xl shadow-sm transition active:scale-[0.99] cursor-pointer disabled:opacity-60 flex items-center justify-center min-h-[50px]"
+                className="w-full mt-8 bg-[#5c5cf6] hover:bg-[#4d4df0] active:bg-[#4342db] text-white font-semibold text-base py-3.5 rounded-xl shadow-sm transition active:scale-[0.99] cursor-pointer disabled:opacity-60 flex items-center justify-center min-h-[50px] zenet-btn-interactive zenet-stagger-item zenet-stagger-7"
               >
                 {loading ? 'Logging in...' : 'Login'}
               </button>
 
-              {/* Bottom Switch Link */}
-              <div className="text-center mt-6 text-sm text-slate-900 font-medium">
+              {/* Bottom Switch Link - Stagger Step 8 */}
+              <div className="text-center mt-6 text-sm text-slate-900 font-medium zenet-stagger-item zenet-stagger-8">
                 Don't have an account?{' '}
                 <button
                   type="button"
@@ -418,14 +480,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Register
                 </button>
               </div>
+
+              {/* Small Legal Links Below Login - Stagger Step 9 */}
+              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-500 font-medium zenet-stagger-item zenet-stagger-9">
+                <button
+                  type="button"
+                  onClick={() => handleOpenPolicy('terms-of-service')}
+                  className="hover:text-[#5c5cf6] hover:underline cursor-pointer"
+                >
+                  Terms of Service
+                </button>
+                <span className="text-slate-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenPolicy('privacy-policy')}
+                  className="hover:text-[#5c5cf6] hover:underline cursor-pointer"
+                >
+                  Privacy Policy
+                </button>
+              </div>
             </div>
           )}
 
           {/* ================= SIGN UP / REGISTER FORM ================= */}
           {mode === 'signup' && (
             <div>
-              {/* Full Name* */}
-              <div>
+              {/* Full Name* - Step 4 */}
+              <div className="zenet-stagger-item zenet-stagger-4">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Full Name*
                 </label>
@@ -439,8 +520,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              {/* Phone* */}
-              <div className="mt-4">
+              {/* Phone* - Step 5 */}
+              <div className="mt-4 zenet-stagger-item zenet-stagger-5">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Phone*
                 </label>
@@ -454,8 +535,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              {/* Email* */}
-              <div className="mt-4">
+              {/* Email* - Step 6 */}
+              <div className="mt-4 zenet-stagger-item zenet-stagger-6">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Email*
                 </label>
@@ -469,8 +550,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              {/* Password* */}
-              <div className="mt-4">
+              {/* Password* - Step 7 */}
+              <div className="mt-4 zenet-stagger-item zenet-stagger-7">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Password*
                 </label>
@@ -494,8 +575,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              {/* Confirm Password* */}
-              <div className="mt-4">
+              {/* Confirm Password* - Step 8 */}
+              <div className="mt-4 zenet-stagger-item zenet-stagger-8">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Confirm Password*
                 </label>
@@ -519,8 +600,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              {/* Referral Code (Optional) */}
-              <div className="mt-4">
+              {/* Referral Code (Optional) - Step 9 */}
+              <div className="mt-4 zenet-stagger-item zenet-stagger-9">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Referral Code (Optional)
                 </label>
@@ -533,17 +614,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              {/* Register Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-6 bg-[#5c5cf6] hover:bg-[#4d4df0] active:bg-[#4342db] text-white font-semibold text-base py-3.5 rounded-xl shadow-sm transition active:scale-[0.99] cursor-pointer disabled:opacity-60 flex items-center justify-center min-h-[50px]"
-              >
-                {loading ? 'Registering...' : 'Register'}
-              </button>
-
-              {/* Terms & Conditions Checkbox */}
-              <div className="flex items-start gap-3 mt-4">
+              {/* Terms of Service & Privacy Policy Agreement Checkbox - Step 10 */}
+              <div className="flex items-start gap-3 mt-5 zenet-stagger-item zenet-stagger-10">
                 <input
                   id="terms-checkbox"
                   type="checkbox"
@@ -551,13 +623,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   onChange={(e) => setAgreeTerms(e.target.checked)}
                   className="w-5 h-5 mt-0.5 rounded border-[#5c5cf6] text-[#5c5cf6] focus:ring-[#5c5cf6] cursor-pointer accent-[#5c5cf6] shrink-0"
                 />
-                <label htmlFor="terms-checkbox" className="text-sm font-bold text-slate-900 leading-snug cursor-pointer select-none">
-                  I agree to the <span className="text-[#5c5cf6]">Terms & conditions & Privacy Policy</span> set out by this site.
+                <label htmlFor="terms-checkbox" className="text-sm font-semibold text-slate-900 leading-snug cursor-pointer select-none">
+                  I agree to the{' '}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPolicy('terms-of-service')}
+                    className="text-[#5c5cf6] hover:underline font-bold cursor-pointer"
+                  >
+                    Terms of Service
+                  </button>{' '}
+                  and{' '}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPolicy('privacy-policy')}
+                    className="text-[#5c5cf6] hover:underline font-bold cursor-pointer"
+                  >
+                    Privacy Policy
+                  </button>.
                 </label>
               </div>
 
-              {/* Bottom Switch Link */}
-              <div className="text-center mt-6 text-sm text-slate-900 font-medium">
+              {/* Register Button - Step 11 */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-5 bg-[#5c5cf6] hover:bg-[#4d4df0] active:bg-[#4342db] text-white font-semibold text-base py-3.5 rounded-xl shadow-sm transition active:scale-[0.99] cursor-pointer disabled:opacity-60 flex items-center justify-center min-h-[50px] zenet-btn-interactive zenet-stagger-item zenet-stagger-11"
+              >
+                {loading ? 'Registering...' : 'Register'}
+              </button>
+
+              {/* Bottom Switch Link - Step 12 */}
+              <div className="text-center mt-6 text-sm text-slate-900 font-medium zenet-stagger-item zenet-stagger-12">
                 Already have an account?{' '}
                 <button
                   type="button"
@@ -572,14 +668,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Login
                 </button>
               </div>
+
+              {/* Small Legal Links Below Sign Up - Step 13 */}
+              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-500 font-medium zenet-stagger-item zenet-stagger-13">
+                <button
+                  type="button"
+                  onClick={() => handleOpenPolicy('terms-of-service')}
+                  className="hover:text-[#5c5cf6] hover:underline cursor-pointer"
+                >
+                  Terms of Service
+                </button>
+                <span className="text-slate-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenPolicy('privacy-policy')}
+                  className="hover:text-[#5c5cf6] hover:underline cursor-pointer"
+                >
+                  Privacy Policy
+                </button>
+              </div>
             </div>
           )}
 
           {/* ================= FORGOT PASSWORD FORM ================= */}
           {mode === 'forgot' && (
             <div>
-              {/* Email* */}
-              <div>
+              {/* Email* - Step 4 */}
+              <div className="zenet-stagger-item zenet-stagger-4">
                 <label className="block text-sm font-semibold text-slate-900 mb-1.5">
                   Email*
                 </label>
@@ -593,17 +708,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              {/* Reset Button */}
+              {/* Reset Button - Step 5 */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-6 bg-[#5c5cf6] hover:bg-[#4d4df0] active:bg-[#4342db] text-white font-semibold text-base py-3.5 rounded-xl shadow-sm transition active:scale-[0.99] cursor-pointer disabled:opacity-60 flex items-center justify-center min-h-[50px]"
+                className="w-full mt-6 bg-[#5c5cf6] hover:bg-[#4d4df0] active:bg-[#4342db] text-white font-semibold text-base py-3.5 rounded-xl shadow-sm transition active:scale-[0.99] cursor-pointer disabled:opacity-60 flex items-center justify-center min-h-[50px] zenet-btn-interactive zenet-stagger-item zenet-stagger-5"
               >
                 {loading ? 'Sending link...' : 'Send Reset Link'}
               </button>
 
-              {/* Return to Login */}
-              <div className="text-center mt-6 text-sm text-slate-900 font-medium">
+              {/* Return to Login - Step 6 */}
+              <div className="text-center mt-6 text-sm text-slate-900 font-medium zenet-stagger-item zenet-stagger-6">
                 Remember your password?{' '}
                 <button
                   type="button"

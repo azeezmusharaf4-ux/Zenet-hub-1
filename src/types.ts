@@ -187,10 +187,13 @@ export interface ReferralRecord {
   referredUserEmail: string;
   referredUserName?: string;
   referredAt: string;
-  totalSpent: number;
+  totalSpent?: number;
   rewardClaimed: boolean;
   rewardAmount: number;
   rewardClaimedAt?: string;
+  qualifyingDepositAmount?: number;
+  qualifyingDepositReference?: string;
+  status?: 'pending' | 'completed';
 }
 
 export interface SellerReview {
@@ -459,11 +462,15 @@ export interface SocialBoostOrder {
   link?: string;
   quantity: number;
   charge?: number; // in NGN
+  totalCharge?: number;
+  price?: number;
   totalChargeNgn?: number;
   providerCost?: number;
   markup?: number;
   profit?: number;
   providerOrderId?: string;
+  refill?: boolean;
+  cancel?: boolean;
   status?: 'pending' | 'in_progress' | 'processing' | 'completed' | 'partial' | 'canceled' | string;
   startCount?: number;
   remains?: number;
@@ -515,7 +522,11 @@ export type ActiveAppView =
   | 'support'
   | 'admin_wallets'
   | 'log-approve'
-  | 'withdrawals';
+  | 'withdrawals'
+  | 'about'
+  | 'terms-of-service'
+  | 'privacy-policy'
+  | 'refund-policy';
 
 export type TikTokServiceType = 'followers' | 'views' | 'likes' | 'comments' | 'shares' | 'favorites';
 

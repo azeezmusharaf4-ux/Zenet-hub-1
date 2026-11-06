@@ -1,5 +1,6 @@
 import { getDb, ensureServerAuthenticated, doc, getDoc, setDoc, updateDoc, collection, getDocs, parseAndVerifyToken } from './_firebase';
 import { runTransaction } from 'firebase/firestore';
+import { sendProductPurchaseSuccessEmail } from '../../src/server/emailService';
 
 export const handler = async (event: any) => {
   const headers = {
@@ -415,6 +416,20 @@ export const handler = async (event: any) => {
         purchaseRecord
       };
     });
+
+    // Dispatch real email confirmation directly to user's registered Gmail
+    if (purchaseResult?.purchaseRecord?.buyerEmail) {
+      await sendProductPurchaseSuccessEmail({
+        to: purchaseResult.purchaseRecord.buyerEmail,
+        name: purchaseResult.purchaseRecord.buyerName,
+        productTitle: purchaseResult.purchaseRecord.listingTitle || 'Digital Account',
+        amount: purchaseResult.purchaseRecord.price,
+        orderId: purchaseResult.purchaseRecord.id,
+        transactionId: purchaseResult.txId,
+        category: purchaseResult.purchaseRecord.category || 'Log Account',
+        db
+      }).catch(() => {});
+    }
 
     return {
       statusCode: 200,

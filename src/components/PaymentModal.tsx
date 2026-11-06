@@ -312,9 +312,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto zenet-modal-backdrop">
       <div 
-        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative my-auto max-h-[92vh] flex flex-col text-[#0F172A]"
+        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative my-auto max-h-[92vh] flex flex-col text-[#0F172A] zenet-modal-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -621,7 +621,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           onClose();
                           if (onOpenWallet) onOpenWallet();
                         }}
-                        className="w-full bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-extrabold text-xs py-3 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition"
+                        className="w-full bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-extrabold text-xs py-3 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition zenet-btn-interactive"
                       >
                         <PlusCircle className="w-4 h-4 text-white" />
                         <span>Fund Wallet via Paystack</span>
@@ -631,7 +631,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <button
                       type="submit"
                       disabled={isProcessing}
-                      className="w-full bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-extrabold py-3.5 rounded-full shadow-lg shadow-[#5B4DF5]/30 transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2 mt-2"
+                      className="w-full bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-extrabold py-3.5 rounded-full shadow-lg shadow-[#5B4DF5]/30 transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2 mt-2 zenet-btn-interactive"
                     >
                       {isProcessing ? (
                         <div className="flex items-center gap-2">
@@ -739,14 +739,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       type="button"
                       onClick={onClose}
                       disabled={isProcessing}
-                      className="px-5 py-3 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F1F0FB] border border-[#EBE7F7] rounded-full font-bold text-xs sm:text-sm transition cursor-pointer disabled:opacity-40"
+                      className="px-5 py-3 text-[#64748B] hover:text-[#0F172A] bg-[#F8F7FD] hover:bg-[#F1F0FB] border border-[#EBE7F7] rounded-full font-bold text-xs sm:text-sm transition cursor-pointer disabled:opacity-40 zenet-btn-interactive"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={isProcessing}
-                      className="flex-1 bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-extrabold py-3.5 rounded-full shadow-lg shadow-[#5B4DF5]/30 transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2"
+                      className="flex-1 bg-[#5B4DF5] hover:bg-[#4839EB] text-white font-extrabold py-3.5 rounded-full shadow-lg shadow-[#5B4DF5]/30 transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm flex items-center justify-center gap-2 zenet-btn-interactive"
                     >
                       {isProcessing ? (
                         <div className="flex items-center gap-2">

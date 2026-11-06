@@ -33,11 +33,11 @@ export const InsufficientBalanceModal: React.FC<InsufficientBalanceModalProps> =
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto zenet-modal-backdrop"
       onClick={onClose}
     >
       <div 
-        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-[#0F172A]"
+        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto zenet-modal-dialog animate-in fade-in zoom-in-95 duration-200 text-[#0F172A]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -105,7 +105,7 @@ export const InsufficientBalanceModal: React.FC<InsufficientBalanceModalProps> =
                   onClose();
                   onPayDirectWithPaystack();
                 }}
-                className="w-full bg-[#059669] hover:bg-[#047857] text-white font-black text-sm py-3.5 px-6 rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                className="w-full bg-[#059669] hover:bg-[#047857] text-white font-black text-sm py-3.5 px-6 rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2 zenet-btn-interactive"
               >
                 <ArrowRight className="w-4 h-4" />
                 <span>Pay ₦{listing.price.toLocaleString()} with Paystack (Instant Delivery)</span>
@@ -117,7 +117,7 @@ export const InsufficientBalanceModal: React.FC<InsufficientBalanceModalProps> =
                 onClose();
                 onOpenFundWallet();
               }}
-              className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-black text-sm py-3.5 px-6 rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+              className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-black text-sm py-3.5 px-6 rounded-2xl shadow-md transition cursor-pointer flex items-center justify-center gap-2 zenet-btn-interactive"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Fund Wallet with Paystack</span>
@@ -126,7 +126,7 @@ export const InsufficientBalanceModal: React.FC<InsufficientBalanceModalProps> =
 
             <button
               onClick={onClose}
-              className="w-full bg-[#F8F7FD] hover:bg-[#F2EFFC] text-[#64748B] hover:text-[#0F172A] border border-[#EBE7F7] font-bold text-xs py-3 rounded-2xl transition cursor-pointer"
+              className="w-full bg-[#F8F7FD] hover:bg-[#F2EFFC] text-[#64748B] hover:text-[#0F172A] border border-[#EBE7F7] font-bold text-xs py-3 rounded-2xl transition cursor-pointer zenet-btn-interactive"
             >
               Cancel
             </button>

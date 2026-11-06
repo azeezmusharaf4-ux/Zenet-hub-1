@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { AccountListing } from '../types';
-import { X, Lock, Trash2 } from 'lucide-react';
+import { isListingPendingApproval } from '../utils/listingVisibility';
+import { X, Lock, Trash2, Clock } from 'lucide-react';
 
 interface ListingDetailModalProps {
   listing: AccountListing | null;
@@ -61,6 +62,7 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
     ? Math.max(inventoryAvailable, docStock) 
     : docStock;
 
+  const isPending = isListingPendingApproval(current);
   const isSoldOut = current.status === 'sold' || rawStock <= 0;
   const stockCount = isSoldOut ? 0 : rawStock;
 
@@ -70,9 +72,9 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
     : 'Verified account with instant digital delivery and secure takeover guaranteed.';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto zenet-modal-backdrop">
       <div 
-        className="bg-white border border-purple-100 rounded-2xl sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col text-slate-900 p-4 sm:p-6 gap-4 sm:gap-5 my-auto max-h-[92dvh] sm:max-h-[90vh]"
+        className="bg-white border border-purple-100 rounded-2xl sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative flex flex-col text-slate-900 p-4 sm:p-6 gap-4 sm:gap-5 my-auto max-h-[92dvh] sm:max-h-[90vh] zenet-modal-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -127,9 +129,9 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
           {/* Stock Block */}
           <div className="bg-purple-50/40 border border-purple-100 rounded-2xl p-3.5 flex flex-col justify-center">
             <span className="text-[10px] text-purple-600 font-bold uppercase tracking-wider">Availability</span>
-            <span className={`text-xs font-extrabold mt-1 flex items-center gap-1.5 ${isSoldOut ? 'text-slate-500' : 'text-purple-900'}`}>
-              <span className={`w-2 h-2 rounded-full ${isSoldOut ? 'bg-slate-400' : 'bg-purple-600 animate-pulse'}`} />
-              <span>{isSoldOut ? 'Sold Out' : `${stockCount} in stock`}</span>
+            <span className={`text-xs font-extrabold mt-1 flex items-center gap-1.5 ${isPending ? 'text-amber-700' : (isSoldOut ? 'text-slate-500' : 'text-purple-900')}`}>
+              <span className={`w-2 h-2 rounded-full ${isPending ? 'bg-amber-500' : (isSoldOut ? 'bg-slate-400' : 'bg-purple-600 animate-pulse')}`} />
+              <span>{isPending ? 'Pending Owner Approval' : (isSoldOut ? 'Sold Out' : `${stockCount} in stock`)}</span>
             </span>
           </div>
         </div>
@@ -139,23 +141,39 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="w-full flex items-center justify-center bg-purple-50 hover:bg-purple-100 text-purple-900 hover:text-purple-950 font-bold text-xs py-3 px-4 rounded-2xl border border-purple-200 transition cursor-pointer shadow-xs active:scale-[0.98]"
+            className="w-full flex items-center justify-center bg-purple-50 hover:bg-purple-100 text-purple-900 hover:text-purple-950 font-bold text-xs py-3 px-4 rounded-2xl border border-purple-200 transition cursor-pointer shadow-xs zenet-btn-interactive"
           >
             <span>Close</span>
           </button>
 
           {/* Buy Button */}
           <button
+            disabled={isPending || isSoldOut}
             onClick={() => {
-              if (onBuyNow) {
+              if (onBuyNow && !isPending && !isSoldOut) {
                 onClose();
                 onBuyNow(current);
               }
             }}
-            className="w-full flex items-center justify-center gap-1.5 font-extrabold text-xs py-3 px-4 rounded-2xl transition cursor-pointer bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-600/20 active:scale-[0.98]"
+            className={`w-full flex items-center justify-center gap-1.5 font-extrabold text-xs py-3 px-4 rounded-2xl transition cursor-pointer zenet-btn-interactive ${
+              isPending
+                ? 'bg-amber-100 text-amber-800 border border-amber-300 cursor-not-allowed opacity-80'
+                : (isSoldOut
+                  ? 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-600/20')
+            }`}
           >
-            <Lock className="w-3.5 h-3.5 text-purple-100" />
-            <span>{isSoldOut ? 'Sold Out' : 'Buy Now'}</span>
+            {isPending ? (
+              <>
+                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                <span>Pending Approval</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3.5 h-3.5 text-purple-100" />
+                <span>{isSoldOut ? 'Sold Out' : 'Buy Now'}</span>
+              </>
+            )}
           </button>
         </div>
 

@@ -347,9 +347,9 @@ export const ZenetUpdateModal: React.FC<ZenetUpdateModalProps> = ({
 
   return (
     <>
-      <div id="zenet-update-modal" className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-start sm:items-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div id="zenet-update-modal" className="fixed inset-0 z-50 overflow-y-auto flex justify-center items-start sm:items-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm zenet-modal-backdrop animate-in fade-in duration-200">
         <div 
-          className="relative w-full max-w-3xl my-auto bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-visible sm:overflow-hidden text-slate-900"
+          className="relative w-full max-w-3xl my-auto bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-visible sm:overflow-hidden text-slate-900 zenet-modal-dialog"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

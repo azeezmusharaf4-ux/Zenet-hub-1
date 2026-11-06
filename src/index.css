@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
 /* =========================================================
    ZENET HUB - CORE DUAL THEME SYSTEM (LIGHT & DARK PURPLE)
    High-Contrast, Crisp Typography, Zero-Jank Mobile Engine
@@ -304,69 +306,53 @@ html:not(.dark) textarea::placeholder {
 
 
 /* =========================================================
-   3. DARK MODE SYSTEM (DARK PURPLE & BLACK PALETTE)
-   Active when html.dark or html[data-theme="dark"]
-   Reflects exact screenshots palette:
-   - Pitch-black purple background (#070410)
-   - Deep rich dark purple cards (#110a24)
-   - Purple/violet borders (#2c1850)
-   - Luminous purple accents (#c084fc / #8b5cf6)
-   - Crisp white text (#FFFFFF)
-   - Soft lavender subtitles (#a49abf)
+   3. DARK MODE SYSTEM (MODERN LUXURY DARK PURPLE PALETTE)
+   Active ONLY when html.dark or html[data-theme="dark"]
+   - Comfortable, balanced dark violet canvas (#0e0b1a) - never pitch black
+   - Distinct, elevated royal purple-slate cards (#18132d) for natural depth
+   - Coordinated nested panels & insets (#21193c)
+   - Refined, subtle borders (#2f2352 / rgba(167, 139, 250, 0.16))
+   - High-contrast crisp white headings (#FFFFFF)
+   - Soft, readable lavender secondary text (#c4b8e2)
+   - Distinct status indicators (emerald, amber, rose, blue)
+   - Flawless coherence across Profile, Admin Center, Log Approve,
+     Notifications, Withdraw, Order History & Bottom Nav
    ========================================================= */
 
+/* 3.1 Dark Page Wrappers, Body & Root Canvas (Comfortable Midnight Violet) */
 html.dark,
 html[data-theme="dark"],
 html.dark body,
 html[data-theme="dark"] body,
 html.dark #root,
 html[data-theme="dark"] #root {
-  background-color: #070410 !important;
+  background-color: #0e0b1a !important;
   color: #FFFFFF !important;
   color-scheme: dark !important;
 }
 
-/* 3.1 Dark Page Wrappers, Views & Main Layout Areas */
 html.dark .min-h-screen,
-html.dark .bg-\[\#F8F7FF\],
-html.dark .bg-\[\#FAF8FE\],
-html.dark .bg-\[\#F8F7FD\],
-html.dark .bg-\[\#FAF9FF\],
-html.dark .bg-\[\#F5F3FF\],
-html.dark .bg-\[\#FAF5FF\],
-html.dark .bg-\[\#F5F0FF\],
-html.dark .bg-\[\#FDFCFE\],
-html.dark .bg-\[\#F9F7FE\],
-html.dark .bg-\[\#F3F0FF\],
-html.dark .bg-\[\#F3F0FA\],
-html.dark .bg-\[\#F8F9FA\],
-html.dark .bg-\[\#F4F2FC\],
-html.dark .bg-\[\#EEF2FF\],
-html.dark .bg-slate-50\/0,
-html.dark .bg-purple-50\/40,
-html.dark .bg-amber-50\/30,
-html.dark aside.bg-\[\#FAF8FE\],
 html.dark main,
-html.dark [data-app-wrapper] {
-  background-color: #070410 !important;
+html.dark [data-app-wrapper],
+html.dark .bg-\[\#F8F7FF\] {
+  background-color: #0e0b1a !important;
   color: #FFFFFF !important;
 }
 
-/* 3.2 Dark Cards, Containers, Modals, Panels & Dropdowns */
+/* 3.2 Dark Cards, Containers, Modals, Panels & Dropdowns (Elevated Surface) */
 html.dark .bg-white,
 html.dark .bg-white\/95,
 html.dark .bg-white\/90,
 html.dark .bg-white\/80,
 html.dark .bg-\[\#FFFFFF\],
-html.dark .bg-slate-50,
-html.dark .bg-slate-100,
-html.dark .bg-gray-50,
-html.dark .bg-gray-100,
-html.dark .bg-purple-50,
-html.dark .bg-amber-50,
 html.dark [class*="bg-white"],
 html.dark .listing-card,
 html.dark [class*="ListingCard"],
+html.dark .bg-\[\#F8F7FD\],
+html.dark .bg-\[\#FAF8FE\],
+html.dark .bg-\[\#FDFCFE\],
+html.dark .bg-\[\#F9F7FE\],
+html.dark .bg-\[\#F4F2FC\],
 html.dark .bg-\[\#171827\],
 html.dark .bg-\[\#130a24\],
 html.dark .bg-\[\#150c2a\],
@@ -377,13 +363,13 @@ html.dark .bg-\[\#190d34\],
 html.dark .bg-\[\#170c30\],
 html.dark .bg-slate-900,
 html.dark .bg-slate-950 {
-  background-color: #110a24 !important;
+  background-color: #18132d !important;
   color: #FFFFFF !important;
-  border-color: #2c1850 !important;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.65), 0 2px 8px -2px rgba(124, 58, 237, 0.12) !important;
+  border-color: #2f2352 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(167, 139, 250, 0.12) !important;
 }
 
-/* 3.3 Sub-Panels, Inner Cards, Table Rows & Nested Containers */
+/* 3.3 Sub-Panels, Inset Boxes, Table Rows & Nested Containers */
 html.dark .bg-\[\#F1EEF9\],
 html.dark .bg-\[\#F1F0FB\],
 html.dark .bg-\[\#F3EEFF\],
@@ -394,18 +380,32 @@ html.dark .bg-\[\#F1F3F9\],
 html.dark .bg-\[\#EBE7F7\],
 html.dark .bg-\[\#E2E8F0\],
 html.dark .bg-\[\#E0DAFD\],
-html.dark .bg-\[\#1a0f34\],
-html.dark .bg-\[\#1e1039\],
-html.dark .bg-\[\#20123d\],
-html.dark .bg-\[\#1a0e33\],
-html.dark .bg-\[\#2b184d\],
+html.dark .bg-slate-50,
+html.dark .bg-slate-100,
+html.dark .bg-gray-50,
+html.dark .bg-gray-100,
 html.dark .bg-slate-800 {
-  background-color: #180e34 !important;
-  color: #FFFFFF !important;
-  border-color: #381e64 !important;
+  background-color: #21193c !important;
+  color: #EDE9FE !important;
+  border-color: #35265c !important;
 }
 
-/* 3.4 Purple / Violet Borders & Outlines */
+/* 3.4 Opacity-Based Background Variants (Fixes grey/pink strips leaking into dark theme) */
+html.dark .bg-slate-50\/80,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/60,
+html.dark .bg-slate-50\/50,
+html.dark [class*="bg-slate-50/"],
+html.dark .bg-slate-100\/90,
+html.dark .bg-slate-100\/80,
+html.dark .bg-slate-100\/60,
+html.dark [class*="bg-slate-100/"] {
+  background-color: #15102a !important;
+  border-color: #2d204e !important;
+  color: #EDE9FE !important;
+}
+
+/* 3.5 Purple / Violet Borders, Dividers & Outlines */
 html.dark .border-\[\#EBE7F7\],
 html.dark .border-\[\#E9E2FA\],
 html.dark .border-\[\#EAE6F8\],
@@ -433,10 +433,17 @@ html.dark [class*="border-\[\#F"],
 html.dark [class*="border-\[\#D"],
 html.dark [class*="border-slate-"],
 html.dark [class*="border-gray-"] {
-  border-color: #2c1850 !important;
+  border-color: #2f2352 !important;
 }
 
-/* 3.5 High-Contrast Typography: Crisp White Headings & Main Text */
+html.dark [class*="divide-"] > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-\[\#F1EEF9\] > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #281e46 !important;
+}
+
+/* 3.6 High-Contrast Typography: Crisp White Headings & Main Text */
 html.dark h1, 
 html.dark h2, 
 html.dark h3, 
@@ -458,7 +465,7 @@ html.dark .text-slate-700 {
   color: #FFFFFF !important;
 }
 
-/* 3.6 Readable Soft Lavender Secondary Text */
+/* 3.7 Readable Soft Lavender Secondary Text (Clear 6.5+:1 Contrast) */
 html.dark .text-\[\#64748B\],
 html.dark .text-\[\#475569\],
 html.dark .text-\[\#716B82\],
@@ -466,17 +473,17 @@ html.dark .text-slate-600,
 html.dark .text-slate-500,
 html.dark .text-gray-600,
 html.dark .text-gray-500 {
-  color: #a49abf !important;
+  color: #c4b8e2 !important;
 }
 
-/* 3.7 Muted Supporting Text */
+/* 3.8 Muted Supporting Text & Timestamps */
 html.dark .text-\[\#94A3B8\],
 html.dark .text-slate-400,
 html.dark .text-gray-400 {
-  color: #7d6f96 !important;
+  color: #8e80ab !important;
 }
 
-/* 3.8 Luminous Violet Highlights & Brand Accents */
+/* 3.9 Luminous Violet Highlights & Brand Accents */
 html.dark .text-\[\#5B4DF5\],
 html.dark .text-\[\#7C3AED\],
 html.dark .text-\[\#6D28D9\],
@@ -491,13 +498,13 @@ html.dark .text-indigo-600 {
   color: #c084fc !important;
 }
 
-/* 3.9 Form Inputs, Selects & Textareas in Dark Mode */
+/* 3.10 Form Inputs, Selects & Textareas in Dark Mode */
 html.dark input:not([type="checkbox"]):not([type="radio"]),
 html.dark select,
 html.dark textarea {
-  background-color: #110a24 !important;
+  background-color: #140e2b !important;
   color: #FFFFFF !important;
-  border-color: #351d5c !important;
+  border-color: #35265c !important;
 }
 
 html.dark input:not([type="checkbox"]):not([type="radio"]):focus,
@@ -510,37 +517,52 @@ html.dark textarea:focus {
 
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #73658f !important;
+  color: #7d6d9e !important;
   opacity: 1 !important;
 }
 
-/* 3.10 Navigation: Top Header, Sidebar & Bottom Nav */
+/* 3.11 Navigation: Top Header, Sidebar & Mobile Bottom Nav */
 html.dark #zenet-global-header,
 html.dark header,
 html.dark aside,
 html.dark #zenet-mobile-bottom-nav,
 html.dark nav {
-  background-color: rgba(10, 6, 20, 0.94) !important;
-  border-color: #241442 !important;
+  background-color: rgba(18, 14, 34, 0.96) !important;
+  border-color: rgba(167, 139, 250, 0.16) !important;
   color: #FFFFFF !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
 }
 
 html.dark #zenet-mobile-bottom-nav {
-  box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.8) !important;
+  box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.55) !important;
 }
 
-/* Inactive bottom nav items */
+/* Inactive bottom nav buttons: refined soft lavender, never bright or muddy */
 html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]) {
-  color: #a49abf !important;
+  color: #9f93bf !important;
 }
 html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]) svg {
-  color: #a49abf !important;
+  color: #9f93bf !important;
 }
 html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]) span {
-  color: #a49abf !important;
+  color: #9f93bf !important;
+}
+html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]):hover,
+html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]):hover svg,
+html.dark #zenet-mobile-bottom-nav button:not(.bg-\[\#5B4DF5\]):not([class*="bg-purple"]):hover span {
+  color: #ddd6fe !important;
 }
 
-/* 3.11 Primary Buttons in Dark Mode */
+/* Active bottom nav button */
+html.dark #zenet-mobile-bottom-nav button.bg-\[\#5B4DF5\],
+html.dark #zenet-mobile-bottom-nav button[class*="bg-purple"] {
+  background-color: #7c3aed !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4) !important;
+}
+
+/* 3.12 Primary Buttons in Dark Mode */
 html.dark button.bg-\[\#7C3AED\],
 html.dark button.bg-\[\#5B4DF5\],
 html.dark button.bg-purple-600,
@@ -566,26 +588,44 @@ html.dark button.bg-\[\#EDE9FE\],
 html.dark .bg-purple-50,
 html.dark .bg-purple-100,
 html.dark .bg-\[\#F5F3FF\],
-html.dark button.bg-slate-100 {
-  background-color: #1e123b !important;
+html.dark button.bg-slate-100,
+html.dark button.bg-slate-50 {
+  background-color: rgba(124, 58, 237, 0.18) !important;
   color: #ddd6fe !important;
-  border-color: #3b2068 !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
 }
 
 html.dark .bg-\[\#EDE9FE\]:hover,
 html.dark button.bg-\[\#EDE9FE\]:hover,
 html.dark .bg-purple-50:hover,
 html.dark .bg-purple-100:hover,
-html.dark .bg-\[\#F5F3FF\]:hover {
-  background-color: #2b1a52 !important;
+html.dark .bg-\[\#F5F3FF\]:hover,
+html.dark button.bg-slate-100:hover,
+html.dark button.bg-slate-50:hover {
+  background-color: rgba(124, 58, 237, 0.28) !important;
   color: #FFFFFF !important;
 }
 
-/* 3.12 Modals, Dialogs & Backdrop Overlays */
+/* Hover and active states for list rows & interactive cards */
+html.dark .hover\:bg-\[\#FAF9FF\]:hover,
+html.dark .hover\:bg-\[\#F3EEFF\]:hover,
+html.dark .hover\:bg-\[\#F2EFFC\]:hover,
+html.dark .hover\:bg-\[\#F1F0FB\]:hover,
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #281f4a !important;
+}
+
+html.dark .active\:bg-\[\#F3EEFF\]:active,
+html.dark .active\:bg-slate-200:active {
+  background-color: #33265d !important;
+}
+
+/* 3.13 Modals, Dialogs & Backdrop Overlays */
 html.dark [role="dialog"],
 html.dark .modal-content {
-  background-color: #110a24 !important;
-  border-color: #2c1850 !important;
+  background-color: #18132d !important;
+  border-color: #2f2352 !important;
   color: #FFFFFF !important;
 }
 
@@ -595,43 +635,464 @@ html.dark .bg-black\/70,
 html.dark .bg-black\/80,
 html.dark .bg-slate-950\/90,
 html.dark .bg-slate-900\/60 {
-  background-color: rgba(4, 2, 10, 0.78) !important;
+  background-color: rgba(6, 4, 14, 0.82) !important;
+  backdrop-filter: blur(8px) !important;
 }
 
-/* 3.13 Tables in Dark Mode */
+/* 3.14 Tables in Dark Mode */
 html.dark table th {
-  background-color: #140b2a !important;
+  background-color: #1f1839 !important;
   color: #FFFFFF !important;
-  border-color: #2c1850 !important;
+  border-color: #2f2352 !important;
 }
 
 html.dark table td {
-  border-color: #241442 !important;
-  color: #e2d9f3 !important;
+  border-color: #261d44 !important;
+  color: #EDE9FE !important;
 }
 
 html.dark table tr:hover {
-  background-color: #190f36 !important;
+  background-color: #261d44 !important;
 }
 
-/* 3.14 Badges & Status Chips */
-html.dark .bg-purple-50,
-html.dark .bg-blue-50,
-html.dark .bg-pink-50,
+/* 3.15 Status Badges & Chips (Distinct, readable, premium & coordinated) */
+/* Green / Emerald (Completed, Approved, Active, Escrow Ready, Verified) */
 html.dark .bg-emerald-50,
-html.dark .bg-amber-50 {
-  background-color: #1a0f36 !important;
-  color: #c4b5fd !important;
-  border-color: #381e64 !important;
+html.dark .bg-emerald-100,
+html.dark .bg-emerald-50\/90,
+html.dark [class*="bg-emerald-50"],
+html.dark [class*="bg-emerald-100"] {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+  color: #34d399 !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+html.dark .text-emerald-600,
+html.dark .text-emerald-700,
+html.dark .text-emerald-800,
+html.dark .text-emerald-900,
+html.dark .text-emerald-950 {
+  color: #34d399 !important;
 }
 
-/* 3.15 Dark Scrollbar */
+/* Yellow / Amber (Pending, In Progress, Review, Waiting) */
+html.dark .bg-amber-50,
+html.dark .bg-amber-100,
+html.dark .bg-yellow-50,
+html.dark .bg-yellow-100,
+html.dark [class*="bg-amber-50"],
+html.dark [class*="bg-amber-100"] {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+html.dark .text-amber-600,
+html.dark .text-amber-700,
+html.dark .text-amber-800,
+html.dark .text-amber-900 {
+  color: #fbbf24 !important;
+}
+
+/* Red / Rose (Rejected, Failed, Cancelled, Expired, Alerts) */
+html.dark .bg-rose-50,
+html.dark .bg-rose-100,
+html.dark .bg-red-50,
+html.dark .bg-red-100,
+html.dark [class*="bg-rose-50"],
+html.dark [class*="bg-rose-100"] {
+  background-color: rgba(244, 63, 94, 0.16) !important;
+  color: #fb7185 !important;
+  border-color: rgba(244, 63, 94, 0.35) !important;
+}
+html.dark .text-rose-600,
+html.dark .text-rose-700,
+html.dark .text-rose-800,
+html.dark .text-rose-900 {
+  color: #fb7185 !important;
+}
+
+/* Blue / Indigo (Info, Processed, In Transit, Secondary Status) */
+html.dark .bg-blue-50,
+html.dark .bg-blue-100,
+html.dark [class*="bg-blue-50"],
+html.dark [class*="bg-blue-100"] {
+  background-color: rgba(99, 102, 241, 0.16) !important;
+  color: #818cf8 !important;
+  border-color: rgba(99, 102, 241, 0.35) !important;
+}
+html.dark .text-blue-600,
+html.dark .text-blue-700,
+html.dark .text-blue-800 {
+  color: #818cf8 !important;
+}
+
+/* Royal Gold OWNER Badges */
+html.dark .bg-amber-100.text-amber-800,
+html.dark span.bg-amber-100,
+html.dark .owner-badge {
+  background-color: rgba(245, 158, 11, 0.22) !important;
+  color: #fde047 !important;
+  border-color: rgba(245, 158, 11, 0.45) !important;
+}
+
+/* 3.16 Component-Specific Dark Mode Harmonization */
+
+/* A. ProfileView: Admin Center row (fixes pink band clashing on dark theme) */
+html.dark #profile-opt-admin-center,
+html.dark .bg-rose-50\/70 {
+  background-color: rgba(147, 51, 234, 0.14) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+}
+html.dark #profile-opt-admin-center:hover,
+html.dark .hover\:bg-rose-100\/80:hover {
+  background-color: rgba(147, 51, 234, 0.24) !important;
+}
+html.dark #profile-opt-admin-center .text-rose-900 {
+  color: #FFFFFF !important;
+}
+html.dark #profile-opt-admin-center .text-rose-600 {
+  color: #c084fc !important;
+}
+html.dark #profile-opt-admin-center .bg-rose-600 {
+  background-color: rgba(245, 158, 11, 0.25) !important;
+  color: #fde047 !important;
+  border: 1px solid rgba(245, 158, 11, 0.5) !important;
+}
+
+/* B. ProfileView: Payment Notifications & Log Approve rows */
+html.dark #profile-opt-payment-notifications,
+html.dark .bg-purple-50\/40 {
+  background-color: rgba(124, 58, 237, 0.1) !important;
+}
+html.dark #profile-opt-payment-notifications:hover {
+  background-color: rgba(124, 58, 237, 0.18) !important;
+}
+html.dark #profile-opt-log-approve,
+html.dark .bg-amber-50\/30 {
+  background-color: rgba(245, 158, 11, 0.08) !important;
+}
+html.dark #profile-opt-log-approve:hover {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+
+/* C. ProfileView: Appearance Modal */
+html.dark #profile-opt-appearance-modal .border-\[\#5B4DF5\],
+html.dark .border-\[\#5B4DF5\].bg-\[\#F5F3FF\] {
+  background-color: #261a46 !important;
+  border-color: #8b5cf6 !important;
+  color: #FFFFFF !important;
+}
+
+/* D. WalletModal: Tab Strip & Preset Chips (fixes light grey strip circled in red) */
+html.dark .bg-slate-50\/80 button.bg-white,
+html.dark [class*="bg-slate-50/"] button.bg-white {
+  background-color: #20173a !important;
+  border-color: #362858 !important;
+  color: #c4b8e2 !important;
+}
+html.dark .bg-slate-50\/80 button.bg-white:hover,
+html.dark [class*="bg-slate-50/"] button.bg-white:hover {
+  background-color: #291e48 !important;
+  color: #FFFFFF !important;
+}
+html.dark .bg-slate-50\/80 button.bg-\[\#5c5cf6\],
+html.dark [class*="bg-slate-50/"] button.bg-\[\#5c5cf6\] {
+  background-color: #7c3aed !important;
+  color: #FFFFFF !important;
+  border-color: #9333ea !important;
+}
+
+/* Quick Amount preset buttons */
+html.dark .grid button.bg-slate-50,
+html.dark .grid button.bg-slate-100 {
+  background-color: #1e1638 !important;
+  border-color: #352556 !important;
+  color: #EDE9FE !important;
+}
+html.dark .grid button.bg-slate-50:hover,
+html.dark .grid button.bg-slate-100:hover {
+  background-color: #291e48 !important;
+  color: #FFFFFF !important;
+}
+html.dark .grid button.bg-\[\#5c5cf6\] {
+  background-color: #7c3aed !important;
+  border-color: #9333ea !important;
+  color: #FFFFFF !important;
+}
+
+/* E. AdminPanelModal: Navigation tabs and headers */
+html.dark .bg-slate-50.border-b.border-slate-200 {
+  background-color: #140e2b !important;
+  border-color: #2a1f48 !important;
+}
+html.dark .border-blue-600.text-blue-600,
+html.dark .border-pink-600.text-pink-600,
+html.dark .border-\[\#5B4DF5\].text-\[\#5B4DF5\] {
+  border-color: #a855f7 !important;
+  color: #c084fc !important;
+}
+
+/* 3.17 Dark Scrollbar */
 html.dark .custom-scrollbar::-webkit-scrollbar-track {
-  background: #0d071a;
+  background: #100c1e;
 }
 html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #351d5c;
+  background: #38285e;
 }
 html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #4e2b82;
+  background: #533a8a;
 }
+
+/* =========================================================
+   4. ZENET HUB - SUBTLE, PROFESSIONAL ANIMATION SUITE
+   Hardware-Accelerated, Micro-interactions, Zero-Jank
+   Strictly Animates transform & opacity, Respects Reduced Motion
+   ========================================================= */
+
+/* 4.1 Page Transitions (Smooth, quick view switching) */
+@keyframes zenetPageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.zenet-page-enter {
+  animation: zenetPageFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* 4.2 Card Entrances & Interactive Micro-interactions */
+@keyframes zenetCardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.zenet-card-enter {
+  animation: zenetCardEntrance 0.26s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  will-change: opacity, transform;
+}
+
+.zenet-card-stagger-1 { animation-delay: 0.03s; }
+.zenet-card-stagger-2 { animation-delay: 0.06s; }
+.zenet-card-stagger-3 { animation-delay: 0.09s; }
+.zenet-card-stagger-4 { animation-delay: 0.12s; }
+.zenet-card-stagger-5 { animation-delay: 0.15s; }
+.zenet-card-stagger-6 { animation-delay: 0.18s; }
+
+.zenet-card-interactive {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.2s ease,
+              background-color 0.2s ease;
+  will-change: transform, box-shadow;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .zenet-card-interactive:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.zenet-card-interactive:active {
+  transform: scale(0.985);
+}
+
+/* 4.3 Wallet Card Entrance & Accent Glow Animations */
+@keyframes zenetWalletEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.zenet-wallet-enter {
+  animation: zenetWalletEntrance 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+@keyframes zenetShimmerSlow {
+  0%, 100% {
+    opacity: 0.12;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.05);
+  }
+}
+
+.zenet-glow-pulse {
+  animation: zenetShimmerSlow 5s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+/* 4.4 Button Micro-interactions (Desktop hover lift + Mobile touch feedback) */
+.zenet-btn-interactive {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.18s ease,
+              border-color 0.18s ease,
+              color 0.18s ease;
+  will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .zenet-btn-interactive:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+.zenet-btn-interactive:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* 4.5 Modals & Popups (Smooth fade backdrop + subtle slide-up scale) */
+@keyframes zenetBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zenetModalSlideUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.zenet-modal-backdrop {
+  animation: zenetBackdropFadeIn 0.2s ease-out forwards;
+}
+
+.zenet-modal-dialog {
+  animation: zenetModalSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* 4.6 Clean, Lightweight Loading Shimmer & Spinner */
+@keyframes zenetShimmerSweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.zenet-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(241, 240, 251, 1) 0%,
+    rgba(235, 231, 250, 0.7) 50%,
+    rgba(241, 240, 251, 1) 100%
+  );
+  background-size: 200% 100%;
+  animation: zenetShimmerSweep 1.8s ease-in-out infinite;
+}
+
+html.dark .zenet-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(33, 19, 58, 1) 0%,
+    rgba(49, 27, 86, 0.7) 50%,
+    rgba(33, 19, 58, 1) 100%
+  );
+  background-size: 200% 100%;
+  animation: zenetShimmerSweep 1.8s ease-in-out infinite;
+}
+
+/* 4.7 Navigation Indicator & Tab Transitions */
+.zenet-nav-transition {
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.zenet-nav-transition:active {
+  transform: scale(0.96);
+}
+
+/* 4.9 Professional Staggered Entrance Suite (Subtle Fade-In & Upward Motion) */
+@keyframes zenetStaggerEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.zenet-stagger-item {
+  animation-name: zenetStaggerEntrance;
+  animation-duration: 440ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+  will-change: opacity, transform;
+}
+
+/* Stagger delay intervals (100–150ms per step, ~110ms optimal cadence) */
+.zenet-stagger-1  { animation-delay: 0ms; }
+.zenet-stagger-2  { animation-delay: 110ms; }
+.zenet-stagger-3  { animation-delay: 220ms; }
+.zenet-stagger-4  { animation-delay: 330ms; }
+.zenet-stagger-5  { animation-delay: 440ms; }
+.zenet-stagger-6  { animation-delay: 550ms; }
+.zenet-stagger-7  { animation-delay: 660ms; }
+.zenet-stagger-8  { animation-delay: 770ms; }
+.zenet-stagger-9  { animation-delay: 880ms; }
+.zenet-stagger-10 { animation-delay: 990ms; }
+.zenet-stagger-11 { animation-delay: 1100ms; }
+.zenet-stagger-12 { animation-delay: 1210ms; }
+.zenet-stagger-13 { animation-delay: 1320ms; }
+.zenet-stagger-14 { animation-delay: 1430ms; }
+.zenet-stagger-15 { animation-delay: 1540ms; }
+
+/* 4.8 Accessibility: Strict Reduced-Motion Compliance */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .zenet-page-enter,
+  .zenet-card-enter,
+  .zenet-wallet-enter,
+  .zenet-modal-dialog,
+  .zenet-modal-backdrop,
+  .zenet-glow-pulse,
+  .zenet-skeleton-shimmer,
+  .zenet-stagger-item,
+  [class*="zenet-stagger-"] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+

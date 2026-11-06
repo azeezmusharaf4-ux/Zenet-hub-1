@@ -15,6 +15,7 @@ import { isAuthorizedOwner, isAuthorizedOwnerEmail } from '../lib/authorizedOwne
 import { safeApiFetch } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
 import { ZenetHeader } from './ZenetHeader';
+import { SocialBoostPricingManager } from './SocialBoostPricingManager';
 import { DEFAULT_TIKTOK_SERVICES } from '../data/tiktokServices';
 import { 
   AccountListing, 
@@ -69,7 +70,8 @@ import {
   ArrowDownToLine,
   Building2,
   Check,
-  Clock
+  Clock,
+  Mail
 } from 'lucide-react';
 const AdminWalletsView = React.lazy(() => import('./AdminWalletsView').then(m => ({ default: m.AdminWalletsView })));
 
@@ -78,7 +80,7 @@ interface AdminPanelModalProps {
   user: User | null;
   userProfile: UserProfile | null;
   onClose: () => void;
-  initialTab?: 'listings' | 'users' | 'admins' | 'wallets' | 'orders' | 'inquiries_reports' | 'reviews' | 'analytics' | 'tiktok_services' | 'withdrawals';
+  initialTab?: 'listings' | 'users' | 'admins' | 'wallets' | 'orders' | 'inquiries_reports' | 'reviews' | 'analytics' | 'tiktok_services' | 'social_boost_pricing' | 'withdrawals';
   onApproveListing?: (id: string) => void;
   onRejectListing?: (id: string) => void;
   onToggleFeatured?: (id: string, currentFeatured: boolean) => void;
@@ -1009,7 +1011,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const isAdmin = isOwner || userProfile?.role === 'admin';
 
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<'listings' | 'users' | 'admins' | 'wallets' | 'orders' | 'inquiries_reports' | 'reviews' | 'analytics' | 'tiktok_services' | 'withdrawals'>(initialTab || 'listings');
+  const [activeTab, setActiveTab] = useState<'listings' | 'users' | 'admins' | 'wallets' | 'orders' | 'inquiries_reports' | 'reviews' | 'analytics' | 'tiktok_services' | 'social_boost_pricing' | 'withdrawals'>((initialTab as any) || 'listings');
   const [inquirySubTab, setInquirySubTab] = useState<'inquiries' | 'reports'>('inquiries');
 
   // Owner/Admin Withdrawal Center State
@@ -1178,6 +1180,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     action: 'promote' | 'demote';
   } | null>(null);
   const [isProcessingRole, setIsProcessingRole] = useState(false);
+  const [adminsList, setAdminsList] = useState<any[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(true);
+  const [roleChangeSuccessMessage, setRoleChangeSuccessMessage] = useState<string | null>(null);
 
   // Security & Admin Auth State
   const [passcode, setPasscode] = useState('');
@@ -1268,6 +1273,25 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     }, (err) => {
       console.warn('Error fetching users from Firestore:', err);
       setLoadingUsers(false);
+    });
+    return () => unsubscribe();
+  }, [isAdmin]);
+
+  // 2b. Real-time Firestore Admins Listener (Admin Only)
+  useEffect(() => {
+    if (!isAdmin) return;
+    setLoadingAdmins(true);
+    const adminsRef = collection(db, 'admins');
+    const unsubscribe = onSnapshot(adminsRef, (snapshot) => {
+      const adminsData: any[] = snapshot.docs.map((docSnap) => ({
+        uid: docSnap.id,
+        ...docSnap.data()
+      }));
+      setAdminsList(adminsData);
+      setLoadingAdmins(false);
+    }, (err) => {
+      console.warn('Error fetching admins from Firestore:', err);
+      setLoadingAdmins(false);
     });
     return () => unsubscribe();
   }, [isAdmin]);
@@ -1557,6 +1581,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     const newRole = action === 'promote' ? 'admin' : 'buyer';
 
     setIsProcessingRole(true);
+    setRoleChangeSuccessMessage(null);
     try {
       const token = user ? await getSafeIdToken(user) : null;
 
@@ -1575,7 +1600,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       });
 
       if (!apiRes || !apiRes.success) {
-        console.warn('Backend manage-role notice:', apiRes?.error);
+        throw new Error(apiRes?.error || 'Failed to update user role on server');
       }
 
       // 2. Direct Firestore update to persist immediately in client cache
@@ -1589,6 +1614,34 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
       // 3. Update local state
       setUsers((prev) => prev.map((u) => (u.uid === targetUser.uid ? { ...u, role: newRole } : u)));
+      setAdminsList((prev) => {
+        if (newRole === 'admin') {
+          const exists = prev.some((a) => a.uid === targetUser.uid);
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                uid: targetUser.uid,
+                email: targetUser.email || '',
+                displayName: targetUser.displayName || targetUser.username || 'Admin',
+                role: 'admin',
+                grantedAt: new Date().toISOString(),
+                grantedBy: user?.email || 'azeezmusharaf4@gmail.com'
+              }
+            ];
+          }
+          return prev;
+        } else {
+          return prev.filter((a) => a.uid !== targetUser.uid);
+        }
+      });
+
+      setRoleChangeSuccessMessage(
+        action === 'promote'
+          ? `Successfully granted Administrator privileges to ${targetUser.displayName || targetUser.email}.`
+          : `Successfully revoked Administrator privileges from ${targetUser.displayName || targetUser.email}.`
+      );
+      setTimeout(() => setRoleChangeSuccessMessage(null), 6000);
       setAdminActionModal(null);
     } catch (err: any) {
       console.error('Role update error:', err);
@@ -1627,7 +1680,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       });
 
       if (!apiRes || !apiRes.success) {
-        console.warn('Backend manage-role notice:', apiRes?.error);
+        throw new Error(apiRes?.error || 'Failed to update user role on server');
       }
 
       // 2. Direct Firestore update to persist in client cache
@@ -1640,6 +1693,30 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       });
 
       setUsers((prev) => prev.map((u) => (u.uid === uid ? { ...u, role: newRole } : u)));
+      setAdminsList((prev) => {
+        if (newRole === 'admin') {
+          const exists = prev.some((a) => a.uid === uid);
+          if (!exists && targetUser) {
+            return [
+              ...prev,
+              {
+                uid: targetUser.uid,
+                email: targetUser.email || '',
+                displayName: targetUser.displayName || targetUser.username || 'Admin',
+                role: 'admin',
+                grantedAt: new Date().toISOString(),
+                grantedBy: user?.email || 'azeezmusharaf4@gmail.com'
+              }
+            ];
+          }
+          return prev;
+        } else {
+          return prev.filter((a) => a.uid !== uid);
+        }
+      });
+
+      setRoleChangeSuccessMessage(`Successfully updated role to ${newRole}.`);
+      setTimeout(() => setRoleChangeSuccessMessage(null), 5000);
     } catch (err: any) {
       console.error('Failed updating user role:', err);
       alert('Failed to update user role: ' + (err.message || 'Permission denied'));
@@ -1671,17 +1748,27 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       alert('Action Denied: Primary OWNER account cannot be deleted.');
       return;
     }
-    if (!isOwner && target?.role === 'admin') {
-      alert('Action Denied: Only an authorized OWNER can delete administrator accounts.');
+    if (!isOwner) {
+      alert('Action Denied: Only the verified site OWNER is permitted to remove user accounts.');
       return;
     }
-    if (!window.confirm('Are you sure you want to remove this user document from Firestore?')) return;
+    const confirmName = prompt(
+      `SECURITY CONFIRMATION:\nAre you sure you want to permanently delete the account for "${target?.email || uid}"?\n\nType DELETE in capital letters to confirm:`
+    );
+    if (confirmName !== 'DELETE') return;
     try {
       const userRef = doc(db, 'users', uid);
       await deleteDoc(userRef);
+      try {
+        await deleteDoc(doc(db, 'admins', uid));
+      } catch (adminErr) {
+        // ignore if not present in admins
+      }
       setUsers((prev) => prev.filter((u) => u.uid !== uid));
-    } catch (err) {
+      setAdminsList((prev) => prev.filter((a) => a.uid !== uid));
+    } catch (err: any) {
       console.error('Failed deleting user:', err);
+      alert('Failed to delete user: ' + (err.message || 'Error'));
     }
   };
 
@@ -1848,6 +1935,49 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       return true;
     });
   }, [users, userRoleFilter, userSearch]);
+
+  // Combined, verified list of active administrators with email, name, and UID
+  const verifiedAdminAccounts = useMemo(() => {
+    const adminMap = new Map<string, {
+      uid: string;
+      email: string;
+      displayName: string;
+      role: string;
+      grantedAt?: string;
+      grantedBy?: string;
+    }>();
+
+    // 1. Process from admins collection
+    adminsList.forEach((adm) => {
+      if (adm.uid) {
+        const u = users.find((usr) => usr.uid === adm.uid);
+        adminMap.set(adm.uid, {
+          uid: adm.uid,
+          email: adm.email || u?.email || '',
+          displayName: adm.displayName || u?.displayName || u?.username || 'Administrator',
+          role: 'admin',
+          grantedAt: adm.grantedAt || (u as any)?.roleUpdatedAt || u?.createdAt,
+          grantedBy: adm.grantedBy || 'azeezmusharaf4@gmail.com'
+        });
+      }
+    });
+
+    // 2. Process from users collection having role === 'admin'
+    users.filter((u) => u.role === 'admin').forEach((u) => {
+      if (!adminMap.has(u.uid)) {
+        adminMap.set(u.uid, {
+          uid: u.uid,
+          email: u.email || '',
+          displayName: u.displayName || u.username || 'Administrator',
+          role: 'admin',
+          grantedAt: (u as any)?.roleUpdatedAt || u.createdAt,
+          grantedBy: 'azeezmusharaf4@gmail.com'
+        });
+      }
+    });
+
+    return Array.from(adminMap.values());
+  }, [adminsList, users]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
@@ -2158,17 +2288,23 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <span>Analytics</span>
               </button>
 
-              <button
-                onClick={() => setActiveTab('tiktok_services')}
-                className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
-                  activeTab === 'tiktok_services'
-                    ? 'border-purple-500 text-purple-400 font-extrabold'
-                    : 'border-transparent text-slate-500 hover:text-purple-400'
-                }`}
-              >
-                <Sparkles className="w-4 h-4 text-purple-400" />
-                <span>Social Boost Rates</span>
-              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('social_boost_pricing')}
+                  className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition cursor-pointer whitespace-nowrap ${
+                    activeTab === 'social_boost_pricing' || activeTab === 'tiktok_services'
+                      ? 'border-[#7C3AED] text-[#7C3AED] bg-purple-50/70 font-extrabold'
+                      : 'border-transparent text-slate-500 hover:text-[#7C3AED] hover:bg-slate-50'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4 text-[#7C3AED]" />
+                  <span>Social Boost Markup & Pricing Settings</span>
+                  <span className="bg-[#7C3AED] text-white font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                    OWNER ONLY
+                  </span>
+                </button>
+              )}
             </div>
 
             {/* TAB 1: LISTINGS MANAGEMENT */}
@@ -2602,7 +2738,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                           <select
                             value={u.role || 'buyer'}
                             onChange={(e) => handleUpdateUserRole(u.uid, e.target.value as 'admin' | 'seller' | 'buyer')}
-                            className="bg-slate-900 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500 cursor-pointer"
+                            disabled={!isOwner}
+                            className={`bg-slate-900 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500 ${
+                              isOwner ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'
+                            }`}
+                            title={isOwner ? "Change user role" : "Only the site Owner can modify user roles"}
                           >
                             <option value="buyer">Buyer Role</option>
                             <option value="seller">Seller Role</option>
@@ -2621,13 +2761,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                             {u.status === 'suspended' ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
                           </button>
 
-                          <button
-                            onClick={() => handleDeleteUser(u.uid)}
-                            className="p-2 bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 rounded-xl border border-slate-800 transition cursor-pointer"
-                            title="Delete User Record"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {isOwner && (
+                            <button
+                              onClick={() => handleDeleteUser(u.uid)}
+                              className="p-2 bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 rounded-xl border border-slate-800 transition cursor-pointer"
+                              title="Delete User Record (Owner Only)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -2638,7 +2780,23 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
             {/* TAB: MANAGE ADMINS (OWNER ONLY) */}
             {activeTab === 'admins' && isOwner && (
-              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                {/* Success Notification Banner */}
+                {roleChangeSuccessMessage && (
+                  <div className="bg-emerald-950/90 border border-emerald-500/50 text-emerald-200 px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-bold shadow-lg animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>{roleChangeSuccessMessage}</span>
+                    </div>
+                    <button
+                      onClick={() => setRoleChangeSuccessMessage(null)}
+                      className="text-emerald-400 hover:text-white cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 {/* Header Banner */}
                 <div className="bg-gradient-to-r from-amber-950/80 via-purple-950/60 to-slate-950 p-4 rounded-2xl border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -2653,93 +2811,202 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                         </span>
                       </h3>
                       <p className="text-slate-300 text-xs mt-0.5">
-                        Promote trusted buyers to Administrators or revoke Admin privileges. Only you (the site Owner) have authority over admins.
+                        Manage authorized platform administrators. Only you (the site Owner) have authority over admin privileges. All changes persist permanently in Firestore.
                       </p>
                     </div>
                   </div>
 
-                  <div className="bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-mono text-amber-300 shrink-0">
-                    Active Admins: <strong>{users.filter(u => u.role === 'admin' || u.role === 'owner' || isAuthorizedOwner(null, u)).length}</strong>
+                  <div className="bg-slate-900/90 border border-slate-800 px-3.5 py-2 rounded-xl text-xs font-mono text-amber-300 shrink-0 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-amber-400" />
+                    <span>Verified Admins: <strong className="text-white text-sm">{verifiedAdminAccounts.length}</strong></span>
                   </div>
                 </div>
 
-                {/* Search Bar */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
-                  <div className="relative w-full sm:w-80">
-                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
-                    <input
-                      type="text"
-                      placeholder="Search users by Name, Email, or UID..."
-                      value={adminSearch}
-                      onChange={(e) => setAdminSearch(e.target.value)}
-                      className="w-full bg-slate-900 text-slate-200 text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-800 focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div className="text-slate-400 text-xs">
-                    Showing {users.filter(u => 
-                      !adminSearch || 
-                      (u.displayName && u.displayName.toLowerCase().includes(adminSearch.toLowerCase())) ||
-                      (u.email && u.email.toLowerCase().includes(adminSearch.toLowerCase())) ||
-                      (u.uid && u.uid.toLowerCase().includes(adminSearch.toLowerCase()))
-                    ).length} registered users
-                  </div>
-                </div>
-
-                {/* Users List */}
+                {/* SECTION 1: VERIFIED ACTIVE ADMINISTRATORS */}
                 <div className="space-y-3">
-                  {users
-                    .filter(u => 
-                      !adminSearch || 
-                      (u.displayName && u.displayName.toLowerCase().includes(adminSearch.toLowerCase())) ||
-                      (u.email && u.email.toLowerCase().includes(adminSearch.toLowerCase())) ||
-                      (u.uid && u.uid.toLowerCase().includes(adminSearch.toLowerCase()))
-                    )
-                    .map((u) => {
-                      const isThisOwner = isAuthorizedOwner(null, u) || u.role === 'owner';
-                      const isThisAdmin = !isThisOwner && u.role === 'admin';
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-rose-400" />
+                      <h4 className="text-white font-extrabold text-xs uppercase tracking-wider">
+                        Active Administrators ({verifiedAdminAccounts.length} Accounts)
+                      </h4>
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                      Authenticated and verified in database
+                    </span>
+                  </div>
 
-                      return (
+                  {loadingAdmins ? (
+                    <div className="p-8 bg-slate-950 rounded-2xl border border-slate-800 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                      <span>Loading administrator credentials from Firestore...</span>
+                    </div>
+                  ) : verifiedAdminAccounts.length === 0 ? (
+                    <div className="p-8 bg-slate-950 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">
+                      No administrator accounts found.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {verifiedAdminAccounts.map((adm) => {
+                        const isThisOwner = isAuthorizedOwner(null, { email: adm.email, uid: adm.uid }) || adm.role === 'owner';
+                        return (
+                          <div
+                            key={adm.uid}
+                            className="bg-slate-950 p-4 rounded-2xl border border-rose-900/40 hover:border-rose-700/60 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-2xl font-black text-sm uppercase flex items-center justify-center shrink-0 border bg-gradient-to-br from-rose-600 to-amber-600 text-white border-rose-400/50 shadow-md">
+                                {(adm.displayName || adm.email || 'A').charAt(0)}
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-extrabold text-white text-sm">
+                                    {adm.displayName || 'Administrator'}
+                                  </h4>
+
+                                  {isThisOwner ? (
+                                    <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded uppercase">
+                                      PRIMARY OWNER
+                                    </span>
+                                  ) : (
+                                    <span className="bg-rose-950 text-rose-300 border border-rose-800 font-extrabold text-[9px] px-2 py-0.5 rounded uppercase">
+                                      ADMINISTRATOR
+                                    </span>
+                                  )}
+
+                                  <span className="bg-emerald-950/80 text-emerald-300 border border-emerald-800/80 font-bold text-[9px] px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    Verified
+                                  </span>
+                                </div>
+
+                                {/* Email with copy button */}
+                                <div className="flex items-center gap-2 flex-wrap text-xs text-slate-300">
+                                  <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
+                                    <Mail className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    <span className="font-mono text-amber-200 select-all font-semibold">
+                                      {adm.email || 'No email registered'}
+                                    </span>
+                                    {adm.email && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          copyToClipboard(adm.email);
+                                          alert(`Copied "${adm.email}" to clipboard.`);
+                                        }}
+                                        className="text-slate-400 hover:text-white p-0.5 rounded hover:bg-slate-800 transition cursor-pointer"
+                                        title="Copy email address"
+                                      >
+                                        <Copy className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <span className="text-slate-500">•</span>
+
+                                  <span className="text-[11px] text-slate-400">
+                                    UID: <code className="text-slate-300 font-mono text-[10px]">{adm.uid}</code>
+                                  </span>
+                                </div>
+
+                                <p className="text-[10px] text-slate-500">
+                                  Granted: {adm.grantedAt ? new Date(adm.grantedAt).toLocaleDateString() : 'Active'} • Authority: {adm.grantedBy || 'Owner'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                              {isThisOwner ? (
+                                <span className="text-amber-400 text-xs font-bold bg-amber-950/80 border border-amber-800/80 px-3 py-1.5 rounded-xl">
+                                  Protected Owner
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    const targetUser: UserProfile = users.find(u => u.uid === adm.uid) || {
+                                      uid: adm.uid,
+                                      email: adm.email,
+                                      displayName: adm.displayName,
+                                      role: 'admin',
+                                      createdAt: adm.grantedAt || new Date().toISOString()
+                                    };
+                                    setAdminActionModal({ isOpen: true, targetUser, action: 'demote' });
+                                  }}
+                                  className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 hover:border-rose-500 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+                                  title="Revoke Administrator role"
+                                >
+                                  <UserX className="w-3.5 h-3.5" />
+                                  <span>Remove Admin</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* SECTION 2: PROMOTE REGISTERED USERS */}
+                <div className="space-y-3 pt-4 border-t border-slate-800">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-2">
+                        <Users className="w-4 h-4 text-cyan-400" />
+                        <span>Promote Registered User to Administrator</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Search buyers and sellers to elevate to Administrator status.
+                      </p>
+                    </div>
+
+                    <div className="relative w-full sm:w-72">
+                      <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Search by name, email, or UID..."
+                        value={adminSearch}
+                        onChange={(e) => setAdminSearch(e.target.value)}
+                        className="w-full bg-slate-900 text-slate-200 text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-800 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Filtered Non-Admin Users List */}
+                  <div className="space-y-3">
+                    {users
+                      .filter(u => {
+                        const isAlreadyAdmin = verifiedAdminAccounts.some(a => a.uid === u.uid) || u.role === 'admin' || isAuthorizedOwner(null, u);
+                        if (isAlreadyAdmin) return false;
+                        if (!adminSearch.trim()) return true;
+                        const q = adminSearch.toLowerCase();
+                        return (
+                          (u.displayName && u.displayName.toLowerCase().includes(q)) ||
+                          (u.email && u.email.toLowerCase().includes(q)) ||
+                          (u.uid && u.uid.toLowerCase().includes(q))
+                        );
+                      })
+                      .slice(0, 20)
+                      .map((u) => (
                         <div
                           key={u.uid}
-                          className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-                            isThisOwner
-                              ? 'bg-amber-950/20 border-amber-500/40'
-                              : isThisAdmin
-                              ? 'bg-rose-950/20 border-rose-500/30'
-                              : 'bg-slate-950 border-slate-800'
-                          }`}
+                          className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-slate-700 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                         >
                           <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-2xl font-black text-sm uppercase flex items-center justify-center shrink-0 border ${
-                              isThisOwner
-                                ? 'bg-amber-500 text-slate-950 border-amber-300'
-                                : isThisAdmin
-                                ? 'bg-rose-600 text-white border-rose-400'
-                                : 'bg-slate-800 text-slate-300 border-slate-700'
-                            }`}>
+                            <div className="w-10 h-10 rounded-2xl font-black text-sm uppercase flex items-center justify-center shrink-0 border bg-slate-800 text-slate-300 border-slate-700">
                               {(u.displayName || u.email || 'U').charAt(0)}
                             </div>
 
                             <div>
                               <div className="flex items-center gap-2">
                                 <h4 className="font-extrabold text-white text-sm">
-                                  {u.displayName || 'Unnamed Account'}
+                                  {u.displayName || 'Unnamed User'}
                                 </h4>
-
-                                {isThisOwner ? (
-                                  <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded uppercase">
-                                    OWNER (Protected)
-                                  </span>
-                                ) : isThisAdmin ? (
-                                  <span className="bg-rose-500 text-white font-black text-[9px] px-2 py-0.5 rounded uppercase">
-                                    ADMINISTRATOR
-                                  </span>
-                                ) : (
-                                  <span className="bg-slate-800 text-slate-300 font-bold text-[9px] px-2 py-0.5 rounded uppercase">
-                                    BUYER
-                                  </span>
-                                )}
+                                <span className="bg-slate-800 text-slate-300 font-bold text-[9px] px-2 py-0.5 rounded uppercase">
+                                  {u.role || 'buyer'}
+                                </span>
                               </div>
 
                               <p className="text-xs text-slate-400 mt-0.5">
@@ -2748,33 +3015,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                             </div>
                           </div>
 
-                          {/* Action Buttons */}
                           <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                            {isThisOwner ? (
-                              <span className="text-amber-400 text-xs font-bold bg-amber-950/80 border border-amber-800/80 px-3 py-1.5 rounded-xl">
-                                Site Owner
-                              </span>
-                            ) : isThisAdmin ? (
-                              <button
-                                onClick={() => setAdminActionModal({ isOpen: true, targetUser: u, action: 'demote' })}
-                                className="bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 hover:border-rose-500 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
-                              >
-                                <UserX className="w-3.5 h-3.5" />
-                                <span>Remove Admin</span>
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => setAdminActionModal({ isOpen: true, targetUser: u, action: 'promote' })}
-                                className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:border-amber-400 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
-                              >
-                                <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-                                <span>Make Admin</span>
-                              </button>
-                            )}
+                            <button
+                              onClick={() => setAdminActionModal({ isOpen: true, targetUser: u, action: 'promote' })}
+                              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:border-amber-400 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Make Admin</span>
+                            </button>
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -3739,120 +3991,29 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
               </div>
             )}
 
-            {/* TAB 7: TIKTOK PROMOTION RATES & LIMITS CONFIGURATION */}
-            {activeTab === 'tiktok_services' && (
-              <div className="flex-1 overflow-y-auto p-5 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-                  <div>
-                    <h3 className="font-extrabold text-white text-base flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-purple-400" />
-                      <span>Social Boost Rates & Limits Controls</span>
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Configure live price per 1,000 units, minimum & maximum order quantities, and active/paused service status for each TikTok service.
+            {/* TAB: SOCIAL BOOST MARKUP & PRICING SETTINGS (OWNER ONLY) */}
+            {(activeTab === 'social_boost_pricing' || activeTab === 'tiktok_services') && (
+              <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-[#FAF8FE] text-slate-900">
+                {isOwner ? (
+                  <SocialBoostPricingManager isOwner={true} />
+                ) : (
+                  <div className="p-8 sm:p-12 text-center space-y-4 max-w-md mx-auto my-12 bg-white rounded-3xl border border-rose-200 shadow-sm text-slate-900">
+                    <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto border border-rose-100">
+                      <Lock className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900">Owner Access Only</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      The Social Boost Markup & Pricing Settings section is strictly restricted to the verified website owner (Super Admin). Normal administrators, sellers, and customers do not have permission to view or access provider pricing and markups.
                     </p>
-                  </div>
-                  <button
-                    onClick={handleSaveTikTokServices}
-                    disabled={isSavingTikTokServices}
-                    className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs px-5 py-2.5 rounded-xl transition cursor-pointer shadow-lg active:scale-95 disabled:opacity-50"
-                  >
-                    {isSavingTikTokServices ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    <span>{isSavingTikTokServices ? 'Saving...' : 'Save Service Rates'}</span>
-                  </button>
-                </div>
-
-                {tikTokSaveSuccess && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold p-3.5 rounded-2xl flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Social Boost service rates and limits updated successfully in database!</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('listings')}
+                      className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition cursor-pointer shadow-xs"
+                    >
+                      Return to Listings
+                    </button>
                   </div>
                 )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {tikTokServices.map((svc, idx) => (
-                    <div key={`${svc.id}-${idx}`} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3.5 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-black text-white text-sm">{svc.name}</h4>
-                          <span className="text-[10px] text-purple-300 font-semibold uppercase tracking-wider block">
-                            Target: {svc.targetType === 'profile_url' ? 'Profile URL' : 'Video URL'}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTikTokServices((prev) =>
-                              prev.map((s) => s.id === svc.id ? { ...s, status: s.status === 'active' ? 'paused' : 'active' } : s)
-                            );
-                          }}
-                          className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border transition cursor-pointer ${
-                            svc.status === 'active'
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                              : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                          }`}
-                        >
-                          {svc.status}
-                        </button>
-                      </div>
-
-                      <div className="space-y-2.5 text-xs">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 block mb-1">
-                            Price per 1,000 Units (₦)
-                          </label>
-                          <input
-                            type="number"
-                            value={svc.pricePer1k}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setTikTokServices((prev) =>
-                                prev.map((s) => s.id === svc.id ? { ...s, pricePer1k: val } : s)
-                              );
-                            }}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
-                              Min Quantity
-                            </label>
-                            <input
-                              type="number"
-                              value={svc.minQuantity}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                setTikTokServices((prev) =>
-                                  prev.map((s) => s.id === svc.id ? { ...s, minQuantity: val } : s)
-                                );
-                              }}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
-                              Max Quantity
-                            </label>
-                            <input
-                              type="number"
-                              value={svc.maxQuantity}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                setTikTokServices((prev) =>
-                                  prev.map((s) => s.id === svc.id ? { ...s, maxQuantity: val } : s)
-                                );
-                              }}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </>

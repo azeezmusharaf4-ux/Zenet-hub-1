@@ -1,7 +1,12 @@
 import express from 'express';
 import crypto from 'crypto';
-import { Firestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
-import { isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from '../lib/authorizedOwners';
+import { Firestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
+import { isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from '../lib/authorizedOwners.ts';
+import {
+  sendVirtualNumberPurchaseEmail,
+  sendOtpAvailableNotificationEmail,
+  sendRefundSuccessEmail
+} from './emailService.ts';
 
 // =========================================================================
 // VIRTUALSMSNUMBERS INTEGRATION GATEWAY (SERVER-SIDE PROXY)
@@ -15,6 +20,8 @@ export interface VirtualNumberPricingSettings {
   maxMarkup: number;
   pricingStyle: 'natural' | 'clean' | 'tiered';
   eurToNgnRate?: number;
+  customPrices?: Record<string, number>;
+  customPriceDetails?: Record<string, any>;
 }
 
 // In-memory cache
@@ -27,15 +34,17 @@ let cachedPricingSettings: VirtualNumberPricingSettings = {
   minMarkup: 500,
   maxMarkup: 4500,
   pricingStyle: 'natural',
-  eurToNgnRate: 1750
+  eurToNgnRate: 1750,
+  customPrices: {},
+  customPriceDetails: {}
 };
 
 // Purchase idempotency locks
 const userOrderLocks = new Map<string, number>();
 
 let lastPricingSettingsFetch = 0;
-export const loadPricingSettingsFromDb = async (db: Firestore | null) => {
-  if (!db || (Date.now() - lastPricingSettingsFetch < 60000)) return cachedPricingSettings;
+export const loadPricingSettingsFromDb = async (db: Firestore | null, forceReload: boolean = false) => {
+  if (!db || (!forceReload && (Date.now() - lastPricingSettingsFetch < 30000))) return cachedPricingSettings;
   try {
     const sRef = doc(db, 'system_settings', 'virtual_number_pricing');
     const sSnap = await getDoc(sRef);
@@ -46,7 +55,9 @@ export const loadPricingSettingsFromDb = async (db: Firestore | null) => {
         minMarkup: Math.max(Number(data.minMarkup) || 500, 100),
         maxMarkup: Math.max(Number(data.maxMarkup) || 4500, 500),
         pricingStyle: (['natural', 'clean', 'tiered'].includes(data.pricingStyle as any) ? data.pricingStyle : 'natural') as any,
-        eurToNgnRate: Number(data.eurToNgnRate) || Number(process.env.EUR_TO_NGN_RATE) || cachedPricingSettings.eurToNgnRate || 1750
+        eurToNgnRate: Number(data.eurToNgnRate) || Number(process.env.EUR_TO_NGN_RATE) || cachedPricingSettings.eurToNgnRate || 1750,
+        customPrices: (data.customPrices && typeof data.customPrices === 'object') ? data.customPrices : {},
+        customPriceDetails: (data.customPriceDetails && typeof data.customPriceDetails === 'object') ? data.customPriceDetails : {}
       };
       lastPricingSettingsFetch = Date.now();
     }
@@ -54,6 +65,61 @@ export const loadPricingSettingsFromDb = async (db: Firestore | null) => {
     console.warn('[VirtualSMSNumbers] Pricing settings load notice:', err?.message || err);
   }
   return cachedPricingSettings;
+};
+
+/**
+ * Universal resolver for owner-managed custom selling prices.
+ * Supports exact canonical keys (service_country, e.g. whatsapp_us, whatsapp_gb, whatsapp_ca, whatsapp_au, telegram_au),
+ * legacy dial-code keys (whatsapp_+1, whatsapp_+4, whatsapp_+7), and fallback service keys (whatsapp_all).
+ */
+export const getCustomPriceForServiceCountry = (
+  serviceSlug: string,
+  countryCode: string,
+  customPrices: Record<string, number> = {}
+): { hasCustomPrice: boolean; customPrice: number | null; matchedKey: string | null } => {
+  if (!customPrices || typeof customPrices !== 'object') {
+    return { hasCustomPrice: false, customPrice: null, matchedKey: null };
+  }
+  const s = (serviceSlug || '').toLowerCase().trim();
+  const c = (countryCode || '').toLowerCase().trim();
+  if (!s || !c) {
+    return { hasCustomPrice: false, customPrice: null, matchedKey: null };
+  }
+
+  // 1. Exact canonical ISO key: e.g. "whatsapp_us", "whatsapp_gb", "whatsapp_ca", "whatsapp_au", "telegram_au"
+  const key1 = `${s}_${c}`;
+  if (customPrices[key1] !== undefined && !isNaN(Number(customPrices[key1])) && Number(customPrices[key1]) > 0) {
+    return { hasCustomPrice: true, customPrice: Math.round(Number(customPrices[key1])), matchedKey: key1 };
+  }
+
+  // 2. Legacy dial code or fallback key match (e.g. "whatsapp_+1" for "us", "whatsapp_+4" for "gb", "whatsapp_+7" for "ru")
+  const dialMap: Record<string, string[]> = {
+    'us': ['+1', '1'],
+    'ca': ['+1', '1'],
+    'gb': ['+44', '+4', '44', '4'],
+    'ru': ['+7', '7'],
+    'au': ['+61', '+6', '61'],
+    'ng': ['+234', '+2', '234'],
+    'de': ['+49', '+4', '49'],
+    'fr': ['+33', '+3', '33'],
+    'nl': ['+31', '+3', '31']
+  };
+  if (dialMap[c]) {
+    for (const d of dialMap[c]) {
+      const k = `${s}_${d}`;
+      if (customPrices[k] !== undefined && !isNaN(Number(customPrices[k])) && Number(customPrices[k]) > 0) {
+        return { hasCustomPrice: true, customPrice: Math.round(Number(customPrices[k])), matchedKey: k };
+      }
+    }
+  }
+
+  // 3. Service-wide fallback key (e.g. "whatsapp_all")
+  const keyAll = `${s}_all`;
+  if (customPrices[keyAll] !== undefined && !isNaN(Number(customPrices[keyAll])) && Number(customPrices[keyAll]) > 0) {
+    return { hasCustomPrice: true, customPrice: Math.round(Number(customPrices[keyAll])), matchedKey: keyAll };
+  }
+
+  return { hasCustomPrice: false, customPrice: null, matchedKey: null };
 };
 
 export const getVirtualSMSNumbersConfig = () => {
@@ -166,6 +232,7 @@ export const getVsnCountriesList = async () => {
     { id: 12, code: 'US', name: 'United States', dial_code: '+1', region: 'North America', flag: '🇺🇸' },
     { id: 16, code: 'GB', name: 'United Kingdom', dial_code: '+44', region: 'Europe', flag: '🇬🇧' },
     { id: 36, code: 'CA', name: 'Canada', dial_code: '+1', region: 'North America', flag: '🇨🇦' },
+    { id: 259, code: 'AU', name: 'Australia', dial_code: '+61', region: 'Oceania', flag: '🇦🇺' },
     { id: 19, code: 'NG', name: 'Nigeria', dial_code: '+234', region: 'Africa', flag: '🇳🇬' },
     { id: 117, code: 'PT', name: 'Portugal', dial_code: '+351', region: 'Europe', flag: '🇵🇹' },
     { id: 77, code: 'FR', name: 'France', dial_code: '+33', region: 'Europe', flag: '🇫🇷' },
@@ -239,17 +306,91 @@ export const resolveToVsnCountryCode = (countryInput: string, countriesList: any
     'philippines': 'PH',
     'south africa': 'ZA',
     'ghana': 'GH',
-    'kenya': 'KE'
+    'kenya': 'KE',
+    'poland': 'PL',
+    'ukraine': 'UA',
+    'vietnam': 'VN',
+    'china': 'CN',
+    'russia': 'RU',
+    'turkey': 'TR',
+    'thailand': 'TH',
+    'italy': 'IT',
+    'spain': 'ES',
+    'mexico': 'MX',
+    'australia': 'AU',
+    // Dial code mappings
+    '+1': 'US',
+    '+44': 'GB',
+    '+61': 'AU',
+    '+7': 'RU',
+    '+234': 'NG',
+    '+49': 'DE',
+    '+33': 'FR',
+    '+31': 'NL',
+    '+351': 'PT',
+    '+55': 'BR',
+    '+91': 'IN',
+    '+62': 'ID',
+    '+63': 'PH',
+    '+27': 'ZA',
+    '+233': 'GH',
+    '+254': 'KE',
+    '+48': 'PL',
+    '+380': 'UA',
+    '+84': 'VN',
+    '+86': 'CN',
+    '+90': 'TR',
+    '+66': 'TH',
+    '+39': 'IT',
+    '+34': 'ES',
+    '+52': 'MX',
+    // VirtualSMSNumbers numeric country IDs
+    '36': 'CA',
+    '12': 'US',
+    '16': 'GB',
+    '19': 'NG',
+    '43': 'DE',
+    '77': 'FR',
+    '48': 'NL',
+    '73': 'BR',
+    '22': 'IN',
+    '6': 'ID',
+    '4': 'PH',
+    '31': 'ZA',
+    '38': 'GH',
+    '8': 'KE',
+    '15': 'PL',
+    '117': 'PT',
+    '1': 'UA',
+    '10': 'VN',
+    '3': 'CN',
+    '62': 'TR',
+    '21': 'TH',
+    '86': 'IT',
+    '56': 'ES',
+    '259': 'AU'
   };
   if (commonCountryMap[lower]) {
     return commonCountryMap[lower];
   }
+  if (commonCountryMap[clean]) {
+    return commonCountryMap[clean];
+  }
   for (const c of countriesList) {
-    if (String(c.id) === countryInput || c.code?.toUpperCase() === clean || c.name?.toLowerCase() === lower) {
-      return (c.code || 'US').toUpperCase();
+    if (String(c.id) === countryInput || c.code?.toUpperCase() === clean || c.name?.toLowerCase() === lower || c.dial_code === countryInput) {
+      return (c.code || c.id || 'US').toUpperCase();
     }
   }
-  return clean.slice(0, 2);
+  if (clean.startsWith('+')) {
+    if (clean.startsWith('+1')) return 'US';
+    if (clean.startsWith('+44')) return 'GB';
+    if (clean.startsWith('+61')) return 'AU';
+    if (clean.startsWith('+7')) return 'RU';
+    if (clean.startsWith('+234')) return 'NG';
+    if (clean.startsWith('+49')) return 'DE';
+    if (clean.startsWith('+33')) return 'FR';
+  }
+  return clean.replace(/[^A-Z]/g, '').slice(0, 2) || 'US';
 };
 
 // Resolver from user input (short code or service name) to canonical VirtualSMSNumbers service slug
@@ -566,6 +707,18 @@ export const handleVirtualSMSNumbersWebhook = async (
             }
 
             console.log(`[VirtualSMSNumbers Webhook] Order ${orderDocId} updated with received SMS code.`);
+
+            // Dispatch safe email notification: OTP is ready in dashboard (without exposing the raw code in the email)
+            if (orderData.userEmail) {
+              sendOtpAvailableNotificationEmail({
+                to: orderData.userEmail,
+                serviceName: orderData.service || orderData.serviceSlug || 'Virtual Number',
+                country: orderData.country || orderData.countryCode || 'Global',
+                phoneNumber: orderData.phoneNumber || '',
+                orderId: orderDocId,
+                db
+              }).catch((e) => console.warn('[EmailService] Webhook OTP available email notice:', e?.message));
+            }
           } else if (eventName.includes('expired') || eventName.includes('timeout') || statusUpper === 'EXPIRED') {
             if (!orderData.refunded && orderData.status !== 'RECEIVED' && !orderData.code) {
               const refundAmount = Number(orderData.price || orderData.totalCharge || 0);
@@ -597,6 +750,17 @@ export const handleVirtualSMSNumbersWebhook = async (
                   createdAt: nowIso
                 });
               });
+
+              if (orderData.userEmail) {
+                sendRefundSuccessEmail({
+                  to: orderData.userEmail,
+                  amount: refundAmount,
+                  reason: 'Activation expired without receiving an SMS code (Webhook)',
+                  orderId: orderDocId,
+                  db
+                }).catch((e) => console.warn('[EmailService] Webhook refund email notice:', e?.message));
+              }
+
               console.log(`[VirtualSMSNumbers Webhook] Order ${orderDocId} expired; refunded ₦${refundAmount} to user ${orderData.userId}`);
             } else {
               await updateDoc(doc(db, 'virtual_number_orders', orderDocId), {
@@ -775,14 +939,16 @@ export const handleVirtualSMSNumbersGateway = async (
         const countryIso = isCheapestQuery ? '' : resolveToVsnCountryCode(rawCountry, vsnCountries);
 
         let resolvedCountry = countryIso || 'US';
-        let resolvedCountryName = 'United States';
-        let resolvedFlag = '🇺🇸';
-        let resolvedDialCode = '+1';
+        const initialMatched = vsnCountries.find((c: any) => c.code?.toUpperCase() === resolvedCountry || String(c.id) === resolvedCountry);
+        let resolvedCountryName = initialMatched?.name || (resolvedCountry === 'CA' ? 'Canada' : 'United States');
+        let resolvedFlag = initialMatched?.flag || (resolvedCountry === 'CA' ? '🇨🇦' : '🇺🇸');
+        let resolvedDialCode = initialMatched?.dial_code || '+1';
 
-        let providerCostNgn = 350;
-        let providerCostEur = 0.20;
-        let stock = 100;
+        let providerCostNgn = 0;
+        let providerCostEur = 0;
+        let stock = 0;
         let successRate = 0.90;
+        let isAvailable = false;
 
         try {
           const priceQueryParams: Record<string, any> = {
@@ -810,32 +976,51 @@ export const handleVirtualSMSNumbersGateway = async (
               : Math.round((Number(item.price) || 0) * 100);
             providerCostEur = priceCents / 100;
             const currentEurRate = Number(cachedPricingSettings.eurToNgnRate) || Number(process.env.EUR_TO_NGN_RATE) || eurToNgnRate;
-            // Customer price is exact provider cost in EUR * EUR_TO_NGN_RATE rounded to whole naira
             providerCostNgn = Math.round(providerCostEur * currentEurRate);
             stock = Number(item.available ?? item.stock ?? item.count ?? 0);
             if (isNaN(stock) || stock < 0) stock = 0;
             successRate = Number(item.success_rate ?? item.rate) || 0.90;
+            isAvailable = stock > 0;
 
             const cCode = (item.country || item.country_code || item.code || countryIso || 'US').toString().toUpperCase();
             resolvedCountry = cCode;
             const matched = vsnCountries.find((c: any) => c.code?.toUpperCase() === cCode || String(c.id) === cCode);
-            resolvedCountryName = matched?.name || item.country_name || cCode;
-            resolvedFlag = matched?.flag || '🌐';
-            resolvedDialCode = matched?.dial_code || '+1';
+            resolvedCountryName = matched?.name || item.country_name || resolvedCountryName;
+            resolvedFlag = matched?.flag || resolvedFlag;
+            resolvedDialCode = matched?.dial_code || resolvedDialCode;
+          } else {
+            stock = 0;
+            isAvailable = false;
           }
         } catch (err: any) {
           console.warn(`[VirtualSMSNumbers Price Notice] (${countryIso || 'cheapest'}/${cleanService}):`, err.message);
+          stock = 0;
+          isAvailable = false;
         }
 
         const isOwner = await isOwnerRequest();
-        const options = generateVsnPriceOptions(providerCostNgn, cachedPricingSettings, isOwner);
-        const customerPrice = providerCostNgn; // Converted provider cost ONLY, ZERO markup
+        
+        // Check if owner configured custom selling price for this service and country
+        const { hasCustomPrice, customPrice } = getCustomPriceForServiceCountry(cleanService, resolvedCountry, cachedPricingSettings.customPrices);
+        const effectiveSellingPrice = (hasCustomPrice && customPrice !== null && customPrice > 0)
+          ? customPrice
+          : providerCostNgn;
+        const profitNgn = Math.max(0, effectiveSellingPrice - providerCostNgn);
+
+        const options = (isAvailable || effectiveSellingPrice > 0)
+          ? generateVsnPriceOptions(effectiveSellingPrice, cachedPricingSettings, isOwner).map(opt => ({
+              ...opt,
+              customerPrice: effectiveSellingPrice,
+              markup: isOwner ? profitNgn : opt.markup,
+              profit: isOwner ? profitNgn : opt.profit
+            }))
+          : [];
 
         return res.json({
           success: true,
           provider: 'VirtualSMSNumbers',
           hasApiKey,
-          available: stock > 0,
+          available: isAvailable,
           resolvedCountry,
           resolvedCountryName,
           resolvedFlag,
@@ -843,16 +1028,20 @@ export const handleVirtualSMSNumbersGateway = async (
           isCheapest: isCheapestQuery,
           options,
           priceOptions: options,
-          customerPrice: providerCostNgn,
-          totalPrice: providerCostNgn,
-          price: providerCostNgn,
+          customerPrice: effectiveSellingPrice,
+          totalPrice: effectiveSellingPrice,
+          price: effectiveSellingPrice,
+          effectiveSellingPrice,
           providerCost: providerCostNgn,
           providerCostEur,
           availableStock: stock,
           successRate,
           currency: 'NGN',
-          markup: 0,
-          profit: 0
+          markup: profitNgn,
+          profit: profitNgn,
+          hasCustomPrice,
+          customPrice: hasCustomPrice ? effectiveSellingPrice : null,
+          minSellingPrice: providerCostNgn
         });
       }
 
@@ -862,7 +1051,7 @@ export const handleVirtualSMSNumbersGateway = async (
         if (!isOwner) {
           return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
         }
-        await loadPricingSettingsFromDb(db);
+        await loadPricingSettingsFromDb(db, true);
         return res.json({
           success: true,
           provider: 'VirtualSMSNumbers',
@@ -870,6 +1059,21 @@ export const handleVirtualSMSNumbersGateway = async (
             ...cachedPricingSettings,
             eurToNgnRate: cachedPricingSettings.eurToNgnRate || eurToNgnRate
           }
+        });
+      }
+
+      // 2e2. CUSTOM PRICES LIST (Owner)
+      if (action === 'custom-prices' || action === 'get-custom-prices') {
+        const isOwner = await isOwnerRequest();
+        if (!isOwner) {
+          return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
+        }
+        await loadPricingSettingsFromDb(db, true);
+        return res.json({
+          success: true,
+          provider: 'VirtualSMSNumbers',
+          customPrices: cachedPricingSettings.customPrices || {},
+          customPriceDetails: cachedPricingSettings.customPriceDetails || {}
         });
       }
 
@@ -928,6 +1132,14 @@ export const handleVirtualSMSNumbersGateway = async (
           return res.status(403).json({ success: false, error: 'Forbidden' });
         }
 
+        const createdAtMs = orderData.createdAtMs || (orderData.createdAt ? new Date(orderData.createdAt).getTime() : Date.now());
+        const refundAvailableAtMs = orderData.refundAvailableAtMs || (createdAtMs + 15 * 60 * 1000);
+        const nowMs = Date.now();
+        const remainingRefundMs = Math.max(0, refundAvailableAtMs - nowMs);
+        const remainingRefundSeconds = Math.ceil(remainingRefundMs / 1000);
+        const isRefundEligible = orderData.status === 'WAITING' && !orderData.code && !orderData.refunded && remainingRefundSeconds === 0;
+        const cleanPhone = String(orderData.phoneNumber || '').replace(/[^\d]/g, '');
+
         // 1. If already code received / completed
         if (orderData.status === 'RECEIVED' || orderData.status === 'COMPLETED' || orderData.code) {
           return res.json({
@@ -935,7 +1147,16 @@ export const handleVirtualSMSNumbersGateway = async (
             status: 'RECEIVED',
             code: orderData.code || '',
             smsText: orderData.smsText || '',
-            order: orderData
+            refundAvailableAtMs,
+            remainingRefundSeconds: 0,
+            isRefundEligible: false,
+            order: {
+              ...orderData,
+              phoneNumber: cleanPhone,
+              refundAvailableAtMs,
+              remainingRefundSeconds: 0,
+              isRefundEligible: false
+            }
           });
         }
 
@@ -947,14 +1168,22 @@ export const handleVirtualSMSNumbersGateway = async (
             code: '',
             smsText: '',
             refunded: true,
-            order: orderData
+            refundAvailableAtMs,
+            remainingRefundSeconds: 0,
+            isRefundEligible: false,
+            order: {
+              ...orderData,
+              phoneNumber: cleanPhone,
+              refundAvailableAtMs,
+              remainingRefundSeconds: 0,
+              isRefundEligible: false
+            }
           });
         }
 
         // 3. For WAITING orders: check upstream provider API
         if (orderData.status === 'WAITING' && orderData.providerOrderId && hasApiKey) {
-          const createdAtMs = new Date(orderData.createdAt || Date.now()).getTime();
-          const orderAgeMs = Date.now() - createdAtMs;
+          const orderAgeMs = nowMs - createdAtMs;
           const isPast20Min = orderAgeMs >= 20 * 60 * 1000;
 
           try {
@@ -987,7 +1216,7 @@ export const handleVirtualSMSNumbersGateway = async (
 
               const isReceived = uStatus === 'code_received' || uStatus === 'received' || uStatus === 'success' || uStatus === 'completed' || uStatus === '2' || Boolean(extractedCode);
 
-              // Code received = successful order = cancellation disabled!
+              // Code received = successful order = cancellation and refund permanently disabled!
               if (isReceived && extractedCode) {
                 const nowIso = new Date().toISOString();
                 await updateDoc(orderRef, {
@@ -998,12 +1227,37 @@ export const handleVirtualSMSNumbersGateway = async (
                   updatedAt: nowIso
                 });
 
+                // Dispatch safe email notification: OTP is ready in dashboard (without exposing the raw code in the email)
+                const targetEmail = (orderData.userEmail || '').trim();
+                if (targetEmail) {
+                  sendOtpAvailableNotificationEmail({
+                    to: targetEmail,
+                    serviceName: orderData.service || orderData.serviceSlug || 'Virtual Number',
+                    country: orderData.country || orderData.countryCode || 'Global',
+                    phoneNumber: cleanPhone,
+                    orderId: orderData.orderId || orderId,
+                    db
+                  }).catch((e) => console.warn('[EmailService] OTP available email notice:', e?.message));
+                }
+
                 return res.json({
                   success: true,
                   status: 'RECEIVED',
                   code: extractedCode,
                   smsText: extractedText || `Verification code: ${extractedCode}`,
-                  order: { ...orderData, status: 'RECEIVED', code: extractedCode, smsText: extractedText }
+                  refundAvailableAtMs,
+                  remainingRefundSeconds: 0,
+                  isRefundEligible: false,
+                  order: {
+                    ...orderData,
+                    phoneNumber: cleanPhone,
+                    status: 'RECEIVED',
+                    code: extractedCode,
+                    smsText: extractedText,
+                    refundAvailableAtMs,
+                    remainingRefundSeconds: 0,
+                    isRefundEligible: false
+                  }
                 });
               }
 
@@ -1063,6 +1317,16 @@ export const handleVirtualSMSNumbersGateway = async (
                     });
                   });
 
+                  if (orderData.userEmail) {
+                    sendRefundSuccessEmail({
+                      to: orderData.userEmail,
+                      amount: refundAmount,
+                      reason: '20-Minute Waiting Timeout Elapsed (No SMS received)',
+                      orderId: orderData.orderId || orderId,
+                      db
+                    }).catch((e) => console.warn('[EmailService] Timeout refund email notice:', e?.message));
+                  }
+
                   return res.json({
                     success: true,
                     status: 'EXPIRED',
@@ -1113,6 +1377,16 @@ export const handleVirtualSMSNumbersGateway = async (
                   });
                 });
 
+                if (orderData.userEmail) {
+                  sendRefundSuccessEmail({
+                    to: orderData.userEmail,
+                    amount: refundAmount,
+                    reason: 'Carrier cancelled number activation (no SMS received)',
+                    orderId: orderData.orderId || orderId,
+                    db
+                  }).catch((e) => console.warn('[EmailService] Carrier cancellation refund email notice:', e?.message));
+                }
+
                 return res.json({
                   success: true,
                   status: 'CANCELLED',
@@ -1132,7 +1406,16 @@ export const handleVirtualSMSNumbersGateway = async (
           status: orderData.status || 'WAITING',
           code: orderData.code || '',
           smsText: orderData.smsText || '',
-          order: orderData
+          refundAvailableAtMs,
+          remainingRefundSeconds,
+          isRefundEligible,
+          order: {
+            ...orderData,
+            phoneNumber: cleanPhone,
+            refundAvailableAtMs,
+            remainingRefundSeconds,
+            isRefundEligible
+          }
         });
       }
 
@@ -1150,7 +1433,26 @@ export const handleVirtualSMSNumbersGateway = async (
         }
 
         const snap = await getDocs(ordersQuery);
-        const ordersList = snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+        const nowMs = Date.now();
+        const ordersList = snap.docs.map(d => {
+          const data = d.data() as Record<string, any>;
+          const cMs = data.createdAtMs || (data.createdAt ? new Date(data.createdAt).getTime() : 0);
+          const rMs = data.refundAvailableAtMs || (cMs ? cMs + 15 * 60 * 1000 : 0);
+          const remMs = Math.max(0, rMs - nowMs);
+          const remSec = Math.ceil(remMs / 1000);
+          const eligible = data.status === 'WAITING' && !data.code && !data.refunded && remSec === 0;
+          const cleanPhone = String(data.phoneNumber || '').replace(/[^\d]/g, '');
+
+          return {
+            id: d.id,
+            ...data,
+            phoneNumber: cleanPhone,
+            createdAtMs: cMs,
+            refundAvailableAtMs: rMs,
+            remainingRefundSeconds: remSec,
+            isRefundEligible: eligible
+          };
+        });
         ordersList.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
         return res.json({
@@ -1187,6 +1489,208 @@ export const handleVirtualSMSNumbersGateway = async (
           success: true,
           message: 'Virtual number pricing settings updated successfully.',
           settings: newSettings
+        });
+      }
+
+      // 3a2. SET CUSTOM SELLING PRICE (Owner Only, with Strict Minimum Enforced)
+      if (action === 'set-custom-price') {
+        const isOwner = await isOwnerRequest();
+        if (!isOwner) {
+          return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
+        }
+        if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+
+        const {
+          service,
+          country,
+          sellingPrice,
+          serviceName: inputServiceName,
+          serviceId: inputServiceId,
+          countryName: inputCountryName,
+          countryId: inputCountryId,
+          callerEmail: inputCallerEmail
+        } = req.body;
+
+        if (!service) {
+          return res.status(400).json({ success: false, error: 'Service parameter is required.' });
+        }
+
+        const vsnServices = await getVsnServicesList();
+        const vsnCountries = await getVsnCountriesList();
+        const cleanService = resolveToVsnServiceSlug(service, vsnServices);
+        const countryIso = resolveToVsnCountryCode(country, vsnCountries) || 'US';
+        const priceKey = `${cleanService}_${countryIso.toLowerCase()}`;
+
+        const matchedService = vsnServices.find((s: any) => s.slug === cleanService || s.code === cleanService || s.name?.toLowerCase() === cleanService);
+        const serviceName = inputServiceName || matchedService?.name || cleanService;
+        const serviceId = inputServiceId || matchedService?.id || cleanService;
+
+        const matchedCountry = vsnCountries.find((c: any) => c.code?.toUpperCase() === countryIso || String(c.id) === countryIso);
+        const countryName = inputCountryName || matchedCountry?.name || countryIso;
+        const countryId = inputCountryId || matchedCountry?.id || countryIso;
+
+        // Fetch live provider cost to enforce the minimum price restriction
+        let providerCostNgn = 0;
+        let providerCostEur = 0;
+        try {
+          const priceRes = await queryVirtualSMSNumbers('/prices', {
+            service: cleanService,
+            country: countryIso,
+            per_page: 5
+          });
+          const itemsList = Array.isArray(priceRes?.data) ? priceRes.data : (Array.isArray(priceRes?.prices) ? priceRes.prices : []);
+          if (itemsList.length > 0) {
+            const item = itemsList[0];
+            const priceCents = Number(item.price_cents) !== undefined && item.price_cents !== null && !isNaN(Number(item.price_cents))
+              ? Number(item.price_cents)
+              : Math.round((Number(item.price) || 0) * 100);
+            providerCostEur = priceCents / 100;
+            const currentEurRate = Number(cachedPricingSettings.eurToNgnRate) || Number(process.env.EUR_TO_NGN_RATE) || eurToNgnRate;
+            providerCostNgn = Math.round(providerCostEur * currentEurRate);
+          }
+        } catch (e: any) {
+          console.warn('[VirtualSMSNumbers] Price check for set-custom-price notice:', e.message);
+        }
+
+        const numSellingPrice = Math.round(Number(sellingPrice) || 0);
+        if (providerCostNgn > 0 && numSellingPrice < providerCostNgn) {
+          return res.status(400).json({
+            success: false,
+            error: `Selling price (₦${numSellingPrice.toLocaleString()}) cannot be lower than the actual provider cost of ₦${providerCostNgn.toLocaleString()} for this service and country.`
+          });
+        }
+
+        const profitNgn = Math.max(0, numSellingPrice - providerCostNgn);
+        const marginPercent = providerCostNgn > 0 ? Math.round((profitNgn / providerCostNgn) * 10000) / 100 : 0;
+        const nowIso = new Date().toISOString();
+        const updatedBy = inputCallerEmail || 'owner';
+
+        const priceDetailRecord = {
+          id: priceKey,
+          priceKey,
+          serviceId,
+          serviceName,
+          serviceSlug: cleanService,
+          countryId,
+          countryName,
+          countryCode: countryIso,
+          providerCostNgn,
+          providerCostEur,
+          sellingPrice: numSellingPrice,
+          profitNgn,
+          marginPercent,
+          currency: 'NGN',
+          isCustomPrice: true,
+          updatedAt: nowIso,
+          updatedBy
+        };
+
+        // Always reload fresh pricing from Firestore first
+        await loadPricingSettingsFromDb(db, true);
+        const updatedCustomPrices = {
+          ...(cachedPricingSettings.customPrices || {}),
+          [priceKey]: numSellingPrice
+        };
+        const updatedCustomPriceDetails = {
+          ...(cachedPricingSettings.customPriceDetails || {}),
+          [priceKey]: priceDetailRecord
+        };
+
+        const sRef = doc(db, 'system_settings', 'virtual_number_pricing');
+        await setDoc(sRef, {
+          customPrices: updatedCustomPrices,
+          customPriceDetails: updatedCustomPriceDetails,
+          updatedAt: nowIso
+        }, { merge: true });
+
+        try {
+          const pRef = doc(db, 'service_prices', priceKey);
+          await setDoc(pRef, priceDetailRecord, { merge: true });
+        } catch (pErr: any) {
+          console.warn('[VirtualSMSNumbers] Save to service_prices collection notice:', pErr.message);
+        }
+
+        cachedPricingSettings.customPrices = updatedCustomPrices;
+        cachedPricingSettings.customPriceDetails = updatedCustomPriceDetails;
+        lastPricingSettingsFetch = Date.now();
+
+        return res.json({
+          success: true,
+          message: `Selling price for ${serviceName} (${countryName}) successfully saved at ₦${numSellingPrice.toLocaleString()}.`,
+          priceKey,
+          service: cleanService,
+          serviceName,
+          serviceId,
+          country: countryIso,
+          countryName,
+          countryId,
+          providerCostNgn,
+          sellingPrice: numSellingPrice,
+          profitNgn,
+          marginPercent,
+          priceDetail: priceDetailRecord
+        });
+      }
+
+      // 3a3. RESET CUSTOM SELLING PRICE (Owner Only)
+      if (action === 'reset-custom-price') {
+        const isOwner = await isOwnerRequest();
+        if (!isOwner) {
+          return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
+        }
+        if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+
+        const { service, country } = req.body;
+        const vsnServices = await getVsnServicesList();
+        const vsnCountries = await getVsnCountriesList();
+        const cleanService = resolveToVsnServiceSlug(service, vsnServices);
+        const countryIso = resolveToVsnCountryCode(country, vsnCountries) || 'US';
+        const priceKey = `${cleanService}_${countryIso.toLowerCase()}`;
+
+        await loadPricingSettingsFromDb(db, true);
+        const updatedCustomPrices = { ...(cachedPricingSettings.customPrices || {}) };
+        delete updatedCustomPrices[priceKey];
+
+        // Also clean up any legacy dial-code aliases
+        const dialMap: Record<string, string[]> = {
+          'us': ['+1', '1'],
+          'ca': ['+1', '1'],
+          'gb': ['+44', '+4', '44', '4'],
+          'ru': ['+7', '7'],
+          'au': ['+61', '+6', '61'],
+          'ng': ['+234', '+2', '234']
+        };
+        if (dialMap[countryIso.toLowerCase()]) {
+          for (const d of dialMap[countryIso.toLowerCase()]) {
+            delete updatedCustomPrices[`${cleanService}_${d}`];
+          }
+        }
+
+        const updatedCustomPriceDetails = { ...(cachedPricingSettings.customPriceDetails || {}) };
+        delete updatedCustomPriceDetails[priceKey];
+
+        const sRef = doc(db, 'system_settings', 'virtual_number_pricing');
+        await setDoc(sRef, {
+          customPrices: updatedCustomPrices,
+          customPriceDetails: updatedCustomPriceDetails,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+        try {
+          const pRef = doc(db, 'service_prices', priceKey);
+          await deleteDoc(pRef);
+        } catch (delErr: any) {
+          console.warn('[VirtualSMSNumbers] Delete service_prices notice:', delErr.message);
+        }
+
+        cachedPricingSettings.customPrices = updatedCustomPrices;
+        cachedPricingSettings.customPriceDetails = updatedCustomPriceDetails;
+        lastPricingSettingsFetch = Date.now();
+
+        return res.json({
+          success: true,
+          message: `Custom price for ${cleanService} (${countryIso}) reset to provider cost.`,
+          priceKey
         });
       }
 
@@ -1251,9 +1755,12 @@ export const handleVirtualSMSNumbersGateway = async (
 
           if (!countryIso) countryIso = 'US'; // default canonical fallback country
 
-          // Convert exact provider rate to NGN with ZERO markup
+          // Check if owner configured custom selling price for this service and country
+          const { hasCustomPrice, customPrice: ownerCustomPrice } = getCustomPriceForServiceCountry(cleanService, countryIso, cachedPricingSettings.customPrices);
           let customerPrice = Math.max(1, Math.round(providerEurCost * eurToNgnRate));
-          if (selectedPrice && Number(selectedPrice) > 0) {
+          if (hasCustomPrice && ownerCustomPrice !== null && ownerCustomPrice > 0) {
+            customerPrice = ownerCustomPrice;
+          } else if (selectedPrice && Number(selectedPrice) > 0) {
             customerPrice = Math.round(Number(selectedPrice));
           }
 
@@ -1323,11 +1830,14 @@ export const handleVirtualSMSNumbersGateway = async (
           // 6. PROVIDER CONFIRMED ALLOCATION -> ATOMICALLY DEBIT USER WALLET & SAVE ORDER
           const providerActivationId = String(activationResult.id || activationResult.activation_id || activationResult.order_id);
           const rawPhone = String(activationResult.phone_number || activationResult.phoneNumber || activationResult.phone || '');
-          const cleanPhone = rawPhone.replace(/^\+/, '');
-          const nowIso = new Date().toISOString();
-          const expiresAtIso = new Date(Date.now() + 20 * 60 * 1000).toISOString(); // 20-minute maximum waiting period
-          const orderId = `ORD-VSN-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-          const txId = `TX-NUM-${Date.now()}`;
+          const cleanPhone = rawPhone.replace(/[^\d]/g, '');
+          const nowMs = Date.now();
+          const nowIso = new Date(nowMs).toISOString();
+          const refundAvailableAtMs = nowMs + 15 * 60 * 1000; // 15-minute carrier waiting window
+          const refundAvailableAt = new Date(refundAvailableAtMs).toISOString();
+          const expiresAtIso = new Date(nowMs + 20 * 60 * 1000).toISOString(); // 20-minute maximum waiting period
+          const orderId = `ORD-VSN-${nowMs}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          const txId = `TX-NUM-${nowMs}`;
 
           await runTransaction(db, async (tx) => {
             const uSnap = await tx.get(userRef);
@@ -1378,6 +1888,7 @@ export const handleVirtualSMSNumbersGateway = async (
               userEmail: userData.email || '',
               provider: 'VirtualSMSNumbers',
               providerOrderId: providerActivationId,
+              providerActivationId,
               phoneNumber: cleanPhone,
               country: countryIso,
               countryCode: countryIso,
@@ -1392,27 +1903,52 @@ export const handleVirtualSMSNumbersGateway = async (
               smsText: null,
               refunded: false,
               createdAt: nowIso,
+              createdAtMs: nowMs,
+              refundAvailableAt,
+              refundAvailableAtMs,
               expiresAt: expiresAtIso,
-              timeoutAt: Date.now() + 20 * 60 * 1000,
+              timeoutAt: nowMs + 20 * 60 * 1000,
               updatedAt: nowIso
             });
           });
 
+          // Dispatch real email purchase confirmation directly to user's registered Gmail
+          const recipientEmail = (userData.email || (req as any).authEmail || '').trim();
+          if (recipientEmail) {
+            sendVirtualNumberPurchaseEmail({
+              to: recipientEmail,
+              name: userData.displayName || userData.fullName || undefined,
+              serviceName: cleanService,
+              country: countryIso,
+              phoneNumber: cleanPhone,
+              amount: customerPrice,
+              orderId,
+              db
+            }).catch((e) => console.warn('[EmailService] Virtual number purchase email notice:', e?.message));
+          }
+
           return res.json({
             success: true,
-            message: `Allocated +${cleanPhone} successfully. Maximum waiting period: 20 minutes.`,
+            message: `Allocated +${cleanPhone} successfully. Waiting for carrier verification code.`,
             orderId,
             order: {
               id: orderId,
               orderId,
               providerOrderId: providerActivationId,
+              providerActivationId,
               phoneNumber: cleanPhone,
               country: countryIso,
               service: cleanService,
               status: 'WAITING',
               price: customerPrice,
+              customerPrice,
               expiresAt: expiresAtIso,
-              createdAt: nowIso
+              createdAt: nowIso,
+              createdAtMs: nowMs,
+              refundAvailableAt,
+              refundAvailableAtMs,
+              remainingRefundSeconds: 15 * 60,
+              isRefundEligible: false
             }
           });
 
@@ -1443,12 +1979,12 @@ export const handleVirtualSMSNumbersGateway = async (
           return res.status(403).json({ success: false, error: 'Forbidden: You do not own this order.' });
         }
 
-        // 1. If code already received locally: REJECT CANCELLATION
+        // 1. If code already received locally: REJECT CANCELLATION PERMANENTLY
         if (orderData.status === 'RECEIVED' || orderData.status === 'COMPLETED' || orderData.code) {
           return res.status(400).json({
             success: false,
             code: 'CODE_ALREADY_RECEIVED',
-            error: 'Cannot cancel order: The SMS verification code has already arrived. No refund can be issued.'
+            error: 'Cannot cancel order: An SMS verification code has already arrived for this activation. Activations that receive an OTP are permanently non-refundable.'
           });
         }
 
@@ -1461,7 +1997,25 @@ export const handleVirtualSMSNumbersGateway = async (
           });
         }
 
-        // 3. Race Condition Protection: Verify provider state before cancelling or refunding!
+        // 3. ENFORCE 15-MINUTE WAITING PERIOD BEFORE REFUND IS PERMITTED
+        const createdAtMs = orderData.createdAtMs || (orderData.createdAt ? new Date(orderData.createdAt).getTime() : 0);
+        const refundAvailableAtMs = orderData.refundAvailableAtMs || (createdAtMs ? createdAtMs + 15 * 60 * 1000 : 0);
+        const nowMs = Date.now();
+        const remainingMs = Math.max(0, refundAvailableAtMs - nowMs);
+        const isOwner = await isOwnerRequest();
+
+        if (!isOwner && remainingMs > 0) {
+          const remMinutes = Math.floor(remainingMs / 60000);
+          const remSeconds = Math.ceil((remainingMs % 60000) / 1000);
+          return res.status(400).json({
+            success: false,
+            code: 'WAITING_PERIOD_ACTIVE',
+            error: `Refund requests become available after 15 minutes of carrier waiting. Please wait ${remMinutes}m ${remSeconds}s before requesting a refund.`,
+            remainingSeconds: Math.ceil(remainingMs / 1000)
+          });
+        }
+
+        // 4. Race Condition Protection: Verify provider state before cancelling or refunding!
         // If code arrived at the same time customer pressed Cancel, verify provider state first.
         if (orderData.providerOrderId && hasApiKey) {
           try {
@@ -1474,7 +2028,7 @@ export const handleVirtualSMSNumbersGateway = async (
                 extractedCode = dataObj.messages[0].code || null;
               }
 
-              // Code received from provider API -> Save code, mark received, REJECT cancellation and refund!
+              // Code received from provider API -> Save code, mark received, PERMANENTLY REJECT cancellation and refund!
               if (extractedCode || uStatus === 'code_received' || uStatus === 'received' || uStatus === 'completed') {
                 const nowIso = new Date().toISOString();
                 await updateDoc(orderRef, {
@@ -1488,7 +2042,7 @@ export const handleVirtualSMSNumbersGateway = async (
                 return res.status(400).json({
                   success: false,
                   code: 'CODE_ALREADY_RECEIVED',
-                  error: 'Cannot cancel order: The verification code arrived from the carrier. Cancellation and refund are disabled.',
+                  error: 'Cannot cancel order: The verification code arrived from the carrier. Cancellation and refund are permanently disabled.',
                   receivedCode: extractedCode
                 });
               }
@@ -1497,14 +2051,14 @@ export const handleVirtualSMSNumbersGateway = async (
             console.warn('[VirtualSMSNumbers Cancel Pre-Check Notice]:', checkErr.message);
           }
 
-          // 4. Provider confirmed NO code has arrived. Now attempt provider cancellation/release:
+          // 5. Provider confirmed NO code has arrived. Now attempt provider cancellation/release:
           try {
             const cancelResult = await queryVirtualSMSNumbers(`/activations/${orderData.providerOrderId}/cancel`, {}, 'POST');
             if (cancelResult && cancelResult.error) {
               return res.status(400).json({
                 success: false,
                 code: cancelResult.error.code || 'PROVIDER_DECLINED',
-                error: `Provider declined cancellation: ${cancelResult.error.message || 'Carrier release failed'}.`
+                error: `Provider declined cancellation: ${cancelResult.error.message || 'Carrier release failed'}. Refund cannot be processed yet.`
               });
             }
           } catch (cancelErr: any) {
@@ -1514,7 +2068,7 @@ export const handleVirtualSMSNumbersGateway = async (
               return res.status(400).json({
                 success: false,
                 code: cancelErr.code || 'PROVIDER_DECLINED',
-                error: `Provider declined cancellation: ${cancelErr.message}.`
+                error: `Provider declined cancellation: ${cancelErr.message || 'Unable to release number from carrier'}. Refund cannot be processed yet.`
               });
             }
           }
@@ -1578,6 +2132,17 @@ export const handleVirtualSMSNumbersGateway = async (
             createdAt: nowIso
           });
         });
+
+        // Dispatch real refund email notification directly to user's registered Gmail
+        if (orderData.userEmail) {
+          sendRefundSuccessEmail({
+            to: orderData.userEmail,
+            amount: refundPrice,
+            reason: 'Order cancelled by customer after carrier waiting window',
+            orderId: orderData.orderId || orderId,
+            db
+          }).catch((e) => console.warn('[EmailService] Manual cancel refund email notice:', e?.message));
+        }
 
         return res.json({
           success: true,

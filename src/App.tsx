@@ -23,6 +23,7 @@ import { recordSellerRevenueInDb } from './lib/revenueSplit';
 import { AccountListing, CategoryType, FilterState, Inquiry, UserProfile, PurchaseRecord, ActiveAppView, WalletTransaction } from './types';
 import { isCategoryMatch } from './utils/category';
 import { safeApiFetch } from './utils/api';
+import { isPublicActiveListing, isListingPendingApproval } from './utils/listingVisibility';
 
 import { Sidebar } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
@@ -33,6 +34,10 @@ import { ListingCard } from './components/ListingCard';
 import { NavigationDrawer } from './components/NavigationDrawer';
 import { CategoriesView } from './components/CategoriesView';
 import { SupportView } from './components/SupportView';
+import { AboutView } from './components/AboutView';
+import { TermsOfServiceView } from './components/TermsOfServiceView';
+import { PrivacyPolicyView } from './components/PrivacyPolicyView';
+import { RefundPolicyView } from './components/RefundPolicyView';
 import { LandingPage } from './components/LandingPage';
 import { Footer } from './components/Footer';
 import { LogAccountsView } from './components/LogAccountsView';
@@ -43,7 +48,8 @@ import { ProfileView } from './components/ProfileView';
 import { EditProfileView } from './components/EditProfileView';
 import { ReferralsView, generateUserReferralCode } from './components/ReferralsView';
 import { ChangePasswordView } from './components/ChangePasswordView';
-import { safeLocalStorage } from './utils/storage';
+import { safeLocalStorage, safeSessionStorage } from './utils/storage';
+import { WhatsAppPromoModal } from './components/WhatsAppPromoModal';
 import { ServiceUnavailableView } from './components/ServiceUnavailableView';
 import type { DashboardTab } from './components/UserDashboardModal';
 
@@ -223,24 +229,24 @@ const CATEGORY_META: Record<CategoryType, { icon: string; title: string; subtitl
 };
 
 const ListingSkeleton = React.memo(() => (
-  <div className="w-full bg-white border border-[#EBE7F7] rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 animate-pulse shadow-xs">
+  <div className="w-full bg-white border border-[#EBE7F7] rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-3.5 shadow-xs zenet-card-enter">
     <div className="space-y-2.5">
       <div className="flex items-start space-x-3">
-        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#F1F0FB] shrink-0" />
+        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#F1F0FB] shrink-0 zenet-skeleton-shimmer" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 bg-[#F1F0FB] rounded-md w-3/4" />
-          <div className="h-3 bg-[#F8F7FD] rounded-md w-1/2" />
+          <div className="h-4 bg-[#F1F0FB] rounded-md w-3/4 zenet-skeleton-shimmer" />
+          <div className="h-3 bg-[#F8F7FD] rounded-md w-1/2 zenet-skeleton-shimmer" />
         </div>
       </div>
-      <div className="h-3 bg-[#F8F7FD] rounded-md w-full" />
+      <div className="h-3 bg-[#F8F7FD] rounded-md w-full zenet-skeleton-shimmer" />
       <div className="flex space-x-2">
-        <div className="h-5 bg-[#F1F0FB] rounded-full w-16" />
-        <div className="h-5 bg-[#F1F0FB] rounded-full w-20" />
+        <div className="h-5 bg-[#F1F0FB] rounded-full w-16 zenet-skeleton-shimmer" />
+        <div className="h-5 bg-[#F1F0FB] rounded-full w-20 zenet-skeleton-shimmer" />
       </div>
     </div>
     <div className="pt-3 border-t border-[#EBE7F7] flex items-center justify-between">
-      <div className="h-6 bg-[#F1F0FB] rounded-md w-20" />
-      <div className="h-8 bg-[#F1F0FB] rounded-xl w-24" />
+      <div className="h-6 bg-[#F1F0FB] rounded-md w-20 zenet-skeleton-shimmer" />
+      <div className="h-8 bg-[#F1F0FB] rounded-xl w-24 zenet-skeleton-shimmer" />
     </div>
   </div>
 ));
@@ -429,6 +435,139 @@ export default function App() {
   const [isSellerDashboardOpen, setIsSellerDashboardOpen] = useState(false);
   const [selectedSeller, setSelectedSeller] = useState<{ id: string; name: string } | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
+
+  // WhatsApp Promotional Pop-Up State
+  const [isWhatsAppPromoOpen, setIsWhatsAppPromoOpen] = useState(false);
+
+  // Initialize session start time once per visit
+  useEffect(() => {
+    const existing = safeSessionStorage.getItem('zenet_session_start_time') || safeLocalStorage.getItem('zenet_session_start_time');
+    if (!existing) {
+      const nowStr = String(Date.now());
+      safeSessionStorage.setItem('zenet_session_start_time', nowStr);
+      safeLocalStorage.setItem('zenet_session_start_time', nowStr);
+    }
+  }, []);
+
+  // WhatsApp Promotional Pop-up trigger checker:
+  // 1. Shows when user returns to Home screen after 15 minutes.
+  // 2. Never interrupts shopping, filling out forms, or completing payments.
+  // 3. If dismissed, does not show again immediately.
+  const checkAndTriggerWhatsAppPromo = useCallback(() => {
+    // 1. Must be on the Home screen ('marketplace')
+    if (activeView !== 'marketplace') return;
+
+    // 2. Do not interrupt while shopping, filling forms, or completing payments
+    const isInterrupted = Boolean(
+      selectedListing ||
+      buyingListing ||
+      confirmingBuyListing ||
+      isProcessingPurchase ||
+      completedOrder ||
+      insufficientBalanceListing ||
+      isCreateOpen ||
+      contactListing ||
+      isWalletModalOpen ||
+      isWithdrawModalOpen ||
+      authMode ||
+      isSellerDashboardOpen ||
+      adminOpen ||
+      isZenetUpdateModalOpen ||
+      isZenetUpdateAdminModalOpen ||
+      dashboardTab ||
+      selectedPurchaseDetails ||
+      isLogoutConfirmOpen
+    );
+    if (isInterrupted) return;
+
+    const now = Date.now();
+    const FIFTEEN_MINUTES = 15 * 60 * 1000;
+
+    // 3. If a user dismisses it, do not show it again immediately (must wait at least 15 minutes)
+    const dismissedAt = Number(safeLocalStorage.getItem('zenet_whatsapp_promo_dismissed_at') || '0');
+    if (dismissedAt && (now - dismissedAt < FIFTEEN_MINUTES)) {
+      return;
+    }
+
+    // 4. Check if 15 minutes have elapsed since session start or initial visit
+    const sessionStart = Number(
+      safeSessionStorage.getItem('zenet_session_start_time') ||
+      safeLocalStorage.getItem('zenet_session_start_time') ||
+      '0'
+    );
+
+    if (sessionStart && (now - sessionStart >= FIFTEEN_MINUTES)) {
+      setIsWhatsAppPromoOpen(true);
+    }
+  }, [
+    activeView,
+    selectedListing,
+    buyingListing,
+    confirmingBuyListing,
+    isProcessingPurchase,
+    completedOrder,
+    insufficientBalanceListing,
+    isCreateOpen,
+    contactListing,
+    isWalletModalOpen,
+    isWithdrawModalOpen,
+    authMode,
+    isSellerDashboardOpen,
+    adminOpen,
+    isZenetUpdateModalOpen,
+    isZenetUpdateAdminModalOpen,
+    dashboardTab,
+    selectedPurchaseDetails,
+    isLogoutConfirmOpen
+  ]);
+
+  // Trigger when returning to the Home screen
+  useEffect(() => {
+    if (activeView === 'marketplace') {
+      const timer = setTimeout(() => {
+        checkAndTriggerWhatsAppPromo();
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [activeView, checkAndTriggerWhatsAppPromo]);
+
+  // Trigger when returning to the browser tab/app (tab switch, unminimizing)
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndTriggerWhatsAppPromo();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [checkAndTriggerWhatsAppPromo]);
+
+  // Periodic check every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkAndTriggerWhatsAppPromo();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [checkAndTriggerWhatsAppPromo]);
+
+  // Expose test trigger for verification on mobile/desktop via URL param or console
+  useEffect(() => {
+    (window as any).triggerWhatsAppPromo = () => {
+      setIsWhatsAppPromoOpen(true);
+    };
+    try {
+      if (typeof window !== 'undefined' && window.location.search.includes('testWhatsAppPromo')) {
+        setIsWhatsAppPromoOpen(true);
+      }
+    } catch {}
+    return () => {
+      delete (window as any).triggerWhatsAppPromo;
+    };
+  }, []);
 
   // Wallet State with immediate persistent cache hydration
   const [walletBalance, setWalletBalance] = useState<number>(() => {
@@ -835,6 +974,9 @@ export default function App() {
   });
 
   const handleSelectListing = React.useCallback((listing: AccountListing) => {
+    if (!isPublicActiveListing(listing) && !isOwner) {
+      return;
+    }
     navigateRoute({ product: listing });
     setRecentlyViewedIds((prev) => {
       const updated = [listing.id, ...prev.filter((id) => id !== listing.id)].slice(0, 10);
@@ -845,7 +987,7 @@ export default function App() {
       }
       return updated;
     });
-  }, [navigateRoute]);
+  }, [navigateRoute, isOwner]);
 
   const listingsRef = useRef(listings);
   const isPurchasingRef = useRef(false);
@@ -932,9 +1074,17 @@ export default function App() {
     const prodId = url.searchParams.get('product') || url.searchParams.get('p');
     if (prodId && listings.length > 0 && !selectedListing) {
       const match = listings.find((l) => l.id === prodId);
-      if (match) setSelectedListing(match);
+      if (match) {
+        if (isPublicActiveListing(match) || isOwner) {
+          setSelectedListing(match);
+        }
+      }
     }
-  }, [listings, selectedListing]);
+    const authParam = url.searchParams.get('auth');
+    if (authParam === 'login' || authParam === 'signup') {
+      setAuthMode(authParam);
+    }
+  }, [listings, selectedListing, isOwner]);
 
   // 1. Firebase Auth state change listener & Connection Validation
   useEffect(() => {
@@ -1214,34 +1364,66 @@ export default function App() {
             const pendingRefCode = safeLocalStorage.getItem('pending_referral_code');
             if (pendingRefCode) {
               try {
-                const qRef = query(collection(db, 'users'), where('referralCode', '==', pendingRefCode.toUpperCase()));
-                const refQuerySnap = await getDocs(qRef);
-                if (!refQuerySnap.empty) {
-                  const referrerDoc = refQuerySnap.docs[0];
-                  if (referrerDoc.id !== currentUser.uid) {
-                    referredBy = referrerDoc.id;
-                    const referrerData = referrerDoc.data() as UserProfile;
+                // Try backend linking first (with authenticated ID token)
+                let linkedViaBackend = false;
+                try {
+                  const idToken = await currentUser.getIdToken();
+                  const linkRes = await fetch('/api/referrals/link', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({
+                      referralCode: pendingRefCode.trim().toUpperCase(),
+                      displayName: currentUser.displayName || existingData.displayName || '',
+                      email: currentUser.email || ''
+                    })
+                  });
+                  if (linkRes.ok) {
+                    const linkData = await linkRes.json();
+                    if (linkData.success && linkData.referrerId) {
+                      referredBy = linkData.referrerId;
+                      linkedViaBackend = true;
+                      safeLocalStorage.removeItem('pending_referral_code');
+                    }
+                  }
+                } catch (bErr) {
+                  console.warn('Backend referral linking notice:', bErr);
+                }
 
-                    // Create referral record
-                    const referralRecordId = `ref_${currentUser.uid}`;
-                    const refDocRef = doc(db, 'referrals', referralRecordId);
-                    await setDoc(refDocRef, {
-                      id: referralRecordId,
-                      referrerId: referrerDoc.id,
-                      referredUserId: currentUser.uid,
-                      referredUserEmail: currentUser.email || '',
-                      referredUserName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
-                      referredAt: new Date().toISOString(),
-                      totalSpent: existingData.totalPurchasesAmount || 0,
-                      rewardClaimed: existingData.referralRewardClaimed || false,
-                      rewardAmount: 100
-                    }, { merge: true });
+                // Client fallback if backend was unavailable
+                if (!linkedViaBackend) {
+                  const qRef = query(collection(db, 'users'), where('referralCode', '==', pendingRefCode.toUpperCase()));
+                  const refQuerySnap = await getDocs(qRef);
+                  if (!refQuerySnap.empty) {
+                    const referrerDoc = refQuerySnap.docs[0];
+                    if (referrerDoc.id !== currentUser.uid) {
+                      referredBy = referrerDoc.id;
+                      const referrerData = referrerDoc.data() as UserProfile;
 
-                    // Increment referrer referral count
-                    const newRefCount = (referrerData.referralCount || 0) + 1;
-                    await setDoc(doc(db, 'users', referrerDoc.id), { referralCount: newRefCount }, { merge: true });
+                      // Create referral record
+                      const referralRecordId = `ref_${currentUser.uid}`;
+                      const refDocRef = doc(db, 'referrals', referralRecordId);
+                      await setDoc(refDocRef, {
+                        id: referralRecordId,
+                        referrerId: referrerDoc.id,
+                        referredUserId: currentUser.uid,
+                        referredUserEmail: currentUser.email || '',
+                        referredUserName: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+                        referredAt: new Date().toISOString(),
+                        totalSpent: existingData.totalPurchasesAmount || 0,
+                        rewardClaimed: existingData.referralRewardClaimed || false,
+                        rewardAmount: 100,
+                        status: 'pending'
+                      }, { merge: true });
 
-                    safeLocalStorage.removeItem('pending_referral_code');
+                      // Increment referrer referral count
+                      const newRefCount = (referrerData.referralCount || 0) + 1;
+                      await setDoc(doc(db, 'users', referrerDoc.id), { referralCount: newRefCount }, { merge: true });
+
+                      safeLocalStorage.removeItem('pending_referral_code');
+                    }
                   }
                 }
               } catch (err) {
@@ -1348,6 +1530,9 @@ export default function App() {
             const currentDbRole = docSnap.data().role;
             if (currentDbRole === 'admin' || currentDbRole === 'owner') {
               profilePayload.role = currentDbRole;
+            } else if (!isAuthorizedOwnerEmail(currentUser.email) && !isAuthorizedOwnerUid(currentUser.uid)) {
+              // Never touch role field for non-owner user syncs to prevent accidental role resets
+              delete (profilePayload as any).role;
             }
           }
 
@@ -1943,75 +2128,23 @@ export default function App() {
       console.warn('Seller notification notice:', err);
     }
 
-    // 4. Update buyer total spend & credit ₦100 referral bonus if ₦1,000 threshold reached
+    // 4. Update buyer total purchases spend
     try {
       const currentTotalSpent = (userProfile?.totalPurchasesAmount || 0) + paidAmount;
-      const isRewardAlreadyClaimed = userProfile?.referralRewardClaimed || false;
-      const referrerId = userProfile?.referredBy;
-
       const buyerUserRef = doc(db, 'users', user.uid);
       const buyerUpdates: Partial<UserProfile> = {
         totalPurchasesAmount: currentTotalSpent
       };
-
-      if (referrerId) {
-        const refRecordId = `ref_${user.uid}`;
-        const refDocRef = doc(db, 'referrals', refRecordId);
-
-        await setDoc(refDocRef, {
-          totalSpent: currentTotalSpent
-        }, { merge: true }).catch(() => null);
-
-        // Check ₦1,000 threshold
-        if (currentTotalSpent >= 1000 && !isRewardAlreadyClaimed) {
-          buyerUpdates.referralRewardClaimed = true;
-
-          const referrerUserRef = doc(db, 'users', referrerId);
-          const referrerSnap = await getDoc(referrerUserRef).catch(() => null);
-
-          if (referrerSnap && referrerSnap.exists()) {
-            const referrerData = referrerSnap.data() as UserProfile;
-            const currentRefBalance = referrerData.walletBalance || 0;
-            const currentRefEarnings = referrerData.totalReferralEarnings || 0;
-            const newRefBalance = currentRefBalance + 100;
-            const newRefEarnings = currentRefEarnings + 100;
-
-            await setDoc(referrerUserRef, {
-              walletBalance: newRefBalance,
-              totalReferralEarnings: newRefEarnings
-            }, { merge: true });
-
-            const refBonusTx: WalletTransaction = {
-              id: `tx-ref-${Date.now()}`,
-              userId: referrerId,
-              type: 'referral_bonus',
-              amount: 100,
-              description: `Referral Bonus: ${buyerEmail || 'Referred user'} completed ₦1,000+ purchase milestone!`,
-              date: new Date().toISOString().replace('T', ' ').slice(0, 16),
-              status: 'completed',
-              reference: `REF-BONUS-${user.uid.substring(0, 6).toUpperCase()}`
-            };
-            await addDoc(collection(db, 'wallet_transactions'), refBonusTx);
-
-            await setDoc(refDocRef, {
-              rewardClaimed: true,
-              rewardClaimedAt: new Date().toISOString(),
-              totalSpent: currentTotalSpent,
-              rewardAmount: 100
-            }, { merge: true });
-
-            if (user.uid === referrerId) {
-              setWalletBalance(newRefBalance);
-              setWalletTransactions(prev => [refBonusTx, ...prev]);
-            }
-          }
-        }
-      }
-
       await setDoc(buyerUserRef, buyerUpdates, { merge: true });
       setUserProfile(prev => prev ? { ...prev, ...buyerUpdates } : prev);
-    } catch (refErr) {
-      console.error('Error processing referral bonus reward:', refErr);
+
+      const referrerId = userProfile?.referredBy;
+      if (referrerId) {
+        const refDocRef = doc(db, 'referrals', `ref_${user.uid}`);
+        await setDoc(refDocRef, { totalSpent: currentTotalSpent }, { merge: true }).catch(() => null);
+      }
+    } catch (spendErr) {
+      console.warn('Buyer total spend update notice:', spendErr);
     }
 
     // Close checkout and show completed order modal with credentials
@@ -2027,6 +2160,12 @@ export default function App() {
   const handleBuyNow = (listing: AccountListing) => {
     if (!user) {
       setAuthMode('login');
+      return;
+    }
+
+    // Pending log check: unapproved or pending logs cannot be purchased
+    if (!isPublicActiveListing(listing)) {
+      alert('This listing is currently pending approval and is not available for purchase.');
       return;
     }
 
@@ -2051,6 +2190,11 @@ export default function App() {
 
     if (!user) {
       setAuthMode('login');
+      return;
+    }
+
+    if (!isPublicActiveListing(listing)) {
+      alert('This listing is pending owner approval and cannot be purchased.');
       return;
     }
 
@@ -2410,7 +2554,7 @@ export default function App() {
   // Memoized category grouping map for homepage
   const categoryGroupedListings = useMemo(() => {
     const groups: Record<string, AccountListing[]> = {};
-    const activeListings = listings.filter((item) => item.status !== 'sold');
+    const activeListings = listings.filter(isPublicActiveListing);
 
     const specificCats: CategoryType[] = [
       'Facebook', 'Instagram', 'TikTok', 'YouTube', 'Gmail',
@@ -2447,9 +2591,9 @@ export default function App() {
     navigateRoute({ seller: { id: sellerId, name: sellerName } });
   }, [navigateRoute]);
 
-  // Category counts computation
+  // Category counts computation strictly excluding pending and sold logs
   const categoryCounts = useMemo(() => {
-    const activeListings = listings.filter((item) => item.status === 'active' && item.approvalStatus !== 'pending' && item.approvalStatus !== 'rejected');
+    const activeListings = listings.filter(isPublicActiveListing);
     const counts: Record<CategoryType, number> = {
       All: activeListings.length,
       Facebook: 0,
@@ -2492,7 +2636,7 @@ export default function App() {
     return counts;
   }, [listings]);
 
-  // Filter & Search computation
+  // Filter & Search computation strictly excluding pending logs
   const filteredListings = useMemo(() => {
     const hasSearchQuery = Boolean(filters.searchQuery && filters.searchQuery.trim());
     const searchTerms = hasSearchQuery 
@@ -2500,13 +2644,8 @@ export default function App() {
       : [];
 
     return listings.filter((item) => {
-      // 0. Exclude purchased/sold products from public marketplace
-      const invAvail = Array.isArray(item.inventory)
-        ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
-        : undefined;
-      const stockVal = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
-      const effStock = invAvail !== undefined ? invAvail : stockVal;
-      if (item.status === 'sold' || item.status !== 'active' || item.approvalStatus === 'pending' || item.approvalStatus === 'rejected' || effStock <= 0) return false;
+      // 0. Exclude pending, unapproved, reserved, and sold products from public marketplace
+      if (!isPublicActiveListing(item)) return false;
 
       // 1. Category Filter (ALWAYS applied when filters.category !== 'All')
       if (filters.category !== 'All' && !isCategoryMatch(item.category, filters.category)) {
@@ -2555,16 +2694,11 @@ export default function App() {
     });
   }, [listings, filters]);
 
-  // Featured listings subset
+  // Featured listings subset strictly excluding pending logs
   const featuredListings = useMemo(() => {
     return listings.filter((item) => {
-      if (item.status === 'sold') return false;
-      const invAvail = Array.isArray(item.inventory)
-        ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
-        : undefined;
-      const stockVal = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
-      const effStock = invAvail !== undefined ? invAvail : stockVal;
-      return effStock > 0 && (item.featured || (item.sellerRating && item.sellerRating >= 4.9));
+      if (!isPublicActiveListing(item)) return false;
+      return (item.featured || (item.sellerRating && item.sellerRating >= 4.9));
     });
   }, [listings]);
 
@@ -2590,7 +2724,7 @@ export default function App() {
   }, [listings, user, isOwner]);
 
   const savedListings = useMemo(() => {
-    return listings.filter((item) => savedListingIds.includes(item.id));
+    return listings.filter((item) => isPublicActiveListing(item) && savedListingIds.includes(item.id));
   }, [listings, savedListingIds]);
 
   // Auth Loading Splash Screen
@@ -2780,6 +2914,7 @@ export default function App() {
         {/* Main Container */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 sm:pt-5 pb-24 sm:pb-12 overflow-x-hidden">
           <React.Suspense fallback={<LazyViewFallback />}>
+            <div key={activeView} className="zenet-page-enter">
 
           {/* VIEW: SERVICE NUMBER / VIRTUAL NUMBERS (WITH QUICK BUY) */}
           {(activeView === 'virtual-numbers' || activeView === 'virtual-numbers-2') && (
@@ -2838,6 +2973,39 @@ export default function App() {
               isAdmin={isAdmin}
               onOpenAuth={(mode) => setAuthMode(mode)}
               onBackToMarketplace={handleBackToMarketplace}
+            />
+          )}
+
+          {/* VIEW: ABOUT ZENET HUB */}
+          {activeView === 'about' && (
+            <AboutView
+              onBackToMarketplace={handleBackToMarketplace}
+              onSelectView={handleSelectView}
+              onOpenAuth={(mode) => setAuthMode(mode)}
+            />
+          )}
+
+          {/* VIEW: TERMS OF SERVICE */}
+          {activeView === 'terms-of-service' && (
+            <TermsOfServiceView
+              onBackToMarketplace={handleBackToMarketplace}
+              onSelectView={handleSelectView}
+            />
+          )}
+
+          {/* VIEW: PRIVACY POLICY */}
+          {activeView === 'privacy-policy' && (
+            <PrivacyPolicyView
+              onBackToMarketplace={handleBackToMarketplace}
+              onSelectView={handleSelectView}
+            />
+          )}
+
+          {/* VIEW: REFUND POLICY */}
+          {activeView === 'refund-policy' && (
+            <RefundPolicyView
+              onBackToMarketplace={handleBackToMarketplace}
+              onSelectView={handleSelectView}
             />
           )}
 
@@ -2987,14 +3155,23 @@ export default function App() {
             />
           )}
 
+            </div>
           </React.Suspense>
         </main>
 
       {/* Footer */}
-      <Footer onSelectCategory={(cat) => {
-        setFilters((prev) => ({ ...prev, category: cat }));
-        setActiveView('log-accounts');
-      }} />
+      <Footer 
+        onSelectCategory={(cat) => {
+          setFilters((prev) => ({ ...prev, category: cat }));
+          setActiveView('log-accounts');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onSelectView={handleSelectView}
+        onOpenContact={() => {
+          handleSelectView('support');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
 
       </div> {/* Close main right area container */}
 
@@ -3056,6 +3233,11 @@ export default function App() {
             setSessionExpiredNotice('');
           }}
           onSwitchMode={(mode) => setAuthMode(mode)}
+          onOpenPolicy={(policy) => {
+            setAuthMode(null);
+            handleSelectView(policy);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           onSuccess={() => {
             setActiveView('marketplace');
             setAuthMode(null);
@@ -3088,7 +3270,7 @@ export default function App() {
           myListings={myListings}
           inquiries={inquiries}
           savedListings={savedListings}
-          recentlyViewedListings={listings.filter((item) => recentlyViewedIds.includes(item.id))}
+          recentlyViewedListings={listings.filter((item) => isPublicActiveListing(item) && recentlyViewedIds.includes(item.id))}
           purchases={purchases}
           onClose={() => navigateRoute({ dashboardTab: null })}
           onSelectListing={(listing) => handleSelectListing(listing)}
@@ -3158,7 +3340,7 @@ export default function App() {
       )}
 
       {/* 7. Admin Moderation Panel */}
-      {adminOpen && isOwner && (
+      {adminOpen && (isOwner || isAdmin) && (
         <React.Suspense fallback={null}>
           <AdminPanelModal
             listings={listings}
@@ -3277,13 +3459,13 @@ export default function App() {
       {/* 10. Product Deletion Confirmation Popup Modal */}
       {deletingListingId && (
         <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs zenet-modal-backdrop animate-in fade-in duration-200"
           onClick={() => {
             if (!isDeleting) setDeletingListingId(null);
           }}
         >
           <div 
-            className="bg-white border border-[#EBE7F7] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white border border-[#EBE7F7] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 relative overflow-hidden zenet-modal-dialog animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-100 shadow-xs">
@@ -3406,6 +3588,14 @@ export default function App() {
           }}
         />
       )}
+
+      {/* 17. Official WhatsApp Channel Promotional Pop-up */}
+      <WhatsAppPromoModal
+        isOpen={isWhatsAppPromoOpen}
+        onClose={() => setIsWhatsAppPromoOpen(false)}
+        channelUrl="https://whatsapp.com/channel/0029VbCaoET9RZAh5qW0xp3e"
+        channelName="ZENET THA PLUG ⚡"
+      />
       </React.Suspense>
 
     </div>

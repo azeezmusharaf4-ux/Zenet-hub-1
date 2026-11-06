@@ -1,4 +1,6 @@
 import { getDb, ensureServerAuthenticated, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from './_firebase';
+import { sendWalletDepositSuccessEmail, sendProductPurchaseSuccessEmail, sendReferralRewardEmail } from '../../src/server/emailService';
+import { processReferralRewardOnDeposit, QUALIFYING_DEPOSIT_THRESHOLD } from '../../src/server/referralService';
 
 export const handler = async (event: any) => {
   const headers = {
@@ -315,6 +317,20 @@ export const handler = async (event: any) => {
               }
             });
 
+            // Dispatch real email confirmation directly to user's registered Gmail
+            if (createdPurchaseRecord?.buyerEmail) {
+              await sendProductPurchaseSuccessEmail({
+                to: createdPurchaseRecord.buyerEmail,
+                name: createdPurchaseRecord.buyerName,
+                productTitle: createdPurchaseRecord.listingTitle || 'Log Account',
+                amount: amountNaira,
+                orderId: effectiveOrderId,
+                transactionId: reference,
+                category: createdPurchaseRecord.category || 'Log Account',
+                db
+              }).catch(() => {});
+            }
+
             return {
               statusCode: 200,
               headers,
@@ -397,6 +413,45 @@ export const handler = async (event: any) => {
 
             finalVerifiedBalance = newBalance;
             console.log(`[Netlify Paystack Verify] Credited ₦${amountNaira} to User ${targetUid}. New Bal: ₦${newBalance}`);
+
+            // Rule 1 & 2: Automatically process referral reward for qualifying deposits (₦1,000+)
+            if (amountNaira >= QUALIFYING_DEPOSIT_THRESHOLD && targetUid) {
+              try {
+                await processReferralRewardOnDeposit({
+                  db,
+                  depositedUserId: String(targetUid),
+                  depositedUserEmail: customerEmail,
+                  depositAmount: amountNaira,
+                  depositReference: pstData.reference || reference
+                }).then(async (refResult) => {
+                  if (refResult.rewarded && refResult.referrerEmail && refResult.referrerId) {
+                    sendReferralRewardEmail({
+                      to: refResult.referrerEmail,
+                      amount: refResult.rewardAmount || 100,
+                      newBalance: refResult.newReferrerBalance,
+                      qualifyingDepositAmount: amountNaira,
+                      reference: pstData.reference || reference,
+                      db
+                    }).catch(() => {});
+                  }
+                }).catch(() => {});
+              } catch (refErr) {
+                console.warn('[Netlify Paystack Verify] Referral reward notice:', refErr);
+              }
+            }
+
+            // Dispatch automatic deposit confirmation email to the user's authentic registered email
+            if (customerEmail) {
+              await sendWalletDepositSuccessEmail({
+                to: customerEmail,
+                amount: amountNaira,
+                previousBalance: newBalance - amountNaira,
+                newBalance,
+                reference: pstData.reference || reference,
+                paymentMethod: 'Paystack',
+                db
+              }).catch(() => {});
+            }
           }
         } catch (creditErr) {
           console.warn('[Netlify Paystack Verify] Wallet credit notice:', creditErr);

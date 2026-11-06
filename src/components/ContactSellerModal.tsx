@@ -98,9 +98,9 @@ export const ContactSellerModal: React.FC<ContactSellerModalProps> = ({
   const hasContactInfo = Boolean(waUrl || tgUrl);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto zenet-modal-backdrop">
       <div 
-        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh]"
+        className="bg-white border border-[#EBE7F7] rounded-2xl sm:rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh] zenet-modal-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -180,7 +180,7 @@ export const ContactSellerModal: React.FC<ContactSellerModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold py-3 rounded-full shadow-md transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold py-3 rounded-full shadow-md transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 zenet-btn-interactive"
               >
                 <Send className="w-4 h-4" />
                 <span>{loading ? 'Sending Inquiry...' : 'Send In-App Inquiry'}</span>
@@ -206,7 +206,7 @@ export const ContactSellerModal: React.FC<ContactSellerModalProps> = ({
                     href={waUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between bg-emerald-50 hover:bg-emerald-100/80 text-emerald-950 border border-emerald-200 p-3 rounded-2xl transition cursor-pointer group shadow-xs"
+                    className="flex items-center justify-between bg-emerald-50 hover:bg-emerald-100/80 text-emerald-950 border border-emerald-200 p-3 rounded-2xl transition cursor-pointer group shadow-xs zenet-card-interactive"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 border border-emerald-200">
@@ -229,7 +229,7 @@ export const ContactSellerModal: React.FC<ContactSellerModalProps> = ({
                     href={tgUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between bg-sky-50 hover:bg-sky-100/80 text-sky-950 border border-sky-200 p-3 rounded-2xl transition cursor-pointer group shadow-xs"
+                    className="flex items-center justify-between bg-sky-50 hover:bg-sky-100/80 text-sky-950 border border-sky-200 p-3 rounded-2xl transition cursor-pointer group shadow-xs zenet-card-interactive"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 border border-sky-200">

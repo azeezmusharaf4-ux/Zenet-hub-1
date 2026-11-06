@@ -261,9 +261,9 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#05020c]/90 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#05020c]/90 backdrop-blur-md overflow-y-auto zenet-modal-backdrop">
       <div 
-        className="bg-[#120826] border border-[#2d1952] rounded-2xl sm:rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-purple-100 flex flex-col max-h-[92vh]"
+        className="bg-[#120826] border border-[#2d1952] rounded-2xl sm:rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl relative my-auto animate-in fade-in zoom-in-95 duration-200 text-purple-100 flex flex-col max-h-[92vh] zenet-modal-dialog"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sticky Global ZENET HUB Header */}
@@ -329,7 +329,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
             <div className="space-y-6 animate-in fade-in duration-150">
               
               {/* Profile Card Summary Banner */}
-              <div className="bg-gradient-to-r from-[#1b0e38] via-[#160a2f] to-[#1d0b3e] border border-[#351a66] p-5 rounded-3xl relative overflow-hidden shadow-xl">
+              <div className="bg-gradient-to-r from-[#1b0e38] via-[#160a2f] to-[#1d0b3e] border border-[#351a66] p-5 rounded-3xl relative overflow-hidden shadow-xl zenet-card-enter zenet-card-interactive">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 via-violet-600 to-indigo-700 text-white font-black flex items-center justify-center text-2xl shadow-lg border border-purple-400/30">
@@ -360,7 +360,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                         setActiveTab('settings');
                       }
                     }}
-                    className="bg-[#2a1354] hover:bg-[#381a70] text-purple-200 border border-[#48228d] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto"
+                    className="bg-[#2a1354] hover:bg-[#381a70] text-purple-200 border border-[#48228d] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto zenet-btn-interactive"
                   >
                     <Settings className="w-4 h-4 text-purple-300" />
                     <span>Edit Profile</span>
@@ -986,7 +986,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                         </span>
                       </div>
                       <p className="text-xs text-amber-200/80 max-w-xl leading-relaxed">
-                        Share your unique referral code or link. When a referred friend completes <strong className="text-white">₦1,000</strong> or more in account purchases, you automatically receive a <strong className="text-amber-300 font-bold">₦100 NGN</strong> wallet bonus!
+                        Share your unique referral code or link. When a referred friend completes a qualifying deposit of <strong className="text-white">₦1,000</strong> or more, you automatically receive a <strong className="text-amber-300 font-bold">₦100 NGN</strong> wallet bonus!
                       </p>
                     </div>
                   </div>
@@ -1021,7 +1021,7 @@ export const UserDashboardModal: React.FC<UserDashboardModalProps> = ({
                     <span className="text-2xl font-black text-emerald-400">₦100 / user</span>
                     <Award className="w-5 h-5 text-emerald-400 opacity-80" />
                   </div>
-                  <span className="text-[10px] text-emerald-300 font-semibold block">Triggers at ₦1,000 spend</span>
+                  <span className="text-[10px] text-emerald-300 font-semibold block">Triggers on ₦1,000+ deposit</span>
                 </div>
               </div>
 

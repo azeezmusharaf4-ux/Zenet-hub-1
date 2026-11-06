@@ -31,7 +31,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <button
         id="mobile-nav-home"
         onClick={() => onSelectView('marketplace')}
-        className={`flex items-center justify-center min-h-[44px] transition-all cursor-pointer active:scale-95 ${
+        className={`flex items-center justify-center min-h-[44px] cursor-pointer zenet-nav-transition ${
           isHome
             ? 'bg-[#5B4DF5] text-white px-5 sm:px-6 py-2 rounded-full font-extrabold text-xs shadow-md shadow-indigo-600/25 space-x-2'
             : 'flex-col items-center justify-center text-[#0F172A] hover:text-[#5B4DF5] px-4 py-1'
@@ -50,7 +50,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <button
         id="mobile-nav-wallet"
         onClick={onOpenWallet}
-        className={`flex items-center justify-center min-h-[44px] transition-all cursor-pointer active:scale-95 ${
+        className={`flex items-center justify-center min-h-[44px] cursor-pointer zenet-nav-transition ${
           isWallet
             ? 'bg-[#5B4DF5] text-white px-5 sm:px-6 py-2 rounded-full font-extrabold text-xs shadow-md shadow-indigo-600/25 space-x-2'
             : 'flex-col items-center justify-center text-[#0F172A] hover:text-[#5B4DF5] px-4 py-1'
@@ -69,7 +69,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <button
         id="mobile-nav-profile"
         onClick={() => onSelectView('profile')}
-        className={`flex items-center justify-center min-h-[44px] transition-all cursor-pointer active:scale-95 ${
+        className={`flex items-center justify-center min-h-[44px] cursor-pointer zenet-nav-transition ${
           isProfile
             ? 'bg-[#5B4DF5] text-white px-5 sm:px-6 py-2 rounded-full font-extrabold text-xs shadow-md shadow-indigo-600/25 space-x-2'
             : 'flex-col items-center justify-center text-[#0F172A] hover:text-[#5B4DF5] px-4 py-1'

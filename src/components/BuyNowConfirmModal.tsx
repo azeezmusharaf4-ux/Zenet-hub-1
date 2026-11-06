@@ -20,11 +20,11 @@ export const BuyNowConfirmModal: React.FC<BuyNowConfirmModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto zenet-modal-backdrop animate-in fade-in duration-150"
       onClick={onCancel}
     >
       <div 
-        className="bg-white border border-[#EBE7F7] rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto p-6 sm:p-7 text-center space-y-5 animate-in zoom-in-95 duration-150 text-[#0F172A]"
+        className="bg-white border border-[#EBE7F7] rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative my-auto p-6 sm:p-7 text-center space-y-5 zenet-modal-dialog animate-in zoom-in-95 duration-150 text-[#0F172A]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -65,7 +65,7 @@ export const BuyNowConfirmModal: React.FC<BuyNowConfirmModalProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="w-full bg-[#F1F0FB] hover:bg-[#EBE7F7] text-[#475569] font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm transition cursor-pointer border border-[#E2E8F0]"
+            className="w-full bg-[#F1F0FB] hover:bg-[#EBE7F7] text-[#475569] font-extrabold py-3 px-4 rounded-xl text-xs sm:text-sm transition cursor-pointer border border-[#E2E8F0] zenet-btn-interactive"
           >
             Cancel
           </button>
@@ -73,7 +73,7 @@ export const BuyNowConfirmModal: React.FC<BuyNowConfirmModalProps> = ({
           <button
             type="button"
             onClick={onConfirm}
-            className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-black py-3 px-4 rounded-xl text-xs sm:text-sm shadow-md shadow-[#5B4DF5]/25 transition cursor-pointer flex items-center justify-center gap-1.5"
+            className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-black py-3 px-4 rounded-xl text-xs sm:text-sm shadow-md shadow-[#5B4DF5]/25 transition cursor-pointer flex items-center justify-center gap-1.5 zenet-btn-interactive"
           >
             Yes, Purchase
           </button>

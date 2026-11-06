@@ -173,11 +173,11 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto zenet-modal-backdrop animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
-        className="bg-white border border-[#EBE7F7] rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative my-auto animate-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh]"
+        className="bg-white border border-[#EBE7F7] rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative my-auto zenet-modal-dialog animate-in zoom-in-95 duration-200 text-[#0F172A] flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Accent Bar */}

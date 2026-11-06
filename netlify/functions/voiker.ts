@@ -356,9 +356,23 @@ export const handler = async (event: any) => {
       if (!ratePer1000) {
         try {
           const catSnap = await getDoc(doc(db, 'system_settings', 'voiker_catalogue'));
-          if (catSnap.exists() && Array.isArray(catSnap.data()?.services)) {
-            const svc = catSnap.data().services.find((s: any) => s.id === serviceId || s.providerServiceId === cleanServiceId);
-            if (svc?.ratePer1000) ratePer1000 = Number(svc.ratePer1000);
+          if (catSnap.exists()) {
+            const catData = catSnap.data();
+            if (Array.isArray(catData?.services) && catData.services.length > 0) {
+              const svc = catData.services.find((s: any) => s.id === serviceId || s.providerServiceId === cleanServiceId);
+              if (svc?.ratePer1000) ratePer1000 = Number(svc.ratePer1000);
+            } else if (typeof catData?.chunkCount === 'number' && catData.chunkCount > 0) {
+              for (let i = 0; i < catData.chunkCount; i++) {
+                const chunkSnap = await getDoc(doc(db, 'system_settings', `voiker_cat_part_${i}`));
+                if (chunkSnap.exists() && Array.isArray(chunkSnap.data()?.services)) {
+                  const svc = chunkSnap.data().services.find((s: any) => s.id === serviceId || s.providerServiceId === cleanServiceId);
+                  if (svc?.ratePer1000) {
+                    ratePer1000 = Number(svc.ratePer1000);
+                    break;
+                  }
+                }
+              }
+            }
           }
         } catch {}
       }

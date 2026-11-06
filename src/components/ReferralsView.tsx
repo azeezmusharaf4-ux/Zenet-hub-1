@@ -140,8 +140,8 @@ export const ReferralsView: React.FC<ReferralsViewProps> = ({
         </div>
       )}
 
-      {/* Top Bar: Back Button & Centered Title */}
-      <div className="flex items-center justify-between pt-1 mb-5">
+      {/* Top Bar: Back Button & Centered Title - Step 1 */}
+      <div className="flex items-center justify-between pt-1 mb-5 zenet-stagger-item zenet-stagger-1">
         <button
           type="button"
           id="referrals-back-btn"
@@ -162,10 +162,10 @@ export const ReferralsView: React.FC<ReferralsViewProps> = ({
 
       {/* Login Prompt Banner (if guest) */}
       {!user && (
-        <div className="mb-5 p-4 rounded-2xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-between">
+        <div className="mb-5 p-4 rounded-2xl bg-[#EEF2FF] border border-[#C7D2FE] flex items-center justify-between zenet-stagger-item zenet-stagger-1">
           <div className="text-xs text-[#3730A3]">
             <p className="font-bold">Sign in to track your referrals</p>
-            <p className="text-[11px] text-[#4F46E5]">Earn ₦100 NGN for each friend who shops.</p>
+            <p className="text-[11px] text-[#4F46E5]">Earn ₦100 NGN for each friend who deposits ₦1,000 or more.</p>
           </div>
           <button
             type="button"
@@ -177,8 +177,8 @@ export const ReferralsView: React.FC<ReferralsViewProps> = ({
         </div>
       )}
 
-      {/* 1. Purple Gradient "Your Referral Code" Card */}
-      <div className="bg-gradient-to-r from-[#5848F4] via-[#6355F6] to-[#7B61FF] rounded-3xl p-5 sm:p-6 text-white shadow-md shadow-indigo-500/15 mb-5">
+      {/* 1. Purple Gradient "Your Referral Code" Card - Step 2 */}
+      <div className="bg-gradient-to-r from-[#5848F4] via-[#6355F6] to-[#7B61FF] rounded-3xl p-5 sm:p-6 text-white shadow-md shadow-indigo-500/15 mb-5 zenet-stagger-item zenet-stagger-2">
         
         {/* Header inside: Gift Icon + Label */}
         <div className="flex items-center gap-2 mb-4">
@@ -210,8 +210,8 @@ export const ReferralsView: React.FC<ReferralsViewProps> = ({
 
       </div>
 
-      {/* 2. Statistics Card */}
-      <div className="bg-white rounded-3xl p-5 border border-[#E2E8F0]/80 shadow-2xs mb-5">
+      {/* 2. Statistics Card - Step 3 */}
+      <div className="bg-white rounded-3xl p-5 border border-[#E2E8F0]/80 shadow-2xs mb-5 zenet-stagger-item zenet-stagger-3">
         <h2 className="text-base font-bold text-[#0F172A] mb-4">Statistics</h2>
 
         <div className="grid grid-cols-2 gap-3">
@@ -263,8 +263,9 @@ export const ReferralsView: React.FC<ReferralsViewProps> = ({
         </div>
       </div>
 
-      {/* 3. Referrals Card */}
-      <div className="bg-white rounded-3xl p-5 border border-[#E2E8F0]/80 shadow-2xs min-h-[220px] flex flex-col mb-6">
+      {/* 3. Referrals Card - Step 4 */}
+      <div className="bg-white rounded-3xl p-5 border border-[#E2E8F0]/80 shadow-2xs min-h-[220px] flex flex-col mb-6 zenet-stagger-item zenet-stagger-4">
+
         <h2 className="text-base font-bold text-[#0F172A] mb-4">Referrals</h2>
 
         {referralsList.length === 0 ? (

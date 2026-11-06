@@ -68,6 +68,8 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
     { id: 'social-boost' as ActiveAppView, label: 'Social Boost', icon: TrendingUp },
     { id: 'profile' as ActiveAppView, label: 'Dashboard', icon: Home },
     { id: 'orders' as ActiveAppView, label: 'History', icon: Scroll, badge: ordersCount > 0 ? String(ordersCount) : undefined },
+    { id: 'about' as ActiveAppView, label: 'About Zenet Hub', icon: Sparkles },
+    { id: 'support' as ActiveAppView, label: 'Help & Support', icon: MessageSquare },
     ...(isAdmin ? [{ id: 'messages' as ActiveAppView, label: 'Notifications & Messages', icon: MessageSquare, badge: unreadMessagesCount > 0 ? String(unreadMessagesCount) : undefined }] : []),
     ...(isOwner ? [{ id: 'admin_wallets' as ActiveAppView, label: 'Wallet Override', icon: Wallet, badge: 'OWNER' }] : []),
   ];
@@ -126,7 +128,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`w-full text-left px-3 py-2.5 rounded-2xl flex items-center justify-between transition cursor-pointer text-xs font-bold ${
+                className={`w-full text-left px-3 py-2.5 rounded-2xl flex items-center justify-between transition cursor-pointer text-xs font-bold zenet-nav-transition ${
                   isActive
                     ? 'bg-[#7C3AED] text-white shadow-sm shadow-purple-600/20 font-black'
                     : 'text-[#1E192E] hover:bg-[#F3EEFF] hover:text-[#7C3AED]'
@@ -277,7 +279,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
 
               <button
                 onClick={() => { onClose(); onLogout(); }}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#475569] hover:text-[#7C3AED] rounded-xl border border-[#EDE9FE] hover:border-[#DDD6FE] transition font-bold text-xs cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#475569] hover:text-[#7C3AED] rounded-xl border border-[#EDE9FE] hover:border-[#DDD6FE] transition font-bold text-xs cursor-pointer zenet-btn-interactive"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sign out</span>
@@ -287,7 +289,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
             <div className="space-y-2">
               <button
                 onClick={() => { onClose(); onOpenAuth('login'); }}
-                className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black py-3 px-4 rounded-2xl shadow-sm shadow-purple-600/20 transition cursor-pointer"
+                className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black py-3 px-4 rounded-2xl shadow-sm shadow-purple-600/20 transition cursor-pointer zenet-btn-interactive"
               >
                 Sign In / Register
               </button>

@@ -238,7 +238,10 @@
         "totalSpent": { "type": "number" },
         "rewardClaimed": { "type": "boolean" },
         "rewardAmount": { "type": "number" },
-        "rewardClaimedAt": { "type": "string" }
+        "rewardClaimedAt": { "type": "string" },
+        "qualifyingDepositAmount": { "type": "number" },
+        "qualifyingDepositReference": { "type": "string" },
+        "status": { "type": "string" }
       },
       "required": ["referrerId", "referredUserId"]
     },
@@ -385,6 +388,31 @@
         "sales": { "type": "array" }
       },
       "required": ["sellerId", "totalGrossSales", "totalSellerRevenue", "totalOwnerCommission"]
+    },
+    "service_prices": {
+      "title": "Saved Service Prices",
+      "description": "Owner customized selling prices for virtual number services and countries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "priceKey": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "serviceSlug": { "type": "string" },
+        "countryId": { "type": "string" },
+        "countryName": { "type": "string" },
+        "countryCode": { "type": "string" },
+        "providerCostNgn": { "type": "number" },
+        "providerCostEur": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "profitNgn": { "type": "number" },
+        "marginPercent": { "type": "number" },
+        "currency": { "type": "string" },
+        "isCustomPrice": { "type": "boolean" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["id", "priceKey", "serviceSlug", "countryCode", "sellingPrice"]
     }
   },
   "firestore": {
@@ -467,6 +495,10 @@
     "/user_notifications/{notificationId}": {
       "schema": "user_notifications",
       "description": "Permanent user notification records"
+    },
+    "/service_prices/{priceKey}": {
+      "schema": "service_prices",
+      "description": "Permanent owner-saved selling price per service and country"
     }
   }
 }

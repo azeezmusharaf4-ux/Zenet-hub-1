@@ -150,8 +150,8 @@ export const ChangePasswordView: React.FC<ChangePasswordViewProps> = ({
       <form onSubmit={handleChangePassword} className="flex-1 flex flex-col justify-between">
         
         <div>
-          {/* Top Bar: Back Button & Centered Title */}
-          <div className="flex items-center justify-between pt-1 mb-8">
+          {/* Top Bar: Back Button & Centered Title - Step 1 */}
+          <div className="flex items-center justify-between pt-1 mb-8 zenet-stagger-item zenet-stagger-1">
             <button
               type="button"
               id="change-password-back-btn"
@@ -170,8 +170,8 @@ export const ChangePasswordView: React.FC<ChangePasswordViewProps> = ({
             <div className="w-11 h-11 shrink-0" aria-hidden="true" />
           </div>
 
-          {/* Heading & Subtitle exactly matching screenshot */}
-          <div className="mb-8">
+          {/* Heading & Subtitle - Step 2 */}
+          <div className="mb-8 zenet-stagger-item zenet-stagger-2">
             <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight mb-3">
               Change Password
             </h1>
@@ -183,8 +183,8 @@ export const ChangePasswordView: React.FC<ChangePasswordViewProps> = ({
           {/* Input Fields */}
           <div className="space-y-5">
             
-            {/* Current Password Field */}
-            <div>
+            {/* Current Password Field - Step 3 */}
+            <div className="zenet-stagger-item zenet-stagger-3">
               <label 
                 htmlFor="current-password-input"
                 className="block text-sm font-semibold text-[#1E293B] mb-2"
@@ -216,8 +216,8 @@ export const ChangePasswordView: React.FC<ChangePasswordViewProps> = ({
               </div>
             </div>
 
-            {/* New Password Field */}
-            <div>
+            {/* New Password Field - Step 4 */}
+            <div className="zenet-stagger-item zenet-stagger-4">
               <label 
                 htmlFor="new-password-input"
                 className="block text-sm font-semibold text-[#1E293B] mb-2"
@@ -249,8 +249,8 @@ export const ChangePasswordView: React.FC<ChangePasswordViewProps> = ({
               </div>
             </div>
 
-            {/* Confirm New Password Field */}
-            <div>
+            {/* Confirm New Password Field - Step 5 */}
+            <div className="zenet-stagger-item zenet-stagger-5">
               <label 
                 htmlFor="confirm-password-input"
                 className="block text-sm font-semibold text-[#1E293B] mb-2"
@@ -284,9 +284,9 @@ export const ChangePasswordView: React.FC<ChangePasswordViewProps> = ({
 
           </div>
 
-          {/* Quick Password Reset Link option for users who don't remember current password */}
+          {/* Quick Password Reset Link - Step 6 */}
           {user?.email && (
-            <div className="mt-4 flex items-center justify-end">
+            <div className="mt-4 flex items-center justify-end zenet-stagger-item zenet-stagger-6">
               <button
                 type="button"
                 id="send-reset-email-btn"
@@ -302,8 +302,8 @@ export const ChangePasswordView: React.FC<ChangePasswordViewProps> = ({
 
         </div>
 
-        {/* Bottom Full-Width "Change" Action Button */}
-        <div className="pt-10 sm:pt-16 pb-4">
+        {/* Bottom Full-Width "Change" Action Button - Step 7 */}
+        <div className="pt-10 sm:pt-16 pb-4 zenet-stagger-item zenet-stagger-7">
           <button
             id="change-password-submit-btn"
             type="submit"

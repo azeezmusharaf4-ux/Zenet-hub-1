@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, AccountListing, CategoryType } from '../types';
 import { isAuthorizedOwner } from '../lib/authorizedOwners';
+import { isPublicActiveListing } from '../utils/listingVisibility';
 import { ListingCard } from './ListingCard';
 
 interface LogAccountsViewProps {
@@ -76,16 +77,8 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
 
   // Sort and filter listings
   const filteredAndSortedListings = useMemo(() => {
-    // 1. Exclude virtual numbers and sold items
-    let activeListings = listings.filter(item => {
-      if (item.status === 'sold') return false;
-      const invAvail = Array.isArray(item.inventory)
-        ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
-        : undefined;
-      const stock = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
-      const effectiveStock = invAvail !== undefined ? invAvail : stock;
-      return effectiveStock > 0;
-    });
+    // 1. Strictly include ONLY approved, active listings (pending logs excluded completely)
+    let activeListings = listings.filter(isPublicActiveListing);
 
     // 2. Apply Category Filter
     if (categoryFilter !== 'All') {
@@ -119,19 +112,12 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
     });
   }, [listings, categoryFilter, searchQuery]);
 
-  // Compute category counts
+  // Compute category counts strictly excluding pending and sold logs
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     listings.forEach(item => {
-      if (item.status !== 'sold') {
-        const invAvail = Array.isArray(item.inventory)
-          ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
-          : undefined;
-        const stock = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
-        const effectiveStock = invAvail !== undefined ? invAvail : stock;
-        if (effectiveStock > 0) {
-          counts[item.category] = (counts[item.category] || 0) + 1;
-        }
+      if (isPublicActiveListing(item)) {
+        counts[item.category] = (counts[item.category] || 0) + 1;
       }
     });
     return counts;
@@ -190,7 +176,7 @@ export const LogAccountsView: React.FC<LogAccountsViewProps> = ({
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
           {LOG_CATEGORIES.map((cat) => {
             const count = cat.name === 'All' 
-              ? listings.filter(item => item.status !== 'sold').length 
+              ? listings.filter(isPublicActiveListing).length 
               : (categoryCounts[cat.name] || 0);
             
             const isSelected = categoryFilter === cat.name;

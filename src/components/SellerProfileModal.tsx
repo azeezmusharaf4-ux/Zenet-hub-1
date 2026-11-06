@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AccountListing, SellerReview, UserProfile } from '../types';
 import { calculateSellerTrustScore } from '../utils/trustScore';
+import { isPublicActiveListing } from '../utils/listingVisibility';
 import {
   X,
   Star,
@@ -52,7 +53,7 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   const sellerListings = listings.filter(
-    (item) => item.sellerId === sellerId || item.sellerName.toLowerCase() === sellerName.toLowerCase()
+    (item) => (item.sellerId === sellerId || item.sellerName.toLowerCase() === sellerName.toLowerCase()) && isPublicActiveListing(item)
   );
 
   const sellerReviews = reviews.filter(
@@ -87,8 +88,8 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col text-purple-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto zenet-modal-backdrop">
+      <div className="relative w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col text-purple-100 zenet-modal-dialog">
         {/* Header Header Banner */}
         <div className="relative h-32 bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 border-b border-slate-800 p-6 flex items-end justify-between">
           <button

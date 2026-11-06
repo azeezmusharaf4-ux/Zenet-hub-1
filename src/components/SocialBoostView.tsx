@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   ArrowLeft, 
   ChevronRight, 
@@ -10,6 +11,7 @@ import {
   ShieldCheck, 
   CheckCircle2, 
   AlertCircle, 
+  Loader2, 
   X, 
   RefreshCw, 
   Copy, 
@@ -43,7 +45,9 @@ import { UserProfile, SocialBoostService, SocialBoostOrder } from '../types';
 import { auth, db, getSafeIdToken } from '../lib/firebase';
 import { safeApiFetch, sanitizeApiErrorMessage } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
-import { isAuthorizedOwner, isAuthorizedOwnerEmail } from '../lib/authorizedOwners';
+import { safeLocalStorage } from '../utils/storage';
+import { isAuthorizedOwner, isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from '../lib/authorizedOwners';
+import { SocialBoostPricingManager } from './SocialBoostPricingManager';
 
 export interface TikTokServiceSetting {
   id: string;
@@ -87,7 +91,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'TikTok Views Real 💎',
     type: 'Views',
     rateUsd: 0.1246,
-    ratePer1000: 206,
+    ratePer1000: 168,
     min: 1000,
     max: 50000000,
     deliverySpeed: 'Instant Automated Start',
@@ -109,7 +113,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'TikTok Likes | 💖',
     type: 'Likes',
     rateUsd: 0.5670,
-    ratePer1000: 936,
+    ratePer1000: 765,
     min: 10,
     max: 100000,
     deliverySpeed: 'Instant Start',
@@ -130,7 +134,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'TikTok Followers 🌍 | ✅Quality: ₕQ',
     type: 'Followers',
     rateUsd: 2.7450,
-    ratePer1000: 4529,
+    ratePer1000: 3701,
     min: 50,
     max: 5000000,
     deliverySpeed: '5,000 - 15,000 / day',
@@ -152,7 +156,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'TikTok Comments ~ Custom ~ 𝐇𝐐 🚀',
     type: 'Comments',
     rateUsd: 8.4524,
-    ratePer1000: 13946,
+    ratePer1000: 11398,
     min: 10,
     max: 100000,
     deliverySpeed: 'Starts in 0-10 min',
@@ -173,7 +177,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'TikTok Shares 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
     type: 'Shares',
     rateUsd: 0.1606,
-    ratePer1000: 265,
+    ratePer1000: 217,
     min: 10,
     max: 217545811,
     deliverySpeed: '500K / day',
@@ -194,7 +198,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'TikTok Video Saves [Refill: 30 Days] 🔥♻️',
     type: 'Favorites',
     rateUsd: 0.1688,
-    ratePer1000: 279,
+    ratePer1000: 228,
     min: 10,
     max: 100000,
     deliverySpeed: 'Fast Organic Pacing',
@@ -217,7 +221,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Instagram - Likes + Impressions Real Profiles 💖 🌎 🔥',
     type: 'Likes',
     rateUsd: 0.0855,
-    ratePer1000: 141,
+    ratePer1000: 115,
     min: 100,
     max: 100000,
     deliverySpeed: 'Instant Start',
@@ -239,7 +243,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Instagram Followers | 𝐎𝐥𝐝 𝐀𝐜𝐜𝐨𝐮𝐧𝐭 [R365 ♻️] ❌',
     type: 'Followers',
     rateUsd: 3.1949,
-    ratePer1000: 5272,
+    ratePer1000: 4308,
     min: 10,
     max: 217545811,
     deliverySpeed: 'Gradual Organic Pace',
@@ -283,7 +287,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Instagram Mix Positive Emoji Comments',
     type: 'Comments',
     rateUsd: 4.5491,
-    ratePer1000: 7506,
+    ratePer1000: 6134,
     min: 10,
     max: 200000,
     deliverySpeed: 'Gradual Pace',
@@ -304,7 +308,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Instagram Saves + Impressions 🚀',
     type: 'Favorites',
     rateUsd: 0.1357,
-    ratePer1000: 224,
+    ratePer1000: 183,
     min: 10,
     max: 400000,
     deliverySpeed: 'Instant Start',
@@ -327,7 +331,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Facebook Page & Profile Followers 🔴',
     type: 'Followers',
     rateUsd: 0.2358,
-    ratePer1000: 389,
+    ratePer1000: 318,
     min: 10,
     max: 50000,
     deliverySpeed: 'Steady Delivery',
@@ -348,7 +352,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Facebook Post Likes',
     type: 'Likes',
     rateUsd: 0.2498,
-    ratePer1000: 412,
+    ratePer1000: 337,
     min: 10,
     max: 50000,
     deliverySpeed: 'Fast Delivery',
@@ -369,7 +373,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Facebook Views ~ 10 Seconds',
     type: 'Views',
     rateUsd: 0.4436,
-    ratePer1000: 732,
+    ratePer1000: 598,
     min: 500,
     max: 10000000,
     deliverySpeed: 'Fast Delivery',
@@ -392,7 +396,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Youtube Views | Monetizable | Best For SEO | Suggested + Browse | Lifetime Guaranteed',
     type: 'Views',
     rateUsd: 3.6497,
-    ratePer1000: 6022,
+    ratePer1000: 4921,
     min: 100,
     max: 100000000,
     deliverySpeed: 'Natural Organic Pacing',
@@ -414,7 +418,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'YouTube Subscribers ℍ𝕚𝕘𝕙 𝔻𝕣𝕠𝕡 ℕ𝕠 ℝ𝕖𝕗𝕚𝕝𝕝',
     type: 'Subscribers',
     rateUsd: 0.0924,
-    ratePer1000: 152,
+    ratePer1000: 125,
     min: 10,
     max: 500000,
     deliverySpeed: 'Steady Pace',
@@ -436,7 +440,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'YouTube Likes 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
     type: 'Likes',
     rateUsd: 0.1992,
-    ratePer1000: 329,
+    ratePer1000: 269,
     min: 10,
     max: 5000,
     deliverySpeed: 'Instant Start',
@@ -459,7 +463,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Twitter Followers | Real Profile Base',
     type: 'Followers',
     rateUsd: 1.4573,
-    ratePer1000: 2405,
+    ratePer1000: 1965,
     min: 100,
     max: 10000,
     deliverySpeed: 'Fast Delivery',
@@ -480,7 +484,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Twitter Likes | HQ | R30',
     type: 'Likes',
     rateUsd: 2.3905,
-    ratePer1000: 3944,
+    ratePer1000: 3223,
     min: 10,
     max: 10000,
     deliverySpeed: 'Instant Start',
@@ -501,7 +505,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Twitter Retweets',
     type: 'Shares',
     rateUsd: 1.3021,
-    ratePer1000: 2148,
+    ratePer1000: 1756,
     min: 20,
     max: 5000,
     deliverySpeed: 'Fast Delivery',
@@ -524,7 +528,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Telegram Members | Max 100K | 0-15 Minutes',
     type: 'Members',
     rateUsd: 0.3545,
-    ratePer1000: 585,
+    ratePer1000: 478,
     min: 10,
     max: 100000,
     deliverySpeed: '0-15 Minutes Start',
@@ -547,7 +551,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Telegram Post Views ⚡ 🔥',
     type: 'Views',
     rateUsd: 0.0083,
-    ratePer1000: 14,
+    ratePer1000: 11,
     min: 10,
     max: 500000,
     deliverySpeed: 'Instant Speed',
@@ -571,7 +575,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Whatsapp Channel Members 𝐂𝐡𝐞𝐚𝐩𝐞𝐬𝐭 𝐢𝐧 𝐭𝐡𝐞 𝐌𝐚𝐫𝐤𝐞𝐭 🛍️',
     type: 'Members',
     rateUsd: 2.8327,
-    ratePer1000: 4674,
+    ratePer1000: 3820,
     min: 10,
     max: 10000,
     deliverySpeed: 'Fast Delivery',
@@ -594,7 +598,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Spotify Free Plays [Lifetime Guaranteed] [Max: 1M] ♻️',
     type: 'Views',
     rateUsd: 0.4584,
-    ratePer1000: 756,
+    ratePer1000: 618,
     min: 1000,
     max: 1000000000,
     deliverySpeed: '20K / day',
@@ -617,7 +621,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Discord Offline Members | ✅Quality: Real With Avatar',
     type: 'Members',
     rateUsd: 2.8350,
-    ratePer1000: 4678,
+    ratePer1000: 3823,
     min: 50,
     max: 1500,
     deliverySpeed: 'Instant Speed',
@@ -640,7 +644,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Linkedin Followers | Page or Profile | 30 Days Refill ♻️',
     type: 'Followers',
     rateUsd: 13.6500,
-    ratePer1000: 22523,
+    ratePer1000: 18406,
     min: 10,
     max: 100000000,
     deliverySpeed: 'Steady B2B Pace',
@@ -663,7 +667,7 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     name: 'Website Traffic [WW - Direct Visits] [Speed: 50K/Day] 💧',
     type: 'Views',
     rateUsd: 0.5354,
-    ratePer1000: 883,
+    ratePer1000: 722,
     min: 100,
     max: 1000000,
     deliverySpeed: '50K / day',
@@ -882,6 +886,73 @@ const PLATFORMS_METADATA: PlatformCardInfo[] = [
   }
 ];
 
+// Helper to compute exact platform counts from services list matching PLATFORMS_METADATA
+export const computePlatformCountsFromServices = (services: SocialBoostService[]): Record<string, number> => {
+  const counts: Record<string, number> = {};
+  for (const platform of PLATFORMS_METADATA) {
+    const pl = platform.id.toLowerCase();
+    counts[platform.id] = services.filter((s) => {
+      const sp = (s.platform || '').toLowerCase();
+      return sp.includes(pl) || pl.includes(sp);
+    }).length;
+  }
+  return counts;
+};
+
+// In-memory module cache (survives tab switches/route navigations within browser session)
+let inMemoryLiveServices: SocialBoostService[] | null = null;
+let inMemoryPlatformCounts: Record<string, number> | null = null;
+let inMemoryLastFetchTime: number = 0;
+let inFlightServicesPromise: Promise<any> | null = null;
+let inFlightCountsPromise: Promise<Record<string, number> | null> | null = null;
+
+const CACHE_KEY_SERVICES = 'zenet_sb_cached_services_v2';
+const CACHE_KEY_COUNTS = 'zenet_sb_cached_counts_v3';
+const CACHE_KEY_TIMESTAMP = 'zenet_sb_cached_ts_v3';
+
+// Strict validator to ensure counts come from live API and not old fallback mocks
+export function isValidLivePlatformCounts(counts: any): counts is Record<string, number> {
+  if (!counts || typeof counts !== 'object') return false;
+  // Live Voiker API returns ~240+ services for TikTok. Old fallback mocks had only 6 services.
+  const ttCount = Number(counts.TikTok || 0);
+  if (ttCount < 20) return false;
+  return Object.keys(counts).length >= 8;
+}
+
+function getInitialPlatformCounts(): Record<string, number> | null {
+  if (inMemoryPlatformCounts && isValidLivePlatformCounts(inMemoryPlatformCounts)) {
+    return inMemoryPlatformCounts;
+  }
+  try {
+    const raw = safeLocalStorage.getItem(CACHE_KEY_COUNTS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (isValidLivePlatformCounts(parsed)) {
+        inMemoryPlatformCounts = parsed;
+        return parsed;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function getInitialServices(): SocialBoostService[] {
+  if (inMemoryLiveServices && inMemoryLiveServices.length > 20) {
+    return inMemoryLiveServices;
+  }
+  try {
+    const raw = safeLocalStorage.getItem(CACHE_KEY_SERVICES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 20) {
+        inMemoryLiveServices = parsed;
+        return parsed;
+      }
+    }
+  } catch {}
+  return [];
+}
+
 interface SocialBoostViewProps {
   user: User | null;
   userProfile: UserProfile | null;
@@ -906,9 +977,23 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   // Navigation: 'categories' (select platform) or 'platform-services' (browse services for that platform)
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
-  // Live services catalogue from Voiker
-  const [allServices, setAllServices] = useState<SocialBoostService[]>(DEFAULT_TIKTOK_SERVICES);
-  const [isLoadingServices, setIsLoadingServices] = useState<boolean>(false);
+  // Platform counts state (restored synchronously on first render from memory / localStorage for instant 0ms display)
+  const [platformCounts, setPlatformCounts] = useState<Record<string, number> | null>(() => getInitialPlatformCounts());
+
+  // Live services catalogue from Voiker (restored synchronously from cache if available)
+  const [allServices, setAllServices] = useState<SocialBoostService[]>(() => getInitialServices());
+
+  // Tracks whether real live API or cached catalogue is active
+  const [hasRealCatalogue, setHasRealCatalogue] = useState<boolean>(() => {
+    const initialCounts = getInitialPlatformCounts();
+    const initialServices = getInitialServices();
+    return Boolean((initialCounts && isValidLivePlatformCounts(initialCounts)) || initialServices.length > 20);
+  });
+
+  const [isLoadingServices, setIsLoadingServices] = useState<boolean>(() => {
+    const initialServices = getInitialServices();
+    return initialServices.length <= 20;
+  });
   const [activeTypeFilter, setActiveTypeFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
@@ -916,13 +1001,14 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   // Sub-tab: 'browse' or 'orders'
   const [activeSubTab, setActiveSubTab] = useState<'browse' | 'orders'>('browse');
 
-  // Order Placement Modal state
+  // Order Placement state
   const [selectedService, setSelectedService] = useState<SocialBoostService | null>(null);
   const [orderTarget, setOrderTarget] = useState<string>('');
   const [orderQuantity, setOrderQuantity] = useState<number>(1000);
   const [orderComments, setOrderComments] = useState<string>('');
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [orderNotice, setOrderNotice] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<SocialBoostOrder | null>(null);
 
   // User Orders History state
@@ -932,28 +1018,65 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   const [actionLoadingOrderId, setActionLoadingOrderId] = useState<string | null>(null);
   const [actionNotification, setActionNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Admin authorization check
-  const isAdmin = Boolean(
+  // Strict Owner-Only authorization check (Super Admin only - normal admins are NOT owners)
+  const isOwner = Boolean(
     isAuthorizedOwner(user, userProfile) ||
     isAuthorizedOwnerEmail(user?.email || auth.currentUser?.email || userProfile?.email) ||
-    userProfile?.role === 'admin' ||
+    isAuthorizedOwnerUid(user?.uid || auth.currentUser?.uid || userProfile?.uid) ||
     userProfile?.role === 'owner'
   );
 
-  // Admin Settings Modal State
+  // Admin authorization check
+  const isAdmin = Boolean(
+    isOwner ||
+    userProfile?.role === 'admin'
+  );
+
+  // Owner Social Boost Pricing Settings Modal State
+  const [isPricingSettingsOpen, setIsPricingSettingsOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [settingsTab, setSettingsTab] = useState<'voiker' | 'tiktok'>('voiker');
+  const [settingsTab, setSettingsTab] = useState<'voiker' | 'markup' | 'tiktok'>('voiker');
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
   const [settingsSaveSuccess, setSettingsSaveSuccess] = useState<boolean>(false);
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
+
+  // Prevent background document scrolling when Owner Pricing Settings panel is open
+  useEffect(() => {
+    if (!isPricingSettingsOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isPricingSettingsOpen]);
   const [voikerBalance, setVoikerBalance] = useState<{ balanceUsd: number; balanceNgn: number; currency: string } | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
+  const [adminApiKey, setAdminApiKey] = useState<string>('');
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [maskedApiKey, setMaskedApiKey] = useState<string>('');
+  const [platformStatus, setPlatformStatus] = useState<Record<string, boolean>>({
+    TikTok: true,
+    Instagram: true,
+    Facebook: true,
+    YouTube: true,
+    'Twitter / X': true,
+    Telegram: true,
+    WhatsApp: true,
+    'Spotify & Music': true,
+    Discord: true,
+    LinkedIn: true,
+    'Twitch & Streaming': true,
+    Snapchat: true,
+    Reddit: true,
+    Pinterest: true,
+    'Website Traffic & SEO': true
+  });
 
   // Voiker Global Pricing Settings (Zero Markup Direct Mode)
   const [voikerPricing, setVoikerPricing] = useState({
     defaultMarkupPercent: 0,
     minMarkupPer1k: 0,
-    usdToNgnRate: 1650,
+    usdToNgnRate: 1348.45,
     pricingStyle: 'natural'
   });
 
@@ -966,35 +1089,148 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     'tt-views': { id: 'tt-views', name: 'TikTok Views', minQuantity: 500, maxQuantity: 2000000, pricePer1k: 250 }
   });
 
-  // Fetch Voiker & Boosting services from backend
-  const loadServices = useCallback(async () => {
-    setIsLoadingServices(true);
+  // Helper to apply and persist live services response
+  const applyLiveServices = useCallback((res: any) => {
+    if (!res || !res.success || !Array.isArray(res.services)) return;
+    const services: SocialBoostService[] = res.services;
+    inMemoryLiveServices = services;
+    inMemoryLastFetchTime = Date.now();
+    setAllServices(services);
+    setHasApiKey(Boolean(res.hasApiKey));
+
+    // Calculate or take server counts matching PLATFORMS_METADATA
+    let counts: Record<string, number>;
+    if (res.platformCounts && isValidLivePlatformCounts(res.platformCounts)) {
+      counts = res.platformCounts;
+    } else {
+      counts = computePlatformCountsFromServices(services);
+    }
+
+    if (isValidLivePlatformCounts(counts)) {
+      inMemoryPlatformCounts = counts;
+      setPlatformCounts(counts);
+      setHasRealCatalogue(true);
+
+      // Save counts to safeLocalStorage for instant 0ms restoration on future page refreshes
+      try {
+        safeLocalStorage.setItem(CACHE_KEY_COUNTS, JSON.stringify(counts));
+        safeLocalStorage.setItem(CACHE_KEY_TIMESTAMP, String(Date.now()));
+      } catch (e) {
+        console.warn('[Voiker] Local counts cache save notice:', e);
+      }
+    }
+  }, []);
+
+  // Fast lightweight Platform Counts fetcher (~20ms network request)
+  const loadPlatformCounts = useCallback(async (forceRefresh: boolean = false) => {
+    const now = Date.now();
+    if (!forceRefresh && inMemoryPlatformCounts && isValidLivePlatformCounts(inMemoryPlatformCounts) && (now - inMemoryLastFetchTime < 180000)) {
+      return;
+    }
+
+    // Reuse in-flight promise to avoid duplicate network requests
+    if (inFlightCountsPromise) {
+      try {
+        const counts = await inFlightCountsPromise;
+        if (counts && isValidLivePlatformCounts(counts)) {
+          setPlatformCounts(counts);
+          setHasRealCatalogue(true);
+        }
+      } catch {}
+      return;
+    }
+
+    const fetchCountsPromise = (async (): Promise<Record<string, number> | null> => {
+      try {
+        // Fast dedicated counts endpoint
+        let res: any = await safeApiFetch('/api/voiker/counts');
+        if (!res || !res.success || !isValidLivePlatformCounts(res.platformCounts)) {
+          res = await safeApiFetch('/api/voiker/services?countsOnly=true');
+        }
+        if (res && res.success && isValidLivePlatformCounts(res.platformCounts)) {
+          const counts = res.platformCounts;
+          inMemoryPlatformCounts = counts;
+          inMemoryLastFetchTime = Date.now();
+          setPlatformCounts(counts);
+          setHasRealCatalogue(true);
+          try {
+            safeLocalStorage.setItem(CACHE_KEY_COUNTS, JSON.stringify(counts));
+            safeLocalStorage.setItem(CACHE_KEY_TIMESTAMP, String(Date.now()));
+          } catch {}
+          return counts;
+        }
+      } catch (err) {
+        console.warn('[Voiker] Fast counts fetch notice:', err);
+      }
+      return null;
+    })();
+
+    inFlightCountsPromise = fetchCountsPromise;
+    try {
+      await fetchCountsPromise;
+    } finally {
+      inFlightCountsPromise = null;
+    }
+  }, []);
+
+  // Fetch full Voiker & Boosting services catalogue in background with stale-while-revalidate & request deduplication
+  const loadServices = useCallback(async (forceRefresh: boolean = false) => {
+    // If we already have fresh in-memory data (fetched within last 2 minutes) and not forcing refresh, skip duplicate request
+    const now = Date.now();
+    if (!forceRefresh && inMemoryLiveServices && inMemoryLiveServices.length > 20 && (now - inMemoryLastFetchTime < 120000)) {
+      return;
+    }
+
+    // Only set loading state if we do not already have services loaded
+    if (allServices.length === 0) {
+      setIsLoadingServices(true);
+    }
+
+    // Reuse in-flight fetch promise to prevent duplicate concurrent network requests
+    if (inFlightServicesPromise) {
+      try {
+        const res = await inFlightServicesPromise;
+        if (res && res.success && Array.isArray(res.services)) {
+          applyLiveServices(res);
+        }
+      } catch {}
+      setIsLoadingServices(false);
+      return;
+    }
+
     try {
       const callerEmail = user?.email || userProfile?.email || '';
-      // Try /api/voiker/services first
-      let res: any = await safeApiFetch(`/api/voiker/services?callerEmail=${encodeURIComponent(callerEmail)}`);
-      if (!res || !res.success || !Array.isArray(res.services) || res.services.length === 0) {
-        // Fallback to /api/social-boost/services
-        res = await safeApiFetch(`/api/social-boost/services?action=services&callerEmail=${encodeURIComponent(callerEmail)}`);
-      }
+      const fetchPromise = (async () => {
+        // Try /api/voiker/services first
+        let res: any = await safeApiFetch(`/api/voiker/services?callerEmail=${encodeURIComponent(callerEmail)}`);
+        if (!res || !res.success || !Array.isArray(res.services) || res.services.length === 0) {
+          // Fallback to /api/social-boost/services
+          res = await safeApiFetch(`/api/social-boost/services?action=services&callerEmail=${encodeURIComponent(callerEmail)}`);
+        }
+        return res;
+      })();
+
+      inFlightServicesPromise = fetchPromise;
+      const res = await fetchPromise;
 
       if (res && res.success && Array.isArray(res.services) && res.services.length > 0) {
-        setAllServices(res.services);
-        setHasApiKey(Boolean(res.hasApiKey));
-      } else {
-        setAllServices(DEFAULT_TIKTOK_SERVICES);
+        applyLiveServices(res);
       }
     } catch (err) {
       console.warn('[Voiker] Live services fetch notice:', err);
-      setAllServices(DEFAULT_TIKTOK_SERVICES);
+      // NOTE: We deliberately do NOT pollute platformCounts with mock fallback counts!
     } finally {
+      inFlightServicesPromise = null;
       setIsLoadingServices(false);
     }
-  }, [user?.email, userProfile?.email]);
+  }, [user?.email, userProfile?.email, allServices.length, applyLiveServices]);
 
   useEffect(() => {
+    // 1. Instantly fetch/revalidate lightweight counts (~20ms)
+    loadPlatformCounts();
+    // 2. Fetch full catalogue in parallel for when the user clicks a platform card
     loadServices();
-  }, [loadServices]);
+  }, [loadPlatformCounts, loadServices]);
 
   // Realtime subscription to TikTok settings
   useEffect(() => {
@@ -1044,11 +1280,42 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     }
   }, [isAdmin]);
 
+  // Fetch Pricing & Key Settings (Owner only)
+  const fetchPricingSettings = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const token = await getSafeIdToken(auth.currentUser);
+      const res: any = await safeApiFetch('/api/voiker/pricing-settings', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res && res.success && res.settings) {
+        setVoikerPricing({
+          defaultMarkupPercent: res.settings.defaultMarkupPercent ?? 0,
+          minMarkupPer1k: res.settings.minMarkupPer1k ?? 0,
+          usdToNgnRate: res.settings.usdToNgnRate ?? 1348.45,
+          pricingStyle: res.settings.pricingStyle || 'natural'
+        });
+        if (res.settings.platformStatus) {
+          setPlatformStatus(prev => ({ ...prev, ...res.settings.platformStatus }));
+        }
+        if (res.settings.maskedApiKey) {
+          setMaskedApiKey(res.settings.maskedApiKey);
+        }
+        if (typeof res.settings.hasApiKey === 'boolean') {
+          setHasApiKey(res.settings.hasApiKey);
+        }
+      }
+    } catch (e) {
+      console.warn('[Voiker] Pricing settings fetch notice:', e);
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     if (isSettingsOpen && isAdmin) {
       fetchVoikerBalance();
+      fetchPricingSettings();
     }
-  }, [isSettingsOpen, isAdmin, fetchVoikerBalance]);
+  }, [isSettingsOpen, isAdmin, fetchVoikerBalance, fetchPricingSettings]);
 
   // Fetch User's Boosting Orders
   const fetchOrders = useCallback(async () => {
@@ -1151,8 +1418,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   const currentPlatformServices = useMemo(() => {
     if (!selectedPlatform) return [];
     const platLower = selectedPlatform.toLowerCase().trim();
+    const pool = allServices.length > 0 ? allServices : (hasRealCatalogue ? [] : DEFAULT_TIKTOK_SERVICES);
 
-    return allServices.filter(svc => {
+    return pool.filter(svc => {
       const sPlat = (svc.platform || '').toLowerCase().trim();
       const sCat = (svc.category || '').toLowerCase().trim();
       const sName = (svc.name || '').toLowerCase().trim();
@@ -1211,7 +1479,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
       return sPlat === platLower;
     });
-  }, [allServices, selectedPlatform]);
+  }, [allServices, selectedPlatform, hasRealCatalogue]);
 
   // Dynamic Type/Category filter tabs for the current platform
   const dynamicFilterCategories = useMemo(() => {
@@ -1257,27 +1525,24 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     setOrderError(null);
   };
 
-  // Close Order Modal
+  // Close / Back from Order View
   const handleCloseOrderModal = () => {
-    if (isSubmittingOrder) return;
     setSelectedService(null);
     setOrderError(null);
+    setOrderNotice(null);
   };
 
-  // Calculated Order Cost in NGN
+  // Calculated Order Cost in NGN (Exact converted Voiker provider price, 0% markup)
   const calculatedCost = useMemo(() => {
     if (!selectedService) return 0;
     const rate = selectedService.ratePer1000 || selectedService.pricePerThousandNgn || 1500;
     const qty = Math.max(0, Number(orderQuantity) || 0);
-    return Math.max(10, Math.round((rate / 1000) * qty));
+    return Math.max(1, Math.round((rate / 1000) * qty));
   }, [selectedService, orderQuantity]);
 
-  // Place Order handler (Coming Soon state)
+  // Place Order handler: Submits order to Voiker SMM API via backend gateway
   const handlePlaceOrder = async () => {
-    setOrderError('Social Media Boosting is coming soon. The service is currently undergoing provider setup and will be enabled shortly. Your wallet balance was not charged.');
-    return;
-
-    if (!selectedService) return;
+    if (!selectedService || isSubmittingOrder) return;
 
     if (!auth.currentUser) {
       if (onOpenAuth) onOpenAuth('login');
@@ -1286,90 +1551,58 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
     const cleanTarget = orderTarget.trim();
     if (!cleanTarget) {
-      setOrderError(selectedService.inputLabel || 'Please provide your target link or username.');
+      setOrderError(selectedService.inputLabel ? `Please enter your ${selectedService.inputLabel}.` : 'Please provide your target link or username.');
       return;
     }
 
-    if (orderQuantity < selectedService.min || orderQuantity > selectedService.max) {
-      setOrderError(`Quantity must be between ${selectedService.min.toLocaleString()} and ${selectedService.max.toLocaleString()}.`);
+    const minQ = selectedService.min || 10;
+    const maxQ = selectedService.max || 100000;
+    if (orderQuantity < minQ || orderQuantity > maxQ) {
+      setOrderError(`Quantity must be between ${minQ.toLocaleString()} and ${maxQ.toLocaleString()}.`);
       return;
     }
 
     if (walletBalance < calculatedCost) {
-      setOrderError(`Insufficient wallet balance. You need ₦${(calculatedCost - walletBalance).toLocaleString()} more.`);
+      setOrderError(`Insufficient wallet balance. This order costs ₦${calculatedCost.toLocaleString()}, but your balance is ₦${walletBalance.toLocaleString()}. Please top up your wallet.`);
       return;
     }
 
     setIsSubmittingOrder(true);
     setOrderError(null);
+    setOrderNotice(null);
 
     try {
       const token = await getSafeIdToken(auth.currentUser);
-      if (!token) {
-        throw new Error('Please sign in again to place an order.');
-      }
-
-      const payload = {
-        serviceId: selectedService.id,
-        target: cleanTarget,
-        link: cleanTarget,
-        quantity: orderQuantity,
-        ratePer1000: selectedService.ratePer1000,
-        comments: selectedService.inputType === 'custom_comments' ? orderComments : undefined,
-        action: 'order'
-      };
-
-      // Try dedicated Voiker order endpoint first
-      let data: any = await safeApiFetch('/api/voiker/order', {
+      const res: any = await safeApiFetch('/api/voiker/order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          serviceId: selectedService.id,
+          target: cleanTarget,
+          quantity: orderQuantity,
+          comments: orderComments || undefined
+        })
       });
 
-      if (!data || !data.success) {
-        // Fallback to social-boost endpoint
-        data = await safeApiFetch('/api/social-boost/order', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
+      if (res && res.success && res.order) {
+        setOrderSuccess(res.order);
+        if (typeof res.newBalance === 'number' && onBalanceUpdated) {
+          onBalanceUpdated(res.newBalance);
+        }
+        if (onRefreshProfile) {
+          await onRefreshProfile();
+        }
+        await fetchOrders();
+      } else {
+        const errMsg = res?.error || res?.message || 'Failed to place boosting order. Your wallet was not charged.';
+        setOrderError(sanitizeApiErrorMessage(errMsg));
       }
-
-      if (!data || !data.success) {
-        throw new Error(data?.error || 'Failed to place boosting order.');
-      }
-
-      const newOrder: SocialBoostOrder = data.order || {
-        id: data.orderId || `vk-${Date.now()}`,
-        serviceName: selectedService.name,
-        target: cleanTarget,
-        quantity: orderQuantity,
-        charge: calculatedCost,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-
-      setOrderSuccess(newOrder);
-      setSelectedService(null);
-
-      // Deduct balance locally
-      const updatedBalance = Math.max(0, walletBalance - calculatedCost);
-      if (onBalanceUpdated) {
-        onBalanceUpdated(updatedBalance);
-      }
-      if (onRefreshProfile) {
-        await onRefreshProfile();
-      }
-      fetchOrders();
     } catch (err: any) {
-      console.error('[VoikerBoost] Order Error:', err);
-      setOrderError(sanitizeApiErrorMessage(err.message || 'Failed to process boosting order.'));
+      console.error('[SocialBoost] Order error:', err);
+      setOrderError(sanitizeApiErrorMessage(err.message || 'Unable to connect to boosting provider network. Your wallet was not charged.'));
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -1476,14 +1709,34 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     );
   };
 
-  // Helper to render the Admin Settings Modal
+  // Owner-Only Social Boost Markup & Pricing Settings Panel (Full-Screen Clean Purple & White Interface)
   const renderSettingsModal = () => {
-    if (!isSettingsOpen) return null;
+    if (!isOwner || !isPricingSettingsOpen) return null;
 
-    return (
+    const modalContent = (
+      <div 
+        id="social-boost-pricing-modal"
+        className="fixed inset-0 z-[9999] bg-[#FAF8FE] flex flex-col overflow-hidden w-full h-full min-h-[100dvh]"
+      >
+        <SocialBoostPricingManager
+          onClose={() => setIsPricingSettingsOpen(false)}
+          onPriceChangeApplied={() => {
+            loadServices(true);
+          }}
+          isOwner={true}
+        />
+      </div>
+    );
+
+    return typeof document !== 'undefined'
+      ? createPortal(modalContent, document.body)
+      : modalContent;
+  };
+
+  const _legacyUnusedSettings = () => (
       <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
         <div
-          className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl max-w-xl w-full p-4 sm:p-6 shadow-2xl space-y-4 my-auto relative animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
+          className={`bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl ${settingsTab === 'markup' ? 'max-w-5xl' : 'max-w-xl'} w-full p-4 sm:p-6 shadow-2xl space-y-4 my-auto relative animate-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
@@ -1495,14 +1748,14 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base sm:text-lg font-black text-[#0F172A]">
-                    Boosting Service Settings
+                    Boosting Service Settings & Profit Controls
                   </h3>
                   <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 rounded-md">
                     Owner Controls
                   </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-[#64748B]">
-                  Manage Voiker provider connection, wholesale margins, and service overrides.
+                  Manage Voiker provider connection, live USD/NGN exchange rates, and service markup profits.
                 </p>
               </div>
             </div>
@@ -1517,28 +1770,40 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           </div>
 
           {/* Modal Tabs */}
-          <div className="flex items-center gap-2 border-b border-[#F1F5F9] pb-2">
+          <div className="flex items-center gap-2 border-b border-[#F1F5F9] pb-2 overflow-x-auto no-scrollbar">
             <button
               type="button"
-              onClick={() => setSettingsTab('voiker')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                settingsTab === 'voiker'
-                  ? 'bg-[#7C3AED] text-white shadow-2xs'
+              onClick={() => setSettingsTab('markup')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                settingsTab === 'markup'
+                  ? 'bg-[#7C3AED] text-white shadow-2xs font-black'
                   : 'bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A]'
               }`}
             >
-              Voiker Provider & Pricing
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Markup & Pricing Manager</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSettingsTab('voiker')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                settingsTab === 'voiker'
+                  ? 'bg-[#7C3AED] text-white shadow-2xs font-black'
+                  : 'bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A]'
+              }`}
+            >
+              Voiker API & Controls
             </button>
             <button
               type="button"
               onClick={() => setSettingsTab('tiktok')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                 settingsTab === 'tiktok'
-                  ? 'bg-[#7C3AED] text-white shadow-2xs'
+                  ? 'bg-[#7C3AED] text-white shadow-2xs font-black'
                   : 'bg-[#F8FAFC] text-[#64748B] hover:text-[#0F172A]'
               }`}
             >
-              TikTok Overrides
+              TikTok Limits
             </button>
           </div>
 
@@ -1561,21 +1826,21 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                 </div>
               </div>
 
-              {/* Wholesale Balance */}
+              {/* Wholesale Balance & Key Status */}
               <div className="bg-purple-50/60 border border-purple-200/80 rounded-xl p-3.5 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] uppercase tracking-wider font-bold text-purple-700">
                     Voiker Wholesale Account Balance
                   </div>
-                  <div className="text-lg font-black text-[#0F172A] mt-0.5">
+                  <div className="text-base sm:text-lg font-black text-[#0F172A] mt-0.5">
                     {isLoadingBalance ? (
-                      <span className="text-xs text-[#64748B]">Checking...</span>
+                      <span className="text-xs text-[#64748B]">Checking balance...</span>
                     ) : voikerBalance ? (
                       <span>${voikerBalance.balanceUsd.toFixed(2)} USD <span className="text-xs font-semibold text-[#64748B]">(~₦{voikerBalance.balanceNgn.toLocaleString()})</span></span>
                     ) : hasApiKey ? (
-                      <span>Connected (Key active)</span>
+                      <span className="text-xs text-emerald-700 font-bold">Connected (API Key Active)</span>
                     ) : (
-                      <span className="text-xs text-amber-700 font-bold">VOIKER_API_KEY environment variable pending</span>
+                      <span className="text-xs text-amber-700 font-bold">API Key pending setup</span>
                     )}
                   </div>
                 </div>
@@ -1587,6 +1852,126 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   <RefreshCw className={`w-3 h-3 ${isLoadingBalance ? 'animate-spin' : ''}`} />
                   <span>Check</span>
                 </button>
+              </div>
+
+              {/* Shortcut Banner to Markup & Pricing Manager */}
+              <div className="bg-linear-to-r from-purple-50 via-purple-100/40 to-purple-50 border border-purple-200 rounded-xl p-3.5 flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-[#0F172A]">
+                      Social Boost Markup & Pricing Manager
+                    </h4>
+                    <p className="text-[11px] text-[#64748B]">
+                      Control profit in Naira per 1,000 units across all 1,775+ Voika SMM services.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab('markup')}
+                  className="px-3 py-1.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black rounded-lg transition cursor-pointer shrink-0 shadow-xs active:scale-95"
+                >
+                  Open Manager →
+                </button>
+              </div>
+
+              {/* Voiker API Key Manager Card */}
+              <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-extrabold text-[#0F172A] uppercase tracking-wider">
+                      Voiker Provider SMM API Key
+                    </h4>
+                    <p className="text-[11px] text-[#64748B]">
+                      Enter your secret API key from Voiker (Account &gt; API).
+                    </p>
+                  </div>
+                  {hasApiKey ? (
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black rounded-md flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>Key Active</span>
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black rounded-md flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-amber-600" />
+                      <span>Key Required</span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={adminApiKey}
+                      onChange={(e) => setAdminApiKey(e.target.value)}
+                      placeholder={maskedApiKey ? `Active: ${maskedApiKey}` : 'Paste Voiker API Key here...'}
+                      className="flex-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-3 py-2 text-xs font-mono text-[#0F172A] focus:outline-hidden focus:border-[#7C3AED]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="px-2.5 py-2 border border-[#E2E8F0] rounded-lg text-xs font-bold text-[#64748B] hover:bg-[#F8FAFC] transition cursor-pointer"
+                    >
+                      {showApiKey ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  {maskedApiKey && (
+                    <span className="text-[10px] text-[#64748B] block font-mono">
+                      Current Server Key: {maskedApiKey}
+                    </span>
+                  )}
+                </div>
+
+                {adminApiKey.trim() && (
+                  <button
+                    type="button"
+                    disabled={isSavingSettings}
+                    onClick={async () => {
+                      setIsSavingSettings(true);
+                      setSettingsSaveSuccess(false);
+                      setSettingsSaveError(null);
+                      try {
+                        const token = await getSafeIdToken(auth.currentUser);
+                        const res: any = await safeApiFetch('/api/voiker/pricing-settings', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                          },
+                          body: JSON.stringify({
+                            ...voikerPricing,
+                            platformStatus,
+                            apiKey: adminApiKey.trim()
+                          })
+                        });
+                        if (res && res.success) {
+                          setSettingsSaveSuccess(true);
+                          setAdminApiKey('');
+                          if (res.settings?.maskedApiKey) {
+                            setMaskedApiKey(res.settings.maskedApiKey);
+                          }
+                          setHasApiKey(true);
+                          await fetchVoikerBalance();
+                          await loadServices(true);
+                        } else {
+                          throw new Error(res?.error || 'Failed to save API key');
+                        }
+                      } catch (e: any) {
+                        setSettingsSaveError(e.message);
+                      } finally {
+                        setIsSavingSettings(false);
+                      }
+                    }}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Key & Verify Voiker Connection</span>
+                  </button>
+                )}
               </div>
 
               {/* Pricing Controls Form */}
@@ -1602,13 +1987,13 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                     </label>
                     <input
                       type="number"
-                      min="5"
+                      min="0"
                       max="300"
                       value={voikerPricing.defaultMarkupPercent}
-                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, defaultMarkupPercent: Number(e.target.value) || 45 }))}
+                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, defaultMarkupPercent: Number(e.target.value) || 0 }))}
                       className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs text-[#0F172A] font-bold"
                     />
-                    <span className="text-[9px] text-[#64748B]">Applied on top of provider wholesale cost</span>
+                    <span className="text-[9px] text-[#64748B]">Set to 0% for direct wholesale pricing</span>
                   </div>
 
                   <div>
@@ -1617,9 +2002,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                     </label>
                     <input
                       type="number"
-                      min="50"
+                      min="0"
                       value={voikerPricing.minMarkupPer1k}
-                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, minMarkupPer1k: Number(e.target.value) || 350 }))}
+                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, minMarkupPer1k: Number(e.target.value) || 0 }))}
                       className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs text-[#0F172A] font-bold"
                     />
                     <span className="text-[9px] text-[#64748B]">Floor margin per 1,000 units</span>
@@ -1635,7 +2020,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       type="number"
                       min="500"
                       value={voikerPricing.usdToNgnRate}
-                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, usdToNgnRate: Number(e.target.value) || 1650 }))}
+                      onChange={(e) => setVoikerPricing(prev => ({ ...prev, usdToNgnRate: Number(e.target.value) || 1348.45 }))}
                       className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2.5 py-1.5 text-xs text-[#0F172A] font-bold"
                     />
                   </div>
@@ -1656,6 +2041,38 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   </div>
                 </div>
 
+                {/* Platform Availability Toggles */}
+                <div className="pt-2 border-t border-[#F1F5F9] space-y-2">
+                  <span className="text-[11px] font-bold text-[#475569] block">
+                    Supported Platform Availability
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {PLATFORMS_METADATA.map((plat) => {
+                      const isEnabled = platformStatus[plat.name] !== false;
+                      return (
+                        <button
+                          key={plat.id}
+                          type="button"
+                          onClick={() => {
+                            setPlatformStatus(prev => ({
+                              ...prev,
+                              [plat.name]: !isEnabled
+                            }));
+                          }}
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer ${
+                            isEnabled
+                              ? 'bg-purple-50/60 border-purple-200 text-[#7C3AED]'
+                              : 'bg-neutral-50 border-neutral-200 text-[#94A3B8]'
+                          }`}
+                        >
+                          <span className="truncate">{plat.name}</span>
+                          <span className={`w-2 h-2 rounded-full ${isEnabled ? 'bg-emerald-500' : 'bg-neutral-300'}`} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   disabled={isSavingSettings}
@@ -1671,11 +2088,22 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                           'Content-Type': 'application/json',
                           'Authorization': `Bearer ${token}`
                         },
-                        body: JSON.stringify(voikerPricing)
+                        body: JSON.stringify({
+                          ...voikerPricing,
+                          platformStatus,
+                          ...(adminApiKey.trim() ? { apiKey: adminApiKey.trim() } : {})
+                        })
                       });
                       if (res && res.success) {
                         setSettingsSaveSuccess(true);
-                        await loadServices();
+                        if (adminApiKey.trim()) {
+                          setAdminApiKey('');
+                          if (res.settings?.maskedApiKey) {
+                            setMaskedApiKey(res.settings.maskedApiKey);
+                          }
+                          setHasApiKey(true);
+                        }
+                        await loadServices(true);
                       } else {
                         throw new Error(res?.error || 'Failed to update settings');
                       }
@@ -1688,7 +2116,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   className="w-full py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>{isSavingSettings ? 'Saving...' : 'Apply & Save Pricing Rules'}</span>
+                  <span>{isSavingSettings ? 'Saving...' : 'Apply & Save All Boosting Settings'}</span>
                 </button>
               </div>
             </div>
@@ -1774,6 +2202,18 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             </div>
           )}
 
+          {/* Tab 3: Social Boost Markup & Pricing Manager */}
+          {settingsTab === 'markup' && (
+            <div className="overflow-y-auto flex-1 pr-1 py-1">
+              <SocialBoostPricingManager
+                isOwner={true}
+                onPriceChangeApplied={() => {
+                  loadServices(true);
+                }}
+              />
+            </div>
+          )}
+
           {/* Success / Error notification */}
           {settingsSaveSuccess && (
             <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
@@ -1791,7 +2231,6 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         </div>
       </div>
     );
-  };
 
   // =========================================================================
   // VIEW 1: PLATFORMS CATALOGUE (CLEAN GRID OF ALL SUPPORTED SOCIAL NETWORKS)
@@ -1827,15 +2266,16 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               </button>
             </div>
 
-            {isAdmin && (
+            {/* Owner-Only Social Boost Markup & Pricing Settings Button */}
+            {isOwner && (
               <button
                 type="button"
-                onClick={() => setIsSettingsOpen(true)}
-                title="Boosting Settings"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-50 text-[#0F172A] hover:text-[#7C3AED] border border-[#E2E8F0] hover:border-[#7C3AED]/40 rounded-xl text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer"
+                onClick={() => setIsPricingSettingsOpen(true)}
+                title="Social Boost Markup & Pricing Settings"
+                aria-label="Social Boost Markup & Pricing Settings"
+                className="p-2 sm:p-2.5 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#7C3AED] hover:text-[#5B21B6] rounded-xl border border-purple-200 transition cursor-pointer shadow-2xs flex items-center justify-center active:scale-95 shrink-0"
               >
-                <Sliders className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Settings</span>
+                <Settings className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
               </button>
             )}
           </div>
@@ -1843,28 +2283,40 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
         {/* Header Section */}
         <div className="mb-8">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-[#7C3AED] border border-purple-200 text-xs font-semibold mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" />
-            <span>Automated Social Boosting</span>
-            <span className="ml-1 px-1.5 py-0.5 bg-[#7C3AED] text-white text-[9px] font-black rounded-sm uppercase tracking-wider">Coming Soon</span>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-[#7C3AED] border border-purple-200 text-xs font-semibold">
+              <Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" />
+              <span>Automated Social Boosting</span>
+              <span className="ml-1 px-1.5 py-0.5 bg-emerald-600 text-white text-[9px] font-black rounded-sm uppercase tracking-wider">Instant API</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Live Rate: ₦1,348.45 / $1 USD • 0% Markup</span>
+            </div>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-[#0F172A] tracking-tight">
             Social Media Boost
           </h1>
           <p className="text-xs sm:text-sm text-[#64748B] font-medium mt-1">
-            Social Media Boosting is coming soon! Our high-speed delivery network is undergoing final provider setup and will be enabled shortly.
+            High-speed automated engagement, followers, views, and likes across all major social networks at exact converted Voiker provider prices.
           </p>
         </div>
 
         {/* Platform Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           {PLATFORMS_METADATA.map((platform) => {
-            // Count services for this platform
-            const count = allServices.filter(s => {
-              const sp = (s.platform || '').toLowerCase();
-              const pl = platform.id.toLowerCase();
-              return sp.includes(pl) || pl.includes(sp);
-            }).length;
+            // Fast O(1) lookup of real cached/live count for this platform
+            const count = (platformCounts && platformCounts[platform.id] !== undefined)
+              ? platformCounts[platform.id]
+              : (allServices && allServices.length > 20
+                  ? allServices.filter(s => {
+                      const sp = (s.platform || '').toLowerCase();
+                      const pl = platform.id.toLowerCase();
+                      return sp.includes(pl) || pl.includes(sp);
+                    }).length
+                  : undefined);
+
+            const hasCount = typeof count === 'number' && count > 0;
 
             return (
               <button
@@ -1876,7 +2328,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   setSearchQuery('');
                   setActiveSubTab('browse');
                 }}
-                className={`bg-white hover:bg-[#FDFCFE] border border-[#E2E8F0] ${platform.bgColor} rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 flex items-center justify-between group cursor-pointer text-left focus:outline-hidden focus:ring-2 focus:ring-[#7C3AED]/20`}
+                className={`bg-white hover:bg-[#FDFCFE] border border-[#E2E8F0] ${platform.bgColor} rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all duration-200 flex items-center justify-between group cursor-pointer text-left focus:outline-hidden focus:ring-2 focus:ring-[#7C3AED]/20 zenet-card-enter zenet-card-interactive`}
               >
                 <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
                   {/* Platform Icon */}
@@ -1890,12 +2342,13 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       <span className={`text-base sm:text-lg font-black text-[#0F172A] tracking-tight ${platform.textColor} transition-colors truncate`}>
                         {platform.name}
                       </span>
-                      <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-purple-100 text-[#7C3AED] border border-purple-200 rounded-full">
-                        Coming Soon
-                      </span>
-                      {count > 0 && (
+                      {hasCount ? (
                         <span className="text-[10px] font-semibold text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-md">
                           {count} services
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-[#94A3B8] bg-[#F1F5F9] px-2.5 py-0.5 rounded-md animate-pulse">
+                          ...
                         </span>
                       )}
                     </div>
@@ -1915,6 +2368,371 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         </div>
 
         {/* Owner Settings Modal */}
+        {renderSettingsModal()}
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 2.5: ORDER SUCCESS CONFIRMATION MODAL / SCREEN
+  // =========================================================================
+  if (orderSuccess) {
+    return (
+      <div className="w-full max-w-xl mx-auto py-8 sm:py-12 px-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="bg-white border border-[#E2E8F0] rounded-3xl p-6 sm:p-8 shadow-xl text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+            <CheckCircle2 className="w-9 h-9" />
+          </div>
+
+          <div className="space-y-1">
+            <h3 className="text-xl sm:text-2xl font-black text-[#0F172A] tracking-tight">
+              Boosting Order Placed!
+            </h3>
+            <p className="text-xs sm:text-sm text-[#64748B]">
+              Your boosting order has been accepted and dispatched directly to the Voiker delivery provider network.
+            </p>
+          </div>
+
+          {/* Order Details Receipt */}
+          <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-left space-y-2.5 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+              <span className="text-[#64748B] font-semibold">Order ID:</span>
+              <div className="flex items-center gap-1.5 font-mono font-bold text-[#0F172A]">
+                <span>{orderSuccess.orderId || orderSuccess.id}</span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(orderSuccess.orderId || orderSuccess.id, 'success-id')}
+                  className="p-1 hover:bg-[#E2E8F0] rounded cursor-pointer text-[#64748B]"
+                  title="Copy Order ID"
+                >
+                  {copiedId === 'success-id' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            {orderSuccess.providerOrderId && (
+              <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+                <span className="text-[#64748B] font-semibold">Voiker Provider Order:</span>
+                <span className="font-mono font-black text-[#7C3AED]">
+                  #{orderSuccess.providerOrderId}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+              <span className="text-[#64748B] font-semibold">Service:</span>
+              <span className="font-bold text-[#0F172A] text-right truncate max-w-[220px]">
+                {orderSuccess.serviceName}
+              </span>
+            </div>
+
+            {orderSuccess.target && (
+              <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+                <span className="text-[#64748B] font-semibold">Target:</span>
+                <span className="font-mono text-[11px] text-[#475569] text-right truncate max-w-[220px]">
+                  {orderSuccess.target}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+              <span className="text-[#64748B] font-semibold">Quantity:</span>
+              <span className="font-black text-[#0F172A]">
+                {(orderSuccess.quantity || 0).toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0]">
+              <span className="text-[#64748B] font-semibold">Total Paid:</span>
+              <span className="font-black text-[#7C3AED] text-sm">
+                ₦{(orderSuccess.totalCharge || orderSuccess.price || 0).toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-[#64748B] font-semibold">Status:</span>
+              {renderStatusBadge(orderSuccess.status)}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setOrderSuccess(null);
+                setSelectedService(null);
+                setActiveSubTab('orders');
+              }}
+              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-black text-xs sm:text-sm transition cursor-pointer shadow-xs shadow-purple-200"
+            >
+              Track in My Orders
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOrderSuccess(null);
+                setSelectedService(null);
+              }}
+              className="w-full sm:w-auto py-3 px-5 rounded-xl border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] font-bold text-xs transition cursor-pointer"
+            >
+              Boost Another
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 3: SERVICE BOOST CONFIGURATION (CLEAN INLINE VIEW, NO BLACK SCREEN, SMOOTH SCROLLING)
+  // =========================================================================
+  if (selectedService) {
+    return (
+      <div className="w-full max-w-2xl mx-auto py-4 sm:py-6 px-3.5 sm:px-6 pb-28 sm:pb-16 animate-in fade-in duration-150">
+        {/* Top Header Navigation */}
+        <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+          <button
+            type="button"
+            onClick={handleCloseOrderModal}
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to {selectedPlatform || 'Services'}</span>
+          </button>
+
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5 shadow-2xs">
+              <Wallet className="w-4 h-4 text-[#7C3AED]" />
+              <span className="text-xs text-[#64748B] font-medium hidden sm:inline">Balance:</span>
+              <span className="text-xs sm:text-sm font-black text-[#0F172A]">
+                ₦{walletBalance.toLocaleString()}
+              </span>
+              <button
+                type="button"
+                onClick={onOpenWallet}
+                className="text-[10px] sm:text-xs font-black bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-2 py-0.5 rounded-md transition cursor-pointer ml-1"
+              >
+                + Top Up
+              </button>
+            </div>
+
+            {/* Owner-Only Social Boost Markup & Pricing Settings Button */}
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setIsPricingSettingsOpen(true)}
+                title="Social Boost Markup & Pricing Settings"
+                aria-label="Social Boost Markup & Pricing Settings"
+                className="p-2 sm:p-2.5 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#7C3AED] hover:text-[#5B21B6] rounded-xl border border-purple-200 transition cursor-pointer shadow-2xs flex items-center justify-center active:scale-95 shrink-0"
+              >
+                <Settings className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Coming Soon Notice Alert if user tapped order button */}
+        {orderNotice && (
+          <div className="mb-4 p-4 bg-purple-50 border-2 border-purple-300 rounded-2xl shadow-xs text-purple-950 flex items-start justify-between gap-3 animate-in fade-in">
+            <div className="flex items-start gap-2.5">
+              <Sparkles className="w-5 h-5 text-[#7C3AED] shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h4 className="font-extrabold text-sm text-[#7C3AED]">
+                  🚀 Social Media Boost Coming Soon!
+                </h4>
+                <p className="text-xs text-[#475569] leading-relaxed font-medium whitespace-pre-line">
+                  {orderNotice}
+                </p>
+                <p className="text-[11px] font-bold text-emerald-700">
+                  ✓ Your wallet balance has NOT been charged.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOrderNotice(null)}
+              className="text-[#94A3B8] hover:text-[#0F172A] p-1 cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Main Service Configuration Form Card */}
+        <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
+          {/* Header */}
+          <div className="border-b border-[#F1F5F9] pb-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#7C3AED]">
+                {selectedService.platform || selectedPlatform} • {selectedService.type || selectedService.category}
+              </div>
+              <h2 className="text-base sm:text-lg font-black text-[#0F172A] mt-0.5 leading-snug">
+                {selectedService.name}
+              </h2>
+            </div>
+            {selectedService.deliverySpeed && (
+              <span className="shrink-0 px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-[10px] font-bold inline-flex items-center gap-1">
+                <Clock className="w-3 h-3 text-[#7C3AED]" />
+                <span>{selectedService.deliverySpeed}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Rate & Limits Card */}
+          <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-[#64748B] block">Price per 1,000 units</span>
+              <span className="text-base sm:text-lg font-black text-[#7C3AED]">
+                ₦{(selectedService.ratePer1000 || selectedService.pricePerThousandNgn || 1500).toLocaleString()}
+              </span>
+            </div>
+            <div className="text-right text-[11px] text-[#64748B]">
+              <span>Min: <strong>{(selectedService.min || 10).toLocaleString()}</strong></span>
+              <span className="mx-1">•</span>
+              <span>Max: <strong>{(selectedService.max || 100000).toLocaleString()}</strong></span>
+            </div>
+          </div>
+
+          {/* Dynamic Target Input */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[#0F172A] block">
+              {selectedService.inputLabel || `${selectedPlatform} Target URL or @Username`}
+            </label>
+            {selectedService.inputType === 'custom_comments' ? (
+              <textarea
+                rows={4}
+                value={orderComments}
+                onChange={(e) => setOrderComments(e.target.value)}
+                placeholder="Enter custom comments (1 comment per line)...&#10;Great post!&#10;Awesome content!"
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-xs text-[#0F172A] font-medium focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
+              />
+            ) : (
+              <input
+                type="text"
+                value={orderTarget}
+                onChange={(e) => setOrderTarget(e.target.value)}
+                placeholder={selectedService.inputPlaceholder || `https://${selectedPlatform?.toLowerCase().replace(/[^a-z0-9]/g, '')}.com/...`}
+                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-xs text-[#0F172A] font-medium focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
+              />
+            )}
+            <span className="text-[10px] text-[#64748B] block">
+              Ensure account/post is set to <strong>Public</strong> before placing order.
+            </span>
+          </div>
+
+          {/* Quantity Input */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#0F172A]">Quantity to Boost</label>
+              <span className="text-[10px] text-[#64748B]">
+                Min: {(selectedService.min || 10).toLocaleString()} | Max: {(selectedService.max || 100000).toLocaleString()}
+              </span>
+            </div>
+            <input
+              type="number"
+              min={selectedService.min || 10}
+              max={selectedService.max || 100000}
+              step={50}
+              value={orderQuantity}
+              onChange={(e) => setOrderQuantity(Number(e.target.value) || 0)}
+              className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-sm text-[#0F172A] font-extrabold focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
+            />
+
+            {/* Quick Select Buttons */}
+            <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+              {Array.from(
+                new Set(
+                  [selectedService.min || 50, 500, 1000, 2500, 5000, 10000].filter(
+                    (q): q is number =>
+                      typeof q === 'number' &&
+                      !isNaN(q) &&
+                      q >= (selectedService.min || 10) &&
+                      q <= (selectedService.max || 100000)
+                  )
+                )
+              )
+                .sort((a, b) => a - b)
+                .map((qty) => (
+                  <button
+                    key={`quick-qty-${qty}`}
+                    type="button"
+                    onClick={() => setOrderQuantity(qty)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                      orderQuantity === qty
+                        ? 'bg-purple-100 text-[#7C3AED] border-purple-300 font-black shadow-2xs'
+                        : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9]'
+                    }`}
+                  >
+                    {qty.toLocaleString()}
+                  </button>
+                ))}
+            </div>
+          </div>
+
+          {/* Total Calculation & Wallet Check */}
+          <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[#64748B] font-semibold">Total Charge:</span>
+              <span className="text-base font-black text-[#7C3AED]">
+                ₦{calculatedCost.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-purple-200/60">
+              <span className="text-[#64748B] font-semibold">Your Wallet Balance:</span>
+              <span className="font-extrabold text-[#0F172A]">₦{walletBalance.toLocaleString()}</span>
+            </div>
+          </div>
+
+
+
+          {/* Order Error Notification if any */}
+          {orderError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{orderError}</span>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+            <button
+              type="button"
+              disabled={isSubmittingOrder}
+              onClick={handleCloseOrderModal}
+              className="w-full sm:w-auto px-5 py-3 border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50"
+            >
+              Cancel & Back
+            </button>
+
+            <button
+              type="button"
+              disabled={isSubmittingOrder}
+              onClick={handlePlaceOrder}
+              className={`w-full sm:flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-black transition shadow-xs cursor-pointer ${
+                walletBalance < calculatedCost
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                  : 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white active:scale-98 shadow-purple-200'
+              } disabled:opacity-60 disabled:cursor-not-allowed`}
+            >
+              {isSubmittingOrder ? (
+                <>
+                  <RefreshCw className="w-4 h-4 text-white animate-spin" />
+                  <span>Submitting to Voiker Provider...</span>
+                </>
+              ) : walletBalance < calculatedCost ? (
+                <>
+                  <Wallet className="w-4 h-4 text-white" />
+                  <span>Insufficient Balance — Top Up Wallet (₦{calculatedCost.toLocaleString()})</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 text-white" />
+                  <span>Confirm & Boost Now (₦{calculatedCost.toLocaleString()})</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
         {renderSettingsModal()}
       </div>
     );
@@ -1955,15 +2773,16 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             </button>
           </div>
 
-          {isAdmin && (
+          {/* Owner-Only Social Boost Markup & Pricing Settings Button */}
+          {isOwner && (
             <button
               type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              title="Boosting Settings"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-50 text-[#0F172A] hover:text-[#7C3AED] border border-[#E2E8F0] hover:border-[#7C3AED]/40 rounded-xl text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer"
+              onClick={() => setIsPricingSettingsOpen(true)}
+              title="Social Boost Markup & Pricing Settings"
+              aria-label="Social Boost Markup & Pricing Settings"
+              className="p-2 sm:p-2.5 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#7C3AED] hover:text-[#5B21B6] rounded-xl border border-purple-200 transition cursor-pointer shadow-2xs flex items-center justify-center active:scale-95 shrink-0"
             >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Settings</span>
+              <Settings className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
             </button>
           )}
         </div>
@@ -1977,12 +2796,15 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               {renderPlatformIcon(selectedPlatform, "w-7 h-7")}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-black text-[#0F172A] tracking-tight">
                   {selectedPlatform} Boost Services
                 </h1>
                 <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700 rounded-md">
                   Voiker Verified
+                </span>
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-md">
+                  ₦1,348.45 / $1 • 0% Markup
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-[#64748B] font-medium mt-0.5">
@@ -2167,10 +2989,10 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleOpenOrderModal(service)}
-                        className="px-3.5 sm:px-4 py-1.5 sm:py-2 bg-purple-100 hover:bg-purple-200 text-[#7C3AED] border border-purple-200 text-xs font-black rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-98"
+                        className="px-3.5 sm:px-4 py-1.5 sm:py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-98"
                       >
-                        <Clock className="w-3 h-3 text-[#7C3AED]" />
-                        <span>Coming Soon</span>
+                        <Zap className="w-3.5 h-3.5 text-white" />
+                        <span>Boost Now</span>
                       </button>
                     </div>
                   </div>
@@ -2268,15 +3090,15 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1F5F9]">
-                  {orders.map((ord: any) => {
-                    const orderIdStr = ord.orderId || ord.id || 'N/A';
+                  {orders.map((ord: any, idx: number) => {
+                    const orderIdStr = ord.orderId || ord.id || `order-${idx}`;
                     const isPending = ['pending', 'awaiting'].includes((ord.status || '').toLowerCase());
                     const canRefill = Boolean(ord.refill && ord.providerOrderId && ['completed', 'in_progress'].includes((ord.status || '').toLowerCase()));
                     const canCancel = Boolean(ord.cancel && ord.providerOrderId && isPending);
                     const isLoadingThis = actionLoadingOrderId === ord.id;
 
                     return (
-                      <tr key={orderIdStr} className="hover:bg-[#F8FAFC] transition">
+                      <tr key={`${orderIdStr}-${idx}`} className="hover:bg-[#F8FAFC] transition">
                         <td className="py-3 px-3 font-mono text-[11px] text-[#0F172A]">
                           <div className="flex items-center gap-1.5">
                             <span>{orderIdStr}</span>
@@ -2358,247 +3180,6 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
               </table>
             </div>
           )}
-        </div>
-      )}
-
-      {/* ======================= ORDER PLACEMENT MODAL ======================= */}
-      {selectedService && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div
-            className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 my-auto relative animate-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-[#F1F5F9]">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <button
-                  type="button"
-                  onClick={handleCloseOrderModal}
-                  className="p-1.5 rounded-lg hover:bg-[#F1F5F9] text-[#64748B] hover:text-[#0F172A] transition"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#7C3AED]">
-                    {selectedService.platform || selectedPlatform} • {selectedService.type || selectedService.category}
-                  </div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#0F172A] truncate">
-                    {selectedService.name}
-                  </h3>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCloseOrderModal}
-                className="text-[#94A3B8] hover:text-[#0F172A] p-1.5 rounded-lg hover:bg-[#F1F5F9] transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body Form */}
-            <div className="space-y-4 overflow-y-auto pr-1 flex-1 py-1">
-              {/* Rate & Features Header */}
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#64748B] block">Price per 1,000 units</span>
-                  <span className="text-base font-black text-[#7C3AED]">
-                    ₦{(selectedService.ratePer1000 || selectedService.pricePerThousandNgn || 1500).toLocaleString()}
-                  </span>
-                </div>
-                <div className="text-right text-[11px] text-[#64748B]">
-                  <span>Min: <strong>{(selectedService.min || 10).toLocaleString()}</strong></span>
-                  <span className="mx-1">•</span>
-                  <span>Max: <strong>{(selectedService.max || 100000).toLocaleString()}</strong></span>
-                </div>
-              </div>
-
-              {/* Dynamic Target Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#0F172A] block">
-                  {selectedService.inputLabel || `${selectedPlatform} Target URL or @Username`}
-                </label>
-                {selectedService.inputType === 'custom_comments' ? (
-                  <textarea
-                    rows={4}
-                    value={orderComments}
-                    onChange={(e) => setOrderComments(e.target.value)}
-                    placeholder="Enter custom comments (1 comment per line)...&#10;Great post!&#10;Awesome content!"
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-xs text-[#0F172A] font-medium focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    value={orderTarget}
-                    onChange={(e) => setOrderTarget(e.target.value)}
-                    placeholder={selectedService.inputPlaceholder || `https://${selectedPlatform?.toLowerCase().replace(/[^a-z0-9]/g, '')}.com/...`}
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-xs text-[#0F172A] font-medium focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
-                  />
-                )}
-                <span className="text-[10px] text-[#64748B] block">
-                  Ensure account/post is set to <strong>Public</strong> before placing order.
-                </span>
-              </div>
-
-              {/* Quantity Input */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#0F172A]">Quantity to Boost</label>
-                  <span className="text-[10px] text-[#64748B]">
-                    Min: {(selectedService.min || 10).toLocaleString()} | Max: {(selectedService.max || 100000).toLocaleString()}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min={selectedService.min || 10}
-                  max={selectedService.max || 100000}
-                  step={50}
-                  value={orderQuantity}
-                  onChange={(e) => setOrderQuantity(Number(e.target.value) || 0)}
-                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-sm text-[#0F172A] font-extrabold focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
-                />
-
-                {/* Quick Select Buttons */}
-                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
-                  {[selectedService.min, 500, 1000, 2500, 5000, 10000].filter(q => q >= (selectedService.min || 10) && q <= (selectedService.max || 100000)).map(qty => (
-                    <button
-                      key={qty}
-                      type="button"
-                      onClick={() => setOrderQuantity(qty)}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
-                        orderQuantity === qty
-                          ? 'bg-purple-100 text-[#7C3AED] border-purple-300'
-                          : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9]'
-                      }`}
-                    >
-                      {qty.toLocaleString()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Total Calculation & Wallet Check */}
-              <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#64748B]">Total Charge:</span>
-                  <span className="text-base font-black text-[#7C3AED]">
-                    ₦{calculatedCost.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-purple-200/60">
-                  <span className="text-[#64748B]">Your Wallet Balance:</span>
-                  <span className="font-extrabold text-[#0F172A]">₦{walletBalance.toLocaleString()}</span>
-                </div>
-
-                {walletBalance < calculatedCost && (
-                  <div className="text-[11px] text-rose-600 font-bold flex items-center justify-between pt-1">
-                    <span>Shortfall: ₦{(calculatedCost - walletBalance).toLocaleString()}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleCloseOrderModal();
-                        onOpenWallet();
-                      }}
-                      className="underline hover:text-rose-700 cursor-pointer"
-                    >
-                      + Fund Wallet
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Order Error Notification */}
-              {orderError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2 animate-in fade-in">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                  <span>{orderError}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Actions (Coming Soon state) */}
-            <div className="space-y-3 pt-3 border-t border-[#F1F5F9]">
-              <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 text-xs font-bold flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#7C3AED] shrink-0" />
-                <span>Social Media Boosting is coming soon! Live order placement will open as soon as provider setup is finalized. Your wallet balance has not been charged.</span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2.5">
-                <div className="flex items-center gap-1.5 text-xs text-[#7C3AED] font-bold">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Coming Soon</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCloseOrderModal}
-                    className="px-4 py-2 border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#64748B] text-xs font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePlaceOrder}
-                    className="px-4 py-2 bg-purple-100 text-[#7C3AED] border border-purple-200 text-xs font-black rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-98"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Coming Soon</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================= ORDER SUCCESS MODAL ======================= */}
-      {orderSuccess && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl animate-in zoom-in-95">
-            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div>
-              <h3 className="text-lg font-black text-[#0F172A]">Order Successfully Placed!</h3>
-              <p className="text-xs text-[#64748B] mt-1">
-                Your boost request has been submitted to the provider and automated delivery will begin shortly.
-              </p>
-            </div>
-
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3.5 text-left text-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[#64748B]">Order ID:</span>
-                <span className="font-mono font-bold text-[#0F172A]">{orderSuccess.id}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#64748B]">Service:</span>
-                <span className="font-extrabold text-[#0F172A] truncate max-w-[200px]">{orderSuccess.serviceName}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#64748B]">Quantity:</span>
-                <span className="font-bold text-[#0F172A]">{(orderSuccess.quantity || 0).toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[#64748B]">Amount Paid:</span>
-                <span className="font-black text-[#7C3AED]">₦{(orderSuccess.charge || 0).toLocaleString()}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setOrderSuccess(null);
-                  setActiveSubTab('orders');
-                }}
-                className="w-full py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-black rounded-xl transition shadow-xs cursor-pointer"
-              >
-                Track in My Orders
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

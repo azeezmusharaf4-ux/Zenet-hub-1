@@ -29,6 +29,7 @@ import { auth, getSafeIdToken } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { sanitizeApiErrorMessage, isValidOtpCode, resolveCountryInfo, getNetlifyFunctionFallback } from '../utils/api';
 import { copyToClipboard } from '../utils/clipboard';
+import { ServiceLogo } from './ServiceLogo';
 
 export interface PriceOption {
   optionId: string;
@@ -122,6 +123,28 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
   const [settingsSaveSuccess, setSettingsSaveSuccess] = useState<string>('');
 
+  // Owner Price Management Section State
+  const [isPriceSectionOpen, setIsPriceSectionOpen] = useState<boolean>(false);
+  const [priceService, setPriceService] = useState<string>('');
+  const [priceCountry, setPriceCountry] = useState<string>('');
+  const [isPriceServiceDropdownOpen, setIsPriceServiceDropdownOpen] = useState<boolean>(false);
+  const [isPriceCountryDropdownOpen, setIsPriceCountryDropdownOpen] = useState<boolean>(false);
+  const [priceServiceSearchQuery, setPriceServiceSearchQuery] = useState<string>('');
+  const [priceCountrySearchQuery, setPriceCountrySearchQuery] = useState<string>('');
+  const priceServiceDropdownRef = useRef<HTMLDivElement>(null);
+  const priceCountryDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [priceSectionLoading, setPriceSectionLoading] = useState<boolean>(false);
+  const [priceSectionProviderCost, setPriceSectionProviderCost] = useState<number | null>(null);
+  const [priceSectionCurrentPrice, setPriceSectionCurrentPrice] = useState<number | null>(null);
+  const [priceSectionStock, setPriceSectionStock] = useState<number | null>(null);
+  const [priceSectionInputPrice, setPriceSectionInputPrice] = useState<number>(0);
+  const [priceSectionHasCustomPrice, setPriceSectionHasCustomPrice] = useState<boolean>(false);
+  const [priceSectionSaving, setPriceSectionSaving] = useState<boolean>(false);
+  const [priceSectionResetting, setPriceSectionResetting] = useState<boolean>(false);
+  const [priceSectionSuccessMsg, setPriceSectionSuccessMsg] = useState<string>('');
+  const [priceSectionErrorMsg, setPriceSectionErrorMsg] = useState<string>('');
+
   // Active Order info
   const [activeOrder, setActiveOrder] = useState<any>(null);
   const [pollingStatus, setPollingStatus] = useState<'WAITING' | 'RECEIVED' | 'CANCELLED'>('WAITING');
@@ -136,6 +159,15 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   const [apiConnectionError, setApiConnectionError] = useState<string>('');
   const [providerTopUpRequired, setProviderTopUpRequired] = useState<boolean>(false);
   const [providerBalanceInfo, setProviderBalanceInfo] = useState<any>(null);
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
+
+  // 1-second ticker for real-time 15-minute refund countdown
+  useEffect(() => {
+    const ticker = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(ticker);
+  }, []);
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,6 +180,12 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
       }
       if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target as Node)) {
         setIsCountryDropdownOpen(false);
+      }
+      if (priceServiceDropdownRef.current && !priceServiceDropdownRef.current.contains(event.target as Node)) {
+        setIsPriceServiceDropdownOpen(false);
+      }
+      if (priceCountryDropdownRef.current && !priceCountryDropdownRef.current.contains(event.target as Node)) {
+        setIsPriceCountryDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -439,7 +477,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         { headers }
       );
 
-      if (ok && data?.available) {
+      if (ok && (data?.available || data?.hasCustomPrice || Number(data?.effectiveSellingPrice || data?.customerPrice || data?.price) > 0)) {
+        const effectivePrice = Number(data.effectiveSellingPrice ?? data.customerPrice ?? data.totalPrice ?? data.price ?? 0);
         const rawOptions: any[] = Array.isArray(data.options) && data.options.length > 0
           ? data.options
           : [{
@@ -448,7 +487,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
               tierName: 'Standard Line',
               badge: 'Popular',
               description: 'Direct carrier routing',
-              customerPrice: Number(data.customerPrice || data.totalPrice || data.price || 0),
+              customerPrice: effectivePrice,
               providerCost: Number(data.providerCost || 0),
               markup: Number(data.markup || 0),
               profit: Number(data.profit || data.markup || 0)
@@ -460,7 +499,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
           tierName: opt.tierName || `Option ${i + 1}`,
           badge: opt.badge,
           description: opt.description,
-          customerPrice: Number(opt.customerPrice || data.customerPrice || 0),
+          customerPrice: Number(opt.customerPrice || effectivePrice),
           providerCost: opt.providerCost !== undefined ? Number(opt.providerCost) : undefined,
           markup: opt.markup !== undefined ? Number(opt.markup) : undefined,
           profit: opt.profit !== undefined ? Number(opt.profit) : undefined,
@@ -475,8 +514,17 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         const actualStock = Number(data.availableStock ?? data.stock ?? 0);
         setAvailableStock(isNaN(actualStock) || actualStock < 0 ? 0 : actualStock);
         setSuccessRate(Number(data.successRate ?? 0.9));
-        setIsPriceAvailable(true);
-        setPriceErrorMessage('');
+        const inStock = Boolean(data.available && actualStock > 0);
+        setIsPriceAvailable(inStock);
+
+        if (!inStock) {
+          const serviceName = getServiceDisplayName(serviceToUse);
+          const countryObj = countries.find(c => c.id === countryToUse || c.code === countryToUse);
+          const countryLabel = countryObj?.name || (data?.resolvedCountryName) || 'this country';
+          setPriceErrorMessage(`No numbers currently in stock for ${serviceName} in ${countryLabel}. Saved selling price is ₦${effectivePrice.toLocaleString()}.`);
+        } else {
+          setPriceErrorMessage('');
+        }
 
         if (data.isCheapest && data.resolvedCountry) {
           setResolvedCheapestCountry({
@@ -490,7 +538,11 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         setIsPriceAvailable(false);
         setPriceOptions([]);
         setCalculatedPrice(0);
-        setPriceErrorMessage(sanitizeApiErrorMessage(data?.error, 'No numbers currently available for this service and country. Try selecting Cheapest available or another country.'));
+        const serviceName = getServiceDisplayName(serviceToUse);
+        const countryObj = countries.find(c => c.id === countryToUse || c.code === countryToUse);
+        const countryLabel = countryObj?.name || (data?.resolvedCountryName) || 'this country';
+        const dynamicMsg = `No numbers currently in stock for ${serviceName} in ${countryLabel}. Try selecting Cheapest available or another country (e.g. United States, United Kingdom, Poland) which have numbers in stock.`;
+        setPriceErrorMessage(sanitizeApiErrorMessage(data?.error, dynamicMsg));
       }
     } catch (err: any) {
       console.error('Failed to get price options:', err);
@@ -513,6 +565,188 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
       setPriceErrorMessage('');
     }
   }, [selectedService, selectedCountry]);
+
+  // Owner Price Management Data Fetcher
+  const fetchPriceManagementData = async (serviceToFetch = priceService, countryToFetch = priceCountry) => {
+    if (!serviceToFetch || !countryToFetch) {
+      setPriceSectionProviderCost(null);
+      setPriceSectionCurrentPrice(null);
+      setPriceSectionInputPrice(0);
+      setPriceSectionHasCustomPrice(false);
+      setPriceSectionErrorMsg('');
+      return;
+    }
+
+    setPriceSectionLoading(true);
+    setPriceSectionErrorMsg('');
+    setPriceSectionSuccessMsg('');
+
+    try {
+      const headers = await getAuthHeaders();
+      const callerEmail = (userProfile?.email || auth?.currentUser?.email || '').toLowerCase().trim();
+      if (callerEmail) {
+        headers['x-caller-email'] = callerEmail;
+      }
+
+      const { ok, data } = await safeFetchJson(
+        `/api/onegridhub/price?action=price&country=${encodeURIComponent(countryToFetch)}&service=${encodeURIComponent(serviceToFetch)}&callerEmail=${encodeURIComponent(callerEmail)}`,
+        { headers }
+      );
+
+      if (ok && data) {
+        const providerCost = Number(data.providerCost ?? 0);
+        const customerPrice = Number(data.effectiveSellingPrice ?? data.customerPrice ?? data.price ?? providerCost);
+        const actualStock = Number(data.availableStock ?? data.stock ?? 0);
+        setPriceSectionStock(isNaN(actualStock) ? 0 : actualStock);
+        setPriceSectionProviderCost(providerCost);
+        setPriceSectionCurrentPrice(customerPrice);
+        setPriceSectionInputPrice(customerPrice > 0 ? customerPrice : providerCost);
+        setPriceSectionHasCustomPrice(Boolean(data.hasCustomPrice));
+      } else {
+        setPriceSectionStock(null);
+        setPriceSectionProviderCost(null);
+        setPriceSectionCurrentPrice(null);
+        setPriceSectionErrorMsg(sanitizeApiErrorMessage(data?.error, 'Could not retrieve pricing details for this selection.'));
+      }
+    } catch (err: any) {
+      setPriceSectionStock(null);
+      setPriceSectionProviderCost(null);
+      setPriceSectionCurrentPrice(null);
+      setPriceSectionErrorMsg(sanitizeApiErrorMessage(err?.message, 'Failed to connect to provider.'));
+    } finally {
+      setPriceSectionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOwner && priceService && priceCountry) {
+      fetchPriceManagementData(priceService, priceCountry);
+    } else {
+      setPriceSectionStock(null);
+      setPriceSectionProviderCost(null);
+      setPriceSectionCurrentPrice(null);
+      setPriceSectionInputPrice(0);
+      setPriceSectionHasCustomPrice(false);
+      setPriceSectionErrorMsg('');
+      setPriceSectionSuccessMsg('');
+    }
+  }, [priceService, priceCountry, isOwner]);
+
+  const handleSaveCustomPrice = async () => {
+    if (!priceService || !priceCountry) return;
+
+    const providerCost = priceSectionProviderCost ?? 0;
+    const numPrice = Math.round(Number(priceSectionInputPrice) || 0);
+
+    if (numPrice <= 0) {
+      setPriceSectionErrorMsg('Please enter a valid selling price greater than 0.');
+      return;
+    }
+
+    // Strict minimum price restriction enforcement:
+    if (providerCost > 0 && numPrice < providerCost) {
+      setPriceSectionErrorMsg(`Selling price (₦${numPrice.toLocaleString()}) cannot be lower than the provider cost of ₦${providerCost.toLocaleString()}.`);
+      return;
+    }
+
+    setPriceSectionSaving(true);
+    setPriceSectionErrorMsg('');
+    setPriceSectionSuccessMsg('');
+
+    try {
+      const headers = await getAuthHeaders();
+      const callerEmail = (userProfile?.email || auth?.currentUser?.email || '').toLowerCase().trim();
+      if (callerEmail) {
+        headers['x-caller-email'] = callerEmail;
+      }
+
+      const matchedService = services.find(s => s.slug === priceService || s.id === priceService || (s as any).code === priceService);
+      const matchedCountry = countries.find(c => c.id === priceCountry || c.code === priceCountry);
+      const canonicalCountry = (matchedCountry?.id || priceCountry).toUpperCase();
+
+      const { ok, data } = await safeFetchJson('/api/onegridhub/set-custom-price', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'set-custom-price',
+          service: matchedService?.slug || priceService,
+          serviceName: matchedService?.name || priceService,
+          serviceId: matchedService?.id || '',
+          serviceSlug: matchedService?.slug || priceService,
+          country: canonicalCountry,
+          countryName: matchedCountry?.name || canonicalCountry,
+          countryId: canonicalCountry,
+          countryCode: canonicalCountry,
+          providerCost: providerCost,
+          sellingPrice: numPrice,
+          profit: Math.max(0, numPrice - providerCost),
+          callerEmail
+        })
+      });
+
+      if (ok && data?.success) {
+        setPriceSectionSuccessMsg(data.message || `Selling price successfully saved at ₦${numPrice.toLocaleString()}.`);
+        setPriceSectionCurrentPrice(numPrice);
+        setPriceSectionHasCustomPrice(true);
+        if (selectedService === priceService && (selectedCountry === priceCountry || selectedCountry === canonicalCountry || selectedCountry === 'cheapest')) {
+          fetchPrice(selectedService, selectedCountry);
+        }
+      } else {
+        setPriceSectionErrorMsg(data?.error || 'Failed to save selling price.');
+      }
+    } catch (err: any) {
+      setPriceSectionErrorMsg(err?.message || 'Network error while saving selling price.');
+    } finally {
+      setPriceSectionSaving(false);
+    }
+  };
+
+  const handleResetCustomPrice = async () => {
+    if (!priceService || !priceCountry) return;
+    setPriceSectionResetting(true);
+    setPriceSectionErrorMsg('');
+    setPriceSectionSuccessMsg('');
+
+    try {
+      const headers = await getAuthHeaders();
+      const callerEmail = (userProfile?.email || auth?.currentUser?.email || '').toLowerCase().trim();
+      if (callerEmail) {
+        headers['x-caller-email'] = callerEmail;
+      }
+
+      const matchedService = services.find(s => s.slug === priceService || s.id === priceService || (s as any).code === priceService);
+      const matchedCountry = countries.find(c => c.id === priceCountry || c.code === priceCountry);
+      const canonicalCountry = (matchedCountry?.id || priceCountry).toUpperCase();
+
+      const { ok, data } = await safeFetchJson('/api/onegridhub/reset-custom-price', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          action: 'reset-custom-price',
+          service: matchedService?.slug || priceService,
+          country: canonicalCountry,
+          callerEmail
+        })
+      });
+
+      if (ok && data?.success) {
+        const cost = priceSectionProviderCost || 0;
+        setPriceSectionSuccessMsg(`Custom price reset. Selling price is now provider cost (₦${cost.toLocaleString()}).`);
+        setPriceSectionCurrentPrice(cost);
+        setPriceSectionInputPrice(cost);
+        setPriceSectionHasCustomPrice(false);
+        if (selectedService === priceService && (selectedCountry === priceCountry || selectedCountry === canonicalCountry || selectedCountry === 'cheapest')) {
+          fetchPrice(selectedService, selectedCountry);
+        }
+      } else {
+        setPriceSectionErrorMsg(data?.error || 'Failed to reset custom price.');
+      }
+    } catch (err: any) {
+      setPriceSectionErrorMsg(err?.message || 'Network error while resetting price.');
+    } finally {
+      setPriceSectionResetting(false);
+    }
+  };
 
   // 3. Orders History Fetcher
   const fetchOrders = async () => {
@@ -576,7 +810,8 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
       setVerificationCode('');
       setSmsContent('');
       setElapsedSeconds(0);
-      setInfoMessage(`Allocated +${newOrder.phoneNumber || ''}! Waiting for SMS code (up to 20 mins).`);
+      const cleanFormattedPhone = String(newOrder.phoneNumber || '').replace(/[^\d]/g, '');
+      setInfoMessage(`Allocated +${cleanFormattedPhone}! Waiting for SMS code (up to 20 mins).`);
 
       startSmsPolling(newOrder.orderId || newOrder.id);
       if (onRefreshProfile) onRefreshProfile();
@@ -756,6 +991,36 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
   const selectedCountryObj = countries.find(c => c.id === selectedCountry || c.code === selectedCountry);
   const selectedServiceObj = services.find(s => s.id === selectedService || s.slug === selectedService);
 
+  const filteredPriceServices = useMemo(() => {
+    const q = priceServiceSearchQuery.toLowerCase().trim();
+    if (!q) {
+      return services;
+    }
+    return services.filter(s => {
+      const name = (s.name || '').toLowerCase();
+      const id = (s.id || '').toLowerCase();
+      const slug = (s.slug || '').toLowerCase();
+      const display = getServiceDisplayName(s.id, s.name).toLowerCase();
+      return name.includes(q) || id.includes(q) || slug.includes(q) || display.includes(q);
+    });
+  }, [services, priceServiceSearchQuery]);
+
+  const filteredPriceCountries = useMemo(() => {
+    const q = priceCountrySearchQuery.toLowerCase().trim();
+    if (!q) {
+      return countries;
+    }
+    return countries.filter(c => {
+      const name = (c.name || '').toLowerCase();
+      const id = (c.id || '').toLowerCase();
+      const code = (c.code || '').toLowerCase();
+      return name.includes(q) || id.includes(q) || code.includes(q);
+    });
+  }, [countries, priceCountrySearchQuery]);
+
+  const selectedPriceCountryObj = countries.find(c => c.id === priceCountry || c.code === priceCountry);
+  const selectedPriceServiceObj = services.find(s => s.id === priceService || s.slug === priceService);
+
   const formatTime = (seconds: number) => {
     const min = Math.floor(seconds / 60);
     const sec = seconds % 60;
@@ -772,16 +1037,37 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
     }
   };
 
+  const formatPhoneNumber = (phone: string | number | null | undefined): string => {
+    if (!phone) return '';
+    const digits = String(phone).replace(/[^\d]/g, '');
+    return digits ? `+${digits}` : '';
+  };
+
+  const getRefundCountdown = (order: any) => {
+    if (order.status !== 'WAITING' || order.code || order.refunded) {
+      return { eligible: false, remainingSeconds: 0, text: '' };
+    }
+    const createdMs = order.createdAtMs || (order.createdAt ? new Date(order.createdAt).getTime() : 0);
+    const availableMs = order.refundAvailableAtMs || (createdMs ? createdMs + 15 * 60 * 1000 : 0);
+    const diffMs = Math.max(0, availableMs - currentTime);
+    const remainingSec = Math.ceil(diffMs / 1000);
+    const eligible = remainingSec === 0;
+    const mins = Math.floor(remainingSec / 60);
+    const secs = remainingSec % 60;
+    const text = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    return { eligible, remainingSeconds: remainingSec, text };
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
       
       {/* 1. TOP HEADER & WALLET BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-3xl border border-[#E9E2FA] shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-3xl border border-[#E9E2FA] shadow-xs zenet-card-enter">
         <div className="flex items-center space-x-3">
           <button
             type="button"
             onClick={onBackToMarketplace}
-            className="w-10 h-10 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] rounded-2xl transition cursor-pointer border border-[#E9E2FA] flex items-center justify-center shrink-0 active:scale-95 shadow-2xs"
+            className="w-10 h-10 bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] rounded-2xl transition cursor-pointer border border-[#E9E2FA] flex items-center justify-center shrink-0 active:scale-95 shadow-2xs zenet-btn-interactive"
             title="Back to Marketplace"
           >
             <ArrowLeft className="w-5 h-5 text-[#171329]" />
@@ -804,7 +1090,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
         {/* Wallet Balance & Action */}
         <div className="flex items-center space-x-3 self-end sm:self-auto">
-          <div className="flex items-center space-x-2 bg-[#FAF8FE] border border-[#E9E2FA] px-3.5 py-1.5 rounded-2xl">
+          <div className="flex items-center space-x-2 bg-[#FAF8FE] border border-[#E9E2FA] px-3.5 py-1.5 rounded-2xl zenet-card-interactive">
             <span className="text-xs font-medium text-[#64748B]">Balance:</span>
             <span className="text-sm font-black text-[#6D28D9]">
               ₦{Number(walletBalance || 0).toLocaleString()}
@@ -817,6 +1103,20 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => setIsPriceSectionOpen(prev => !prev)}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-2xl border transition cursor-pointer ${
+                isPriceSectionOpen 
+                  ? 'bg-[#6D28D9] text-white border-[#6D28D9] shadow-xs' 
+                  : 'bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#6D28D9] hover:text-[#5B21B6] border-[#E9E2FA]'
+              }`}
+            >
+              Price
+            </button>
+          )}
 
           {isOwner && (
             <button
@@ -871,6 +1171,499 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
         </div>
       )}
 
+      {/* OWNER PRICE MANAGEMENT SECTION (UNDER THE NOTIFICATION) */}
+      {isOwner && isPriceSectionOpen && (
+        <div className="bg-white border-2 border-[#6D28D9]/25 rounded-3xl p-5 sm:p-6 shadow-xl space-y-5 max-h-[85vh] sm:max-h-[680px] overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
+          
+          {/* Section Header */}
+          <div className="flex items-center justify-between border-b border-[#E9E2FA] pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-2xl bg-[#FAF8FE] border border-[#E9E2FA] flex items-center justify-center text-[#6D28D9] font-black text-base shadow-2xs">
+                ₦
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-base sm:text-lg font-black text-[#171329] tracking-tight">
+                    Price Management
+                  </h3>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#EDE9FE] text-[#6D28D9] border border-[#DDD6FE]">
+                    Owner Only
+                  </span>
+                </div>
+                <p className="text-xs text-[#64748B] mt-0.5">
+                  Select a service &amp; country to view VirtualSMS provider price and manage your selling price.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPriceSectionOpen(false)}
+              className="p-2 text-[#64748B] hover:text-[#171329] hover:bg-[#FAF8FE] rounded-xl border border-[#E9E2FA] transition cursor-pointer"
+              title="Close Price Management"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Searchable Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            {/* Field 1: Select service */}
+            <div className="space-y-1.5" ref={priceServiceDropdownRef}>
+              <label className="text-xs font-bold text-[#171329] block">
+                Select service
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPriceServiceDropdownOpen(prev => !prev);
+                    setIsPriceCountryDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between bg-[#FAF8FE] hover:bg-[#F3F0FA] border border-[#E9E2FA] p-3 rounded-2xl text-left transition cursor-pointer shadow-2xs group"
+                >
+                  <div className="flex items-center space-x-2.5 truncate">
+                    {priceService ? (
+                      <>
+                        <ServiceLogo
+                          serviceId={priceService}
+                          serviceName={selectedPriceServiceObj?.name}
+                          category={selectedPriceServiceObj?.category}
+                          size="md"
+                        />
+                        <span className="text-xs sm:text-sm font-bold text-[#171329] truncate">
+                          {getServiceDisplayName(priceService, selectedPriceServiceObj?.name)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-7 h-7 rounded-lg bg-white border border-[#E9E2FA] flex items-center justify-center text-xs font-bold text-[#64748B] shadow-2xs shrink-0">
+                          #
+                        </div>
+                        <span className="text-xs sm:text-sm font-semibold text-[#64748B] truncate">
+                          Select service
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#64748B] shrink-0 transition-transform ${isPriceServiceDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Dropdown Menu */}
+                {isPriceServiceDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-[#E9E2FA] rounded-2xl shadow-xl z-50 p-2.5 space-y-2 animate-in fade-in zoom-in-95">
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={priceServiceSearchQuery}
+                        onChange={(e) => setPriceServiceSearchQuery(e.target.value)}
+                        placeholder="Search service..."
+                        className="w-full pl-9 pr-8 py-2 bg-[#FAF8FE] border border-[#E9E2FA] rounded-xl text-xs font-medium text-[#171329] focus:outline-none focus:border-[#6D28D9]"
+                        autoFocus
+                      />
+                      {priceServiceSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setPriceServiceSearchQuery('')}
+                          className="absolute right-2.5 top-2.5 text-xs text-[#64748B] hover:text-[#171329]"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                      {filteredPriceServices.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-[#64748B]">
+                          No services found matching &quot;{priceServiceSearchQuery}&quot;
+                        </div>
+                      ) : (
+                        filteredPriceServices.map(s => {
+                          const serviceKey = (s as any).slug || s.id;
+                          const isSelected = priceService === serviceKey;
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setPriceService(serviceKey);
+                                setIsPriceServiceDropdownOpen(false);
+                                setPriceServiceSearchQuery('');
+                              }}
+                              className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition cursor-pointer ${
+                                isSelected ? 'bg-[#FAF8FE] text-[#6D28D9] font-bold border border-[#E9E2FA]' : 'hover:bg-[#FAF8FE] text-[#171329]'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2.5 truncate">
+                                <ServiceLogo
+                                  serviceId={s.id}
+                                  serviceName={s.name}
+                                  category={s.category}
+                                  size="sm"
+                                />
+                                <span className="truncate">{getServiceDisplayName(s.id, s.name)}</span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-[#6D28D9] shrink-0" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Field 2: 🌐 Select country */}
+            <div className="space-y-1.5" ref={priceCountryDropdownRef}>
+              <label className="text-xs font-bold text-[#171329] block">
+                🌐 Select country
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPriceCountryDropdownOpen(prev => !prev);
+                    setIsPriceServiceDropdownOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between bg-[#FAF8FE] hover:bg-[#F3F0FA] border border-[#E9E2FA] p-3 rounded-2xl text-left transition cursor-pointer shadow-2xs group"
+                >
+                  <div className="flex items-center space-x-2.5 truncate">
+                    {priceCountry ? (
+                      <>
+                        <span className="text-lg shrink-0">
+                          {getCountryFlagEmoji(priceCountry)}
+                        </span>
+                        <span className="text-xs sm:text-sm font-bold text-[#171329] truncate">
+                          {selectedPriceCountryObj?.name || priceCountry}
+                        </span>
+                        <span className="text-xs text-[#64748B] font-mono">
+                          {getCountryDialCode(priceCountry, selectedPriceCountryObj?.name, selectedPriceCountryObj?.code)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-7 h-7 rounded-lg bg-white border border-[#E9E2FA] flex items-center justify-center text-base shadow-2xs shrink-0">
+                          🌐
+                        </div>
+                        <span className="text-xs sm:text-sm font-semibold text-[#64748B] truncate">
+                          🌐 Select country
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#64748B] shrink-0 transition-transform ${isPriceCountryDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Dropdown Menu */}
+                {isPriceCountryDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-[#E9E2FA] rounded-2xl shadow-xl z-50 p-2.5 space-y-2 animate-in fade-in zoom-in-95">
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={priceCountrySearchQuery}
+                        onChange={(e) => setPriceCountrySearchQuery(e.target.value)}
+                        placeholder="Search country or dial code..."
+                        className="w-full pl-9 pr-8 py-2 bg-[#FAF8FE] border border-[#E9E2FA] rounded-xl text-xs font-medium text-[#171329] focus:outline-none focus:border-[#6D28D9]"
+                        autoFocus
+                      />
+                      {priceCountrySearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setPriceCountrySearchQuery('')}
+                          className="absolute right-2.5 top-2.5 text-xs text-[#64748B] hover:text-[#171329]"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                      {filteredPriceCountries.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-[#64748B]">
+                          No countries found matching &quot;{priceCountrySearchQuery}&quot;
+                        </div>
+                      ) : (
+                        filteredPriceCountries.map(c => {
+                          const isSelected = priceCountry === c.id;
+                          const flag = c.flag || getCountryFlagEmoji(c.code || c.id);
+                          const dial = getCountryDialCode(c.id, c.name, c.code);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setPriceCountry(c.id);
+                                setIsPriceCountryDropdownOpen(false);
+                                setPriceCountrySearchQuery('');
+                              }}
+                              className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition cursor-pointer ${
+                                isSelected ? 'bg-[#FAF8FE] text-[#6D28D9] font-bold border border-[#E9E2FA]' : 'hover:bg-[#FAF8FE] text-[#171329]'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2 truncate">
+                                <span className="text-base shrink-0">{flag}</span>
+                                <span className="truncate">{c.name}</span>
+                                {dial && <span className="text-[10px] text-[#64748B] font-mono shrink-0">({dial})</span>}
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-[#6D28D9] shrink-0" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* PRICING DETAILS & ADJUSTMENT */}
+          {(!priceService || !priceCountry) ? (
+            <div className="p-4 bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl text-center text-xs text-[#64748B]">
+              Please select both a service and country above to view the provider&apos;s price and set your selling price.
+            </div>
+          ) : priceSectionLoading ? (
+            <div className="p-6 bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl flex flex-col items-center justify-center space-y-2">
+              <Loader2 className="w-6 h-6 animate-spin text-[#6D28D9]" />
+              <p className="text-xs font-bold text-[#171329]">Loading price from VirtualSMSNumbers...</p>
+            </div>
+          ) : priceSectionProviderCost !== null ? (
+            <div className="bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl p-4 sm:p-5 space-y-4">
+              
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Provider Price Card */}
+                <div className="bg-white border border-[#E9E2FA] rounded-xl p-3.5 shadow-2xs">
+                  <div className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
+                    Provider&apos;s Price (VirtualSMS)
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-[#171329] mt-1">
+                    ₦{priceSectionProviderCost.toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-[#64748B] mt-1">
+                    {priceSectionProviderCost > 0
+                      ? 'Minimum allowable selling price. VirtualSMS charges this exact cost.'
+                      : 'Provider stock is currently 0. Minimum restriction applies when stock arrives.'}
+                  </p>
+                </div>
+
+                {/* Current Selling Price Card */}
+                <div className="bg-white border border-[#E9E2FA] rounded-xl p-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
+                      Current Selling Price
+                    </span>
+                    {priceSectionHasCustomPrice && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Custom
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl sm:text-2xl font-black text-[#6D28D9] mt-1">
+                    ₦{(priceSectionCurrentPrice ?? priceSectionProviderCost).toLocaleString()}
+                  </div>
+                  <p className="text-[10px] text-[#64748B] mt-1">
+                    What customers currently pay for this selection.
+                  </p>
+                </div>
+
+                {/* Provider Stock Card */}
+                <div className="bg-white border border-[#E9E2FA] rounded-xl p-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
+                      Provider Stock
+                    </span>
+                    {priceSectionStock !== null && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        priceSectionStock > 0
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}>
+                        {priceSectionStock > 0 ? 'In Stock' : 'Out of Stock'}
+                      </span>
+                    )}
+                  </div>
+                  <div className={`text-xl sm:text-2xl font-black mt-1 ${
+                    (priceSectionStock ?? 0) > 0 ? 'text-emerald-700' : 'text-rose-600'
+                  }`}>
+                    {priceSectionStock !== null ? `${priceSectionStock.toLocaleString()} numbers` : 'Checking...'}
+                  </div>
+                  <p className="text-[10px] text-[#64748B] mt-1">
+                    {(priceSectionStock ?? 0) > 0
+                      ? 'Live available inventory from VirtualSMS.'
+                      : 'Currently 0 stock from provider. Your saved price applies when stock arrives.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Set or Increase/Decrease Selling Price */}
+              <div className="bg-white border border-[#E9E2FA] rounded-xl p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-[#171329]">
+                    Set Your Selling Price (₦)
+                  </label>
+                  <div className="text-xs font-bold text-emerald-700">
+                    Profit: ₦{Math.max(0, (priceSectionInputPrice || 0) - priceSectionProviderCost).toLocaleString()}
+                  </div>
+                </div>
+
+                {/* Stepper Input */}
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriceSectionInputPrice(prev => Math.max(priceSectionProviderCost, (prev || priceSectionProviderCost) - 50));
+                    }}
+                    disabled={priceSectionInputPrice <= priceSectionProviderCost}
+                    className="w-10 h-10 rounded-xl bg-[#FAF8FE] hover:bg-[#EDE9FE] disabled:opacity-40 disabled:hover:bg-[#FAF8FE] border border-[#E9E2FA] flex items-center justify-center font-black text-lg text-[#171329] transition cursor-pointer shrink-0"
+                    title="Decrease price by ₦50"
+                  >
+                    -
+                  </button>
+
+                  <div className="relative flex-1">
+                    <span className="absolute left-3.5 top-2.5 text-sm font-black text-[#64748B]">₦</span>
+                    <input
+                      type="number"
+                      min={priceSectionProviderCost}
+                      step="1"
+                      value={priceSectionInputPrice || ''}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setPriceSectionInputPrice(isNaN(val) ? 0 : val);
+                      }}
+                      className="w-full pl-8 pr-3 py-2 bg-[#FAF8FE] border border-[#E9E2FA] rounded-xl text-sm font-black text-[#171329] focus:outline-none focus:border-[#6D28D9]"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriceSectionInputPrice(prev => (prev || priceSectionProviderCost) + 50);
+                    }}
+                    className="w-10 h-10 rounded-xl bg-[#FAF8FE] hover:bg-[#EDE9FE] border border-[#E9E2FA] flex items-center justify-center font-black text-lg text-[#171329] transition cursor-pointer shrink-0"
+                    title="Increase price by ₦50"
+                  >
+                    +
+                  </button>
+                </div>
+
+                {/* Quick step increment/decrement chips */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPriceSectionInputPrice(priceSectionProviderCost)}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#6D28D9] border border-[#E9E2FA] rounded-lg transition cursor-pointer"
+                  >
+                    Minimum (₦{priceSectionProviderCost.toLocaleString()})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriceSectionInputPrice(prev => (prev || priceSectionProviderCost) + 50)}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] border border-[#E9E2FA] rounded-lg transition cursor-pointer"
+                  >
+                    +₦50
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriceSectionInputPrice(prev => (prev || priceSectionProviderCost) + 100)}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] border border-[#E9E2FA] rounded-lg transition cursor-pointer"
+                  >
+                    +₦100
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriceSectionInputPrice(prev => (prev || priceSectionProviderCost) + 200)}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] border border-[#E9E2FA] rounded-lg transition cursor-pointer"
+                  >
+                    +₦200
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriceSectionInputPrice(prev => (prev || priceSectionProviderCost) + 500)}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] border border-[#E9E2FA] rounded-lg transition cursor-pointer"
+                  >
+                    +₦500
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriceSectionInputPrice(prev => (prev || priceSectionProviderCost) + 1000)}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-[#FAF8FE] hover:bg-[#EDE9FE] text-[#171329] border border-[#E9E2FA] rounded-lg transition cursor-pointer"
+                  >
+                    +₦1,000
+                  </button>
+                </div>
+
+                {/* Minimum Price Restriction Warning */}
+                {priceSectionProviderCost !== null && priceSectionProviderCost > 0 && priceSectionInputPrice < priceSectionProviderCost && (
+                  <div className="flex items-center space-x-2 text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-xl text-xs font-bold animate-in fade-in">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>
+                      Selling price cannot be below the provider&apos;s price of ₦{priceSectionProviderCost.toLocaleString()}.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Success / Error Messages */}
+              {priceSectionSuccessMsg && (
+                <div className="flex items-center space-x-2 text-emerald-800 bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs font-bold animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{priceSectionSuccessMsg}</span>
+                </div>
+              )}
+              {priceSectionErrorMsg && (
+                <div className="flex items-center space-x-2 text-rose-800 bg-rose-50 border border-rose-200 p-3 rounded-xl text-xs font-bold animate-in fade-in">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{priceSectionErrorMsg}</span>
+                </div>
+              )}
+
+              {/* Actions Footer */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                {priceSectionHasCustomPrice ? (
+                  <button
+                    type="button"
+                    disabled={priceSectionResetting || priceSectionSaving}
+                    onClick={handleResetCustomPrice}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center space-x-1"
+                  >
+                    {priceSectionResetting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    <span>Reset to Provider Cost</span>
+                  </button>
+                ) : <div />}
+
+                <button
+                  type="button"
+                  disabled={priceSectionSaving || priceSectionResetting || (priceSectionProviderCost !== null && priceSectionProviderCost > 0 && priceSectionInputPrice < priceSectionProviderCost)}
+                  onClick={handleSaveCustomPrice}
+                  className="px-5 py-2.5 bg-[#6D28D9] hover:bg-[#5B21B6] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition cursor-pointer flex items-center justify-center space-x-2 shadow-xs"
+                >
+                  {priceSectionSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving Price...</span>
+                    </>
+                  ) : (
+                    <span>Save Price</span>
+                  )}
+                </button>
+              </div>
+
+            </div>
+          ) : (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 font-bold">
+              {priceSectionErrorMsg || 'Could not load pricing details for this selection.'}
+            </div>
+          )}
+
+        </div>
+      )}
+
       {/* 2. MAIN DASHBOARD: QUICK BUY AT TOP, NUMBER HISTORY UNDERNEATH */}
       <div className="space-y-6">
         
@@ -912,9 +1705,12 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   <div className="flex items-center space-x-2.5 truncate">
                     {selectedService ? (
                       <>
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${getServiceColor(selectedService)} shadow-2xs`}>
-                          {getServiceBadgeInitial(selectedService)}
-                        </div>
+                        <ServiceLogo
+                          serviceId={selectedService}
+                          serviceName={selectedServiceObj?.name}
+                          category={selectedServiceObj?.category}
+                          size="md"
+                        />
                         <span className="text-xs sm:text-sm font-bold text-[#171329] truncate">
                           {getServiceDisplayName(selectedService, selectedServiceObj?.name)}
                         </span>
@@ -979,10 +1775,13 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                                 isSelected ? 'bg-[#FAF8FE] text-[#6D28D9] font-bold border border-[#E9E2FA]' : 'hover:bg-[#FAF8FE] text-[#171329]'
                               }`}
                             >
-                              <div className="flex items-center space-x-2 truncate">
-                                <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 ${getServiceColor(s.id)}`}>
-                                  {getServiceBadgeInitial(s.id)}
-                                </div>
+                              <div className="flex items-center space-x-2.5 truncate">
+                                <ServiceLogo
+                                  serviceId={s.id}
+                                  serviceName={s.name}
+                                  category={s.category}
+                                  size="sm"
+                                />
                                 <span className="truncate">{getServiceDisplayName(s.id, s.name)}</span>
                               </div>
                               {isSelected && <Check className="w-4 h-4 text-[#6D28D9] shrink-0" />}
@@ -1298,6 +2097,24 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
 
         </div>
 
+        {/* SECURITY & REFUND POLICY NOTICE */}
+        <div className="bg-[#FAF8FE] border border-[#E9E2FA] rounded-3xl p-5 sm:p-6 shadow-xs space-y-3">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-[#6D28D9] shrink-0">
+              <ShieldCheck className="w-4 h-4 text-[#6D28D9]" />
+            </div>
+            <h4 className="text-xs font-black text-[#171329] uppercase tracking-wider">
+              SECURITY &amp; REFUND POLICY
+            </h4>
+          </div>
+          <ul className="text-xs text-[#64748B] space-y-1.5 list-disc list-inside font-medium leading-relaxed pl-1">
+            <li>Refund requests become available after 15 minutes, subject to provider verification.</li>
+            <li>Activations that have received an OTP are not refundable.</li>
+            <li>Refunds are processed only after successful provider cancellation and eligibility verification.</li>
+            <li>Never share your OTP with anyone.</li>
+          </ul>
+        </div>
+
         {/* ORDERS HISTORY / NUMBER HISTORY SECTION (MOVED BELOW QUICK BUY) */}
         <div className="space-y-6">
           
@@ -1338,20 +2155,32 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                   const hasValidCode = isValidOtpCode(o.code);
                   const isCompleted = hasValidCode || o.status === 'COMPLETED';
                   const isCancelled = o.status === 'CANCELLED' || o.status === 'cancelled' || o.status === 'EXPIRED' || o.status === 'expired';
+                  const displayPhone = formatPhoneNumber(o.phoneNumber);
+                  const activationId = o.providerOrderId || o.providerActivationId;
 
                   return (
                     <div
                       key={o.orderId || o.id}
                       className="bg-[#FAF8FE] border border-[#E9E2FA] rounded-2xl p-4 space-y-3 transition hover:border-[#6D28D9]/40"
                     >
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center justify-between text-xs gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ServiceLogo
+                            serviceId={o.serviceSlug || o.service}
+                            serviceName={o.serviceName}
+                            size="xs"
+                          />
                           <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full text-white bg-[#6D28D9] uppercase tracking-wider">
                             {getServiceDisplayName(o.serviceSlug || o.service)}
                           </span>
                           <span className="font-semibold text-[#171329]">
                             {getCountryFlagEmoji(o.country)} {o.country}
                           </span>
+                          {activationId && (
+                            <span className="text-[10px] font-mono text-[#64748B] bg-white border border-[#E9E2FA] px-1.5 py-0.5 rounded">
+                              ID: {activationId}
+                            </span>
+                          )}
                         </div>
                         <span className="text-[11px] text-[#64748B]">
                           {formatDateSimple(o.createdAt)}
@@ -1361,11 +2190,11 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                       {/* Number & Copy Row */}
                       <div className="flex items-center justify-between bg-white border border-[#E9E2FA] p-3 rounded-xl">
                         <span className="text-base font-black text-[#6D28D9] font-mono tracking-wider">
-                          +{o.phoneNumber}
+                          {displayPhone}
                         </span>
                         <button
                           type="button"
-                          onClick={() => handleCopy(o.phoneNumber, o.orderId || o.id)}
+                          onClick={() => handleCopy(displayPhone, o.orderId || o.id)}
                           className="flex items-center space-x-1 px-2.5 py-1 bg-[#FAF8FE] hover:bg-[#EDE9FE] border border-[#E9E2FA] text-[#171329] rounded-lg text-xs font-bold transition cursor-pointer"
                         >
                           {copiedText === (o.orderId || o.id) ? (
@@ -1383,7 +2212,7 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                       </div>
 
                       {/* Status and OTP */}
-                      <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E9E2FA]">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-[#E9E2FA]">
                         <div>
                           {hasValidCode ? (
                             <div className="flex items-center space-x-2">
@@ -1392,11 +2221,12 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                                 {o.code}
                               </span>
                               <button
+                                type="button"
                                 onClick={() => handleCopy(o.code, `${o.orderId || o.id}-code`)}
                                 className="text-emerald-700 hover:text-emerald-900 cursor-pointer"
                                 title="Copy OTP"
                               >
-                                {copiedText === `${o.orderId || o.id}-code` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                {copiedText === `${o.orderId || o.id}-code` ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                               </button>
                             </div>
                           ) : isCancelled ? (
@@ -1404,19 +2234,38 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                               REFUNDED / EXPIRED
                             </span>
                           ) : (
-                            <div className="flex items-center space-x-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 animate-pulse">
                                 WAITING FOR OTP
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => handleCancelOrder(o)}
-                                disabled={cancellingLoading}
-                                className="text-[10px] text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 font-bold px-2 py-0.5 rounded cursor-pointer transition"
-                                title="Cancel order and refund to wallet"
-                              >
-                                Cancel & Refund
-                              </button>
+                              {(() => {
+                                const { eligible, text } = getRefundCountdown(o);
+                                if (!eligible) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled
+                                      className="text-[10px] text-gray-500 bg-gray-100 border border-gray-200 font-bold px-2.5 py-1 rounded-lg cursor-not-allowed flex items-center space-x-1"
+                                      title={`Refund unlocks after 15 minutes of carrier waiting. Remaining: ${text}`}
+                                    >
+                                      <Clock className="w-3 h-3 text-gray-400" />
+                                      <span>Refund in {text}</span>
+                                    </button>
+                                  );
+                                }
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelOrder(o)}
+                                    disabled={cancellingLoading}
+                                    className="text-[10px] text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 font-bold px-2.5 py-1 rounded-lg cursor-pointer transition flex items-center space-x-1 active:scale-95"
+                                    title="Cancel order and refund to wallet"
+                                  >
+                                    {cancellingLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                    <span>Cancel &amp; Refund</span>
+                                  </button>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
@@ -1426,9 +2275,10 @@ export const VirtualNumbersView: React.FC<VirtualNumbersViewProps> = ({
                             ₦{(Number(o.customerPrice || o.price || 0)).toLocaleString()}
                           </span>
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedService(o.serviceSlug || o.service);
-                              setSelectedCountry(o.country || 'cheapest');
+                              setSelectedCountry(o.country || o.countryCode || 'cheapest');
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                             className="text-[11px] text-[#6D28D9] hover:underline font-bold cursor-pointer"

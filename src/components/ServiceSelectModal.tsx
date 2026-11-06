@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, X, Loader2, Smartphone } from 'lucide-react';
+import { ServiceLogo } from './ServiceLogo';
 
 export interface ServiceOption {
   id: string;
@@ -169,10 +170,11 @@ export const ServiceSelectModal: React.FC<ServiceSelectModalProps> = ({
                   }`}
                 >
                   <div className="flex items-center space-x-3.5 min-w-0 flex-1">
-                    {/* Phone/App icon in soft light blue squircle */}
-                    <div className="w-10 h-10 rounded-xl bg-sky-100/70 border border-sky-200/50 flex items-center justify-center shrink-0 text-sky-600 shadow-2xs">
-                      <Smartphone className="w-5 h-5 text-sky-500" />
-                    </div>
+                    <ServiceLogo
+                      serviceId={service.id}
+                      serviceName={service.name}
+                      size="md"
+                    />
 
                     {/* Service Name */}
                     <div className="flex-1 min-w-0">

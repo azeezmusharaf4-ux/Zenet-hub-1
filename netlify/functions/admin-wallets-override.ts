@@ -1,4 +1,5 @@
 import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, parseAndVerifyToken } from './_firebase';
+import { sendWalletDepositSuccessEmail, sendWalletTransactionSuccessEmail } from '../../src/server/emailService';
 
 export const handler = async (event: any) => {
   const headers = {
@@ -174,6 +175,36 @@ export const handler = async (event: any) => {
       date: new Date().toISOString(),
       createdAt: new Date().toISOString()
     });
+
+    // Asynchronously dispatch email notification to user if email is known
+    if (resolvedEmail && resolvedEmail.includes('@')) {
+      const isCreditAction = action === 'credit' || (action === 'set' && newBalance >= previousBalance);
+      const diffAmount = Math.abs(newBalance - previousBalance);
+      if (diffAmount > 0) {
+        if (isCreditAction) {
+          await sendWalletDepositSuccessEmail({
+            to: resolvedEmail,
+            amount: diffAmount,
+            previousBalance,
+            newBalance,
+            reference: txId,
+            paymentMethod: 'Account Credit (Admin Override)',
+            db
+          }).catch(() => {});
+        } else {
+          await sendWalletTransactionSuccessEmail({
+            to: resolvedEmail,
+            type: 'debit',
+            amount: diffAmount,
+            previousBalance,
+            newBalance,
+            description: reason || 'Account Balance Adjustment',
+            reference: txId,
+            db
+          }).catch(() => {});
+        }
+      }
+    }
 
     return {
       statusCode: 200,

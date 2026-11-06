@@ -76,10 +76,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const isOwner = isAuthorizedOwner(user, userProfile);
   const isAdmin = isOwner || userProfile?.role === 'admin';
+  const isBuyer = Boolean(
+    !isOwner && (
+      userProfile?.role === 'buyer' ||
+      userProfile?.role === 'customer' ||
+      ((userProfile?.role as string) === 'user') ||
+      (!userProfile?.role && !isOwner)
+    )
+  );
+  // Exclusively for authorized Owner - strictly forbidden and hidden from any buyer
+  const canViewPaymentNotifications = Boolean(isOwner && !isBuyer);
 
-  // Listen to pending withdrawal notifications count in real-time
+  // Listen to pending withdrawal notifications count in real-time (Owner only, never buyers)
   useEffect(() => {
-    if (!user || !isAdmin || !db) return;
+    if (!user || !canViewPaymentNotifications || !db) return;
     const q = query(
       collection(db, 'withdrawal_requests'),
       where('status', '==', 'pending')
@@ -90,7 +100,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       console.warn('Notice loading pending withdrawals count:', err);
     });
     return () => unsub();
-  }, [user?.uid, isAdmin]);
+  }, [user?.uid, canViewPaymentNotifications]);
 
   // Listen to pending stock submissions count for Owner in real-time
   useEffect(() => {
@@ -177,7 +187,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* 2. Top User Card */}
-      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-[#EAE6F8] shadow-sm flex items-center justify-between gap-3">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-[#EAE6F8] shadow-sm flex items-center justify-between gap-3 zenet-card-enter zenet-card-interactive">
         <div className="flex items-center gap-3.5 min-w-0">
           {/* Avatar */}
           <div className="w-14 h-14 rounded-full bg-[#EDE9FE] border-2 border-[#5B4DF5]/20 flex items-center justify-center text-[#5B4DF5] shrink-0 overflow-hidden shadow-xs">
@@ -222,7 +232,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <button
           id="profile-quick-edit-action-btn"
           onClick={() => onSelectView('edit-profile')}
-          className="w-11 h-11 rounded-2xl bg-[#F5F3FF] hover:bg-[#EDE9FE] border border-[#DDD6FE] text-[#5B4DF5] flex items-center justify-center shrink-0 cursor-pointer transition active:scale-95 shadow-xs"
+          className="w-11 h-11 rounded-2xl bg-[#F5F3FF] hover:bg-[#EDE9FE] border border-[#DDD6FE] text-[#5B4DF5] flex items-center justify-center shrink-0 cursor-pointer transition active:scale-95 shadow-xs zenet-btn-interactive"
           title="Edit Profile"
           aria-label="Edit Profile"
         >
@@ -231,10 +241,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* 3. Main Options Card: Clean list with subtle dividers */}
-      <div className="bg-white rounded-3xl border border-[#EAE6F8] shadow-sm divide-y divide-[#F1EEF9] overflow-hidden">
+      <div className="bg-white rounded-3xl border border-[#EAE6F8] shadow-sm divide-y divide-[#F1EEF9] overflow-hidden zenet-card-enter">
         
-        {/* Option: Payment Notifications (Owner & Admin) */}
-        {isAdmin && (
+        {/* Option: Payment Notifications (Exclusively Owner - never shown to any buyer) */}
+        {canViewPaymentNotifications && (
           <button
             id="profile-opt-payment-notifications"
             onClick={() => setIsPaymentNotificationsOpen(true)}
@@ -259,7 +269,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <span className="text-[11px] text-[#64748B] font-medium">Review customer withdrawals & confirm payment</span>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full uppercase">
+                OWNER
+              </span>
+              <ChevronRight className="w-4 h-4 text-[#94A3B8]" />
+            </div>
           </button>
         )}
 
@@ -587,8 +602,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      {/* MODAL: Payment Notifications for Admin & Owner */}
-      {isPaymentNotificationsOpen && (
+      {/* MODAL: Payment Notifications for Owner (Never buyers) */}
+      {isPaymentNotificationsOpen && canViewPaymentNotifications && (
         <PaymentNotificationsModal
           isOpen={isPaymentNotificationsOpen}
           onClose={() => setIsPaymentNotificationsOpen(false)}

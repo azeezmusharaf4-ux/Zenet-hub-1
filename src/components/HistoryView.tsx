@@ -104,7 +104,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
         // 2. Social boost orders
         try {
-          const res = await fetch(`/api/social-boost/orders?action=orders&userId=${encodeURIComponent(user.uid)}`);
+          const token = await user.getIdToken().catch(() => null);
+          const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+          const res = await fetch(`/api/social-boost/orders?action=orders&userId=${encodeURIComponent(user.uid)}`, { headers });
           if (res.ok) {
             const data = await res.json();
             if (isMounted && data && Array.isArray(data.orders)) {
@@ -251,6 +253,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       .map((p) => ({
         id: p.id,
         orderId: p.transactionId || p.id,
+        providerOrderId: (p as any).providerOrderId || '',
         serviceName: p.listingTitle || 'Social Boost Order',
         target: (p as any).target || '',
         quantity: (p as any).quantity || 1000,
@@ -264,10 +267,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       .map((o) => ({
         id: o.orderId || o.id,
         orderId: o.orderId || o.id,
+        providerOrderId: o.providerOrderId || '',
         serviceName: o.serviceName || 'Social Boost Order',
-        target: o.target || '',
+        target: o.target || (o as any).link || '',
         quantity: o.quantity || 0,
-        charge: o.charge || 0,
+        charge: (o as any).totalCharge || (o as any).price || o.charge || 0,
         status: o.status || 'pending',
         createdAt: o.createdAt || new Date().toISOString()
       }));
@@ -751,7 +755,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                           <h4 className="font-black text-sm sm:text-base text-[#171329]">{item.serviceName}</h4>
                         </div>
                         <span className="text-[11px] text-[#716B82] block mt-0.5">
-                          Order ID: <strong className="font-mono text-[#171329]">{item.orderId}</strong> • {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          Order ID: <strong className="font-mono text-[#171329]">{item.orderId}</strong>
+                          {(item as any).providerOrderId ? (
+                            <span> • Provider ID: <strong className="font-mono text-[#7C3AED]">#{(item as any).providerOrderId}</strong></span>
+                          ) : null}
+                          <span> • {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         </span>
                       </div>
 

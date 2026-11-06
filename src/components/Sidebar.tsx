@@ -56,6 +56,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'marketplace' as ActiveAppView, label: 'Marketplace', icon: ShoppingCart },
     { id: 'profile' as ActiveAppView, label: 'Dashboard', icon: Home },
     { id: 'orders' as ActiveAppView, label: 'History', icon: Scroll, badge: ordersCount > 0 ? String(ordersCount) : undefined },
+    { id: 'about' as ActiveAppView, label: 'About Zenet Hub', icon: Sparkles },
+    { id: 'support' as ActiveAppView, label: 'Help & Support', icon: MessageSquare },
     ...(isAdmin ? [{ id: 'messages' as ActiveAppView, label: 'Notifications & Messages', icon: MessageSquare, badge: unreadMessagesCount > 0 ? String(unreadMessagesCount) : undefined }] : []),
     ...(isOwner ? [{ id: 'admin_wallets' as ActiveAppView, label: 'Wallet Override', icon: Wallet, badge: 'OWNER' }] : []),
   ];
@@ -92,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => handleNavClick(item.id)}
-              className={`w-full text-left px-3 py-2.5 rounded-2xl flex items-center justify-between transition cursor-pointer text-xs font-bold ${
+              className={`w-full text-left px-3 py-2.5 rounded-2xl flex items-center justify-between cursor-pointer text-xs font-bold zenet-nav-transition ${
                 isActive
                   ? 'bg-[#7C3AED] text-white shadow-sm shadow-purple-600/20 font-black'
                   : 'text-[#1E192E] hover:bg-[#F3EEFF] hover:text-[#7C3AED]'

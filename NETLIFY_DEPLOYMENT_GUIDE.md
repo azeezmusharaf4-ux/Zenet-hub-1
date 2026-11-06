@@ -18,7 +18,8 @@ When you connect your GitHub repository to Netlify:
    - `VOIKER_API_KEY`: Your Voiker API key (obtain from https://voiker.com/account/api or your Voiker account dashboard under API settings)
    - `VOIKER_BASE_URL`: `https://voiker.com/api/v2` (defaults to https://voiker.com/api/v2 if omitted)
    - `USD_TO_NGN_RATE`: `1650` (or your preferred exchange rate for converting Voiker USD rates to NGN)
-   - `VSN_API_KEY`: Your VirtualSMSNumbers API key
+   - `VSN_API_KEY`: Your VirtualSMSNumbers API key (e.g., `vsn_live_Rl1JhcPURhhWpVxP3wVdkd24dD4ELVSr` — server-side proxy automatically routes live requests)
+   - `EUR_TO_NGN_RATE`: `1750` (or your preferred exchange rate for converting VirtualSMS EUR rates to NGN)
    - `PAYSTACK_SECRET_KEY`: Your live Paystack secret key (`sk_live_...`)
    - `VITE_FIREBASE_PROJECT_ID`: Your Firebase project ID (`ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9`)
    - `VITE_FIREBASE_API_KEY`: Your Firebase web API key
@@ -26,6 +27,9 @@ When you connect your GitHub repository to Netlify:
    - `VITE_FIREBASE_STORAGE_BUCKET`: `ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9.appspot.com`
    - `VITE_FIREBASE_MESSAGING_SENDER_ID`: Your Firebase sender ID
    - `VITE_FIREBASE_APP_ID`: Your Firebase app ID
+   - `GMAIL_USER`: `Zenethubifficial@gmail.com` (Official ZENET HUB sender Gmail)
+   - `GMAIL_APP_PASSWORD`: Your 16-character Google App Password (generated in Google Account > Security > 2-Step Verification > App passwords)
+   - `EMAIL_FROM`: `ZENET HUB <Zenethubifficial@gmail.com>`
 
 ---
 

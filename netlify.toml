@@ -140,6 +140,27 @@
   status = 200
   force = true
 
+# Email Status & Diagnostics
+[[redirects]]
+  from = "/api/email/status"
+  to = "/.netlify/functions/email-status"
+  status = 200
+  force = true
+
+# Email Test endpoint
+[[redirects]]
+  from = "/api/email/test-send"
+  to = "/.netlify/functions/email-test"
+  status = 200
+  force = true
+
+# Auth Event notifications (Welcome & Login)
+[[redirects]]
+  from = "/api/notifications/auth-event"
+  to = "/.netlify/functions/notifications-auth-event"
+  status = 200
+  force = true
+
 # VirtualSMSNumbers Webhook endpoints
 [[redirects]]
   from = "/hooks/virtualsmsnumbers"

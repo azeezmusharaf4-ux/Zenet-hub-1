@@ -1,13 +1,13 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserLocalPersistence, onIdTokenChanged, User } from 'firebase/auth';
-import { getFirestore, Firestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, Firestore, doc, getDocFromServer, setLogLevel } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import firebaseConfigData from '../../firebase-applet-config.json';
 
-// Set Firestore log level to error to avoid harmless stream cancellation RPC debug notices
+// Silence harmless internal network transition notices from polluting the console
 if (typeof window !== 'undefined') {
   try {
-    setLogLevel('error');
+    setLogLevel('silent');
   } catch {}
 }
 
@@ -51,8 +51,16 @@ export async function getSafeIdToken(user?: User | null, forceRefresh = false): 
   }
 }
 
-// Initialize Firestore
-export const db: Firestore = getFirestore(app, firebaseConfigData.firestoreDatabaseId);
+// Initialize Firestore with robust auto-detect long polling for reliable connectivity behind proxies, iframes, and mobile networks
+export const db: Firestore = (() => {
+  try {
+    return initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+    }, firebaseConfigData.firestoreDatabaseId || undefined);
+  } catch {
+    return getFirestore(app, firebaseConfigData.firestoreDatabaseId || undefined);
+  }
+})();
 
 // Initialize Firebase Storage
 export const storage: FirebaseStorage = getStorage(app);

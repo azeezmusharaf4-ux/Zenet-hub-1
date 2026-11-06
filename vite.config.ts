@@ -87,15 +87,7 @@ export default defineConfig(() => {
     ],
     build: {
       cssTarget: ['chrome49', 'safari10'],
-      minify: 'terser' as const,
-      terserOptions: {
-        compress: {
-          passes: 1,
-        },
-        format: {
-          comments: false,
-        },
-      },
+      minify: 'esbuild',
       rollupOptions: {
         output: {
           manualChunks(id) {

@@ -457,11 +457,11 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 md:z-[120] bg-white md:bg-black/60 md:backdrop-blur-xs flex flex-col md:items-center md:justify-center md:p-4 w-full h-[100dvh] max-h-[100dvh] overflow-hidden animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 md:z-[120] bg-white md:bg-black/60 md:backdrop-blur-xs flex flex-col md:items-center md:justify-center md:p-4 w-full h-[100dvh] max-h-[100dvh] overflow-hidden zenet-modal-backdrop animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
-        className="w-full max-w-lg mx-auto flex-1 flex flex-col h-full min-h-0 bg-white rounded-none border-0 md:rounded-3xl md:border md:border-[#EAE6F8] md:shadow-2xl md:max-h-[90vh] md:flex-initial overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-lg mx-auto flex-1 flex flex-col h-full min-h-0 bg-white rounded-none border-0 md:rounded-3xl md:border md:border-[#EAE6F8] md:shadow-2xl md:max-h-[90vh] md:flex-initial overflow-hidden zenet-modal-dialog animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with prominent Top-Left Back Button */}

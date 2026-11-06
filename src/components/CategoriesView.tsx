@@ -1,6 +1,7 @@
 import React from 'react';
 import { CategoryType, AccountListing } from '../types';
 import { isCategoryMatch } from '../utils/category';
+import { isPublicActiveListing } from '../utils/listingVisibility';
 import { getPlatformConfig } from './PlatformIcon';
 import { 
   CheckCircle2, 
@@ -226,7 +227,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
       {/* Grid of Categories */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
         {CATEGORY_CATALOG.map((cat) => {
-          const catListings = listings.filter((l) => isCategoryMatch(l.category, cat.type) && l.status === 'active');
+          const catListings = listings.filter((l) => isCategoryMatch(l.category, cat.type) && isPublicActiveListing(l));
           const count = catListings.length;
           const platformConfig = getPlatformConfig(cat.type);
 
@@ -234,7 +235,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
             <div
               key={cat.type}
               onClick={() => onSelectCategory(cat.type)}
-              className="bg-white border border-[#EBE7F7] p-5 sm:p-6 rounded-3xl space-y-4 hover:border-[#5B4DF5]/50 transition duration-200 cursor-pointer shadow-xs hover:shadow-md group relative overflow-hidden text-[#0F172A]"
+              className="bg-white border border-[#EBE7F7] p-5 sm:p-6 rounded-3xl space-y-4 hover:border-[#5B4DF5]/50 transition duration-200 cursor-pointer shadow-xs hover:shadow-md group relative overflow-hidden text-[#0F172A] zenet-card-enter zenet-card-interactive"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3.5">

@@ -68,7 +68,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
   );
 
   return (
-    <div className="w-full h-full group bg-white hover:bg-[#F8F7FD] border border-[#EBE7F7] hover:border-[#5B4DF5] rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200 shadow-xs hover:shadow-md relative overflow-hidden gap-3.5">
+    <div className="w-full h-full group bg-white hover:bg-[#F8F7FD] border border-[#EBE7F7] hover:border-[#5B4DF5] rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all duration-200 shadow-xs hover:shadow-md relative overflow-hidden gap-3.5 zenet-card-enter zenet-card-interactive">
       
       {/* Top Header Section: Platform Icon Avatar, Title & Seller */}
       <div className="z-10 space-y-2.5">
@@ -205,7 +205,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
           <button
             type="button"
             onClick={() => onSelect(listing)}
-            className="w-full min-h-[40px] flex items-center justify-center gap-1.5 bg-white hover:bg-[#F8F7FD] text-[#0F172A] font-black text-xs py-2.5 px-2.5 rounded-xl border border-[#EBE7F7] hover:border-[#5B4DF5] transition cursor-pointer shadow-xs active:scale-[0.98] whitespace-nowrap"
+            className="w-full min-h-[40px] flex items-center justify-center gap-1.5 bg-white hover:bg-[#F8F7FD] text-[#0F172A] font-black text-xs py-2.5 px-2.5 rounded-xl border border-[#EBE7F7] hover:border-[#5B4DF5] transition cursor-pointer shadow-xs whitespace-nowrap zenet-btn-interactive"
           >
             <Eye className="w-3.5 h-3.5 text-[#5B4DF5] shrink-0" />
             <span>Preview</span>
@@ -221,7 +221,7 @@ export const ListingCard: React.FC<ListingCardProps> = React.memo(({
                 onContact(listing);
               }
             }}
-            className={`w-full min-h-[40px] flex items-center justify-center gap-1.5 font-black text-xs py-2.5 px-2.5 rounded-xl transition cursor-pointer whitespace-nowrap active:scale-[0.98] ${
+            className={`w-full min-h-[40px] flex items-center justify-center gap-1.5 font-black text-xs py-2.5 px-2.5 rounded-xl transition cursor-pointer whitespace-nowrap zenet-btn-interactive ${
               isSoldOut
                 ? 'bg-[#F8F7FD] hover:bg-[#F1F0FB] text-[#64748B] border border-[#EBE7F7]'
                 : 'bg-[#5B4DF5] hover:bg-[#4839EB] text-white shadow-sm shadow-[#5B4DF5]/20'

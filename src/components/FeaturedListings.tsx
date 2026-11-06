@@ -1,6 +1,7 @@
 import React from 'react';
 import { AccountListing } from '../types';
 import { calculateSellerTrustScore } from '../utils/trustScore';
+import { isPublicActiveListing } from '../utils/listingVisibility';
 import { getPlatformConfig } from './PlatformIcon';
 import { Sparkles, ShieldCheck, Flame, ChevronRight, Eye, CheckCircle2, Check, Star, Award } from 'lucide-react';
 
@@ -17,15 +18,7 @@ export const FeaturedListings: React.FC<FeaturedListingsProps> = React.memo(({
   onContactSeller,
   onBuyNow,
 }) => {
-  const activeListings = listings.filter((item) => {
-    if (item.status === 'sold') return false;
-    const invAvail = Array.isArray(item.inventory)
-      ? item.inventory.filter((acc: any) => (acc.status || '').toLowerCase() !== 'sold').length
-      : undefined;
-    const stock = item.stockCount !== undefined ? item.stockCount : (item.stock !== undefined ? item.stock : 1);
-    const effectiveStock = invAvail !== undefined ? invAvail : stock;
-    return effectiveStock > 0;
-  });
+  const activeListings = listings.filter(isPublicActiveListing);
   const featured = activeListings.filter((item) => item.featured || item.badges?.includes('Featured'));
   const itemsToDisplay = featured.length > 0 ? featured : activeListings.slice(0, 3);
 

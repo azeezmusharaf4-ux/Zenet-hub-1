@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, Auth } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction, Firestore } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, type Auth } from 'firebase/auth';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, runTransaction, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: "gen-lang-client-0874836857",
@@ -89,4 +89,4 @@ export function parseAndVerifyToken(authHeader?: string): DecodedAuthToken | nul
   }
 }
 
-export { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction };
+export { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, runTransaction };

@@ -312,7 +312,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
       />
 
       {/* Inner Container: Full width on mobile, centered and neatly bounded to max-w-xl on desktop so it never gets too big */}
-      <div className="w-full max-w-xl mx-auto flex flex-col flex-1 h-full min-h-0 bg-white">
+      <div className="w-full max-w-xl mx-auto flex flex-col flex-1 h-full min-h-0 bg-white zenet-modal-dialog">
         
         {/* Full-Screen Header */}
         <div className="bg-white px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
@@ -376,7 +376,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
             <form onSubmit={handlePaystackCheckout} className="space-y-5 animate-in fade-in duration-150">
               
               {/* CURRENT BALANCE BANNER */}
-              <div className="bg-[#5c5cf6]/5 border border-[#5c5cf6]/20 p-4 sm:p-5 rounded-2xl flex items-center justify-between">
+              <div className="bg-[#5c5cf6]/5 border border-[#5c5cf6]/20 p-4 sm:p-5 rounded-2xl flex items-center justify-between zenet-wallet-enter">
                 <div>
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Your Balance</span>
                   <div className="flex items-baseline gap-1.5">
@@ -458,7 +458,7 @@ export const WalletModal: React.FC<WalletModalProps> = ({
               <button
                 type="submit"
                 disabled={isProcessing || !amount || amount < 100}
-                className="w-full bg-[#5c5cf6] hover:bg-[#4d4df0] active:bg-[#4342db] text-white font-bold text-base py-3.5 px-6 rounded-xl shadow-sm transition active:scale-[0.99] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 mt-4 min-h-[50px]"
+                className="w-full bg-[#5c5cf6] hover:bg-[#4d4df0] active:bg-[#4342db] text-white font-bold text-base py-3.5 px-6 rounded-xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 mt-4 min-h-[50px] zenet-btn-interactive"
               >
                 {isProcessing ? (
                   <>

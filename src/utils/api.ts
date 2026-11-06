@@ -161,6 +161,9 @@ export const getNetlifyFunctionFallback = (path: string): string | null => {
   if (pathname.startsWith('/api/admin/manage-role')) {
     return `/.netlify/functions/admin-manage-role${qs}`;
   }
+  if (pathname.startsWith('/api/referrals/link')) {
+    return `/.netlify/functions/referrals-link${qs}`;
+  }
   if (pathname.startsWith('/api/health')) {
     return `/.netlify/functions/health${qs}`;
   }

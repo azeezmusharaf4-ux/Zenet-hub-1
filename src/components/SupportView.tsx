@@ -630,7 +630,7 @@ export const SupportView: React.FC<SupportViewProps> = ({
                 return (
                   <div
                     key={idx}
-                    className="bg-white border border-[#EBE7F7] rounded-2xl overflow-hidden transition shadow-xs"
+                    className="bg-white border border-[#EBE7F7] rounded-2xl overflow-hidden transition shadow-xs zenet-card-interactive"
                   >
                     <button
                       onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
@@ -734,7 +734,7 @@ export const SupportView: React.FC<SupportViewProps> = ({
             <button
               type="submit"
               disabled={ticketSubmitting}
-              className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold text-xs py-2.5 rounded-xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-[#5B4DF5] hover:bg-[#4838EE] text-white font-extrabold text-xs py-2.5 rounded-xl shadow-sm transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 zenet-btn-interactive"
             >
               {ticketSubmitting ? (
                 <span>Submitting Ticket...</span>
