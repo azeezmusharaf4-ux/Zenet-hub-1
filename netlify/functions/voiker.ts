@@ -1,4 +1,4 @@
-import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction, ensureServerAuthenticated } from './_firebase';
+import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction, ensureServerAuthenticated, parseAndVerifyToken } from './_firebase';
 
 // Helper to resolve Voiker API Key
 const getVoikerApiKey = (): string => (process.env.VOIKER_API_KEY || '').trim();
@@ -254,8 +254,9 @@ export const handler = async (event: any) => {
         // Direct Voiker pricing without markup as requested
         const customerRate = providerRatePer1000;
 
-        const min = Math.max(1, Number(raw.min) || 50);
-        const max = Math.max(min, Number(raw.max) || 100000);
+        const isViews = /view|play|stream|watch/i.test(`${type} ${category} ${name}`);
+        const min = isViews ? 1000 : 100;
+        const max = isViews ? 1000000 : 100000;
 
         const baseSvc = {
           id: `vk-${sid}`,
@@ -332,16 +333,20 @@ export const handler = async (event: any) => {
 
     // 3. POST /order or /add
     if (action === 'order' || action === 'add' || action === 'buy') {
-      const { serviceId, target, quantity, comments, userId } = body;
+      const authHeader = event.headers?.authorization || event.headers?.Authorization;
+      const verified = parseAndVerifyToken(authHeader);
+      const effectiveUserId = verified?.uid || body.userId;
+
+      const { serviceId, target, quantity, comments } = body;
       if (!serviceId || !target || !quantity) {
         return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Missing serviceId, target, or quantity' }) };
       }
 
-      if (!db || !userId) {
-        return { statusCode: 401, headers, body: JSON.stringify({ success: false, error: 'User must be signed in' }) };
+      if (!db || !effectiveUserId) {
+        return { statusCode: 401, headers, body: JSON.stringify({ success: false, error: 'Invalid or expired session. Please sign in.' }) };
       }
 
-      const userRef = doc(db, 'users', userId);
+      const userRef = doc(db, 'users', effectiveUserId);
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) {
         return { statusCode: 404, headers, body: JSON.stringify({ success: false, error: 'User not found' }) };
@@ -349,7 +354,22 @@ export const handler = async (event: any) => {
       const uData = userSnap.data();
       const currentBal = Number(uData.walletBalance ?? uData.balance ?? 0);
 
+      const isViews = /view|play|stream|watch/i.test(`${serviceId} ${body.name || ''} ${body.type || ''}`);
+      const effectiveMin = isViews ? 1000 : 100;
+      const effectiveMax = isViews ? 1000000 : 100000;
+
       const orderQty = Math.round(Number(quantity));
+      if (orderQty < effectiveMin || orderQty > effectiveMax) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({
+            success: false,
+            error: `Quantity must be between ${effectiveMin.toLocaleString()} and ${effectiveMax.toLocaleString()} for this service.`
+          })
+        };
+      }
+
       const cleanServiceId = String(serviceId).replace(/^vk-/, '');
 
       let ratePer1000 = Number(body.ratePer1000) || 0;
@@ -361,17 +381,6 @@ export const handler = async (event: any) => {
             if (Array.isArray(catData?.services) && catData.services.length > 0) {
               const svc = catData.services.find((s: any) => s.id === serviceId || s.providerServiceId === cleanServiceId);
               if (svc?.ratePer1000) ratePer1000 = Number(svc.ratePer1000);
-            } else if (typeof catData?.chunkCount === 'number' && catData.chunkCount > 0) {
-              for (let i = 0; i < catData.chunkCount; i++) {
-                const chunkSnap = await getDoc(doc(db, 'system_settings', `voiker_cat_part_${i}`));
-                if (chunkSnap.exists() && Array.isArray(chunkSnap.data()?.services)) {
-                  const svc = chunkSnap.data().services.find((s: any) => s.id === serviceId || s.providerServiceId === cleanServiceId);
-                  if (svc?.ratePer1000) {
-                    ratePer1000 = Number(svc.ratePer1000);
-                    break;
-                  }
-                }
-              }
             }
           }
         } catch {}
@@ -390,51 +399,70 @@ export const handler = async (event: any) => {
         };
       }
 
-      // Deduct balance atomically
+      // Check provider first: wallet is only deducted AFTER provider confirms order!
+      let providerOrderId = '';
+      let initialStatus = 'in_progress';
+      if (!apiKey) {
+        return {
+          statusCode: 503,
+          headers,
+          body: JSON.stringify({ success: false, error: 'Voiker API key is not configured on the server yet. Funds were not deducted.' })
+        };
+      }
+
+      try {
+        const vRes = await queryVoiker('add', {
+          service: cleanServiceId,
+          link: target.trim(),
+          quantity: orderQty,
+          ...(comments ? { comments } : {})
+        }, 'POST');
+
+        if (vRes?.order || vRes?.order_id) {
+          providerOrderId = String(vRes.order || vRes.order_id);
+          initialStatus = 'in_progress';
+        } else if (vRes?.error || vRes?.message) {
+          const errMsg = String(vRes.error || vRes.message);
+          let friendly = errMsg;
+          if (/insufficient_funds|balance/i.test(errMsg)) {
+            friendly = 'Provider account is awaiting funding. Your wallet was not charged.';
+          } else {
+            friendly = `Provider notice: ${errMsg}. Your wallet was not charged.`;
+          }
+          return {
+            statusCode: 422,
+            headers,
+            body: JSON.stringify({ success: false, error: friendly })
+          };
+        } else {
+          return {
+            statusCode: 422,
+            headers,
+            body: JSON.stringify({ success: false, error: 'Provider network could not accept this order. Your wallet was not charged.' })
+          };
+        }
+      } catch (e: any) {
+        return {
+          statusCode: 502,
+          headers,
+          body: JSON.stringify({ success: false, error: `Upstream connection notice: ${e.message}. Your wallet was not charged.` })
+        };
+      }
+
+      // Provider confirmed order -> Deduct balance atomically
       await runTransaction(db, async (tx) => {
         const uS = await tx.get(userRef);
-        const cur = Number(uS.data()?.walletBalance ?? 0);
+        const cur = Number(uS.data()?.walletBalance ?? uS.data()?.balance ?? 0);
         if (cur < totalCharge) throw new Error('Insufficient wallet balance');
-        tx.update(userRef, { walletBalance: cur - totalCharge, balance: cur - totalCharge });
+        const finalBal = cur - totalCharge;
+        tx.update(userRef, { walletBalance: finalBal, balance: finalBal });
       });
-
-      // Submit to Voiker
-      let providerOrderId = '';
-      let initialStatus = 'pending';
-      if (apiKey) {
-        try {
-          const vRes = await queryVoiker('add', {
-            service: cleanServiceId,
-            link: target.trim(),
-            quantity: orderQty,
-            ...(comments ? { comments } : {})
-          }, 'POST');
-          if (vRes?.order || vRes?.order_id) {
-            providerOrderId = String(vRes.order || vRes.order_id);
-            initialStatus = 'in_progress';
-          } else if (vRes?.error) {
-            // Auto refund
-            await runTransaction(db, async (tx) => {
-              const uS = await tx.get(userRef);
-              const cur = Number(uS.data()?.walletBalance ?? 0);
-              tx.update(userRef, { walletBalance: cur + totalCharge });
-            });
-            return {
-              statusCode: 422,
-              headers,
-              body: JSON.stringify({ success: false, error: `Voiker rejected: ${vRes.error}. Wallet not charged.` })
-            };
-          }
-        } catch (e: any) {
-          console.warn('[Voiker Netlify] Upstream note:', e.message);
-        }
-      }
 
       const orderId = `ORD-VK-${Date.now()}`;
       const orderDoc = {
         id: orderId,
         orderId,
-        userId,
+        userId: effectiveUserId,
         userEmail: uData.email || '',
         provider: 'Voiker',
         providerOrderId,

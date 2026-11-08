@@ -79,8 +79,47 @@ export const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-
   </svg>
 );
 
+// Helper to identify whether a service is a Views service
+export const isViewsService = (service?: Partial<SocialBoostService> | null): boolean => {
+  if (!service) return false;
+  const t = (service.type || '').toLowerCase();
+  const c = (service.category || '').toLowerCase();
+  const n = (service.name || '').toLowerCase();
+  const id = (service.id || '').toLowerCase();
+  return (
+    t.includes('view') || c.includes('view') || n.includes('view') || id.includes('view') ||
+    t.includes('play') || c.includes('play') || n.includes('play') ||
+    t.includes('stream') || c.includes('stream') || n.includes('stream') ||
+    t.includes('retention') || c.includes('retention') || n.includes('retention') ||
+    t.includes('watch') || c.includes('watch') || n.includes('watch')
+  );
+};
+
+// Strict requested limits: Views: Min 1,000 / Max 1,000,000 | Regular: Min 100 / Max 100,000
+export const getSocialBoostQuantityLimits = (service?: Partial<SocialBoostService> | null) => {
+  const isViews = isViewsService(service);
+  if (isViews) {
+    return {
+      isViews: true,
+      min: 1000,
+      max: 1000000,
+      defaultQty: 1000,
+      step: 500,
+      presets: [1000, 2500, 5000, 10000, 25000, 50000, 100000]
+    };
+  }
+  return {
+    isViews: false,
+    min: 100,
+    max: 100000,
+    defaultQty: 1000,
+    step: 50,
+    presets: [100, 500, 1000, 2500, 5000, 10000]
+  };
+};
+
 // High-speed fallback services catalogue covering all major platforms with REAL Voiker IDs
-const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
+const RAW_DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
   // --- TIKTOK (Voiker Real IDs) ---
   {
     id: 'vk-3',
@@ -677,11 +716,18 @@ const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = [
     inputLabel: 'Website URL',
     inputPlaceholder: 'https://example.com',
     inputType: 'link',
-    isActive: true
   }
 ];
 
-// Predefined platform branding definitions for catalogue display
+// Normalized fallback catalogue enforcing strict Views (1,000-1,000,000) and Regular (100-100,000) boundaries
+const DEFAULT_TIKTOK_SERVICES: SocialBoostService[] = RAW_DEFAULT_TIKTOK_SERVICES.map(s => {
+  const limits = getSocialBoostQuantityLimits(s);
+  return {
+    ...s,
+    min: limits.min,
+    max: limits.max
+  };
+});
 interface PlatformCardInfo {
   id: string;
   name: string;
@@ -1082,17 +1128,24 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
   // Configured TikTok service overrides
   const [configuredSettings, setConfiguredSettings] = useState<Record<string, TikTokServiceSetting>>({
-    'tt-followers': { id: 'tt-followers', name: 'TikTok Followers', minQuantity: 10, maxQuantity: 1000000, pricePer1k: 2400 },
-    'tt-likes': { id: 'tt-likes', name: 'TikTok Likes', minQuantity: 50, maxQuantity: 500000, pricePer1k: 850 },
-    'tt-comments': { id: 'tt-comments', name: 'TikTok Comments', minQuantity: 10, maxQuantity: 10000, pricePer1k: 4500 },
-    'tt-shares': { id: 'tt-shares', name: 'TikTok Shares', minQuantity: 50, maxQuantity: 200000, pricePer1k: 650 },
-    'tt-views': { id: 'tt-views', name: 'TikTok Views', minQuantity: 500, maxQuantity: 2000000, pricePer1k: 250 }
+    'tt-followers': { id: 'tt-followers', name: 'TikTok Followers', minQuantity: 100, maxQuantity: 100000, pricePer1k: 2400 },
+    'tt-likes': { id: 'tt-likes', name: 'TikTok Likes', minQuantity: 100, maxQuantity: 100000, pricePer1k: 850 },
+    'tt-comments': { id: 'tt-comments', name: 'TikTok Comments', minQuantity: 100, maxQuantity: 100000, pricePer1k: 4500 },
+    'tt-shares': { id: 'tt-shares', name: 'TikTok Shares', minQuantity: 100, maxQuantity: 100000, pricePer1k: 650 },
+    'tt-views': { id: 'tt-views', name: 'TikTok Views', minQuantity: 1000, maxQuantity: 1000000, pricePer1k: 250 }
   });
 
   // Helper to apply and persist live services response
   const applyLiveServices = useCallback((res: any) => {
     if (!res || !res.success || !Array.isArray(res.services)) return;
-    const services: SocialBoostService[] = res.services;
+    const services: SocialBoostService[] = res.services.map((svc: any) => {
+      const limits = getSocialBoostQuantityLimits(svc);
+      return {
+        ...svc,
+        min: limits.min,
+        max: limits.max
+      };
+    });
     inMemoryLiveServices = services;
     inMemoryLastFetchTime = Date.now();
     setAllServices(services);
@@ -1517,9 +1570,13 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
   // Open Order Modal for a selected service
   const handleOpenOrderModal = (service: SocialBoostService) => {
-    setSelectedService(service);
-    const minQ = service.min || 100;
-    setOrderQuantity(Math.max(minQ, 1000 > minQ && 1000 <= (service.max || 100000) ? 1000 : minQ));
+    const limits = getSocialBoostQuantityLimits(service);
+    setSelectedService({
+      ...service,
+      min: limits.min,
+      max: limits.max
+    });
+    setOrderQuantity(limits.defaultQty);
     setOrderTarget('');
     setOrderComments('');
     setOrderError(null);
@@ -1544,7 +1601,8 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
   const handlePlaceOrder = async () => {
     if (!selectedService || isSubmittingOrder) return;
 
-    if (!auth.currentUser) {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
       if (onOpenAuth) onOpenAuth('login');
       return;
     }
@@ -1555,10 +1613,9 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
       return;
     }
 
-    const minQ = selectedService.min || 10;
-    const maxQ = selectedService.max || 100000;
-    if (orderQuantity < minQ || orderQuantity > maxQ) {
-      setOrderError(`Quantity must be between ${minQ.toLocaleString()} and ${maxQ.toLocaleString()}.`);
+    const limits = getSocialBoostQuantityLimits(selectedService);
+    if (orderQuantity < limits.min || orderQuantity > limits.max) {
+      setOrderError(`Quantity must be between ${limits.min.toLocaleString()} and ${limits.max.toLocaleString()}.`);
       return;
     }
 
@@ -1572,20 +1629,54 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     setOrderNotice(null);
 
     try {
-      const token = await getSafeIdToken(auth.currentUser);
-      const res: any = await safeApiFetch('/api/voiker/order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          serviceId: selectedService.id,
-          target: cleanTarget,
-          quantity: orderQuantity,
-          comments: orderComments || undefined
-        })
-      });
+      // 1. Force refresh fresh token to prevent stale or expired session tokens
+      let token = await getSafeIdToken(currentUser, true);
+      if (!token) {
+        token = await getSafeIdToken(currentUser, false);
+      }
+
+      const orderPayload = {
+        action: 'order',
+        serviceId: selectedService.id,
+        target: cleanTarget,
+        quantity: orderQuantity,
+        comments: orderComments || undefined,
+        userId: currentUser.uid,
+        userEmail: currentUser.email || undefined
+      };
+
+      const sendOrderRequest = async (activeToken: string | null) => {
+        return await safeApiFetch('/api/voiker/order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+            ...(currentUser.email ? { 'x-caller-email': currentUser.email } : {}),
+            'x-user-uid': currentUser.uid
+          },
+          body: JSON.stringify(orderPayload)
+        });
+      };
+
+      let res: any = await sendOrderRequest(token);
+
+      // 2. Automatic session refresh & retry once if token was expired
+      const isSessionNotice = res && !res.success && (
+        res.status === 401 ||
+        (typeof res.error === 'string' && (
+          res.error.toLowerCase().includes('session') ||
+          res.error.toLowerCase().includes('token') ||
+          res.error.toLowerCase().includes('sign in')
+        ))
+      );
+
+      if (isSessionNotice) {
+        console.warn('[SocialBoost] Session notice received, refreshing token and retrying...');
+        const freshToken = await getSafeIdToken(currentUser, true);
+        if (freshToken) {
+          res = await sendOrderRequest(freshToken);
+        }
+      }
 
       if (res && res.success && res.order) {
         setOrderSuccess(res.order);
@@ -2586,11 +2677,16 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                 ₦{(selectedService.ratePer1000 || selectedService.pricePerThousandNgn || 1500).toLocaleString()}
               </span>
             </div>
-            <div className="text-right text-[11px] text-[#64748B]">
-              <span>Min: <strong>{(selectedService.min || 10).toLocaleString()}</strong></span>
-              <span className="mx-1">•</span>
-              <span>Max: <strong>{(selectedService.max || 100000).toLocaleString()}</strong></span>
-            </div>
+            {(() => {
+              const orderLimits = getSocialBoostQuantityLimits(selectedService);
+              return (
+                <div className="text-right text-[11px] text-[#64748B]">
+                  <span>Min: <strong>{orderLimits.min.toLocaleString()}</strong></span>
+                  <span className="mx-1">•</span>
+                  <span>Max: <strong>{orderLimits.max.toLocaleString()}</strong></span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Dynamic Target Input */}
@@ -2621,53 +2717,49 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
           </div>
 
           {/* Quantity Input */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-[#0F172A]">Quantity to Boost</label>
-              <span className="text-[10px] text-[#64748B]">
-                Min: {(selectedService.min || 10).toLocaleString()} | Max: {(selectedService.max || 100000).toLocaleString()}
-              </span>
-            </div>
-            <input
-              type="number"
-              min={selectedService.min || 10}
-              max={selectedService.max || 100000}
-              step={50}
-              value={orderQuantity}
-              onChange={(e) => setOrderQuantity(Number(e.target.value) || 0)}
-              className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-sm text-[#0F172A] font-extrabold focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
-            />
+          {(() => {
+            const orderLimits = getSocialBoostQuantityLimits(selectedService);
+            const validPresets = orderLimits.presets.filter(
+              (q) => q >= orderLimits.min && q <= orderLimits.max
+            );
+            return (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#0F172A]">Quantity to Boost</label>
+                  <span className="text-[10px] text-[#64748B] font-semibold">
+                    Min: {orderLimits.min.toLocaleString()} | Max: {orderLimits.max.toLocaleString()}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min={orderLimits.min}
+                  max={orderLimits.max}
+                  step={orderLimits.step}
+                  value={orderQuantity}
+                  onChange={(e) => setOrderQuantity(Number(e.target.value) || 0)}
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 text-sm text-[#0F172A] font-extrabold focus:outline-hidden focus:border-[#7C3AED] focus:bg-white transition"
+                />
 
-            {/* Quick Select Buttons */}
-            <div className="flex items-center gap-1.5 pt-1 flex-wrap">
-              {Array.from(
-                new Set(
-                  [selectedService.min || 50, 500, 1000, 2500, 5000, 10000].filter(
-                    (q): q is number =>
-                      typeof q === 'number' &&
-                      !isNaN(q) &&
-                      q >= (selectedService.min || 10) &&
-                      q <= (selectedService.max || 100000)
-                  )
-                )
-              )
-                .sort((a, b) => a - b)
-                .map((qty) => (
-                  <button
-                    key={`quick-qty-${qty}`}
-                    type="button"
-                    onClick={() => setOrderQuantity(qty)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                      orderQuantity === qty
-                        ? 'bg-purple-100 text-[#7C3AED] border-purple-300 font-black shadow-2xs'
-                        : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9]'
-                    }`}
-                  >
-                    {qty.toLocaleString()}
-                  </button>
-                ))}
-            </div>
-          </div>
+                {/* Quick Select Buttons - Strictly between service min and max */}
+                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                  {validPresets.map((qty) => (
+                    <button
+                      key={`quick-qty-${qty}`}
+                      type="button"
+                      onClick={() => setOrderQuantity(qty)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        orderQuantity === qty
+                          ? 'bg-purple-100 text-[#7C3AED] border-purple-300 font-black shadow-2xs'
+                          : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9]'
+                      }`}
+                    >
+                      {qty.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Total Calculation & Wallet Check */}
           <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3.5 space-y-2">
@@ -2959,20 +3051,25 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                         </p>
                       )}
 
-                      <div className="flex items-center gap-2 sm:gap-2.5 text-[10px] sm:text-[11px] text-[#64748B] pt-0.5 flex-wrap">
-                        <span>Min: <strong className="text-[#0F172A]">{(service.min || 10).toLocaleString()}</strong></span>
-                        <span>•</span>
-                        <span>Max: <strong className="text-[#0F172A]">{(service.max || 100000).toLocaleString()}</strong></span>
-                        {service.deliverySpeed && (
-                          <>
+                      {(() => {
+                        const cardLimits = getSocialBoostQuantityLimits(service);
+                        return (
+                          <div className="flex items-center gap-2 sm:gap-2.5 text-[10px] sm:text-[11px] text-[#64748B] pt-0.5 flex-wrap">
+                            <span>Min: <strong className="text-[#0F172A]">{cardLimits.min.toLocaleString()}</strong></span>
                             <span>•</span>
-                            <span className="inline-flex items-center gap-1 text-purple-700 font-medium">
-                              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                              <span>{service.deliverySpeed}</span>
-                            </span>
-                          </>
-                        )}
-                      </div>
+                            <span>Max: <strong className="text-[#0F172A]">{cardLimits.max.toLocaleString()}</strong></span>
+                            {service.deliverySpeed && (
+                              <>
+                                <span>•</span>
+                                <span className="inline-flex items-center gap-1 text-purple-700 font-medium">
+                                  <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                                  <span>{service.deliverySpeed}</span>
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Price and Action Button */}

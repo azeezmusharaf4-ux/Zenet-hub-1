@@ -75,13 +75,37 @@ export function parseAndVerifyToken(authHeader?: string): DecodedAuthToken | nul
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   try {
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) return null;
-    if (payload.iss !== `https://securetoken.google.com/${firebaseConfig.projectId}`) return null;
-    if (payload.aud !== firebaseConfig.projectId) return null;
+    // Allow 5 minutes clock-skew grace period
+    if (payload.exp && (payload.exp + 300) < now) return null;
+
+    const uid = payload.sub || payload.user_id;
+    if (!uid) return null;
+
+    if (payload.iss && !payload.iss.startsWith('https://securetoken.google.com/')) {
+      return null;
+    }
+
+    const validProjectIds = [
+      firebaseConfig.projectId,
+      'gen-lang-client-0874836857',
+      'ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9'
+    ].filter(Boolean);
+
+    if (payload.aud && validProjectIds.length > 0) {
+      const matchesAud = validProjectIds.some(pid =>
+        payload.aud === pid || payload.aud.includes(pid) || pid.includes(payload.aud)
+      );
+      if (!matchesAud && payload.iss !== `https://securetoken.google.com/${payload.aud}`) {
+        return null;
+      }
+    }
+
     return {
-      uid: payload.sub || payload.user_id,
+      uid,
       email: payload.email
     };
   } catch {

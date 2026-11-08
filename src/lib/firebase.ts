@@ -33,8 +33,8 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Safely retrieves an ID token with a timeout to prevent UI freezes
- * after device sleep or network reconnection.
+ * Safely retrieves an ID token with generous timeout and automatic retry
+ * to prevent UI freezes or session dropouts after device sleep or network reconnection.
  */
 export async function getSafeIdToken(user?: User | null, forceRefresh = false): Promise<string | null> {
   const targetUser = user || auth.currentUser;
@@ -42,12 +42,19 @@ export async function getSafeIdToken(user?: User | null, forceRefresh = false): 
 
   try {
     const tokenPromise = targetUser.getIdToken(forceRefresh);
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
-    const token = await Promise.race([tokenPromise, timeoutPromise]);
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000));
+    let token = await Promise.race([tokenPromise, timeoutPromise]);
+    if (!token && forceRefresh) {
+      token = await targetUser.getIdToken(false).catch(() => null);
+    }
     return token || null;
   } catch (err) {
     console.warn('[Firebase Auth] Token acquisition notice:', err);
-    return null;
+    try {
+      return await targetUser.getIdToken(false);
+    } catch {
+      return null;
+    }
   }
 }
 

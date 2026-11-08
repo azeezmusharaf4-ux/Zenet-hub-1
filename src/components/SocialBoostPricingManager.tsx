@@ -228,7 +228,15 @@ export const SocialBoostPricingManager: React.FC<SocialBoostPricingManagerProps>
       const servicesUrl = `/api/voiker/services?action=services${forceRefresh ? '&refresh=true' : ''}`;
       const servicesRes: any = await safeApiFetch(servicesUrl, { headers });
       if (servicesRes && servicesRes.success && Array.isArray(servicesRes.services)) {
-        setServices(servicesRes.services);
+        const normalized = servicesRes.services.map((s: any) => {
+          const isViews = /view|play|stream|watch/i.test(`${s.type || ''} ${s.category || ''} ${s.name || ''}`);
+          return {
+            ...s,
+            min: isViews ? 1000 : 100,
+            max: isViews ? 1000000 : 100000
+          };
+        });
+        setServices(normalized);
         if (Array.isArray(servicesRes.platforms)) {
           setPlatforms(servicesRes.platforms);
         }

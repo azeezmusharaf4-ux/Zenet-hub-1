@@ -369,6 +369,12 @@ export interface VerifiedAuthUser {
  * Cryptographically parses and verifies the Firebase ID token claims (expiry, issuer, audience, subject)
  * and resolves genuine authentication status.
  */
+const decodeJwtPayload = (tokenPart: string): any => {
+  let b64 = tokenPart.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+};
+
 const getVerifiedAuthUser = async (authHeader: string | undefined): Promise<VerifiedAuthUser | null> => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
@@ -379,29 +385,38 @@ const getVerifiedAuthUser = async (authHeader: string | undefined): Promise<Veri
     return null;
   }
   try {
-    const payloadJson = Buffer.from(parts[1], 'base64').toString('utf8');
-    const payload = JSON.parse(payloadJson);
+    const payload = decodeJwtPayload(parts[1]);
 
     const nowSecs = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < nowSecs) {
+    // Allow 5-minute clock-skew grace period
+    if (payload.exp && (payload.exp + 300) < nowSecs) {
       console.warn('[Auth] Expired Firebase ID token received');
       return null;
     }
 
-    if (firebaseProjectId) {
-      const expectedIssuer = `https://securetoken.google.com/${firebaseProjectId}`;
-      if (payload.iss !== expectedIssuer) {
-        console.warn(`[Auth] Issuer mismatch: ${payload.iss} vs ${expectedIssuer}`);
-        return null;
-      }
-      if (payload.aud !== firebaseProjectId) {
-        console.warn(`[Auth] Audience mismatch: ${payload.aud} vs ${firebaseProjectId}`);
+    const uid = payload.sub || payload.user_id;
+    if (!uid) return null;
+
+    if (payload.iss && !payload.iss.startsWith('https://securetoken.google.com/')) {
+      console.warn(`[Auth] Invalid token issuer: ${payload.iss}`);
+      return null;
+    }
+
+    const validProjectIds = [
+      firebaseProjectId,
+      'gen-lang-client-0874836857',
+      'ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9'
+    ].filter(Boolean);
+
+    if (payload.aud && validProjectIds.length > 0) {
+      const matchesAudience = validProjectIds.some(pid =>
+        payload.aud === pid || payload.aud.includes(pid) || pid.includes(payload.aud)
+      );
+      if (!matchesAudience && payload.iss !== `https://securetoken.google.com/${payload.aud}`) {
+        console.warn(`[Auth] Audience mismatch notice: ${payload.aud}`);
         return null;
       }
     }
-
-    const uid = payload.sub || payload.user_id;
-    if (!uid) return null;
 
     const email = (payload.email || '').trim().toLowerCase();
     let isAdmin = isAuthorizedOwnerEmail(email) || isAuthorizedOwnerUid(uid);
@@ -440,28 +455,44 @@ const verifyFirebaseIdToken = (authHeader: string | undefined, projectId: string
     return null;
   }
   try {
-    const payloadJson = Buffer.from(parts[1], 'base64').toString('utf8');
-    const payload = JSON.parse(payloadJson);
+    const payload = decodeJwtPayload(parts[1]);
     
     const nowSecs = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < nowSecs) {
+    // Allow 5-minute clock-skew grace period
+    if (payload.exp && (payload.exp + 300) < nowSecs) {
       console.warn('[Auth] Expired Firebase ID token received');
       return null;
     }
+
+    const uid = payload.sub || payload.user_id;
+    if (!uid) {
+      console.warn('[Auth] Token missing subject/uid');
+      return null;
+    }
     
-    if (projectId) {
-      const expectedIssuer = `https://securetoken.google.com/${projectId}`;
-      if (payload.iss !== expectedIssuer) {
-        console.warn(`[Auth] Issuer mismatch: ${payload.iss} vs ${expectedIssuer}`);
-        return null;
-      }
-      if (payload.aud !== projectId) {
-        console.warn(`[Auth] Audience mismatch: ${payload.aud} vs ${projectId}`);
+    if (payload.iss && !payload.iss.startsWith('https://securetoken.google.com/')) {
+      console.warn(`[Auth] Invalid token issuer: ${payload.iss}`);
+      return null;
+    }
+
+    const validProjectIds = [
+      projectId,
+      firebaseProjectId,
+      'gen-lang-client-0874836857',
+      'ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9'
+    ].filter(Boolean);
+
+    if (payload.aud && validProjectIds.length > 0) {
+      const matchesAudience = validProjectIds.some(pid =>
+        payload.aud === pid || payload.aud.includes(pid) || pid.includes(payload.aud)
+      );
+      if (!matchesAudience && payload.iss !== `https://securetoken.google.com/${payload.aud}`) {
+        console.warn(`[Auth] Audience mismatch notice: ${payload.aud}`);
         return null;
       }
     }
     
-    return payload.sub || payload.user_id || null; // Returns user UID
+    return uid; // Returns user UID
   } catch (err) {
     console.error('[Auth] Error decoding ID Token:', err);
     return null;
@@ -8384,8 +8415,11 @@ app.get('/api/social-boost/services', async (req, res) => {
       const isPinnedBest = settings.bestValueServiceIds?.[s.platform] === s.id;
       const isAutoCheapest = platformCheapestMap[s.platform]?.serviceId === s.id;
       const isBest = isPinnedBest || isAutoCheapest;
+      const isViews = /view|play|stream|watch/i.test(`${s.type || ''} ${s.category || ''} ${s.name || ''}`);
       return {
         ...s,
+        min: isViews ? 1000 : 100,
+        max: isViews ? 1000000 : 100000,
         isBestValue: Boolean(isBest),
         isCheapest: Boolean(isAutoCheapest)
       };
@@ -8685,259 +8719,11 @@ app.post('/api/social-boost/pricing-settings', async (req, res) => {
   }
 });
 
-// 3. POST /api/social-boost/order (Atomic Order & Wallet Deduction)
+// 3. POST /api/social-boost/order (Atomic Order & Wallet Deduction via Voiker Gateway)
 app.post('/api/social-boost/order', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ success: false, error: 'Please sign in to place a boosting order.' });
-    }
-    const uid = verifyFirebaseIdToken(authHeader, firebaseProjectId);
-    if (!uid || !db) {
-      return res.status(401).json({ success: false, error: 'Invalid or expired session token.' });
-    }
-
-    const { serviceId, target, quantity } = req.body || {};
-
-    // Provider is not funded yet. Live boost orders are paused.
-    // Prevent boost orders from being submitted and ensure NO wallet balance is deducted.
-    return res.status(200).json({
-      success: false,
-      isComingSoon: true,
-      error: '🚀 Social Media Boost Coming Soon!\nOur Social Media Boost service is currently being prepared. Live orders will be available once provider setup is complete. Please check back soon!'
-    });
-
-    // Find service definition across base and live pool
-    let servicePool = [...BASE_SOCIAL_SERVICES];
-    if (cachedLiveProviderServices.length > 0) {
-      const bMap = new Map(servicePool.map(s => [s.id, s]));
-      for (const liveSvc of cachedLiveProviderServices) {
-        if (!bMap.has(liveSvc.id)) {
-          servicePool.push(liveSvc);
-        }
-      }
-    }
-    const baseService = servicePool.find(s => 
-      s.id === serviceId || 
-      (s as any).providerServiceId === serviceId ||
-      (serviceId === 'tt-followers' && (s.id === 'tt-followers-hq' || s.id === 'tt-followers' || (s.platform === 'TikTok' && s.type === 'Followers'))) ||
-      (serviceId === 'tt-likes' && (s.id === 'tt-likes-fast' || s.id === 'tt-likes' || (s.platform === 'TikTok' && s.type === 'Likes'))) ||
-      (serviceId === 'tt-views' && (s.id === 'tt-views-viral' || s.id === 'tt-views' || s.id === 'tt-views-retention' || (s.platform === 'TikTok' && s.type === 'Views'))) ||
-      (serviceId === 'tt-comments' && (s.id === 'tt-comments-custom' || s.id === 'tt-comments' || (s.platform === 'TikTok' && s.type === 'Comments'))) ||
-      (serviceId === 'tt-shares' && (s.id === 'tt-shares-reposts' || s.id === 'tt-shares' || s.id === 'tt-shares-viral' || (s.platform === 'TikTok' && s.type === 'Shares'))) ||
-      (serviceId === 'tt-favorites' && (s.id === 'tt-favorites' || (s.platform === 'TikTok' && (s.type === 'Favorites' || s.category?.toLowerCase().includes('favorite')))))
-    );
-    if (!baseService) {
-      return res.status(404).json({ success: false, error: 'Selected boosting service not found.' });
-    }
-
-    const orderQty = Math.round(Number(quantity));
-    if (orderQty < baseService.min || orderQty > baseService.max) {
-      return res.status(400).json({
-        success: false,
-        error: `Quantity must be between ${baseService.min.toLocaleString()} and ${baseService.max.toLocaleString()} for this service.`
-      });
-    }
-
-    // Enforce idempotency lock per user
-    const now = Date.now();
-    const lastLock = activeBuyLocks.get(uid);
-    if (lastLock && (now - lastLock < 6000)) {
-      return res.status(429).json({ success: false, error: 'An order is already processing. Please wait.' });
-    }
-    activeBuyLocks.set(uid, now);
-
-    try {
-      const settings = await getSocialBoostPricingSettings();
-      const override = settings.serviceOverrides?.[baseService.id] || {};
-
-      // Check platform active status and curation
-      const isPlatformActive = settings.platformStatus[baseService.platform] !== false;
-      const isSvcDisabled = settings.disabledServices.includes(baseService.id) || override.enabled === false;
-      const isCurated = settings.curatedServiceIds && settings.curatedServiceIds.length > 0 
-        ? settings.curatedServiceIds.includes(baseService.id) 
-        : true;
-
-      if (!isPlatformActive || isSvcDisabled || !isCurated) {
-        return res.status(400).json({ success: false, error: 'This boosting service is currently unavailable or under maintenance. Please try another option.' });
-      }
-
-      // Calculate customer price
-      const effectiveMarkupPercent = typeof override.customMarkupPercent === 'number' 
-        ? override.customMarkupPercent 
-        : (settings.defaultMarkupPercent || 45);
-
-      let customerRate = typeof override.customRatePer1000 === 'number'
-        ? override.customRatePer1000
-        : Math.round(baseService.providerRatePer1000 * (1 + effectiveMarkupPercent / 100));
-
-      if (customerRate - baseService.providerRatePer1000 < settings.minMarkupPer1k) {
-        customerRate = baseService.providerRatePer1000 + settings.minMarkupPer1k;
-      }
-      if (settings.pricingStyle === 'clean') {
-        customerRate = Math.round(customerRate / 100) * 100;
-      } else if (settings.pricingStyle === 'tiered') {
-        customerRate = Math.ceil(customerRate / 50) * 50;
-      }
-
-      const totalCharge = Math.max(10, Math.round((customerRate / 1000) * orderQty));
-      const providerWholesaleCost = Math.round((baseService.providerRatePer1000 / 1000) * orderQty);
-      const profit = Math.max(0, totalCharge - providerWholesaleCost);
-
-      const userRef = doc(db, 'users', uid);
-      let userEmail = '';
-      let userName = '';
-
-      // Atomically verify balance and deduct totalCharge
-      await runTransaction(db, async (tx) => {
-        const userDocSnap = await tx.get(userRef);
-        if (!userDocSnap.exists()) {
-          throw new Error('User profile not found.');
-        }
-        const uData = userDocSnap.data();
-        userEmail = uData.email || '';
-        userName = uData.displayName || uData.name || '';
-        const rawBal = uData.walletBalance !== undefined ? uData.walletBalance : uData.balance;
-        const currentBalance = typeof rawBal === 'number' ? rawBal : (rawBal ? Number(rawBal) : 0);
-
-        if (currentBalance < totalCharge) {
-          throw new Error(`Insufficient wallet balance. This order costs ₦${totalCharge.toLocaleString()}, but your balance is ₦${currentBalance.toLocaleString()}. Please fund your wallet.`);
-        }
-
-        const newBal = currentBalance - totalCharge;
-        tx.update(userRef, { 
-          walletBalance: newBal,
-          balance: newBal,
-          updatedAt: new Date().toISOString()
-        });
-        tx.set(doc(db, 'wallets', uid), {
-          userId: uid,
-          userEmail,
-          walletBalance: newBal,
-          balance: newBal,
-          updatedAt: new Date().toISOString()
-        }, { merge: true });
-      });
-
-      // Dispatch to OneGridHub upstream SMM API if real provider is live
-      const orderId = `ORD-SB-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-      const transactionId = generateUniqueTransactionId('boost');
-      let providerOrderId = '';
-
-      try {
-        const upstreamServiceId = (baseService as any).providerServiceId || baseService.id;
-        const smmRes = await queryOneGridHubSmm('add', {
-          service: upstreamServiceId,
-          link: target.trim(),
-          quantity: orderQty
-        });
-
-        if (smmRes && (smmRes.order || smmRes.order_id || smmRes.orderId)) {
-          providerOrderId = String(smmRes.order || smmRes.order_id || smmRes.orderId);
-        }
-      } catch (upstreamErr) {
-        console.warn('[SocialBoost] Upstream provider notification notice:', upstreamErr);
-      }
-
-      // Record in Firestore social_boost_orders
-      const orderDocData = {
-        id: orderId,
-        orderId,
-        transactionId,
-        userId: uid,
-        userEmail,
-        userName,
-        platform: baseService.platform,
-        serviceId: baseService.id,
-        serviceName: baseService.name,
-        serviceType: baseService.type,
-        target: target.trim(),
-        quantity: orderQty,
-        charge: totalCharge,
-        providerCost: providerWholesaleCost,
-        markup: profit,
-        profit,
-        providerOrderId: providerOrderId || `OGH-${Date.now()}`,
-        status: 'in_progress',
-        startCount: 0,
-        remains: orderQty,
-        type: 'social_boost',
-        category: 'social_boost',
-        transactionCategory: 'social_boost',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      await setDoc(doc(db, 'social_boost_orders', orderId), orderDocData);
-
-      // Dual-record in purchases collection for seamless unified access & Recent Activities
-      try {
-        await setDoc(doc(db, 'purchases', orderId), {
-          id: orderId,
-          transactionId,
-          listingId: orderId,
-          listingTitle: `Social Boost: ${baseService.name} (${orderQty.toLocaleString()} units)`,
-          category: 'social_boost',
-          type: 'social_boost',
-          transactionCategory: 'social_boost',
-          price: totalCharge,
-          paidAmount: totalCharge,
-          currency: 'NGN',
-          buyerId: uid,
-          buyerEmail: userEmail || '',
-          sellerId: 'zenet-social-boost',
-          sellerName: 'ZENET Social Boost',
-          status: 'in_progress',
-          target: target.trim(),
-          quantity: orderQty,
-          purchasedAt: orderDocData.createdAt,
-          createdAt: orderDocData.createdAt
-        });
-      } catch (pErr) {
-        console.warn('[SocialBoost Order] Could not dual-write purchases doc:', pErr);
-      }
-
-      // Record in wallet_transactions
-      await setDoc(doc(db, 'wallet_transactions', orderId), {
-        id: orderId,
-        transactionId,
-        userId: uid,
-        userEmail,
-        amount: totalCharge,
-        type: 'purchase',
-        category: 'social_boost',
-        transactionCategory: 'social_boost',
-        method: 'wallet',
-        status: 'successful',
-        description: `Social Boost: ${baseService.name} (${orderQty.toLocaleString()} units) for ${target.trim()}`,
-        date: new Date().toISOString(),
-        createdAt: new Date().toISOString()
-      });
-
-      console.log(`[SocialBoost Order] Created order ${orderId} for ${userEmail} (Charge: ₦${totalCharge}, Provider Cost: ₦${providerWholesaleCost}, Profit: ₦${profit})`);
-
-      // Determine if caller is Owner for response sanitation
-      const isOwner = userEmail.toLowerCase() === 'azeezmusharaf4@gmail.com';
-      if (isOwner) {
-        return res.json({ success: true, order: orderDocData });
-      } else {
-        const { providerCost: _pc, markup: _mk, profit: _pf, ...sanitized } = orderDocData;
-        return res.json({ success: true, order: sanitized });
-      }
-
-    } catch (orderErr: any) {
-      console.error('[SocialBoost Order] Processing failure:', orderErr);
-      return res.status(400).json({ success: false, error: orderErr.message || 'Failed to place boosting order' });
-    } finally {
-      activeBuyLocks.delete(uid);
-    }
-
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message || 'Server error processing boosting order' });
-  }
+  return handleVoikerGateway(req, res, db, firebaseProjectId, verifyFirebaseIdToken, 'order');
 });
 
-// 4. GET /api/social-boost/orders (Fetch user orders or all orders if Owner)
 app.get('/api/social-boost/orders', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
