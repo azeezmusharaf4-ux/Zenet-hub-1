@@ -1,16 +1,25 @@
 import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction, ensureServerAuthenticated, parseAndVerifyToken } from './_firebase';
 
 // Helper to resolve Voiker API Key
-const getVoikerApiKey = (): string => (process.env.VOIKER_API_KEY || '').trim();
+const getVoikerApiKey = (fallbackKey?: string): string => (
+  process.env.VOIKER_API_KEY ||
+  process.env.VOIKA_API_KEY ||
+  process.env.SMM_API_KEY ||
+  process.env.VOIKER_KEY ||
+  process.env.VOIKA_KEY ||
+  fallbackKey ||
+  ''
+).trim();
 
 // Helper to resolve Voiker Base URL
 const getVoikerBaseUrl = (): string => (process.env.VOIKER_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');
 
 // Default pricing config
 const DEFAULT_PRICING = {
-  defaultMarkupPercent: 45,
-  minMarkupPer1k: 350,
-  usdToNgnRate: 1650,
+  defaultMarkupPercent: 0,
+  defaultMarkupFixedNgn: 0,
+  minMarkupPer1k: 0,
+  usdToNgnRate: 1348.45,
   pricingStyle: 'natural',
   platformStatus: {
     TikTok: true,
@@ -24,6 +33,15 @@ const DEFAULT_PRICING = {
     Threads: true,
     Discord: true,
     LinkedIn: true
+  },
+  categoryMarkups: {
+    Followers: { markupFixedNgn: 0, markupPercent: 0 },
+    Views: { markupFixedNgn: 0, markupPercent: 0 },
+    Likes: { markupFixedNgn: 0, markupPercent: 0 },
+    Comments: { markupFixedNgn: 0, markupPercent: 0 },
+    Shares: { markupFixedNgn: 0, markupPercent: 0 },
+    Subscribers: { markupFixedNgn: 0, markupPercent: 0 },
+    Other: { markupFixedNgn: 0, markupPercent: 0 }
   },
   disabledServices: [],
   curatedServiceIds: [],
@@ -105,8 +123,8 @@ const determineInput = (name: string, type: string, platform: string) => {
 };
 
 // Query Voiker API v2 (supports GET and POST)
-const queryVoiker = async (action: string, params: Record<string, any> = {}, method: 'POST' | 'GET' = 'POST'): Promise<any> => {
-  const apiKey = getVoikerApiKey();
+const queryVoiker = async (action: string, params: Record<string, any> = {}, method: 'POST' | 'GET' = 'POST', explicitApiKey?: string): Promise<any> => {
+  const apiKey = getVoikerApiKey(explicitApiKey);
   const baseUrl = getVoikerBaseUrl();
 
   const queryParams: Record<string, string> = {
@@ -449,38 +467,106 @@ export const handler = async (event: any) => {
         };
       }
 
-      // Provider confirmed order -> Deduct balance atomically
+      // Provider confirmed order -> Deduct balance atomically and record transactions
+      const orderId = `ORD-VK-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const txId = `TX-BOOST-${Date.now()}`;
+      let finalNewBalance = currentBal - totalCharge;
+
       await runTransaction(db, async (tx) => {
         const uS = await tx.get(userRef);
+        if (!uS.exists()) throw new Error('User profile not found');
         const cur = Number(uS.data()?.walletBalance ?? uS.data()?.balance ?? 0);
         if (cur < totalCharge) throw new Error('Insufficient wallet balance');
-        const finalBal = cur - totalCharge;
-        tx.update(userRef, { walletBalance: finalBal, balance: finalBal });
+        finalNewBalance = cur - totalCharge;
+        tx.update(userRef, { walletBalance: finalNewBalance, balance: finalNewBalance, updatedAt: new Date().toISOString() });
+        tx.set(doc(db, 'wallets', effectiveUserId), {
+          userId: effectiveUserId,
+          userEmail: uData.email || '',
+          walletBalance: finalNewBalance,
+          balance: finalNewBalance,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+
+        // Record in transactions collection
+        tx.set(doc(db, 'transactions', txId), {
+          id: txId,
+          userId: effectiveUserId,
+          userEmail: uData.email || '',
+          type: 'purchase',
+          category: 'boost',
+          amount: totalCharge,
+          currency: 'NGN',
+          status: 'completed',
+          description: `Social Boost: ${orderQty.toLocaleString()} ${(body.serviceName || serviceId)}`,
+          metadata: {
+            orderId,
+            provider: 'Voiker',
+            providerOrderId,
+            serviceId,
+            target: target.trim(),
+            quantity: orderQty
+          },
+          createdAt: new Date().toISOString()
+        });
+
+        // Record in wallet_transactions collection for dual-audit history
+        tx.set(doc(db, 'wallet_transactions', txId), {
+          id: txId,
+          userId: effectiveUserId,
+          userEmail: uData.email || '',
+          type: 'debit',
+          amount: totalCharge,
+          category: 'social_boost',
+          description: `Social Boost: ${orderQty.toLocaleString()} ${(body.serviceName || serviceId)}`,
+          status: 'completed',
+          reference: orderId,
+          createdAt: new Date().toISOString()
+        });
+
+        // Save order
+        tx.set(doc(db, 'social_boost_orders', orderId), {
+          id: orderId,
+          orderId,
+          transactionId: txId,
+          userId: effectiveUserId,
+          userEmail: uData.email || '',
+          userName: uData.displayName || uData.name || '',
+          provider: 'Voiker',
+          providerOrderId,
+          serviceId,
+          serviceName: body.serviceName || `Voiker #${cleanServiceId}`,
+          platform: body.platform || 'Social',
+          target: target.trim(),
+          quantity: orderQty,
+          ratePer1000,
+          price: totalCharge,
+          totalCharge,
+          charge: totalCharge,
+          status: initialStatus,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
       });
-
-      const orderId = `ORD-VK-${Date.now()}`;
-      const orderDoc = {
-        id: orderId,
-        orderId,
-        userId: effectiveUserId,
-        userEmail: uData.email || '',
-        provider: 'Voiker',
-        providerOrderId,
-        serviceId,
-        target: target.trim(),
-        quantity: orderQty,
-        price: totalCharge,
-        totalCharge,
-        status: initialStatus,
-        createdAt: new Date().toISOString()
-      };
-
-      await setDoc(doc(db, 'social_boost_orders', orderId), orderDoc);
 
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ success: true, message: 'Boosting order placed successfully!', order: orderDoc })
+        body: JSON.stringify({
+          success: true,
+          message: 'Boosting order placed successfully!',
+          newBalance: finalNewBalance,
+          order: {
+            id: orderId,
+            orderId,
+            providerOrderId,
+            serviceId,
+            target: target.trim(),
+            quantity: orderQty,
+            totalCharge,
+            status: initialStatus,
+            createdAt: new Date().toISOString()
+          }
+        })
       };
     }
 
@@ -566,6 +652,143 @@ export const handler = async (event: any) => {
         statusCode: 200,
         headers,
         body: JSON.stringify({ success: true, orders, count: orders.length })
+      };
+    }
+
+    // 8. POST & GET /pricing-settings
+    if (action === 'pricing-settings') {
+      if (event.httpMethod === 'POST') {
+        if (!isOwner) {
+          return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Forbidden: Owner permission required.' }) };
+        }
+        const newSettings = {
+          ...pricing,
+          ...body,
+          updatedAt: new Date().toISOString()
+        };
+        await setDoc(doc(db, 'system_settings', 'voiker_pricing'), newSettings, { merge: true });
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ success: true, message: 'Settings saved', settings: newSettings })
+        };
+      }
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, settings: pricing })
+      };
+    }
+
+    // 9. POST /save-markup
+    if (action === 'save-markup' && event.httpMethod === 'POST') {
+      if (!isOwner) {
+        return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Forbidden' }) };
+      }
+      const { serviceId, customMarkupFixedNgn, defaultMarkupFixedNgn } = body;
+      const currentOverrides = { ...(pricing.serviceOverrides || {}) };
+      if (serviceId) {
+        if (customMarkupFixedNgn === null || customMarkupFixedNgn === undefined || customMarkupFixedNgn === '' || customMarkupFixedNgn === 'reset') {
+          delete currentOverrides[serviceId];
+        } else {
+          currentOverrides[serviceId] = {
+            ...(currentOverrides[serviceId] || {}),
+            customMarkupFixedNgn: Math.max(0, Math.round(Number(customMarkupFixedNgn) || 0))
+          };
+        }
+      }
+      const newDef = typeof defaultMarkupFixedNgn === 'number' ? Math.max(0, Math.round(defaultMarkupFixedNgn)) : (pricing.defaultMarkupFixedNgn || 0);
+      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+        defaultMarkupFixedNgn: newDef,
+        serviceOverrides: currentOverrides,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, defaultMarkupFixedNgn: newDef, serviceOverrides: currentOverrides }) };
+    }
+
+    // 10. POST /save-bulk-markups
+    if ((action === 'save-bulk-markups' || action === 'bulk-markup') && event.httpMethod === 'POST') {
+      if (!isOwner) {
+        return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Forbidden' }) };
+      }
+      const { markups, categoryMarkups, defaultMarkupFixedNgn, defaultMarkupPercent } = body;
+      const currentOverrides = { ...(pricing.serviceOverrides || {}) };
+      if (markups && typeof markups === 'object') {
+        for (const [sId, mVal] of Object.entries(markups)) {
+          if (mVal === null || mVal === undefined || mVal === '' || mVal === 'reset') {
+            delete currentOverrides[sId];
+          } else {
+            currentOverrides[sId] = {
+              ...(currentOverrides[sId] || {}),
+              customMarkupFixedNgn: Math.max(0, Math.round(Number(mVal) || 0))
+            };
+          }
+        }
+      }
+      const currentCategoryMarkups = { ...(pricing.categoryMarkups || {}) };
+      if (categoryMarkups && typeof categoryMarkups === 'object') {
+        for (const [cat, val] of Object.entries(categoryMarkups)) {
+          if (val && typeof val === 'object') {
+            currentCategoryMarkups[cat] = {
+              markupFixedNgn: Math.max(0, Math.round(Number((val as any).markupFixedNgn) || 0)),
+              markupPercent: Math.max(0, Math.min(500, Number((val as any).markupPercent) || 0))
+            };
+          }
+        }
+      }
+      const newDefFixed = typeof defaultMarkupFixedNgn === 'number' ? Math.max(0, Math.round(defaultMarkupFixedNgn)) : (pricing.defaultMarkupFixedNgn || 0);
+      const newDefPct = typeof defaultMarkupPercent === 'number' ? Math.max(0, Math.min(300, Math.round(defaultMarkupPercent))) : (pricing.defaultMarkupPercent || 0);
+      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+        categoryMarkups: currentCategoryMarkups,
+        defaultMarkupFixedNgn: newDefFixed,
+        defaultMarkupPercent: newDefPct,
+        serviceOverrides: currentOverrides,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          defaultMarkupFixedNgn: newDefFixed,
+          defaultMarkupPercent: newDefPct,
+          categoryMarkups: currentCategoryMarkups,
+          serviceOverrides: currentOverrides
+        })
+      };
+    }
+
+    // 11. POST /save-category-markups
+    if (action === 'save-category-markups' && event.httpMethod === 'POST') {
+      if (!isOwner) {
+        return { statusCode: 403, headers, body: JSON.stringify({ success: false, error: 'Forbidden' }) };
+      }
+      const { categoryMarkups, defaultMarkupFixedNgn } = body;
+      const currentCategoryMarkups = { ...(pricing.categoryMarkups || {}) };
+      if (categoryMarkups && typeof categoryMarkups === 'object') {
+        for (const [cat, val] of Object.entries(categoryMarkups)) {
+          if (val && typeof val === 'object') {
+            currentCategoryMarkups[cat] = {
+              markupFixedNgn: Math.max(0, Math.round(Number((val as any).markupFixedNgn) || 0)),
+              markupPercent: Math.max(0, Math.min(500, Number((val as any).markupPercent) || 0))
+            };
+          }
+        }
+      }
+      const newDefFixed = typeof defaultMarkupFixedNgn === 'number' ? Math.max(0, Math.round(defaultMarkupFixedNgn)) : (pricing.defaultMarkupFixedNgn || 0);
+      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+        categoryMarkups: currentCategoryMarkups,
+        defaultMarkupFixedNgn: newDefFixed,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          categoryMarkups: currentCategoryMarkups,
+          defaultMarkupFixedNgn: newDefFixed
+        })
       };
     }
 

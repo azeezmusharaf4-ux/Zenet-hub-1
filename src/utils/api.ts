@@ -105,7 +105,7 @@ export const getNetlifyFunctionFallback = (path: string): string | null => {
   if (pathname.startsWith('/api/social-boost')) {
     const sub = pathname.replace('/api/social-boost', '').replace(/^\//, '');
     const actionParam = sub ? (qs ? `&action=${sub}` : `?action=${sub}`) : '';
-    return `/.netlify/functions/social-boost${qs}${actionParam}`;
+    return `/.netlify/functions/voiker${qs}${actionParam}`;
   }
   if (pathname.startsWith('/api/service-number-2')) {
     const sub = pathname.replace('/api/service-number-2', '').replace(/^\//, '');

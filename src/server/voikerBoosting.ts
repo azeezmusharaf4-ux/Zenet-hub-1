@@ -1,10 +1,65 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { Firestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction } from 'firebase/firestore';
+import { Firestore, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction, getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { isAuthorizedOwnerEmail, isAuthorizedOwnerUid } from '../lib/authorizedOwners.ts';
 import { sendSocialBoostOrderSuccessEmail } from './emailService.ts';
+
+// Default built-in Firebase credentials with environment variable overrides
+export const DEFAULT_FIREBASE_CONFIG = {
+  projectId: process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0874836857",
+  appId: process.env.FIREBASE_APP_ID || "1:547531748438:web:d46a93954047839330b7f7",
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCV6oap4QQtnQyG8lD0l42L8UTKZfaFJIc",
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "gen-lang-client-0874836857.firebaseapp.com",
+  firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID || "ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "gen-lang-client-0874836857.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "547531748438",
+};
+
+let cachedFallbackDb: Firestore | null = null;
+
+export const getOrInitFirestoreDb = (existingDb?: Firestore | null): Firestore => {
+  if (existingDb) return existingDb;
+  if (cachedFallbackDb) return cachedFallbackDb;
+
+  let cfg = { ...DEFAULT_FIREBASE_CONFIG };
+  const candidatePaths = [
+    path.join(process.cwd(), 'firebase-applet-config.json'),
+    path.join(__dirname, 'firebase-applet-config.json'),
+    path.join(__dirname, '../..', 'firebase-applet-config.json'),
+    path.join(__dirname, '..', 'firebase-applet-config.json')
+  ];
+
+  for (const p of candidatePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        const fileContent = JSON.parse(fs.readFileSync(p, 'utf8'));
+        cfg = { ...cfg, ...fileContent };
+        break;
+      }
+    } catch {}
+  }
+
+  try {
+    const app = getApps().length > 0 ? getApp() : initializeApp({
+      apiKey: cfg.apiKey,
+      authDomain: cfg.authDomain,
+      projectId: cfg.projectId,
+      storageBucket: cfg.storageBucket,
+      messagingSenderId: cfg.messagingSenderId,
+      appId: cfg.appId,
+    });
+    cachedFallbackDb = getFirestore(app, cfg.firestoreDatabaseId || undefined);
+    return cachedFallbackDb;
+  } catch (err: any) {
+    console.warn('[Voiker] Firestore initialization fallback notice:', err?.message || err);
+    const app = getApps()[0] || initializeApp(cfg);
+    cachedFallbackDb = getFirestore(app);
+    return cachedFallbackDb;
+  }
+};
 
 // ============================================================================
 // VOIKER BOOSTING GATEWAY & SERVICE INTEGRATION (VOIKER.COM SMM API V2)
@@ -252,7 +307,15 @@ const userOrderLocks = new Map<string, number>();
 
 // Helper: Get Voiker API configuration securely from server environment or admin pricing settings
 export const getVoikerConfig = (): VoikerConfig => {
-  const apiKey = (process.env.VOIKER_API_KEY || process.env.VOIKA_API_KEY || cachedPricingSettings.apiKey || '').trim();
+  const apiKey = (
+    process.env.VOIKER_API_KEY ||
+    process.env.VOIKA_API_KEY ||
+    process.env.SMM_API_KEY ||
+    process.env.VOIKER_KEY ||
+    process.env.VOIKA_KEY ||
+    cachedPricingSettings.apiKey ||
+    ''
+  ).trim();
   const baseUrl = (process.env.VOIKER_BASE_URL || process.env.VOIKA_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');
   const usdToNgnRate = cachedLiveExchangeRate?.rate || cachedPricingSettings.usdToNgnRate || 1348.45;
   return {
@@ -497,14 +560,14 @@ export const normalizeVoikerService = (
 };
 
 // Load Pricing Settings from Firestore with 60s in-memory caching
-export const loadVoikerPricingSettings = async (db: Firestore | null, forceRefresh: boolean = false): Promise<VoikerPricingSettings> => {
-  if (!db) return cachedPricingSettings;
+export const loadVoikerPricingSettings = async (db?: Firestore | null, forceRefresh: boolean = false): Promise<VoikerPricingSettings> => {
+  const activeDb = getOrInitFirestoreDb(db);
   const now = Date.now();
   if (!forceRefresh && lastPricingSettingsLoadTime > 0 && (now - lastPricingSettingsLoadTime < PRICING_SETTINGS_CACHE_TTL_MS)) {
     return cachedPricingSettings;
   }
   try {
-    const docSnap = await getDoc(doc(db, 'system_settings', 'voiker_pricing'));
+    const docSnap = await getDoc(doc(activeDb, 'system_settings', 'voiker_pricing'));
     if (docSnap.exists()) {
       const data = docSnap.data();
       cachedPricingSettings = {
@@ -522,7 +585,7 @@ export const loadVoikerPricingSettings = async (db: Firestore | null, forceRefre
       }
     } else {
       // Fallback check social_boost_pricing
-      const sbSnap = await getDoc(doc(db, 'system_settings', 'social_boost_pricing'));
+      const sbSnap = await getDoc(doc(activeDb, 'system_settings', 'social_boost_pricing'));
       if (sbSnap.exists()) {
         const sbData = sbSnap.data();
         cachedPricingSettings = {
@@ -943,11 +1006,12 @@ export const handleVoikerGateway = async (
   res.setHeader('Content-Type', 'application/json');
 
   try {
+    const activeDb = getOrInitFirestoreDb(db);
     const method = req.method;
     const action = (explicitAction || req.query.action || req.body.action || '').toString().toLowerCase();
 
     const config = getVoikerConfig();
-    const settings = await loadVoikerPricingSettings(db);
+    const settings = await loadVoikerPricingSettings(activeDb);
 
     // Helper: Determine if caller is an authorized owner (Super Admin)
     const isOwnerRequest = async (): Promise<boolean> => {
@@ -961,8 +1025,8 @@ export const handleVoikerGateway = async (
         if (isAuthorizedOwnerEmail(emailCandidate) || (authUid && isAuthorizedOwnerUid(authUid))) {
           return true;
         }
-        if (authUid && db) {
-          const userRef = doc(db, 'users', authUid);
+        if (authUid && activeDb) {
+          const userRef = doc(activeDb, 'users', authUid);
           const userSnap = await getDoc(userRef);
           if (userSnap.exists()) {
             const udata = userSnap.data();
@@ -986,7 +1050,7 @@ export const handleVoikerGateway = async (
     if (action === 'counts' || action === 'summary' || req.query.countsOnly === 'true' || req.query.summary === 'true') {
       const forceRefresh = req.query.refresh === 'true';
       if (!cachedPlatformCounts || cachedVoikerServices.length === 0 || forceRefresh) {
-        await fetchVoikerServicesCatalogue(db, forceRefresh);
+        await fetchVoikerServicesCatalogue(activeDb, forceRefresh);
       }
       res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
       return res.json({
@@ -1007,7 +1071,7 @@ export const handleVoikerGateway = async (
       const forceRefresh = req.query.refresh === 'true' || action === 'sync-catalogue';
 
       if (cachedVoikerServices.length === 0 || forceRefresh) {
-        await fetchVoikerServicesCatalogue(db, forceRefresh);
+        await fetchVoikerServicesCatalogue(activeDb, forceRefresh);
       }
 
       const services = cachedVoikerServices.map(svc => {
@@ -1219,10 +1283,6 @@ export const handleVoikerGateway = async (
         return res.status(401).json({ success: false, error: 'Invalid or expired session token. Please sign in again.' });
       }
 
-      if (!db) {
-        return res.status(503).json({ success: false, error: 'Database service is currently initializing. Please try again in a moment.' });
-      }
-
       const { serviceId, target, quantity, comments } = req.body;
       if (!serviceId || !target || !quantity || Number(quantity) <= 0) {
         return res.status(400).json({ success: false, error: 'serviceId, target URL or username, and quantity are required.' });
@@ -1237,7 +1297,7 @@ export const handleVoikerGateway = async (
       userOrderLocks.set(uid, now);
 
       if (cachedVoikerServices.length === 0) {
-        await fetchVoikerServicesCatalogue();
+        await fetchVoikerServicesCatalogue(activeDb);
       }
 
       // Match service
@@ -1278,7 +1338,7 @@ export const handleVoikerGateway = async (
       const profit = Math.max(0, totalCharge - providerWholesaleCost);
 
       // 3a. USER WALLET BALANCE PRE-CHECK
-      const userRef = doc(db, 'users', uid);
+      const userRef = doc(activeDb, 'users', uid);
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) {
         return res.status(404).json({ success: false, error: 'User profile not found.' });
@@ -1364,7 +1424,7 @@ export const handleVoikerGateway = async (
       // 3c. PROVIDER CONFIRMED ALLOCATION -> ATOMICALLY DEBIT USER WALLET & SAVE ORDER
       let finalNewBalance = currentBal - totalCharge;
       try {
-        await runTransaction(db, async (tx) => {
+        await runTransaction(activeDb, async (tx) => {
           const uSnap = await tx.get(userRef);
           if (!uSnap.exists()) throw new Error('User profile not found.');
           const cur = Number(uSnap.data().walletBalance ?? uSnap.data().balance ?? 0);
@@ -1378,7 +1438,7 @@ export const handleVoikerGateway = async (
             balance: finalNewBalance,
             updatedAt: new Date().toISOString()
           });
-          tx.set(doc(db, 'wallets', uid), {
+          tx.set(doc(activeDb, 'wallets', uid), {
             userId: uid,
             userEmail,
             walletBalance: finalNewBalance,
@@ -1386,8 +1446,8 @@ export const handleVoikerGateway = async (
             updatedAt: new Date().toISOString()
           }, { merge: true });
 
-          // Record transaction
-          tx.set(doc(db, 'transactions', txId), {
+          // Record transaction in transactions collection
+          tx.set(doc(activeDb, 'transactions', txId), {
             id: txId,
             userId: uid,
             userEmail,
@@ -1408,8 +1468,22 @@ export const handleVoikerGateway = async (
             createdAt: new Date().toISOString()
           });
 
+          // Record transaction in wallet_transactions collection for dual-audit history
+          tx.set(doc(activeDb, 'wallet_transactions', txId), {
+            id: txId,
+            userId: uid,
+            userEmail,
+            type: 'debit',
+            amount: totalCharge,
+            category: 'social_boost',
+            description: `Social Boost: ${orderQty.toLocaleString()} ${matchedSvc.name} (${matchedSvc.platform})`,
+            status: 'completed',
+            reference: orderId,
+            createdAt: new Date().toISOString()
+          });
+
           // Record order in Firestore
-          tx.set(doc(db, 'social_boost_orders', orderId), {
+          tx.set(doc(activeDb, 'social_boost_orders', orderId), {
             id: orderId,
             orderId,
             transactionId: txId,
@@ -1452,7 +1526,7 @@ export const handleVoikerGateway = async (
             quantity: orderQty,
             amount: totalCharge,
             orderId,
-            db
+            db: activeDb
           }).catch(e => console.warn('[Voiker] Order success email notice:', e.message));
         }
       } catch (txErr: any) {
@@ -1513,13 +1587,13 @@ export const handleVoikerGateway = async (
 
       // Check if orderParam is internal ZENET HUB order ID or Voiker provider order ID
       let matchedOrderDoc: any = null;
-      if (db) {
-        const orderSnap = await getDoc(doc(db, 'social_boost_orders', orderParam));
+      if (activeDb) {
+        const orderSnap = await getDoc(doc(activeDb, 'social_boost_orders', orderParam));
         if (orderSnap.exists()) {
           matchedOrderDoc = orderSnap.data();
         } else {
           // Search by providerOrderId
-          const qSnap = await getDocs(query(collection(db, 'social_boost_orders'), where('providerOrderId', '==', orderParam)));
+          const qSnap = await getDocs(query(collection(activeDb, 'social_boost_orders'), where('providerOrderId', '==', orderParam)));
           if (!qSnap.empty) {
             matchedOrderDoc = qSnap.docs[0].data();
           }
@@ -1543,7 +1617,7 @@ export const handleVoikerGateway = async (
       try {
         const vStatus = await queryVoikerApi('status', { order: voikerOrderId }, 8000, 'GET');
 
-        if (vStatus && vStatus.status && matchedOrderDoc && db) {
+        if (vStatus && vStatus.status && matchedOrderDoc && activeDb) {
           const rawStat = String(vStatus.status).toLowerCase();
           let newStatus = matchedOrderDoc.status;
 
@@ -1557,15 +1631,15 @@ export const handleVoikerGateway = async (
             newStatus = 'cancelled';
             // Auto refund if cancelled by provider
             if (!matchedOrderDoc.refunded) {
-              const uRef = doc(db, 'users', matchedOrderDoc.userId);
+              const uRef = doc(activeDb, 'users', matchedOrderDoc.userId);
               const refundAmount = Number(matchedOrderDoc.price || matchedOrderDoc.totalCharge || 0);
-              await runTransaction(db, async (tx) => {
+              await runTransaction(activeDb, async (tx) => {
                 const uSnap = await tx.get(uRef);
                 if (uSnap.exists()) {
                   const cur = Number(uSnap.data().walletBalance || 0);
                   tx.update(uRef, { walletBalance: cur + refundAmount });
                 }
-                tx.update(doc(db, 'social_boost_orders', matchedOrderDoc.id), {
+                tx.update(doc(activeDb, 'social_boost_orders', matchedOrderDoc.id), {
                   status: 'cancelled',
                   refunded: true,
                   refundedAt: new Date().toISOString(),
@@ -1580,7 +1654,7 @@ export const handleVoikerGateway = async (
             matchedOrderDoc.status = newStatus;
             matchedOrderDoc.startCount = vStatus.start_count ?? matchedOrderDoc.startCount;
             matchedOrderDoc.remains = vStatus.remains ?? matchedOrderDoc.remains;
-            await updateDoc(doc(db, 'social_boost_orders', matchedOrderDoc.id), {
+            await updateDoc(doc(activeDb, 'social_boost_orders', matchedOrderDoc.id), {
               status: newStatus,
               startCount: vStatus.start_count ?? null,
               remains: vStatus.remains ?? null,
@@ -1610,7 +1684,7 @@ export const handleVoikerGateway = async (
         return res.status(401).json({ success: false, error: 'Authentication required.' });
       }
       const uid = verifyFirebaseIdToken(authHeader, firebaseProjectId);
-      if (!uid || !db) {
+      if (!uid || !activeDb) {
         return res.status(401).json({ success: false, error: 'Unauthorized.' });
       }
 
@@ -1621,7 +1695,7 @@ export const handleVoikerGateway = async (
         return res.status(400).json({ success: false, error: 'Order ID is required.' });
       }
 
-      const orderRef = doc(db, 'social_boost_orders', orderParam);
+      const orderRef = doc(activeDb, 'social_boost_orders', orderParam);
       const orderSnap = await getDoc(orderRef);
       if (!orderSnap.exists()) {
         return res.status(404).json({ success: false, error: 'Boosting order not found.' });
@@ -1682,7 +1756,7 @@ export const handleVoikerGateway = async (
         return res.status(401).json({ success: false, error: 'Authentication required.' });
       }
       const uid = verifyFirebaseIdToken(authHeader, firebaseProjectId);
-      if (!uid || !db) {
+      if (!uid || !activeDb) {
         return res.status(401).json({ success: false, error: 'Unauthorized.' });
       }
 
@@ -1693,7 +1767,7 @@ export const handleVoikerGateway = async (
         return res.status(400).json({ success: false, error: 'Order ID is required.' });
       }
 
-      const orderRef = doc(db, 'social_boost_orders', orderParam);
+      const orderRef = doc(activeDb, 'social_boost_orders', orderParam);
       const orderSnap = await getDoc(orderRef);
       if (!orderSnap.exists()) {
         return res.status(404).json({ success: false, error: 'Boosting order not found.' });
@@ -1740,8 +1814,8 @@ export const handleVoikerGateway = async (
           // Atomic refund to customer wallet
           const refundAmount = Number(orderData.price || orderData.totalCharge || 0);
           if (!orderData.refunded && refundAmount > 0) {
-            const userRef = doc(db, 'users', orderData.userId);
-            await runTransaction(db, async (tx) => {
+            const userRef = doc(activeDb, 'users', orderData.userId);
+            await runTransaction(activeDb, async (tx) => {
               const uSnap = await tx.get(userRef);
               if (uSnap.exists()) {
                 const cur = Number(uSnap.data().walletBalance || 0);
@@ -1783,12 +1857,12 @@ export const handleVoikerGateway = async (
           uid = candidateUid;
         }
       }
-      if (!uid || !db) {
+      if (!uid || !activeDb) {
         return res.status(401).json({ success: false, error: 'Authentication required' });
       }
 
       const isOwner = await isOwnerRequest();
-      const ordersCol = collection(db, 'social_boost_orders');
+      const ordersCol = collection(activeDb, 'social_boost_orders');
       let q = query(ordersCol, where('userId', '==', uid));
       if (isOwner && req.query.all === 'true') {
         q = query(ordersCol);
@@ -1837,15 +1911,15 @@ export const handleVoikerGateway = async (
                   newStatus = 'cancelled';
                   // Automatic refund if canceled/failed upstream
                   if (!actOrder.refunded) {
-                    const uRef = doc(db, 'users', actOrder.userId);
+                    const uRef = doc(activeDb, 'users', actOrder.userId);
                     const refundAmount = Number(actOrder.price || actOrder.totalCharge || 0);
-                    await runTransaction(db, async (tx) => {
+                    await runTransaction(activeDb, async (tx) => {
                       const uSnap = await tx.get(uRef);
                       if (uSnap.exists()) {
                         const cur = Number(uSnap.data().walletBalance || 0);
                         tx.update(uRef, { walletBalance: cur + refundAmount });
                       }
-                      tx.update(doc(db, 'social_boost_orders', actOrder.id), {
+                      tx.update(doc(activeDb, 'social_boost_orders', actOrder.id), {
                         status: 'cancelled',
                         refunded: true,
                         refundedAt: new Date().toISOString(),
@@ -1860,14 +1934,14 @@ export const handleVoikerGateway = async (
                     const remains = Number(statusInfo.remains) || 0;
                     const refundAmount = Math.round((remains / Number(actOrder.quantity)) * Number(actOrder.price || 0));
                     if (refundAmount > 0) {
-                      const uRef = doc(db, 'users', actOrder.userId);
-                      await runTransaction(db, async (tx) => {
+                      const uRef = doc(activeDb, 'users', actOrder.userId);
+                      await runTransaction(activeDb, async (tx) => {
                         const uSnap = await tx.get(uRef);
                         if (uSnap.exists()) {
                           const cur = Number(uSnap.data().walletBalance || 0);
                           tx.update(uRef, { walletBalance: cur + refundAmount });
                         }
-                        tx.update(doc(db, 'social_boost_orders', actOrder.id), {
+                        tx.update(doc(activeDb, 'social_boost_orders', actOrder.id), {
                           status: 'partial',
                           partialRefunded: true,
                           partialRefundAmount: refundAmount,
@@ -1884,7 +1958,7 @@ export const handleVoikerGateway = async (
                   actOrder.status = newStatus;
                   actOrder.startCount = statusInfo.start_count ?? actOrder.startCount ?? null;
                   actOrder.remains = statusInfo.remains ?? actOrder.remains ?? null;
-                  await updateDoc(doc(db, 'social_boost_orders', actOrder.id), {
+                  await updateDoc(doc(activeDb, 'social_boost_orders', actOrder.id), {
                     status: newStatus,
                     startCount: actOrder.startCount,
                     remains: actOrder.remains,
@@ -1914,7 +1988,7 @@ export const handleVoikerGateway = async (
       if (!isOwner) {
         return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
       }
-      if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+      if (!activeDb) return res.status(500).json({ success: false, error: 'Database not ready' });
 
       const {
         defaultMarkupPercent,
@@ -1953,7 +2027,7 @@ export const handleVoikerGateway = async (
         newSettings.apiKey = cachedPricingSettings.apiKey;
       }
 
-      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), newSettings, { merge: true });
+      await setDoc(doc(activeDb, 'system_settings', 'voiker_pricing'), newSettings, { merge: true });
       cachedPricingSettings = newSettings;
       lastPricingSettingsLoadTime = Date.now();
 
@@ -2003,7 +2077,7 @@ export const handleVoikerGateway = async (
       if (!isOwner) {
         return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
       }
-      if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+      if (!activeDb) return res.status(500).json({ success: false, error: 'Database not ready' });
 
       const { serviceId, customMarkupFixedNgn, defaultMarkupFixedNgn } = req.body;
       const currentOverrides = { ...(cachedPricingSettings.serviceOverrides || {}) };
@@ -2040,7 +2114,7 @@ export const handleVoikerGateway = async (
         serviceOverrides: currentOverrides
       };
 
-      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+      await setDoc(doc(activeDb, 'system_settings', 'voiker_pricing'), {
         defaultMarkupFixedNgn: newDefaultMarkup,
         serviceOverrides: currentOverrides,
         updatedAt: new Date().toISOString()
@@ -2064,7 +2138,7 @@ export const handleVoikerGateway = async (
       if (!isOwner) {
         return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
       }
-      if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+      if (!activeDb) return res.status(500).json({ success: false, error: 'Database not ready' });
 
       const { markups, categoryMarkups, defaultMarkupFixedNgn, defaultMarkupPercent } = req.body;
       const currentOverrides = { ...(cachedPricingSettings.serviceOverrides || {}) };
@@ -2121,7 +2195,7 @@ export const handleVoikerGateway = async (
         serviceOverrides: currentOverrides
       };
 
-      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+      await setDoc(doc(activeDb, 'system_settings', 'voiker_pricing'), {
         categoryMarkups: currentCategoryMarkups,
         defaultMarkupFixedNgn: newDefaultMarkup,
         defaultMarkupPercent: newDefaultPercent,
@@ -2149,7 +2223,7 @@ export const handleVoikerGateway = async (
       if (!isOwner) {
         return res.status(403).json({ success: false, error: 'Forbidden: Owner permission required.' });
       }
-      if (!db) return res.status(500).json({ success: false, error: 'Database not ready' });
+      if (!activeDb) return res.status(500).json({ success: false, error: 'Database not ready' });
 
       const { categoryMarkups, defaultMarkupFixedNgn } = req.body;
       const currentCategoryMarkups = { ...(cachedPricingSettings.categoryMarkups || {}) };
@@ -2175,7 +2249,7 @@ export const handleVoikerGateway = async (
         defaultMarkupFixedNgn: newDefaultMarkup
       };
 
-      await setDoc(doc(db, 'system_settings', 'voiker_pricing'), {
+      await setDoc(doc(activeDb, 'system_settings', 'voiker_pricing'), {
         categoryMarkups: currentCategoryMarkups,
         defaultMarkupFixedNgn: newDefaultMarkup,
         updatedAt: new Date().toISOString()

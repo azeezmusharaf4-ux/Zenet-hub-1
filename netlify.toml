@@ -202,7 +202,7 @@
 # Voiker Boosting Provider endpoints
 [[redirects]]
   from = "/api/voiker/*"
-  to = "/.netlify/functions/voiker"
+  to = "/.netlify/functions/voiker?action=:splat"
   status = 200
   force = true
 
@@ -215,13 +215,13 @@
 # Social Boost endpoints
 [[redirects]]
   from = "/api/social-boost/*"
-  to = "/.netlify/functions/social-boost"
+  to = "/.netlify/functions/voiker?action=:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/api/social-boost"
-  to = "/.netlify/functions/social-boost"
+  to = "/.netlify/functions/voiker"
   status = 200
   force = true
 

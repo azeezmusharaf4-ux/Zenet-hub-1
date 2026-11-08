@@ -3,13 +3,13 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, ty
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs, runTransaction, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  projectId: "gen-lang-client-0874836857",
-  appId: "1:547531748438:web:d46a93954047839330b7f7",
-  apiKey: "AIzaSyCV6oap4QQtnQyG8lD0l42L8UTKZfaFJIc",
-  authDomain: "gen-lang-client-0874836857.firebaseapp.com",
-  firestoreDatabaseId: "ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9",
-  storageBucket: "gen-lang-client-0874836857.firebasestorage.app",
-  messagingSenderId: "547531748438",
+  projectId: process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0874836857",
+  appId: process.env.FIREBASE_APP_ID || "1:547531748438:web:d46a93954047839330b7f7",
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCV6oap4QQtnQyG8lD0l42L8UTKZfaFJIc",
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "gen-lang-client-0874836857.firebaseapp.com",
+  firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID || "ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "gen-lang-client-0874836857.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "547531748438",
 };
 
 const SERVER_SERVICE_EMAIL = 'zenet-backend-service@zenetmarketplace.internal';
@@ -47,15 +47,17 @@ export async function ensureServerAuthenticated(): Promise<boolean> {
   }
 }
 
-export function getDb(): Firestore | null {
+export function getDb(): Firestore {
   if (db) return db;
   try {
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
     return db;
   } catch (err) {
     console.warn('[Netlify Firebase] Init notice:', err);
-    return null;
+    const app = getApps()[0] || initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    return db;
   }
 }
 

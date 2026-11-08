@@ -202,36 +202,75 @@ async function ensureServerAuthenticated() {
   }
 }
 
-try {
-  const firebaseConfigPath = path.join(process.cwd(), 'firebase-applet-config.json');
-  if (fs.existsSync(firebaseConfigPath)) {
-    const firebaseConfigData = JSON.parse(fs.readFileSync(firebaseConfigPath, 'utf8'));
-    firebaseProjectId = firebaseConfigData.projectId || '';
-    firebaseDatabaseId = firebaseConfigData.firestoreDatabaseId || '(default)';
+export const DEFAULT_FIREBASE_CONFIG = {
+  projectId: process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0874836857",
+  appId: process.env.FIREBASE_APP_ID || "1:547531748438:web:d46a93954047839330b7f7",
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyCV6oap4QQtnQyG8lD0l42L8UTKZfaFJIc",
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "gen-lang-client-0874836857.firebaseapp.com",
+  firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || process.env.FIREBASE_DATABASE_ID || "ai-studio-zenetmarketplace-7ba093fa-b6fb-4165-994b-445510dd6aa9",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "gen-lang-client-0874836857.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "547531748438",
+};
+
+export function getOrInitServerFirestore(): { db: any; serverAuth: any; firebaseProjectId: string; firebaseDatabaseId: string } {
+  if (db) {
+    return { db, serverAuth, firebaseProjectId, firebaseDatabaseId };
+  }
+
+  let config = { ...DEFAULT_FIREBASE_CONFIG };
+  const candidatePaths = [
+    path.join(process.cwd(), 'firebase-applet-config.json'),
+    path.join(__dirname, 'firebase-applet-config.json'),
+    path.join(__dirname, '../..', 'firebase-applet-config.json'),
+    path.join(__dirname, '..', 'firebase-applet-config.json')
+  ];
+
+  for (const p of candidatePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        const fileContent = JSON.parse(fs.readFileSync(p, 'utf8'));
+        config = { ...config, ...fileContent };
+        break;
+      }
+    } catch {}
+  }
+
+  firebaseProjectId = config.projectId;
+  firebaseDatabaseId = config.firestoreDatabaseId || '(default)';
+
+  try {
     const firebaseApp = getApps().length > 0 ? getApp() : initializeApp({
-      apiKey: firebaseConfigData.apiKey,
-      authDomain: firebaseConfigData.authDomain,
-      projectId: firebaseConfigData.projectId,
-      storageBucket: firebaseConfigData.storageBucket,
-      messagingSenderId: firebaseConfigData.messagingSenderId,
-      appId: firebaseConfigData.appId,
+      apiKey: config.apiKey,
+      authDomain: config.authDomain,
+      projectId: config.projectId,
+      storageBucket: config.storageBucket,
+      messagingSenderId: config.messagingSenderId,
+      appId: config.appId,
     });
-    db = getFirestore(firebaseApp, firebaseConfigData.firestoreDatabaseId || undefined);
+    db = getFirestore(firebaseApp, config.firestoreDatabaseId || undefined);
     serverAuth = getAuth(firebaseApp);
-    
-    // Background authenticating server backend service
+
     ensureServerAuthenticated().then(() => {
       if (serverAuth?.currentUser) {
         console.log(`[Server Auth] Server service authenticated: ${serverAuth.currentUser.email}`);
       }
     }).catch((e) => {
-      console.warn('[Server Auth] Initial authentication error:', e);
+      console.warn('[Server Auth] Service authentication notice:', e);
     });
 
     console.log(`Server-side Firestore initialized successfully (Project: ${firebaseProjectId}, DB: ${firebaseDatabaseId})`);
+  } catch (err: any) {
+    console.warn('Server-side Firestore initialization notice:', err?.message || err);
   }
+
+  return { db, serverAuth, firebaseProjectId, firebaseDatabaseId };
+}
+
+// Initialise immediately on module load
+try {
+  getOrInitServerFirestore();
 } catch (fInitErr) {
-  console.warn('Server-side Firestore initialization notice:', fInitErr);
+  console.warn('Server-side Firestore startup note:', fInitErr);
 }
 
 // Firestore REST API helpers for executing operations with caller's verified ID token
@@ -8268,7 +8307,8 @@ setTimeout(async () => {
 // VOIKER BOOSTING GATEWAY & SOCIAL BOOST ROUTES
 // ============================================================================
 const handleVoikerRequest = async (req: express.Request, res: express.Response, explicitAction?: string) => {
-  return handleVoikerGateway(req, res, db, firebaseProjectId, verifyFirebaseIdToken, explicitAction);
+  const { db: activeDb, firebaseProjectId: activePid } = getOrInitServerFirestore();
+  return handleVoikerGateway(req, res, activeDb || db, activePid || firebaseProjectId, verifyFirebaseIdToken, explicitAction);
 };
 
 // Dedicated Voiker routes
@@ -8721,7 +8761,7 @@ app.post('/api/social-boost/pricing-settings', async (req, res) => {
 
 // 3. POST /api/social-boost/order (Atomic Order & Wallet Deduction via Voiker Gateway)
 app.post('/api/social-boost/order', async (req, res) => {
-  return handleVoikerGateway(req, res, db, firebaseProjectId, verifyFirebaseIdToken, 'order');
+  return handleVoikerRequest(req, res, 'order');
 });
 
 app.get('/api/social-boost/orders', async (req, res) => {

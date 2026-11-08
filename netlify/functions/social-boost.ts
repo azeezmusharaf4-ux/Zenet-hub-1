@@ -2,7 +2,14 @@ import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDoc
 import { BASE_SOCIAL_SERVICES } from './_social_services';
 
 // Helper to resolve SMM API Key (Voiker Boosting Provider)
-const getSmmApiKey = (): string => (process.env.VOIKER_API_KEY || '').trim();
+const getSmmApiKey = (): string => (
+  process.env.VOIKER_API_KEY ||
+  process.env.VOIKA_API_KEY ||
+  process.env.SMM_API_KEY ||
+  process.env.VOIKER_KEY ||
+  process.env.VOIKA_KEY ||
+  ''
+).trim();
 
 // Helper to resolve Base URL
 const getBaseUrl = (): string => (process.env.VOIKER_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');

@@ -58,11 +58,11 @@ export interface TikTokServiceSetting {
 }
 
 export const SETTINGS_SERVICES_LIST = [
-  { id: 'tt-followers', name: 'TikTok Followers', type: 'Followers', defaultMin: 10, defaultMax: 1000000, defaultPrice: 2400 },
-  { id: 'tt-likes', name: 'TikTok Likes', type: 'Likes', defaultMin: 50, defaultMax: 500000, defaultPrice: 850 },
-  { id: 'tt-comments', name: 'TikTok Comments', type: 'Comments', defaultMin: 10, defaultMax: 10000, defaultPrice: 4500 },
-  { id: 'tt-shares', name: 'TikTok Shares', type: 'Shares', defaultMin: 50, defaultMax: 200000, defaultPrice: 650 },
-  { id: 'tt-views', name: 'TikTok Views', type: 'Views', defaultMin: 500, defaultMax: 2000000, defaultPrice: 250 }
+  { id: 'tt-followers', name: 'TikTok Followers', type: 'Followers', defaultMin: 100, defaultMax: 100000, defaultPrice: 2400 },
+  { id: 'tt-likes', name: 'TikTok Likes', type: 'Likes', defaultMin: 100, defaultMax: 100000, defaultPrice: 850 },
+  { id: 'tt-comments', name: 'TikTok Comments', type: 'Comments', defaultMin: 100, defaultMax: 100000, defaultPrice: 4500 },
+  { id: 'tt-shares', name: 'TikTok Shares', type: 'Shares', defaultMin: 100, defaultMax: 100000, defaultPrice: 650 },
+  { id: 'tt-views', name: 'TikTok Views', type: 'Views', defaultMin: 1000, defaultMax: 1000000, defaultPrice: 250 }
 ];
 
 // TikTok Vector Icon Component
