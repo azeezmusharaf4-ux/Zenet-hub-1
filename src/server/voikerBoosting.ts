@@ -306,23 +306,135 @@ export const computeAndCacheCounts = (services: any[]): Record<string, number> =
 const userOrderLocks = new Map<string, number>();
 
 // Helper: Get Voiker API configuration securely from server environment or admin pricing settings
-export const getVoikerConfig = (): VoikerConfig => {
-  const apiKey = (
-    process.env.VOIKER_API_KEY ||
-    process.env.VOIKA_API_KEY ||
-    process.env.SMM_API_KEY ||
-    process.env.VOIKER_KEY ||
-    process.env.VOIKA_KEY ||
-    cachedPricingSettings.apiKey ||
-    ''
-  ).trim();
-  const baseUrl = (process.env.VOIKER_BASE_URL || process.env.VOIKA_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');
+export const getVoikerConfig = (fallbackKey?: string, explicitBodyKey?: string, headerKey?: string): VoikerConfig => {
+  let resolvedKey = '';
+
+  // 1. Explicit caller arguments
+  if (fallbackKey && typeof fallbackKey === 'string' && fallbackKey.trim().length > 0) {
+    resolvedKey = fallbackKey.trim();
+  } else if (explicitBodyKey && typeof explicitBodyKey === 'string' && explicitBodyKey.trim().length > 0) {
+    resolvedKey = explicitBodyKey.trim();
+  } else if (headerKey && typeof headerKey === 'string' && headerKey.trim().length > 0) {
+    resolvedKey = headerKey.trim();
+  }
+
+  // 2. Direct exact environment variables (both standard server and Vite client prefixed)
+  if (!resolvedKey) {
+    const candidateNames = [
+      'VOIKER_API_KEY',
+      'VOIKER_KEY',
+      'VOIKER_API',
+      'VOIKER_TOKEN',
+      'VOIKER_API_TOKEN',
+      'VOIKER_SECRET',
+      'VOIKER_SECRET_KEY',
+      'VOIKER_SMM_API_KEY',
+      'VOIKER_SMM_KEY',
+      'VOIKER_SMM_TOKEN',
+      'VOIKER_APIKEY',
+      'VOIKERAPIKEY',
+      'VOIKA_API_KEY',
+      'VOIKA_KEY',
+      'VOIKA_API',
+      'VOIKA_TOKEN',
+      'SMM_API_KEY',
+      'SMM_KEY',
+      'SMM_TOKEN',
+      'SMM_API_TOKEN',
+      'SMM_PROVIDER_KEY',
+      'SMM_PROVIDER_API_KEY',
+      'VITE_VOIKER_API_KEY',
+      'VITE_VOIKER_KEY',
+      'VITE_VOIKER_TOKEN',
+      'VITE_VOIKER_API',
+      'VITE_SMM_API_KEY',
+      'VITE_SMM_KEY',
+      'VITE_VOIKA_API_KEY',
+      'VITE_VOIKA_KEY',
+      'BOOST_API_KEY',
+      'BOOST_KEY',
+      'SOCIAL_BOOST_API_KEY',
+      'SOCIAL_BOOST_KEY',
+      'SOCIALBOOST_API_KEY',
+      'SOCIALBOOST_KEY',
+      'REACT_APP_VOIKER_API_KEY',
+      'REACT_APP_VOIKER_KEY'
+    ];
+
+    for (const name of candidateNames) {
+      const val = process.env[name];
+      if (val && typeof val === 'string' && val.trim().length > 0) {
+        resolvedKey = val.trim();
+        break;
+      }
+    }
+  }
+
+  // 3. Case-insensitive and normalized search across ALL process.env keys
+  if (!resolvedKey) {
+    for (const [key, value] of Object.entries(process.env)) {
+      if (!value || typeof value !== 'string') continue;
+      const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const isVoikerCandidate = cleanKey.includes('voik') && (
+        cleanKey.includes('key') || cleanKey.includes('token') || cleanKey.includes('secret') || cleanKey.includes('api') || cleanKey.includes('auth') || cleanKey.includes('pass')
+      );
+      const isSmmCandidate = cleanKey.includes('smm') && (
+        cleanKey.includes('key') || cleanKey.includes('token') || cleanKey.includes('secret') || cleanKey.includes('api') || cleanKey.includes('provider')
+      );
+      const isBoostCandidate = cleanKey.includes('boost') && (
+        cleanKey.includes('key') || cleanKey.includes('token') || cleanKey.includes('api')
+      );
+      if ((isVoikerCandidate || isSmmCandidate || isBoostCandidate) && value.trim().length >= 6) {
+        resolvedKey = value.trim();
+        break;
+      }
+    }
+  }
+
+  // 4. Cached settings fallback
+  if (!resolvedKey && cachedPricingSettings.apiKey) {
+    resolvedKey = cachedPricingSettings.apiKey.trim();
+  }
+
+  // Resolve Base URL
+  let resolvedUrl = '';
+  const urlCandidates = [
+    'VOIKER_BASE_URL',
+    'VOIKER_API_URL',
+    'VOIKER_URL',
+    'VOIKA_BASE_URL',
+    'SMM_BASE_URL',
+    'SMM_API_URL',
+    'VITE_VOIKER_BASE_URL',
+    'VITE_VOIKER_API_URL'
+  ];
+  for (const name of urlCandidates) {
+    const val = process.env[name];
+    if (val && typeof val === 'string' && val.trim().length > 0) {
+      resolvedUrl = val.trim().replace(/\/+$/, '');
+      break;
+    }
+  }
+  if (!resolvedUrl) {
+    for (const [key, value] of Object.entries(process.env)) {
+      if (!value || typeof value !== 'string') continue;
+      const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if ((cleanKey.includes('voik') || cleanKey.includes('smm')) && (cleanKey.includes('url') || cleanKey.includes('base') || cleanKey.includes('endpoint'))) {
+        if (value.trim().startsWith('http')) {
+          resolvedUrl = value.trim().replace(/\/+$/, '');
+          break;
+        }
+      }
+    }
+  }
+  const baseUrl = resolvedUrl || 'https://voiker.com/api/v2';
   const usdToNgnRate = cachedLiveExchangeRate?.rate || cachedPricingSettings.usdToNgnRate || 1348.45;
+
   return {
-    apiKey,
+    apiKey: resolvedKey,
     baseUrl,
     usdToNgnRate,
-    hasApiKey: Boolean(apiKey)
+    hasApiKey: Boolean(resolvedKey)
   };
 };
 
@@ -331,9 +443,10 @@ export const queryVoikerApi = async (
   action: string,
   params: Record<string, any> = {},
   timeoutMs: number = 10000,
-  method: 'POST' | 'GET' = 'POST'
+  method: 'POST' | 'GET' = 'POST',
+  explicitApiKey?: string
 ): Promise<any> => {
-  const { apiKey, baseUrl, hasApiKey } = getVoikerConfig();
+  const { apiKey, baseUrl, hasApiKey } = getVoikerConfig(explicitApiKey);
 
   if (!hasApiKey && action !== 'quickSearch') {
     return { error: 'VOIKER_API_KEY is not configured in server environment.' };
@@ -1010,8 +1123,10 @@ export const handleVoikerGateway = async (
     const method = req.method;
     const action = (explicitAction || req.query.action || req.body.action || '').toString().toLowerCase();
 
-    const config = getVoikerConfig();
+    const headerKey = (req.headers['x-voiker-api-key'] || req.headers['X-Voiker-Api-Key'] || req.headers['x-smm-api-key'] || '').toString().trim();
+    const bodyKey = (req.body?.apiKey || req.query?.apiKey || req.body?.key || req.query?.key || '').toString().trim();
     const settings = await loadVoikerPricingSettings(activeDb);
+    const config = getVoikerConfig(settings?.apiKey, bodyKey, headerKey);
 
     // Helper: Determine if caller is an authorized owner (Super Admin)
     const isOwnerRequest = async (): Promise<boolean> => {

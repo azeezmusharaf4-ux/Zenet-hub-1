@@ -2,14 +2,26 @@ import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDoc
 import { BASE_SOCIAL_SERVICES } from './_social_services';
 
 // Helper to resolve SMM API Key (Voiker Boosting Provider)
-const getSmmApiKey = (): string => (
-  process.env.VOIKER_API_KEY ||
-  process.env.VOIKA_API_KEY ||
-  process.env.SMM_API_KEY ||
-  process.env.VOIKER_KEY ||
-  process.env.VOIKA_KEY ||
-  ''
-).trim();
+const getSmmApiKey = (fallbackKey?: string): string => {
+  if (fallbackKey && typeof fallbackKey === 'string' && fallbackKey.trim().length > 0) return fallbackKey.trim();
+  const candidateNames = [
+    'VOIKER_API_KEY', 'VOIKER_KEY', 'VOIKER_API', 'VOIKER_TOKEN', 'VOIKER_API_TOKEN', 'VOIKER_SECRET',
+    'VOIKER_SECRET_KEY', 'VOIKER_SMM_API_KEY', 'VOIKER_SMM_KEY', 'VOIKA_API_KEY', 'VOIKA_KEY',
+    'SMM_API_KEY', 'SMM_KEY', 'SMM_TOKEN', 'VITE_VOIKER_API_KEY', 'VITE_VOIKER_KEY', 'BOOST_API_KEY'
+  ];
+  for (const name of candidateNames) {
+    const val = process.env[name];
+    if (val && typeof val === 'string' && val.trim().length > 0) return val.trim();
+  }
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!value || typeof value !== 'string') continue;
+    const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if ((cleanKey.includes('voik') || cleanKey.includes('smm') || cleanKey.includes('boost')) && (cleanKey.includes('key') || cleanKey.includes('token') || cleanKey.includes('api')) && value.trim().length >= 6) {
+      return value.trim();
+    }
+  }
+  return '';
+};
 
 // Helper to resolve Base URL
 const getBaseUrl = (): string => (process.env.VOIKER_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');

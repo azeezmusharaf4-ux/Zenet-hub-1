@@ -79,6 +79,19 @@ export const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-
   </svg>
 );
 
+// Helper to resolve any client-injected Voiker API Key from Vite env
+export const getClientVoikerApiKey = (): string => {
+  const env: any = (import.meta as any).env || {};
+  return (
+    env.VITE_VOIKER_API_KEY ||
+    env.VITE_VOIKER_KEY ||
+    env.VITE_VOIKER_TOKEN ||
+    env.VITE_SMM_API_KEY ||
+    env.VITE_VOIKA_API_KEY ||
+    ''
+  ).toString().trim();
+};
+
 // Helper to identify whether a service is a Views service
 export const isViewsService = (service?: Partial<SocialBoostService> | null): boolean => {
   if (!service) return false;
@@ -1253,12 +1266,18 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
 
     try {
       const callerEmail = user?.email || userProfile?.email || '';
+      const clientKey = getClientVoikerApiKey();
+      const customHeaders = clientKey ? { 'x-voiker-api-key': clientKey } : undefined;
       const fetchPromise = (async () => {
         // Try /api/voiker/services first
-        let res: any = await safeApiFetch(`/api/voiker/services?callerEmail=${encodeURIComponent(callerEmail)}`);
+        let res: any = await safeApiFetch(`/api/voiker/services?callerEmail=${encodeURIComponent(callerEmail)}`, {
+          headers: customHeaders
+        });
         if (!res || !res.success || !Array.isArray(res.services) || res.services.length === 0) {
           // Fallback to /api/social-boost/services
-          res = await safeApiFetch(`/api/social-boost/services?action=services&callerEmail=${encodeURIComponent(callerEmail)}`);
+          res = await safeApiFetch(`/api/social-boost/services?action=services&callerEmail=${encodeURIComponent(callerEmail)}`, {
+            headers: customHeaders
+          });
         }
         return res;
       })();
@@ -1314,9 +1333,11 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     setIsLoadingBalance(true);
     try {
       const token = await getSafeIdToken(auth.currentUser);
+      const clientKey = getClientVoikerApiKey();
       const res: any = await safeApiFetch('/api/voiker/balance', {
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(clientKey ? { 'x-voiker-api-key': clientKey } : {})
         }
       });
       if (res && res.success) {
@@ -1338,8 +1359,12 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
     if (!isAdmin) return;
     try {
       const token = await getSafeIdToken(auth.currentUser);
+      const clientKey = getClientVoikerApiKey();
       const res: any = await safeApiFetch('/api/voiker/pricing-settings', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(clientKey ? { 'x-voiker-api-key': clientKey } : {})
+        }
       });
       if (res && res.success && res.settings) {
         setVoikerPricing({
@@ -1461,6 +1486,41 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
       setActionNotification({
         type: 'error',
         message: err.message || 'Failed to cancel order.'
+      });
+    } finally {
+      setActionLoadingOrderId(null);
+    }
+  };
+
+  // Handle Real-Time Order Status Check from Voiker Provider API
+  const handleCheckOrderStatus = async (order: SocialBoostOrder) => {
+    const targetOrderId = order.providerOrderId || order.id;
+    if (!targetOrderId || actionLoadingOrderId) return;
+    setActionLoadingOrderId(order.id);
+    setActionNotification(null);
+    try {
+      const token = await getSafeIdToken(auth.currentUser);
+      const clientKey = getClientVoikerApiKey();
+      const res: any = await safeApiFetch(`/api/voiker/status?order=${encodeURIComponent(targetOrderId)}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(clientKey ? { 'x-voiker-api-key': clientKey } : {})
+        }
+      });
+      if (res && res.success) {
+        const rawStatus = res.status || res.details?.status || 'Active';
+        setActionNotification({
+          type: 'success',
+          message: `Provider status: ${rawStatus}${res.details?.remains !== undefined ? ` (Remains: ${res.details.remains})` : ''}`
+        });
+        await fetchOrders();
+      } else {
+        throw new Error(res?.error || 'Could not fetch order status from provider.');
+      }
+    } catch (err: any) {
+      setActionNotification({
+        type: 'error',
+        message: err.message || 'Failed to check order status.'
       });
     } finally {
       setActionLoadingOrderId(null);
@@ -1645,6 +1705,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
         userEmail: currentUser.email || undefined
       };
 
+      const clientKey = getClientVoikerApiKey();
       const sendOrderRequest = async (activeToken: string | null) => {
         return await safeApiFetch('/api/voiker/order', {
           method: 'POST',
@@ -1652,9 +1713,13 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
             'Content-Type': 'application/json',
             ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
             ...(currentUser.email ? { 'x-caller-email': currentUser.email } : {}),
+            ...(clientKey ? { 'x-voiker-api-key': clientKey } : {}),
             'x-user-uid': currentUser.uid
           },
-          body: JSON.stringify(orderPayload)
+          body: JSON.stringify({
+            ...orderPayload,
+            ...(clientKey ? { apiKey: clientKey } : {})
+          })
         });
       };
 
@@ -3242,6 +3307,18 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                         </td>
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            {ord.providerOrderId && (
+                              <button
+                                type="button"
+                                onClick={() => handleCheckOrderStatus(ord)}
+                                disabled={isLoadingThis}
+                                title="Check latest live status from Voiker"
+                                className="px-2 py-0.5 bg-purple-50 hover:bg-purple-100 text-[#7C3AED] border border-purple-200 rounded-md text-[10px] font-bold cursor-pointer transition disabled:opacity-50 flex items-center gap-1"
+                              >
+                                <RefreshCw className={`w-2.5 h-2.5 ${isLoadingThis ? 'animate-spin' : ''}`} />
+                                <span>Track</span>
+                              </button>
+                            )}
                             {canRefill && (
                               <button
                                 type="button"
@@ -3262,7 +3339,7 @@ export const SocialBoostView: React.FC<SocialBoostViewProps> = ({
                                 {isLoadingThis ? '...' : 'Cancel'}
                               </button>
                             )}
-                            {!canRefill && !canCancel && (
+                            {!ord.providerOrderId && !canRefill && !canCancel && (
                               <span className="text-[10px] text-[#94A3B8]">—</span>
                             )}
                           </div>

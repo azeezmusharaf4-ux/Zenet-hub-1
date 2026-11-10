@@ -1,21 +1,134 @@
 import { getDb, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, runTransaction, ensureServerAuthenticated, parseAndVerifyToken } from './_firebase';
 
-// Helper to resolve Voiker API Key
-const getVoikerApiKey = (fallbackKey?: string): string => (
-  process.env.VOIKER_API_KEY ||
-  process.env.VOIKA_API_KEY ||
-  process.env.SMM_API_KEY ||
-  process.env.VOIKER_KEY ||
-  process.env.VOIKA_KEY ||
-  fallbackKey ||
-  ''
-).trim();
+// Helper to resolve Voiker API Key from any environment variable name variation, casing, headers, body, or Firestore
+const getVoikerApiKey = (fallbackKey?: string, explicitBodyKey?: string, headerKey?: string): string => {
+  // 1. Explicit caller arguments
+  if (fallbackKey && typeof fallbackKey === 'string' && fallbackKey.trim().length > 0) {
+    return fallbackKey.trim();
+  }
+  if (explicitBodyKey && typeof explicitBodyKey === 'string' && explicitBodyKey.trim().length > 0) {
+    return explicitBodyKey.trim();
+  }
+  if (headerKey && typeof headerKey === 'string' && headerKey.trim().length > 0) {
+    return headerKey.trim();
+  }
+
+  // 2. Direct exact environment variables (both standard server and Vite client prefixed)
+  const candidateNames = [
+    'VOIKER_API_KEY',
+    'VOIKER_KEY',
+    'VOIKER_API',
+    'VOIKER_TOKEN',
+    'VOIKER_API_TOKEN',
+    'VOIKER_SECRET',
+    'VOIKER_SECRET_KEY',
+    'VOIKER_SMM_API_KEY',
+    'VOIKER_SMM_KEY',
+    'VOIKER_SMM_TOKEN',
+    'VOIKER_APIKEY',
+    'VOIKERAPIKEY',
+    'VOIKA_API_KEY',
+    'VOIKA_KEY',
+    'VOIKA_API',
+    'VOIKA_TOKEN',
+    'SMM_API_KEY',
+    'SMM_KEY',
+    'SMM_TOKEN',
+    'SMM_API_TOKEN',
+    'SMM_PROVIDER_KEY',
+    'SMM_PROVIDER_API_KEY',
+    'VITE_VOIKER_API_KEY',
+    'VITE_VOIKER_KEY',
+    'VITE_VOIKER_TOKEN',
+    'VITE_VOIKER_API',
+    'VITE_SMM_API_KEY',
+    'VITE_SMM_KEY',
+    'VITE_VOIKA_API_KEY',
+    'VITE_VOIKA_KEY',
+    'BOOST_API_KEY',
+    'BOOST_KEY',
+    'SOCIAL_BOOST_API_KEY',
+    'SOCIAL_BOOST_KEY',
+    'SOCIALBOOST_API_KEY',
+    'SOCIALBOOST_KEY',
+    'REACT_APP_VOIKER_API_KEY',
+    'REACT_APP_VOIKER_KEY'
+  ];
+
+  for (const name of candidateNames) {
+    const val = process.env[name];
+    if (val && typeof val === 'string' && val.trim().length > 0) {
+      return val.trim();
+    }
+  }
+
+  // 3. Case-insensitive and normalized search across ALL process.env keys
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!value || typeof value !== 'string') continue;
+    const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const isVoikerCandidate = cleanKey.includes('voik') && (
+      cleanKey.includes('key') || cleanKey.includes('token') || cleanKey.includes('secret') || cleanKey.includes('api') || cleanKey.includes('auth') || cleanKey.includes('pass')
+    );
+    const isSmmCandidate = cleanKey.includes('smm') && (
+      cleanKey.includes('key') || cleanKey.includes('token') || cleanKey.includes('secret') || cleanKey.includes('api') || cleanKey.includes('provider')
+    );
+    const isBoostCandidate = cleanKey.includes('boost') && (
+      cleanKey.includes('key') || cleanKey.includes('token') || cleanKey.includes('api')
+    );
+    if ((isVoikerCandidate || isSmmCandidate || isBoostCandidate) && value.trim().length >= 6) {
+      return value.trim();
+    }
+  }
+
+  return '';
+};
 
 // Helper to resolve Voiker Base URL
-const getVoikerBaseUrl = (): string => (process.env.VOIKER_BASE_URL || 'https://voiker.com/api/v2').trim().replace(/\/+$/, '');
+const getVoikerBaseUrl = (): string => {
+  const urlCandidates = [
+    'VOIKER_BASE_URL',
+    'VOIKER_API_URL',
+    'VOIKER_URL',
+    'VOIKA_BASE_URL',
+    'SMM_BASE_URL',
+    'SMM_API_URL',
+    'VITE_VOIKER_BASE_URL',
+    'VITE_VOIKER_API_URL'
+  ];
+  for (const name of urlCandidates) {
+    const val = process.env[name];
+    if (val && typeof val === 'string' && val.trim().length > 0) {
+      return val.trim().replace(/\/+$/, '');
+    }
+  }
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!value || typeof value !== 'string') continue;
+    const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if ((cleanKey.includes('voik') || cleanKey.includes('smm')) && (cleanKey.includes('url') || cleanKey.includes('base') || cleanKey.includes('endpoint'))) {
+      if (value.trim().startsWith('http')) {
+        return value.trim().replace(/\/+$/, '');
+      }
+    }
+  }
+  return 'https://voiker.com/api/v2';
+};
 
 // Default pricing config
-const DEFAULT_PRICING = {
+const DEFAULT_PRICING: {
+  apiKey?: string;
+  defaultMarkupPercent: number;
+  defaultMarkupFixedNgn: number;
+  minMarkupPer1k: number;
+  usdToNgnRate: number;
+  pricingStyle: string;
+  platformStatus: Record<string, boolean>;
+  categoryMarkups: Record<string, { markupFixedNgn: number; markupPercent: number }>;
+  disabledServices: string[];
+  curatedServiceIds: string[];
+  bestValueServiceIds: Record<string, string>;
+  serviceOverrides: Record<string, any>;
+} = {
+  apiKey: '',
   defaultMarkupPercent: 0,
   defaultMarkupFixedNgn: 0,
   minMarkupPer1k: 0,
@@ -210,8 +323,10 @@ export const handler = async (event: any) => {
       action = event.httpMethod === 'POST' ? 'order' : 'services';
     }
 
-    const callerEmail = (queryParams.callerEmail || body.callerEmail || event.headers?.['x-caller-email'] || event.headers?.['x-admin-email'] || '').toLowerCase().trim();
-    const isOwner = callerEmail === 'azeezmusharaf4@gmail.com';
+    const authHeader = event.headers?.authorization || event.headers?.Authorization;
+    const verified = parseAndVerifyToken(authHeader);
+    const callerEmail = (queryParams.callerEmail || body.callerEmail || event.headers?.['x-caller-email'] || event.headers?.['x-admin-email'] || verified?.email || '').toLowerCase().trim();
+    const isOwner = callerEmail === 'azeezmusharaf4@gmail.com' || verified?.email === 'azeezmusharaf4@gmail.com';
 
     // Helper: load pricing settings
     const getPricing = async () => {
@@ -227,7 +342,9 @@ export const handler = async (event: any) => {
 
     const pricing = await getPricing();
     const usdRate = Number(process.env.USD_TO_NGN_RATE) || pricing.usdToNgnRate || 1650;
-    const apiKey = getVoikerApiKey();
+    const headerKey = (event.headers?.['x-voiker-api-key'] || event.headers?.['X-Voiker-Api-Key'] || event.headers?.['x-smm-api-key'] || '').toString().trim();
+    const bodyKey = (body?.apiKey || queryParams?.apiKey || body?.key || queryParams?.key || '').toString().trim();
+    const apiKey = getVoikerApiKey(pricing?.apiKey || (pricing as any)?.key, bodyKey, headerKey);
 
     // 1. GET /services
     if (action === 'services' || action === 'catalogue' || action === 'list') {
@@ -235,7 +352,7 @@ export const handler = async (event: any) => {
 
       if (apiKey) {
         try {
-          const apiRes = await queryVoiker('services', {}, 'GET');
+          const apiRes = await queryVoiker('services', {}, 'GET', apiKey);
           if (Array.isArray(apiRes) && apiRes.length > 0) {
             rawServices = apiRes;
           }
@@ -339,7 +456,7 @@ export const handler = async (event: any) => {
           body: JSON.stringify({ success: true, hasApiKey: false, balanceUsd: 0, balanceNgn: 0 })
         };
       }
-      const bRes = await queryVoiker('balance', {}, 'GET');
+      const bRes = await queryVoiker('balance', {}, 'GET', apiKey);
       const balanceUsd = Number(bRes.balance || 0);
       const balanceNgn = Math.round(balanceUsd * usdRate);
       return {
@@ -434,7 +551,7 @@ export const handler = async (event: any) => {
           link: target.trim(),
           quantity: orderQty,
           ...(comments ? { comments } : {})
-        }, 'POST');
+        }, 'POST', apiKey);
 
         if (vRes?.order || vRes?.order_id) {
           providerOrderId = String(vRes.order || vRes.order_id);
@@ -576,12 +693,41 @@ export const handler = async (event: any) => {
       const orders = queryParams.orders || body.orders;
 
       if (orders && apiKey) {
-        const batchRes = await queryVoiker('status', { orders }, 'GET');
+        const batchRes = await queryVoiker('status', { orders }, 'GET', apiKey);
         return { statusCode: 200, headers, body: JSON.stringify({ success: true, statuses: batchRes }) };
       }
 
       if (order && apiKey) {
-        const sRes = await queryVoiker('status', { order }, 'GET');
+        const sRes = await queryVoiker('status', { order }, 'GET', apiKey);
+        const providerStatus = sRes?.status || sRes?.details?.status;
+
+        // Sync to Firestore if order document exists
+        if (db && providerStatus) {
+          try {
+            const cleanOrderId = String(order).trim();
+            const orderRef = doc(db, 'social_boost_orders', cleanOrderId);
+            const oSnap = await getDoc(orderRef);
+            if (oSnap.exists()) {
+              await updateDoc(orderRef, {
+                status: providerStatus.toLowerCase().replace(/\s+/g, '_'),
+                remains: sRes.remains !== undefined ? sRes.remains : (oSnap.data().remains ?? null),
+                updatedAt: new Date().toISOString()
+              });
+            } else {
+              // Try querying by providerOrderId
+              const q = query(collection(db, 'social_boost_orders'), where('providerOrderId', '==', cleanOrderId));
+              const snap = await getDocs(q);
+              snap.forEach(async (d) => {
+                await updateDoc(doc(db, 'social_boost_orders', d.id), {
+                  status: providerStatus.toLowerCase().replace(/\s+/g, '_'),
+                  remains: sRes.remains !== undefined ? sRes.remains : (d.data().remains ?? null),
+                  updatedAt: new Date().toISOString()
+                });
+              });
+            }
+          } catch {}
+        }
+
         return { statusCode: 200, headers, body: JSON.stringify({ success: true, status: sRes.status, details: sRes }) };
       }
 
@@ -594,10 +740,10 @@ export const handler = async (event: any) => {
       if (!order) return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Order required' }) };
       if (!apiKey) return { statusCode: 503, headers, body: JSON.stringify({ success: false, error: 'VOIKER_API_KEY required' }) };
 
-      let rRes = await queryVoiker('refill', { order }, 'GET');
+      let rRes = await queryVoiker('refill', { order }, 'GET', apiKey);
       if (!rRes || rRes.error) {
         try {
-          const postRes = await queryVoiker('refill', { order }, 'POST');
+          const postRes = await queryVoiker('refill', { order }, 'POST', apiKey);
           if (postRes && !postRes.error) rRes = postRes;
         } catch {}
       }
@@ -614,10 +760,10 @@ export const handler = async (event: any) => {
       if (!order) return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Order required' }) };
       if (!apiKey) return { statusCode: 503, headers, body: JSON.stringify({ success: false, error: 'VOIKER_API_KEY required' }) };
 
-      let cRes = await queryVoiker('cancel', { order }, 'GET');
+      let cRes = await queryVoiker('cancel', { order }, 'GET', apiKey);
       if (!cRes || cRes.error) {
         try {
-          const postRes = await queryVoiker('cancel', { order }, 'POST');
+          const postRes = await queryVoiker('cancel', { order }, 'POST', apiKey);
           if (postRes && !postRes.error) cRes = postRes;
         } catch {}
       }
